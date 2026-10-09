@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">วางร้าน</title>
+  <defs>
+    <linearGradient id="navy" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1b3f77"/><stop offset="1" stop-color="#102c59"/></linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#1699ff"/><stop offset="1" stop-color="#1856ef"/></linearGradient>
+    <linearGradient id="amber" x1="0" y1="0" x2=".8" y2="1"><stop stop-color="#ffcc2f"/><stop offset="1" stop-color="#ff7313"/></linearGradient>
+  </defs>
+  <g fill="none" stroke="url(#navy)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M46 16H29c-7.2 0-13 5.8-13 13v17"/><path d="M82 16h17c7.2 0 13 5.8 13 13v17"/>
+    <path d="M16 82v17c0 7.2 5.8 13 13 13h17"/><path d="M112 82v17c0 7.2-5.8 13-13 13H82"/>
+  </g>
+  <path fill="url(#amber)" d="M34 31h22c6.6 0 12 5.4 12 12v28c0 5.3 4.3 9.6 9.6 9.6v1.4c0 7.2-5.8 13-13 13H34c-6.6 0-12-5.4-12-12V43c0-6.6 5.4-12 12-12Z"/>
+  <path fill="url(#blue)" d="M33 76h25c5.5 0 10-4.5 10-10V58c0-5.5 4.5-10 10-10h3c5.5 0 10 4.5 10 10v32c0 6.6-5.4 12-12 12H33c-6.6 0-12-5.4-12-12v-2c0-6.6 5.4-12 12-12Z"/>
+  <path fill="url(#navy)" d="M78 31h21c6.6 0 12 5.4 12 12v47c0 6.6-5.4 12-12 12H87c-6.6 0-12-5.4-12-12V70H67c-6.6 0-12-5.4-12-12V43c0-6.6 5.4-12 12-12h11Z"/>
+  <path d="M68 31v25c0 8.3 6.7 15 15 15h2c8.3 0 15 6.7 15 15v14" fill="none" stroke="#fff" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
