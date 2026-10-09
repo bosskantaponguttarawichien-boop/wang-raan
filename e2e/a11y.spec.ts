@@ -1,0 +1,58 @@
+import AxeBuilder from "@axe-core/playwright";
+import { expect, test, type Page } from "@playwright/test";
+import { buildReadyCafe } from "./helpers";
+
+/** feat-023: WCAG 2.1 AA ด้วย axe-core (ต้องไม่มี violation) */
+const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+
+async function audit(page: Page) {
+  // ให้ทุก section แสดงผลก่อนตรวจ contrast (reveal ตั้ง opacity 0 ไว้ก่อนเลื่อนถึง)
+  // หยุด animation/transition เพื่อให้วัด contrast จากสีจริง (ไม่ใช่สีระหว่าง fade)
+  await page.addStyleTag({
+    content: "*,*::before,*::after{animation:none!important;transition:none!important}.reveal{opacity:1!important;transform:none!important}",
+  });
+  const { violations } = await new AxeBuilder({ page }).withTags(TAGS).analyze();
+  return violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.slice(0, 3).map((n) => n.target.join(" ")) }));
+}
+
+for (const viewport of [
+  { width: 1440, height: 900 },
+  { width: 375, height: 812 },
+]) {
+  test.describe(`axe ${viewport.width}px`, () => {
+    test.use({ viewport });
+
+    test("Landing", async ({ page }) => {
+      await page.goto("/");
+      expect(await audit(page)).toEqual([]);
+    });
+
+    test("Playground (ผังเปล่า / Blocked) + Drawer ที่มีรายการปัญหา", async ({ page }) => {
+      await page.goto("/playground");
+      await expect(page.getByRole("application")).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+      await page.getByRole("button", { name: /ดูรายการ/ }).click();
+      await expect(page.getByRole("dialog").getByText("ต้องแก้").first()).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+    });
+
+    test("Playground ระหว่างจำลอง + Drawer รายการปัญหา", async ({ page }) => {
+      await page.goto("/playground");
+      await buildReadyCafe(page);
+      await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
+      await page.getByTestId("start-simulation").click();
+      await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
+      expect(await audit(page)).toEqual([]);
+      await page.getByRole("button", { name: /ดูรายการ/ }).click();
+      await expect(page.getByRole("dialog")).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+    });
+
+    test("Playground มุมมอง 3D", async ({ page }) => {
+      await page.goto("/playground");
+      await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();
+      await expect(page.getByRole("img", { name: /ไอโซเมตริก/ })).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+    });
+  });
+}

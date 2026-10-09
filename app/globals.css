@@ -1,0 +1,293 @@
+/* =============================================================================
+ * วางร้าน (Wang-Raan) — Design Tokens
+ * แหล่งอ้างอิงเดียว: design-system.md (v2.0) — ห้ามเปลี่ยนค่าโดยไม่อัปเดตเอกสาร
+ * ความตรงกันของค่ากับเอกสารถูกตรวจโดย app/design-tokens.test.ts
+ * ========================================================================== */
+@import "tailwindcss";
+
+/* ── Runtime tokens (design-system.md §2–§5) ─────────────────────────────── */
+:root {
+  /* §2.1 Core UI Tokens */
+  --blue: #3b62f4;
+  --blue-hover: #2e50da;
+  --blue-soft: #edf1ff;
+  --blue-tint: #eff3ff;
+  --blue-tint-2: #f5f8ff;
+  --blue-tint-3: #f8faff;
+  --ink: #1e2b40;
+  --secondary: #66758a;
+  --muted: #8492a5;
+  /* WCAG 2.1 AA: ข้อความรองบนพื้นสีอ่อน (#f3f6fa–#f8faff) — --secondary ได้ไม่ถึง 4.5:1 บนพื้นเหล่านี้ */
+  --secondary-strong: #627084;
+  --line: #e8ecf3;
+  --line-playground: #e2e8f1;
+  --surface: #f7f9fc;
+  --focus: #a4b6ff;
+  --focus-playground: #b7c5ff;
+  --toast: #233a57;
+
+  /* §2.2 Autosave Tokens */
+  --save-saved: #2e9b78;
+  --save-saved-dot: #84cdb4;
+  --save-saved-dot-alt: #72c6ab;
+  --save-saving: #e5b762;
+
+  /* §2.2 Validation Status Tokens (PRD C-05/C-06) */
+  --status-ready: #2e9b78;
+  --status-warning: #e5b762;
+  --status-blocked: #e4685d;
+  --issue-ring-blocked: rgba(228, 104, 93, 0.25);
+  --issue-ring-warning: rgba(229, 183, 98, 0.25);
+
+  /* §2.2 Selection & UI Chrome */
+  --status-bg: #ffffff;
+  --status-border: #dce5f2;
+  --table-group-ring: rgba(59, 98, 244, 0.12);
+
+  /* §2.3 2D Layout Elements */
+  --plan-table-fill: #edf1ff;
+  --plan-table-stroke: #8da6ef;
+  --plan-chair-fill: #f8f0e5;
+  --plan-chair-stroke: #d9ad7d;
+  --plan-kitchen-fill: #e8edf5;
+  --plan-kitchen-stroke: #9bb0c9;
+  --plan-kitchen-cooktop: #c4d3e5;
+  --plan-counter-fill: #e1e8f3;
+  --plan-counter-stroke: #aebed3;
+  --plan-counter-pos: #bdcce0;
+  --plan-wall: #b6c4d7;
+  --plan-entrance-fill: #ffffff;
+  --plan-entrance-stroke: #9eb1ca;
+  --plan-entrance-label: #6680a9;
+  --plan-grid-minor: #e9eef6;
+  --plan-grid-minor-alt: #e8edf5;
+  --plan-grid-major: #dce5f0;
+  --plan-grid-major-alt: #dde5ef;
+  --plan-selection: #3b62f4;
+
+  /* §2.4 3D Isometric Lighting Palettes (top / right / front / posts…) */
+  --iso-table-top: #d8e3ff;
+  --iso-table-right: #adc2f5;
+  --iso-table-front: #bfd0fb;
+  --iso-table-leg-1: #9fb7ed;
+  --iso-table-leg-2: #7894d3;
+  --iso-table-leg-3: #8ea7df;
+  --iso-chair-top: #f7d9ad;
+  --iso-chair-right: #dcad70;
+  --iso-chair-front: #efc58b;
+  --iso-chair-leg-1: #cb955b;
+  --iso-chair-leg-2: #aa7847;
+  --iso-chair-leg-3: #bd8851;
+  --iso-chair-back-1: #e9bf86;
+  --iso-chair-back-2: #c99057;
+  --iso-chair-back-3: #dba96b;
+  --iso-kitchen-top: #e5ecf5;
+  --iso-kitchen-right: #aabaca;
+  --iso-kitchen-front: #c2d0df;
+  --iso-kitchen-body-1: #b9c9db;
+  --iso-kitchen-body-2: #98aaba;
+  --iso-kitchen-body-3: #acbdce;
+  --iso-counter-top: #e4ebf5;
+  --iso-counter-right: #afc0d5;
+  --iso-counter-front: #cbd7e6;
+  --iso-counter-body-1: #d2ddeb;
+  --iso-counter-body-2: #9eafc5;
+  --iso-counter-body-3: #bdcadb;
+  --iso-counter-pos-1: #eff4fa;
+  --iso-counter-pos-2: #aabbd0;
+  --iso-counter-pos-3: #cad5e2;
+  --iso-floor: #fdfefe;
+  --iso-grid: #e1e8f2;
+  --iso-wall: #eaf0fa;
+  --iso-wall-stroke: #b5c3d6;
+  --iso-shadow: #526f9f;
+
+  /* §2.5 Illustration-Only Palette — ห้ามใช้เป็นพื้นหลัง/ตัวอักษร UI */
+  --illus-cobalt: #3b62f4;
+  --illus-navy: #213b75;
+  --illus-butter: #fff0bd;
+  --illus-coral: #f7a28c;
+  --illus-mint: #b9d9cf;
+
+  /* §3 Typography */
+  --font: var(--font-noto-sans-thai), "Noto Sans Thai", system-ui, -apple-system, "Tahoma", sans-serif;
+
+  /* §4.1 Spacing */
+  --page-gutter: clamp(18px, 4vw, 52px);
+  --section-space: clamp(44px, 6vw, 76px);
+
+  /* §5.1 Radius (ค่าจาก §11) */
+  --radius-xs: 3px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* §5.2 Elevation */
+  --shadow-card: 0 18px 48px -28px rgba(32, 57, 98, 0.19);
+  --shadow-card-hover: 0 22px 52px -27px rgba(32, 57, 98, 0.22);
+  --shadow-playground: 0 17px 40px -32px rgba(29, 57, 97, 0.27);
+  --shadow-chip: 0 10px 30px -20px rgba(41, 71, 124, 0.21);
+  --shadow-status: 0 8px 22px rgba(35, 59, 91, 0.08);
+  --shadow-iso: drop-shadow(0 18px 15px rgba(39, 74, 123, 0.09));
+
+  /* §8.1 Motion */
+  --ease-reveal: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --duration-reveal: 650ms;
+  --duration-hover-lift: 280ms;
+  --duration-underline: 240ms;
+  --duration-cta: 180ms;
+}
+
+/* Playground ใช้ --line / --focus คนละเฉดกับ Landing (§2.1) */
+[data-surface="playground"] {
+  --line: var(--line-playground);
+  --focus: var(--focus-playground);
+}
+
+/* ── Tailwind v4 theme (design-system.md §11) ────────────────────────────── */
+@theme {
+  --color-brand-blue: #3b62f4;
+  --color-brand-blue-hover: #2e50da;
+  --color-brand-blue-soft: #edf1ff;
+  --color-brand-ink: #1e2b40;
+  --color-brand-secondary: #66758a;
+  --color-brand-muted: #8492a5;
+  --color-brand-line: #e2e8f1;
+  --color-brand-surface: #f7f9fc;
+  --color-brand-danger: #e4685d;
+  --color-brand-success: #2e9b78;
+  --color-brand-warning: #e5b762;
+
+  /* Validation Status Tokens */
+  --color-status-ready: #2e9b78;
+  --color-status-warning: #e5b762;
+  --color-status-blocked: #e4685d;
+
+  --font-thai: "Noto Sans Thai", system-ui, -apple-system, sans-serif;
+
+  --radius-xs: 3px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+}
+
+/* Alias สั้นที่อ้างตัวแปร runtime (ใช้ได้กับ override ราย surface) */
+@theme inline {
+  --color-blue: var(--blue);
+  --color-blue-hover: var(--blue-hover);
+  --color-blue-soft: var(--blue-soft);
+  --color-blue-tint: var(--blue-tint);
+  --color-blue-tint-2: var(--blue-tint-2);
+  --color-blue-tint-3: var(--blue-tint-3);
+  --color-ink: var(--ink);
+  --color-secondary: var(--secondary);
+  --color-secondary-strong: var(--secondary-strong);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-surface: var(--surface);
+  --color-focus: var(--focus);
+  --color-toast: var(--toast);
+  --color-issue-ring-blocked: var(--issue-ring-blocked);
+  --color-issue-ring-warning: var(--issue-ring-warning);
+  --color-table-group-ring: var(--table-group-ring);
+
+  --font-sans: var(--font);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-playground: var(--shadow-playground);
+  --shadow-chip: var(--shadow-chip);
+  --shadow-status: var(--shadow-status);
+
+  /* §3 Type Hierarchy — ขนาด + line-height (ไทย: หัวข้อ ≥1.4, เนื้อความ ≥1.85) */
+  --text-h1-hero: clamp(44px, 4.6vw, 67px);
+  --text-h1-hero--line-height: 1.4;
+  --text-h1-hero--letter-spacing: -1.5px;
+  --text-h1-playground: clamp(31px, 4vw, 49px);
+  --text-h1-playground--line-height: 1.35;
+  --text-h1-playground--letter-spacing: -1.3px;
+  --text-h2: 32px;
+  --text-h2--line-height: 1.55;
+  --text-h2--letter-spacing: -0.5px;
+  --text-h2-contact: 30px;
+  --text-h2-contact--line-height: 1.5;
+  --text-h2-contact--letter-spacing: -0.5px;
+  --text-h3: 19px;
+  --text-h3--line-height: 1.6;
+  --text-body-lead: 17px;
+  --text-body-lead--line-height: 1.9;
+  --text-body: 16px;
+  --text-body--line-height: 1.85;
+  --text-small: 14px;
+  --text-small--line-height: 1.9;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.75;
+  --text-kicker: 13px;
+  --text-kicker--line-height: 1.5;
+}
+
+/* ── Base ────────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--ink);
+    background: #fff;
+    line-height: 1.85;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: clip; /* กัน horizontal scrollbar ทุก breakpoint */
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    line-height: 1.4;
+    overflow-wrap: break-word;
+  }
+
+  button,
+  a {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* §5.3 Focus Visible Ring — ทุกองค์ประกอบที่โฟกัสด้วยคีย์บอร์ด */
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 3px;
+  }
+}
+
+/* ── §8.2 Strict prefers-reduced-motion + print ─────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+@media print {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}

@@ -1,73 +1,98 @@
 ---
 name: wangraan-dev
-description: ใช้เมื่อทำงานกับโปรเจกต์ "วางร้าน" (Landing page และ Playground จัดผังร้าน ในโฟลเดอร์ landing/dist) — แก้ UI, เพิ่มฟีเจอร์ผังร้าน, ปรับ responsive, สร้างภาพประกอบ หรือเขียนเนื้อหาภาษาไทย ครอบคลุมกติกาดีไซน์ โครงสร้างไฟล์ state model และขั้นตอนตรวจงาน
+description: ใช้เมื่อทำงานกับโปรเจกต์ "วางร้าน" (Store Designer & Customer Flow Simulation — Next.js 15, BFF, Zustand, Dual-Tier Validation และ POC ใน design-html/) — แก้ UI, เพิ่มฟีเจอร์ผังร้าน, จัดการ Table Set Hierarchy, พัฒนา Validation Engine, ตรวจ Responsive หรือเขียนเนื้อหาภาษาไทย ครอบคลุมกติกาดีไซน์ โครงสร้างไฟล์ และขั้นตอนตรวจงาน
 ---
 
 # วางร้าน — Development Skill
 
-คู่มือสำหรับเอเจนต์/นักพัฒนาที่ทำงานต่อในโปรเจกต์นี้ อ่านก่อนแก้ไฟล์ใด ๆ
+คู่มือมาตรฐานสำหรับเอเจนต์และนักพัฒนาที่ทำงานในโปรเจกต์ **วางร้าน (Wang-Raan)** อ่านทำความเข้าใจก่อนเริ่มแก้หรือสร้างไฟล์ใด ๆ
 
-## เอกสารอ้างอิง
+---
 
-| ไฟล์ | อ่านเมื่อ |
-| --- | --- |
-| `HANDOFF.md` | ต้องการสถานะล่าสุดและสิ่งที่ตกลงกับเจ้าของงานแล้ว |
-| `PRD.md` | ต้องรู้ว่าฟีเจอร์ไหนอยู่ในขอบเขต / ความสำคัญ |
-| `design-system.md` | ทุกครั้งที่แตะ CSS สี ตัวอักษร หรือคอมโพเนนต์ |
-| `architecture.md` | เพิ่ม logic, เปลี่ยน state, หรือวางแผนย้าย framework |
+## 1. เอกสารอ้างอิงหลัก
 
-## กฎที่ห้ามละเมิด
+| ไฟล์ | ควรอ่านเมื่อ |
+| :--- | :--- |
+| [README.md](README.md) | ต้องการภาพรวมระบบ แผนที่เอกสาร และสรุปแนวทางการทำงาน |
+| [PRD.md](PRD.md) | ต้องทราบฟีเจอร์ในขอบเขต, Data Model, กฎ Validation 4 ด้าน, ค่ามาตรฐานระยะ และ P1→P2 Contract |
+| [architecture.md](architecture.md) | ปรับแก้ Core Logic, เพิ่ม Validation Rule, แก้ Zustand State, สร้าง BFF Route, หรือจัดการ Web Worker |
+| [design-system.md](design-system.md) | แตะสไตล์ CSS, สี, ตัวอักษร, ขนาดระยะ, Breakpoints, 2D/3D Isometric Palettes, หรือ Tailwind Theme |
 
-1. **ข้อความ hero อยู่กึ่งกลางทุกขนาดจอ** — ห้ามเปลี่ยนเป็นข้อความชิดซ้ายคู่ภาพ
-2. **ผัง Playground ตัวอย่างต้องอยู่ใต้ hero เสมอ** — ภาพประกอบไม่ใช่สิ่งทดแทน
-3. **UI ใช้น้ำเงิน–ขาว** (`#3b62f4`, `#1e2b40`, `#66758a`) — เหลือง/มิ้นต์/คอรัลอยู่ในภาพประกอบเท่านั้น
-4. **ฟอนต์ Noto Sans Thai** เท่านั้น
-5. **ภาษาไทย คำสั้นง่าย** สื่อลำดับ "จัดร้านก่อน แล้วค่อยจำลองลูกค้า"
-6. **ปุ่มเริ่มจัดร้านและฟอร์มติดต่อบน Landing ยังปิด** จนกว่าเจ้าของงานสั่งเปิด
-7. **ห้ามใส่อีเมล/LINE ที่แต่งขึ้นเอง** — คงข้อความ "รอระบุ…" จนกว่าได้ข้อมูลจริง
-8. **ไม่เพิ่ม dependency หรือขั้นตอน build** ใน `dist/` โดยไม่ได้รับอนุมัติ — ต้องเปิดไฟล์ HTML ได้ตรง ๆ
-9. **ทุกแอนิเมชันต้องปิดได้** ด้วย `prefers-reduced-motion` และ `@media print`
+---
 
-## ไฟล์หลัก
+## 2. กฎเหล็กที่ห้ามละเมิด (Core Non-negotiable Rules)
 
-- `dist/index.html` — Landing (HTML/CSS/JS ไฟล์เดียว) กฎ responsive ที่ใช้จริงอยู่ **ท้าย `<style>`**
-- `dist/playground/index.html` — Playground POC, state key `wang-ran-playground-v1`
-- `dist/assets/` — ภาพประกอบ; `store-steps-illustrations.png` เป็น sprite แบ่ง 3 ส่วนด้วย `background-position`
-- `*-prompt.txt` — prompt สร้างภาพ ใช้เป็นต้นแบบเมื่อต้องสร้างภาพใหม่ให้สไตล์ตรงกัน
+1. **ผังร้านคือพระเอก:** ข้อความ Hero อยู่กึ่งกลางทุกขนาดจอ และผังตัวอย่างต้องอยู่ใต้ Hero เสมอ (ห้ามใช้ภาพประกอบมาทดแทนผังจริง)
+2. **คุมโทนสี UI น้ำเงิน–ขาว:** ใช้โทนสีหลัก `--blue` (`#3b62f4`), `--ink` (`#1e2b40`), `--secondary` (`#66758a`) เท่านั้น ส่วนสีโทนอุ่น (เหลือง, มิ้นต์, คอรัล) สงวนไว้สำหรับภาพประกอบและโมเดล 3D ห้ามใช้เป็นพื้นหลัง UI
+3. **ฟอนต์ Noto Sans Thai และ Line-height:** หัวข้อ `line-height >= 1.4` และเนื้อความ `line-height >= 1.85` ป้องกันสระและวรรณยุกต์ภาษาไทยทับซ้อน
+4. **ครัว (Kitchen) แทนชั้นวาง (Shelf):** องค์ประกอบหลักของ V1 คือ Entrance, Kitchen, Counter, Table, Chair **ห้ามมี Shelf ในโมเดลของ V1**
+5. **Table–Chair Hierarchy & Grouping:**
+   - ห้ามแยกเก้าอี้เป็นวัตถุอิสระ เก้าอี้ทุกตัวต้องสังกัดโต๊ะ (`tableId`)
+   - การเพิ่มโต๊ะต้องสร้างเก้าอี้ลูกตาม Preset (2 หรือ 4 ที่นั่ง) เสมอ
+   - **Cascade Delete:** ลบ Table จะต้องลบ Chair ลูกทั้งหมดตามไปด้วยอัตโนมัติ
+   - **Group Transformation:** เมื่อย้ายตำแหน่งหรือหมุน Table เก้าอี้ลูกทั้งหมดต้องเคลื่อนที่และหมุนตามทั้งชุด
+6. **Non-blocking Canvas Placement:** ผู้ใช้สามารถลากวางวัตถุในตำแหน่งที่ชนหรือผิดกฎได้ชั่วคราวบน Canvas ห้ามเขียนโค้ดบล็อกการวางที่ Canvas แต่ให้รายงานผลผ่าน Validation Engine แทน
+7. **P2 Validation Gate:** ก่อนเริ่ม P2 Simulation หรือส่งข้อมูลข้ามไปยัง P2 ผังต้องผ่านการตรวจ Validation และสถานะต้องเป็น **Ready** หรือ **Warning** เท่านั้น **หากมีข้อผิดพลาดระดับ Blocked ปุ่มเริ่มจำลองต้องถูก Disabled**
+8. **Dual-Tier Validation:** เขียนลอจิกการตรวจผังทั้ง 4 ด้านเป็น Pure TypeScript ใน `src/core/validation/` เพื่อให้สามารถรันบน Client (Instant Feedback 0ms) และรันซ้ำที่ BFF Route Handler ก่อนบันทึกลงฐานข้อมูลได้
+9. **Accessibility & Reduced Motion:** ทุกคอมโพเนนต์ต้องรองรับคีย์บอร์ด (Tab + Focus Ring), มี `aria-label` ภาษาไทย และปิดแอนิเมชันทั้งหมดเมื่อเปิด `prefers-reduced-motion` หรือสั่งพิมพ์ (`@media print`)
 
-## ขั้นตอนการทำงาน
+---
 
-### แก้ UI / CSS
-1. ค้นหา selector ที่เกี่ยวข้องด้วย `grep -n` — selector เดียวกันอาจถูกประกาศหลายจุด ให้แก้ที่จุดล่างสุดที่มีผล
-2. ใช้ CSS variable และค่าจาก `design-system.md` ห้ามสร้างสีใหม่โดยไม่จำเป็น
-3. เพิ่ม/แก้ responsive ใน media query ท้ายไฟล์ (desktop-first `max-width`: 1200 / 1100 / 800 / 600 / 480)
+## 3. โครงสร้างไฟล์และโค้ด
 
-### แก้ logic ผังร้าน (Playground)
-1. แก้ `state` ผ่าน handler เสมอ และเรียก `snapshot()` ก่อนเปลี่ยน เพื่อให้ย้อนกลับได้
-2. ตรวจตำแหน่งด้วย `fits()` — หน่วยเป็นเมตร snap 0.25 ม.
-3. หลังเปลี่ยน state เรียก `render()` (และ `renderIso()` ถ้าอยู่ในมุมมอง 3D) แล้ว `save()`
-4. เพิ่มชนิดเฟอร์นิเจอร์ใหม่: เพิ่มใน `catalog`, CSS `.furniture.<type>`, ฟังก์ชันวาด iso, และ `aria-label` ภาษาไทย
-5. ถ้าเปลี่ยนรูปแบบ state ให้คำนึงถึงข้อมูลเก่าใน localStorage (ปัจจุบัน `load()` merge กับค่าเริ่มต้น)
+- **โค้ดต้นแบบดีไซน์ (Design POC):**
+  - `design-html/index.html` — Landing Page ต้นแบบ (HTML/CSS/JS ไฟล์เดียว) กฎ Responsive อยู่ท้าย `<style>`
+  - `design-html/playground/index.html` — Playground POC ต้นแบบ
+  - `design-html/assets/` — ภาพประกอบ, โลโก้ SVG ทางการ, Sprite ขั้นตอน
+- **โครงสร้างแอปพลิเคชัน Next.js (ตาม [architecture.md](architecture.md)):**
+  - `app/(marketing)/page.tsx` — Landing Page (Next.js Server Components สำหรับ SEO)
+  - `app/(app)/playground/page.tsx` — 2D Canvas Editor, 3D Isometric View, และ Sim Controls
+  - `app/api/layouts/` — BFF Route Handlers สำหรับจัดเก็บและตรวจสอบผัง
+  - `src/core/validation/` — Pure TypeScript Validation (completeness, collision, clearance, accessibility, service-points)
+  - `src/store/use-layout-store.ts` — Zustand Store สำหรับจัดการผังร้าน, History Undo/Redo (40 ขั้น), และผล Validation
 
-### สร้างภาพประกอบใหม่
-อ้างอิง prompt ในไฟล์ `*-prompt.txt`: flat 2D editorial, พื้นโปร่งใส, ไม่มีตัวอักษร/ตัวเลข/โลโก้, cobalt `#3B62F4` เด่น, navy `#213B75`, เหลือง `#FFF0BD` เฉพาะหลังภาพ, คอรัล `#F7A28C` และมิ้นต์ `#B9D9CF` เล็กน้อย
+---
 
-### เขียนเนื้อหา
-- ประโยคสั้น 1 แนวคิดต่อประโยค ใช้ "คุณ" เรียกผู้ใช้
-- หลีกเลี่ยงศัพท์อังกฤษถ้ามีคำไทยที่เข้าใจง่าย (ยกเว้น Playground, 3D)
-- อย่าอ้างว่าระบบทำสิ่งที่ยังไม่มี (เช่น จำลองลูกค้า ส่งข้อความ บันทึกออนไลน์)
+## 4. ขั้นตอนและแนวทางการพัฒนา
 
-## เช็กลิสต์ก่อนส่งงาน
+### 4.1 แก้ไข UI / Styling
+1. ตรวจสอบโทเคนใน [design-system.md](design-system.md) และใช้งานผ่าน CSS Variables หรือ Tailwind Theme Classes (เช่น `--status-ready`, `--status-warning`, `--status-blocked`, `--issue-ring-blocked`)
+2. คงความคมชัดและเบาของ 2D Artboard โดยใช้ Hybrid DOM (% CSS) ร่วมกับ SVG และแสดงเส้นกริดด้วย CSS Linear Gradient
+3. เขียน Media Query แบบ **Desktop-First (`max-width`)**: `1200px`, `1100px`, `800px`, `700px`, `600px`, `480px`, `390px`
 
-- [ ] เปิดในเบราว์เซอร์ที่ 320, 375, 480, 768, 1024, 1440px — ไม่มีการเลื่อนแนวนอน ข้อความไม่ทับภาพ ผังไม่ถูกตัด
-- [ ] คอนโซลไม่มี error
-- [ ] ID ไม่ซ้ำ, ลิงก์ anchor ไปถูกส่วน
-- [ ] ใช้คีย์บอร์ดได้: Tab เห็น focus ring, FAQ เปิดด้วย Enter/Space
-- [ ] บนมือถือ แตะผังตัวอย่างแล้วยังเลื่อนหน้าได้
-- [ ] เปิด reduced motion แล้วไม่มีแอนิเมชัน
-- [ ] Playground: เพิ่ม/ลาก/หมุน/ลบ/ย้อนกลับ/รีเฟรชแล้วผังยังอยู่
-- [ ] อัปเดต `HANDOFF.md` เมื่อสถานะหรือข้อตกลงเปลี่ยน
+### 4.2 พัฒนาและแก้ไข Logic ผังร้าน (Zustand & Core)
+1. **การแปลงตำแหน่ง:** ใช้หน่วย **เมตร (m)** พิกัด Snap Grid ขั้นละ **0.25 เมตร** (ขนาดร้าน 2–30 เมตร)
+2. **การแก้ไขผัง:** เมื่อมีการขยับ, หมุน, เพิ่ม หรือลบวัตถุใน Store ให้เรียก `invalidateValidation()` ทันที เพื่อให้ผลตรวจเดิมหมดอายุ และอัปเดต `layoutRevision`
+3. **ระยะ Clearance มาตรฐาน V1:**
+   - ทางเดินหลักที่จำเป็น: `1.20 ม.`
+   - ทางเดินรองที่จำเป็น: `0.90 ม.`
+   - พื้นที่เข้าถึง Chair: `0.60 ม.`
+   - ระยะสอดใต้โต๊ะของ Chair: สูงสุด `0.10 ม.` (เฉพาะด้านหน้าเก้าอี้และโต๊ะของตนเอง)
+4. **จุดบริการอัตโนมัติ (Service Points):** คำนวณจุดบริการของ Table, Kitchen, และ Counter จาก Bounding Box Geometry เพื่อใช้ตรวจ Accessibility
 
-## สิ่งที่อยู่นอกขอบเขตตอนนี้
+### 4.3 การเขียนเนื้อหาภาษาไทย
+- ใช้ประโยคสั้นกระชับ 1 แนวคิดต่อประโยค และใช้คำว่า "คุณ" เรียกผู้ใช้
+- สื่อสารลำดับแนวคิดหลัก: *"จัดร้านก่อน แล้วค่อยจำลองลูกค้า"*
+- หลีกเลี่ยงศัพท์เทคนิคยากๆ ถ้ามีคำภาษาไทยที่เข้าใจง่าย
 
-ระบบจำลองลูกค้า, backend/บัญชีผู้ใช้, การส่งฟอร์ม, หนีไฟ/ประเมินความปลอดภัย, รายงาน PDF, Marketplace — ถ้าได้รับคำขอ ให้ยืนยันกับเจ้าของงานก่อนและดูแผนใน `architecture.md`
+---
+
+## 5. เช็กลิสต์ตรวจสอบงานก่อนส่งมอบ (Quality Assurance Checklist)
+
+- [ ] **Responsive 6 Breakpoints:** ตรวจสอบบน Viewport กว้าง `320px`, `375px`, `480px`, `768px`, `1024px`, `1440px` — ไม่มีการเลื่อนแนวนอน (Horizontal Scrollbar), ข้อความไม่ล้น/ไม่ทับกัน
+- [ ] **Table Set Lifecycle:**
+  - เพิ่มโต๊ะ 2 ที่นั่ง หรือ 4 ที่นั่ง จะสร้างโต๊ะพร้อมเก้าอี้ลูกในระยะสอดใต้โต๊ะ (≤ 0.10 ม.) ทันที
+  - หมุนหรือย้ายโต๊ะ เก้าอี้ลูกทั้งหมดต้องหมุนและย้ายตามทั้งชุด
+  - ลบโต๊ะ เก้าอี้ลูกทั้งหมดต้องถูกลบตามไปด้วย (Cascade Delete) ไม่เหลือ Orphan Chair
+- [ ] **Validation Engine & P2 Gate:**
+  - ผังที่ไม่มี Entrance, Kitchen, Counter, หรือ Table Set → ขึ้นสถานะ **Blocked**
+  - มีวัตถุชนกัน หรือเก้าอี้สอดโต๊ะเกิน 0.10 ม. → ขึ้นสถานะ **Blocked**
+  - ทางเดินหลักแคบกว่า 1.20 ม. หรือเข้าไม่ถึงเก้าอี้/จุดบริการ → ขึ้นสถานะ **Blocked**
+  - หากสถานะเป็น **Blocked** ปุ่ม "เริ่มจำลอง (Simulation)" ต้องถูกปิดการใช้งาน
+  - เมื่อผังเป็น **Ready** หรือ **Warning** ปุ่มจำลองจึงจะกดได้
+- [ ] **Accessibility (a11y):**
+  - สามารถใช้แป้นพิมพ์ Tab เลื่อนและเห็น Focus Ring ชัดเจน (`outline: 3px solid #a4b6ff`)
+  - อาร์ตบอร์ดและเฟอร์นิเจอร์มี `role` และ `aria-label` ภาษาไทยครบถ้วน
+  - เปิด `prefers-reduced-motion` แล้วแอนิเมชันทั้งหมดถูกระงับ
+- [ ] **คอนโซลสะอาด:** ไม่มี JavaScript Error หรือ Unhandled Promise Rejections บน Browser Console
+- [ ] **Unit Tests ผ่านครบ:** รัน `npm test` หรือ `vitest` ผ่าน 100% ครอบคลุมกฎ Core Validation ทั้ง 4 ด้าน
