@@ -56,6 +56,14 @@ export function startAutosave(store: StoreApi<LayoutStoreState>, storage: Storag
   const unsubscribe = store.subscribe((state, prev) => {
     // บันทึกเฉพาะเมื่อผังหรือประวัติเปลี่ยน (ไม่ใช่ selection / zoom / ผลตรวจ)
     if (state.history === prev.history && state.historyIndex === prev.historyIndex) return;
+    if (state.history.length === 1) {
+      // ผังเริ่มต้นใหม่ที่ยังไม่มีการแก้ไข (เริ่มผังใหม่) → ไม่มีอะไรต้องกู้คืน
+      if (timer) clearTimeout(timer);
+      timer = null;
+      clearDraft(storage);
+      status.setState({ status: "idle" });
+      return;
+    }
     status.setState({ status: "saving" });
     if (timer) clearTimeout(timer);
     timer = setTimeout(flush, delay);

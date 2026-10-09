@@ -5,8 +5,8 @@ export const metadata: Metadata = { title: "Playground — จัดผังร
 
 export default function PlaygroundLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <div data-surface="playground" className="min-h-dvh bg-blue-tint-3">
-      <header className="flex h-[60px] items-center justify-between gap-6 border-b border-[#e5eaf2] bg-white px-[22px] max-[700px]:sticky max-[700px]:top-0 max-[700px]:z-30 max-[700px]:px-4">
+    <div data-surface="playground" className="min-h-dvh bg-blue-tint-3 print:min-h-0 print:bg-white">
+      <header className="print:hidden flex h-[60px] items-center justify-between gap-6 border-b border-[#e5eaf2] bg-white px-[22px] max-[700px]:sticky max-[700px]:top-0 max-[700px]:z-30 max-[700px]:px-4">
         <Link
           href="/"
           aria-label="วางร้าน กลับหน้าแรก"

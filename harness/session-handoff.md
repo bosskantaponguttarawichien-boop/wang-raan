@@ -3,6 +3,29 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-10 04:00 ICT — feat-025 → feat-029 เสร็จ, feat-024 รอ WebKit
+
+### Core & Dev
+- แผงขวาของ `/playground` มีฟอร์ม "ขนาดร้านและทางเข้า", Inspector ของชิ้นที่เลือก, "ไฟล์และการส่งออก" (JSON / PNG / SVG / พิมพ์-PDF) และปุ่ม "เริ่มผังใหม่"
+- Draft บันทึกอัตโนมัติใน localStorage (`wang-raan:draft:v1`) — ล้างด้วยปุ่ม "เริ่มผังใหม่" หรือ `localStorage.removeItem` ระหว่าง debug
+- นำเข้า/ส่งออก: `import { importLayoutFile, createLayoutFile } from "@/core/io"`; ภาพ: `import { renderPlanSvg, summarizeLayout } from "@/core/export"`
+- E2E ใช้ Chromium ในเครื่องอัตโนมัติ; ถ้าแก้ CSS แล้ว build ไม่เปลี่ยน ให้ `rm -rf .next`
+
+### QA
+- unit 452, e2e 37 (Chromium), axe 0 violations, coverage core > 98%
+
+### Active Blockers / Open Questions
+- feat-024 gate ต้องการ WebKit — ยังไม่ได้รัน (ไม่มีในเครื่องนี้): `npx playwright install webkit && E2E_WEBKIT=1 make e2e`
+- PNG วาดข้อความด้วยฟอนต์ของระบบ (SVG ที่แปลงผ่าน `<img>` โหลด web font ไม่ได้) — ถ้าต้องการ Noto Sans Thai ใน PNG ต้องฝังฟอนต์เป็น base64
+- "PDF Summary" ใช้การพิมพ์ของเบราว์เซอร์ (บันทึกเป็น PDF) ไม่ได้สร้างไฟล์ PDF เอง — เลี่ยงการฝังฟอนต์ไทยใน PDF
+- ชื่อเรียกชิ้นงาน (architecture.md §5.4 Inspector) ยังไม่มีใน data model จึงยังไม่ทำ
+- Delete ที่เก้าอี้บน Artboard = ลบเก้าอี้ตัวนั้นออกจากชุด (ตาม Core feat-005) ส่วนปุ่มใน Inspector ตอนเลือกเก้าอี้ = ลบทั้งชุด — ควรยืนยันพฤติกรรมที่ต้องการ
+
+### Next Steps
+1. ปิด feat-024 ด้วย WebKit
+2. feat-030 Public Share & Read-Only Preview
+3. feat-033 TanStack Query BFF Integration
+
 ## 2026-10-10 03:00 ICT — feat-018 → feat-023 เสร็จสมบูรณ์
 
 ### Core & Dev
@@ -89,26 +112,3 @@
 1. feat-006 Completeness Gate
 2. feat-007 Collision Detection (ต้องการ feat-005 ✅)
 3. feat-011 Zustand Editor Store & History
-
-## 2026-10-10 00:55 ICT — Complete Feature List Audit & Harmonization (feat-000)
-
-### Core & Dev
-- ตรวจสอบความสมบูรณ์ของ `harness/feature_list.json` เทียบกับ `PRD.md` และ `architecture.md`
-- ขยายฟีเจอร์จาก 27 เป็น 34 รายการ ครอบคลุมจุดสำคัญที่เคยขาดไป:
-  - Editor Control Panels & Object Inspector (`feat-027`)
-  - Auto-Save Draft & Local Storage Recovery (`feat-028`)
-  - P1-P2 JSON Contract File Import & Export (`feat-029`)
-  - Public Share System & Read-Only Preview (`feat-030`)
-  - NextAuth.js v5 Session Management (`feat-031`)
-  - Contact Inquiry Form & API (`feat-032`)
-  - TanStack Query BFF Integration (`feat-033`)
-
-### QA
-- รัน `./harness/init.sh` และ `python3 scripts/validate_harness.py`: ผ่านสมบูรณ์ทั้ง 34 Tasks ไม่มี Broken / Circular Dependency
-
-### Active Blockers / Open Questions
-- ไม่มีบล็อกเกอร์ สามารถเริ่มงาน `feat-001` (Next.js Setup) หรือ `feat-004` (Pure TS Core Types) ได้ทันที
-
-### Next Steps
-1. รัน `feat-001`: Setup Next.js 15 App Router พร้อม Tailwind CSS v4
-2. รัน `feat-004`: นิยาม Core Geometry Types และ Layout Entity Interfaces ใน `src/core/`

@@ -158,8 +158,12 @@ describe("draft-autosave (feat-028 gate: รีเฟรชแล้วผัง
     const store = createLayoutStore({ newId: createSequentialIds() });
     store.getState().addKitchen();
     saveDraft(storage, { savedAt, history: store.getState().history, historyIndex: 1 });
+    const autosave = startAutosave(store, storage, { status });
     startNewLayout(store, storage, status);
-    expect(storage.getItem(DRAFT_KEY)).toBeNull();
+    vi.advanceTimersByTime(1000);
+    autosave.dispose();
+    expect(storage.getItem(DRAFT_KEY)).toBeNull(); // ผังใหม่ที่ยังไม่แก้ไม่ถูกบันทึกเป็นร่าง
+    expect(status.getState().status).toBe("idle");
     expect(store.getState().history).toHaveLength(1);
     expect(status.getState().restoredAt).toBeNull();
   });

@@ -7,7 +7,9 @@ async function focusedOutline(page: Page) {
   return page.evaluate(() => {
     const el = document.activeElement as HTMLElement;
     const cs = getComputedStyle(el);
-    return { tag: el.tagName, name: el.getAttribute("aria-label") ?? el.textContent?.trim(), outline: `${cs.outlineStyle} ${cs.outlineWidth}` };
+    // ชื่อที่อ่านได้: aria-label → <label for> (ช่องกรอกในฟอร์ม) → ข้อความในปุ่ม
+    const labelled = (el as HTMLInputElement).labels?.[0]?.textContent?.trim();
+    return { tag: el.tagName, name: el.getAttribute("aria-label") ?? (labelled || el.textContent?.trim()), outline: `${cs.outlineStyle} ${cs.outlineWidth}` };
   });
 }
 

@@ -48,6 +48,19 @@ for (const viewport of [
       expect(await audit(page)).toEqual([]);
     });
 
+    test("Playground: Inspector + ฟอร์มขนาดร้านที่มี error + ข้อความนำเข้าไฟล์", async ({ page }) => {
+      await page.goto("/playground");
+      await page.getByRole("button", { name: /^เพิ่ม\s*ครัว/ }).click();
+      await expect(page.getByTestId("object-inspector")).toBeVisible();
+      const form = page.getByTestId("room-settings-form");
+      await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("40");
+      await form.getByRole("button", { name: "นำไปใช้" }).click();
+      await expect(form.getByRole("alert")).toBeVisible();
+      await page.getByTestId("import-input").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{") });
+      await expect(page.getByTestId("file-message")).toContainText("ไม่สำเร็จ");
+      expect(await audit(page)).toEqual([]);
+    });
+
     test("Playground มุมมอง 3D", async ({ page }) => {
       await page.goto("/playground");
       await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();

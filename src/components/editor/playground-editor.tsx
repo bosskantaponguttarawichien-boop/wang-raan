@@ -13,6 +13,8 @@ import { SimulationPanel, formatSimTime } from "@/components/simulation/simulati
 import { PanelTitle } from "./panel-title";
 import { ObjectInspector } from "./forms/object-inspector";
 import { RoomSettingsForm } from "./forms/room-settings-form";
+import { FilePanel } from "./file-panel";
+import { PrintReport } from "./print-report";
 import { useLiveValidation, type LiveValidation } from "@/components/validation/use-live-validation";
 import { ValidationStatusBar } from "@/components/validation/validation-status-bar";
 import {
@@ -127,6 +129,13 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
       <section className="min-w-0">
         <PanelTitle>ขนาดร้านและทางเข้า</PanelTitle>
         <RoomSettingsForm />
+      </section>
+
+      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
+
+      <section className="min-w-0">
+        <PanelTitle>ไฟล์และการส่งออก</PanelTitle>
+        <FilePanel />
       </section>
 
       <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
@@ -317,17 +326,20 @@ export function PlaygroundEditor() {
   useDraftAutosave();
   const live = useLiveValidation();
   return (
-    <div
-      className={cn(
-        "grid bg-blue-tint-3",
-        "h-[calc(100dvh-60px)] grid-cols-[minmax(252px,280px)_minmax(0,1fr)_minmax(242px,280px)] [grid-template-areas:'tools_canvas_selection']",
-        "max-[1020px]:h-auto max-[1020px]:min-h-[calc(100dvh-60px)] max-[1020px]:grid-cols-[minmax(230px,280px)_minmax(0,1fr)] max-[1020px]:gap-3.5 max-[1020px]:p-3.5 max-[1020px]:[grid-template-areas:'tools_canvas''selection_selection']",
-        "max-[700px]:grid-cols-1 max-[700px]:gap-0 max-[700px]:p-0 max-[700px]:[grid-template-areas:'canvas''tools''selection']",
-      )}
-    >
-      <ToolPanel />
-      <CanvasCard live={live} />
-      <SelectionPanel live={live} />
-    </div>
+    <>
+      <div
+        className={cn(
+          "grid bg-blue-tint-3 print:hidden",
+          "h-[calc(100dvh-60px)] grid-cols-[minmax(252px,280px)_minmax(0,1fr)_minmax(242px,280px)] [grid-template-areas:'tools_canvas_selection']",
+          "max-[1020px]:h-auto max-[1020px]:min-h-[calc(100dvh-60px)] max-[1020px]:grid-cols-[minmax(230px,280px)_minmax(0,1fr)] max-[1020px]:gap-3.5 max-[1020px]:p-3.5 max-[1020px]:[grid-template-areas:'tools_canvas''selection_selection']",
+          "max-[700px]:grid-cols-1 max-[700px]:gap-0 max-[700px]:p-0 max-[700px]:[grid-template-areas:'canvas''tools''selection']",
+        )}
+      >
+        <ToolPanel />
+        <CanvasCard live={live} />
+        <SelectionPanel live={live} />
+      </div>
+      <PrintReport live={live} />
+    </>
   );
 }
