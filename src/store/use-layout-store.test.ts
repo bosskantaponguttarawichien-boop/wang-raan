@@ -12,6 +12,7 @@ import {
   selectSelectedObject,
   selectUndoDepth,
 } from "./use-layout-store";
+import { cafeLayout } from "@/test/fixtures/layouts";
 
 function setup() {
   return createLayoutStore({ newId: createSequentialIds(), now: () => new Date("2026-10-10T00:00:00Z") });
@@ -315,5 +316,49 @@ describe("Interaction (ลากต่อเนื่อง) และปรั�
     store.getState().resizeObject(counter.id, Number.NaN, 0.3);
     expect(store.getState().layout.objects.find((o) => o.id === counter.id)).toMatchObject({ width: 0.3 });
     expect(selectUndoDepth(store.getState())).toBe(depth + 1);
+  });
+});
+
+describe("replaceLayout / restoreHistory / resetLayout (feat-028, feat-029)", () => {
+  it("replaceLayout เป็นขั้นเดียวที่ Undo ได้ และล้างการเลือก", () => {
+    const store = createLayoutStore({ newId: createSequentialIds() });
+    const before = store.getState().layout;
+    const id = store.getState().addKitchen();
+    expect(store.getState().selectedObjectId).toBe(id);
+    const next = cafeLayout();
+    store.getState().replaceLayout(next);
+    expect(store.getState().layout).toBe(next);
+    expect(store.getState().selectedObjectId).toBeNull();
+    store.getState().undo();
+    store.getState().undo();
+    expect(store.getState().layout).toBe(before);
+  });
+
+  it("restoreHistory คืนผังและตำแหน่ง Undo/Redo, ตัดประวัติเกิน 41 snapshot", () => {
+    const store = createLayoutStore({ newId: createSequentialIds() });
+    const a = cafeLayout();
+    const b = { ...a, width: 9 };
+    const c = { ...a, width: 10 };
+    store.getState().restoreHistory([a, b, c], 1);
+    expect(store.getState().layout).toBe(b);
+    expect(selectCanUndo(store.getState())).toBe(true);
+    expect(selectCanRedo(store.getState())).toBe(true);
+    store.getState().redo();
+    expect(store.getState().layout).toBe(c);
+
+    const long = Array.from({ length: 50 }, (_, i) => ({ ...a, version: i + 1 }));
+    store.getState().restoreHistory(long, 49);
+    expect(store.getState().history).toHaveLength(HISTORY_LIMIT + 1);
+    expect(store.getState().layout.version).toBe(50);
+    store.getState().restoreHistory([], 0);
+    expect(store.getState().layout.version).toBe(50);
+  });
+
+  it("resetLayout กลับผังเริ่มต้นและล้างประวัติ", () => {
+    const store = createLayoutStore({ newId: createSequentialIds() });
+    store.getState().addKitchen();
+    store.getState().resetLayout();
+    expect(store.getState().layout.objects).toEqual([]);
+    expect(store.getState().history).toHaveLength(1);
   });
 });

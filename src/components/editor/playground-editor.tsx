@@ -5,14 +5,14 @@
  * Desktop-first: > 1020px 3 คอลัมน์, ≤ 1020px 2 คอลัมน์ (ชิ้นงานลงล่าง), ≤ 700px 1 คอลัมน์ (Canvas บนสุด)
  */
 import * as React from "react";
-import { footprint, type Wall } from "@/core/layout";
 import { cn } from "@/lib/cn";
 import { Button, PaletteItem, ViewSwitch } from "@/components/ui";
 import { Artboard } from "@/components/editor-2d/artboard";
-import { WALL_LABEL, objectLabel } from "@/components/editor-2d/stage-math";
 import { IsometricView } from "@/components/preview-3d/isometric-view";
 import { SimulationPanel, formatSimTime } from "@/components/simulation/simulation-panel";
 import { PanelTitle } from "./panel-title";
+import { ObjectInspector } from "./forms/object-inspector";
+import { RoomSettingsForm } from "./forms/room-settings-form";
 import { useLiveValidation, type LiveValidation } from "@/components/validation/use-live-validation";
 import { ValidationStatusBar } from "@/components/validation/validation-status-bar";
 import {
@@ -21,10 +21,11 @@ import {
   layoutStore,
   selectCanRedo,
   selectCanUndo,
-  selectSelectedObject,
   useLayoutStore,
 } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
+import { getDraftStorage } from "@/lib/draft-storage";
+import { restoreDraft, startAutosave, startNewLayout, useDraftStatus } from "@/lib/draft-autosave";
 
 const actions = () => layoutStore.getState();
 
@@ -104,11 +105,8 @@ function ToolPanel() {
 }
 
 function SelectionPanel({ live }: { live: LiveValidation }) {
-  const selected = useLayoutStore(selectSelectedObject);
   const canUndo = useLayoutStore(selectCanUndo);
   const canRedo = useLayoutStore(selectCanRedo);
-  const entrance = useLayoutStore((s) => s.layout.entrance);
-  const fp = selected ? footprint(selected) : null;
 
   return (
     <aside
@@ -121,57 +119,21 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
 
       <section className="min-w-0">
         <PanelTitle>ชิ้นงานที่เลือก</PanelTitle>
-        {selected && fp ? (
-          <div>
-            <p className="m-0 text-[16px] font-semibold leading-[1.5]">{objectLabel(selected)}</p>
-            <p className="m-0 mb-4 text-[12px] leading-[1.75] text-secondary">
-              ตำแหน่ง {selected.x.toFixed(2)}, {selected.y.toFixed(2)} ม. · ขนาด {fp.width.toFixed(2)} × {fp.depth.toFixed(2)} ม. · หมุน {selected.rotation}°
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Button variant="secondary" size="sm" onClick={() => actions().rotateObject(selected.id, -90)}>
-                ↺ 90°
-              </Button>
-              <Button variant="secondary" size="sm" onClick={() => actions().rotateObject(selected.id, 90)}>
-                ↻ 90°
-              </Button>
-              <Button variant="danger" size="sm" className="col-span-2" onClick={() => actions().deleteObject(selected.id)}>
-                × ลบ{selected.type === "table" || selected.type === "chair" ? "ทั้งชุดโต๊ะ" : "ชิ้นงานนี้"}
-              </Button>
-            </div>
-            {(selected.type === "table" || selected.type === "chair") && (
-              <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">ย้าย หมุน และลบ ทำกับโต๊ะและเก้าอี้ทั้งชุด</p>
-            )}
-          </div>
-        ) : (
-          <p className="m-0 text-[13px] leading-[1.75] text-secondary">เลือกชิ้นงานบนผังเพื่อหมุนหรือลบ</p>
-        )}
+        <ObjectInspector />
       </section>
 
       <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
 
       <section className="min-w-0">
-        <PanelTitle>ทางเข้า</PanelTitle>
-        <label className="block text-[12px] text-secondary">
-          ผนังที่ติดตั้ง
-          <select
-            className="mt-1.5 block min-h-10 w-full rounded-[7px] border border-[#dce4ef] bg-white px-2 text-[14px] text-ink focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
-            value={entrance?.wall ?? "south"}
-            onChange={(e) => actions().setEntrance({ wall: e.target.value as Wall, position: entrance?.position ?? 0 })}
-          >
-            {(Object.keys(WALL_LABEL) as Wall[]).map((wall) => (
-              <option key={wall} value={wall}>
-                {WALL_LABEL[wall]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p className="mb-0 mt-2 text-[12px] leading-[1.75] text-secondary">ลากป้าย “เข้า” ไปตามขอบร้าน หรือโฟกัสแล้วใช้ลูกศร</p>
+        <PanelTitle>ขนาดร้านและทางเข้า</PanelTitle>
+        <RoomSettingsForm />
       </section>
 
       <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
 
       <section className="min-w-0">
         <PanelTitle>ประวัติการแก้ไข</PanelTitle>
+        <DraftNotice />
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" size="sm" disabled={!canUndo} onClick={() => actions().undo()} aria-keyshortcuts="Control+Z Meta+Z">
             ↶ ย้อนกลับ
@@ -179,7 +141,18 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
           <Button variant="secondary" size="sm" disabled={!canRedo} onClick={() => actions().redo()} aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z">
             ↷ ทำซ้ำ
           </Button>
+          <Button
+            variant="danger"
+            size="sm"
+            className="col-span-2"
+            onClick={() => {
+              if (window.confirm("เริ่มผังใหม่? ผังปัจจุบันและประวัติการแก้ไขจะถูกล้าง")) startNewLayout(layoutStore, getDraftStorage());
+            }}
+          >
+            เริ่มผังใหม่
+          </Button>
         </div>
+        <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">ผังและประวัติบันทึกในเบราว์เซอร์นี้อัตโนมัติ</p>
       </section>
     </aside>
   );
@@ -261,9 +234,59 @@ function CanvasCard({ live }: { live: LiveValidation }) {
 
       <div className="flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1 border-t border-[#e6ebf2] px-[18px] py-3 text-[12px] text-secondary max-[700px]:px-3.5 max-[700px]:text-[11px]">
         <SimulationStatusText blocked={live.result.status === "blocked"} />
+        <DraftStatusText />
         <span>{is3D ? "มุมมอง Isometric" : "มุมมองด้านบน · กริดละ 0.25 ม."}</span>
       </div>
     </section>
+  );
+}
+
+let draftRestored = false;
+/** กู้คืนร่างครั้งเดียวต่อการโหลดหน้า (store เป็น singleton — การนำทางกลับมาหน้านี้ใช้ผังใน memory) */
+export function restoreDraftOnce() {
+  if (draftRestored) return;
+  draftRestored = true;
+  restoreDraft(layoutStore, getDraftStorage());
+}
+
+/** บันทึกร่างอัตโนมัติ + บันทึกทันทีเมื่อปิด/ซ่อนแท็บ */
+function useDraftAutosave() {
+  React.useEffect(() => {
+    const autosave = startAutosave(layoutStore, getDraftStorage());
+    const onHide = () => autosave.flush();
+    const onVisibility = () => document.visibilityState === "hidden" && autosave.flush();
+    window.addEventListener("pagehide", onHide);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      document.removeEventListener("visibilitychange", onVisibility);
+      autosave.dispose();
+    };
+  }, []);
+}
+
+const SAVE_TEXT = { idle: "ยังไม่มีการแก้ไข", saving: "กำลังบันทึกร่าง…", saved: "บันทึกร่างในเบราว์เซอร์แล้ว", error: "บันทึกร่างไม่สำเร็จ (พื้นที่เบราว์เซอร์เต็มหรือถูกปิด)" } as const;
+
+function DraftStatusText() {
+  const status = useDraftStatus((s) => s.status);
+  const tone = status === "saved" ? "bg-[var(--save-saved-dot)]" : status === "error" ? "bg-status-blocked" : status === "saving" ? "bg-[var(--save-saving)]" : "bg-[#c5cfdd]";
+  return (
+    <span className="flex items-center gap-1.5" data-testid="draft-status" data-status={status}>
+      <span aria-hidden="true" className={cn("size-1.5 rounded-full", tone)} />
+      {SAVE_TEXT[status]}
+    </span>
+  );
+}
+
+/** แจ้งว่ากู้คืนร่างเดิม + ทางเลือกเริ่มผังใหม่ */
+function DraftNotice() {
+  const restoredAt = useDraftStatus((s) => s.restoredAt);
+  if (!restoredAt) return null;
+  const time = new Date(restoredAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
+  return (
+    <p className="m-0 mb-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-secondary-strong" data-testid="draft-notice">
+      กู้คืนผังที่บันทึกไว้เมื่อ {time}
+    </p>
   );
 }
 
@@ -291,6 +314,7 @@ function useHistoryShortcuts() {
 
 export function PlaygroundEditor() {
   useHistoryShortcuts();
+  useDraftAutosave();
   const live = useLiveValidation();
   return (
     <div
