@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { testBackend } from "@/test/backend";
 import { sessionCookie } from "@/test/session";
 import * as contactRoute from "../../app/api/contact/route";
-import { CONTACT_MAX_BYTES, createContactHandler, createMemoryDelivery, createWebhookDelivery } from "./contact-handlers";
+import { CONTACT_MAX_BYTES, createContactHandler } from "./contact-handlers";
 import { clientIp, createRateLimiter } from "./rate-limit";
 import type { ResolveUser } from "./session";
 
@@ -22,18 +23,16 @@ const send = (body: unknown, opts: { ip?: string; user?: string; type?: string }
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
-function setup(now = () => 0, globalLimit = 50) {
-  const delivery = createMemoryDelivery();
-  const handler = createContactHandler({
-    delivery,
-    resolveUser: asUser,
-    ipLimiter: createRateLimiter({ limit: 5, windowMs: 600_000, now }),
-    userLimiter: createRateLimiter({ limit: 5, windowMs: 600_000, now }),
-    globalLimiter: createRateLimiter({ limit: globalLimit, windowMs: 600_000, now }),
-    now: () => new Date("2026-10-10T03:00:00Z"),
-  });
-  return { delivery, handler };
-}
+let clock = 0;
+let backend: ReturnType<typeof testBackend>;
+let handler: ReturnType<typeof createContactHandler>;
+beforeEach(() => {
+  clock = Date.parse("2026-10-10T03:00:00Z");
+  backend = testBackend({ now: () => new Date(clock) });
+  handler = createContactHandler({ resolveUser: asUser, client: backend.client });
+});
+afterEach(() => expect(backend.violations).toEqual([]));
+const delivered = () => backend.mock.inspect().contacts;
 
 describe("rate limiter", () => {
   it("fixed window: ครบโควตาแล้วบล็อก พร้อม retryAfter และรีเซ็ตเมื่อหมดหน้าต่าง", () => {
@@ -75,31 +74,30 @@ describe("rate limiter", () => {
   });
 });
 
-describe("POST /api/contact (feat-032 gate)", () => {
-  it("ส่งสำเร็จ → 202 และส่งต่อข้อความ (trim แล้ว ไม่มี honeypot)", async () => {
-    const { delivery, handler } = setup();
+describe("POST /api/contact → Backend (feat-032 / feat-039)", () => {
+  it("ส่งสำเร็จ → 202 และ Backend ได้ข้อความ (trim แล้ว ไม่มี honeypot) พร้อม IP และผู้ใช้", async () => {
     const res = await handler(send({ ...valid, name: "  สมชาย  ", website: "" }, { user: "guest-1" }));
     expect(res.status).toBe(202);
-    expect(delivery.messages).toEqual([{ ...valid, userId: "guest-1", receivedAt: "2026-10-10T03:00:00.000Z" }]);
+    expect(await res.json()).toEqual({ ok: true });
+    expect(delivered()).toEqual([
+      expect.objectContaining({ ...valid, userId: "guest-1", clientIp: "203.0.113.5", receivedAt: "2026-10-10T03:00:00.000Z" }),
+    ]);
   });
 
-  it("ส่งถี่เกิน 5 ครั้ง / 10 นาที ต่อ IP → 429 + Retry-After", async () => {
-    let t = 0;
-    const { delivery, handler } = setup(() => t);
+  it("Backend นับ rate limit: เกิน 5 ครั้ง / 10 นาที ต่อ IP → 429 + Retry-After + ข้อความไทย", async () => {
     for (let i = 0; i < 5; i++) expect((await handler(send(valid))).status).toBe(202);
-    t = 60_000;
+    clock += 60_000;
     const blocked = await handler(send(valid));
     expect(blocked.status).toBe(429);
     expect(blocked.headers.get("retry-after")).toBe("540");
     expect((await blocked.json()).error).toMatchObject({ code: "RATE_LIMITED", message: "ส่งข้อความถี่เกินไป กรุณารออีก 9 นาที" });
-    expect(delivery.messages).toHaveLength(5);
+    expect(delivered()).toHaveLength(5);
     expect((await handler(send(valid, { ip: "198.51.100.9" }))).status).toBe(202); // IP อื่นไม่โดน
-    t = 600_000;
+    clock += 600_000;
     expect((await handler(send(valid))).status).toBe(202);
   });
 
-  it("ปลอม IP ทุกคำขอ → ไม่หลบ limiter ต่อ IP ได้ (ใช้ IP ที่ proxy ต่อท้าย) และติดเพดานรวม", async () => {
-    const { delivery, handler } = setup(() => 0, 8);
+  it("ปลอมค่าซ้ายสุดของ X-Forwarded-For ไม่ช่วยหลบ — BFF ส่ง IP ที่ proxy ต่อท้ายเป็น X-Client-IP", async () => {
     const spoofed = (i: number) =>
       new Request("http://localhost/api/contact", {
         method: "POST",
@@ -109,16 +107,10 @@ describe("POST /api/contact (feat-032 gate)", () => {
     const statuses = [];
     for (let i = 0; i < 7; i++) statuses.push((await handler(spoofed(i))).status);
     expect(statuses).toEqual([202, 202, 202, 202, 202, 429, 429]);
-
-    // ไม่มี proxy ช่วย (ปลอมค่าขวาสุดได้) → เพดานรวมหยุดการท่วม
-    const statuses2 = [];
-    for (let i = 0; i < 6; i++) statuses2.push((await handler(send(valid, { ip: `192.0.2.${i}` }))).status);
-    expect(statuses2).toEqual([202, 202, 202, 429, 429, 429]);
-    expect(delivery.messages).toHaveLength(8);
+    expect(new Set(delivered().map((c) => c.clientIp))).toEqual(new Set(["203.0.113.77"]));
   });
 
   it("ผู้ใช้ที่ล็อกอินถูกจำกัดต่อบัญชีด้วย แม้เปลี่ยน IP", async () => {
-    const { handler } = setup();
     for (let i = 0; i < 5; i++) expect((await handler(send(valid, { ip: `192.0.2.${i}`, user: "guest-x" }))).status).toBe(202);
     expect((await handler(send(valid, { ip: "192.0.2.99", user: "guest-x" }))).status).toBe(429);
   });
@@ -129,43 +121,33 @@ describe("POST /api/contact (feat-032 gate)", () => {
     ["JSON เสีย", "{", {}, 400, "INVALID_JSON"],
     ["ไม่ใช่ JSON", "a=1", { type: "application/x-www-form-urlencoded" }, 415, "UNSUPPORTED_MEDIA_TYPE"],
     ["ใหญ่เกิน", { ...valid, message: "ก".repeat(CONTACT_MAX_BYTES) }, {}, 413, "PAYLOAD_TOO_LARGE"],
-  ] as const)("%s → %s", async (_name, body, opts, status, code) => {
-    const { delivery, handler } = setup();
+  ] as const)("%s → %s (ไม่ส่งต่อ Backend)", async (_name, body, opts, status, code) => {
     const res = await handler(send(body, opts));
     expect(res.status).toBe(status);
     expect((await res.json()).error.code).toBe(code);
-    expect(delivery.messages).toEqual([]);
+    expect(delivered()).toEqual([]);
   });
 
   it("รายละเอียด error ระบุช่องที่ผิดเป็นภาษาไทย", async () => {
-    const { handler } = setup();
     const { error } = await (await handler(send({ ...valid, email: "x" }))).json();
     expect(error.details).toEqual([{ path: "email", message: "รูปแบบอีเมลไม่ถูกต้อง" }]);
   });
 
   it("Honeypot ถูกกรอก → ตอบเหมือนสำเร็จแต่ไม่ส่งต่อ", async () => {
-    const { delivery, handler } = setup();
     expect((await handler(send({ ...valid, website: "http://spam" }))).status).toBe(202);
-    expect(delivery.messages).toEqual([]);
+    expect(delivered()).toEqual([]);
   });
 
-  it("Webhook: ส่ง JSON ไปปลายทาง; ปลายทางล่ม → 502", async () => {
-    const sent: unknown[] = [];
-    let ok = true;
-    const fetchImpl = (async (_url: RequestInfo | URL, init?: RequestInit) => {
-      sent.push(JSON.parse(String(init?.body)));
-      return new Response(null, { status: ok ? 200 : 500 });
-    }) as typeof fetch;
-    const handler = createContactHandler({ delivery: createWebhookDelivery("https://hooks.example/x", fetchImpl), resolveUser: asUser });
-    expect((await handler(send(valid))).status).toBe(202);
-    expect(sent[0]).toMatchObject({ ...valid, userId: null });
-    ok = false;
+  it("Backend ล่ม → 502 DELIVERY_FAILED (ไม่ลองส่งซ้ำ กันข้อความซ้อน)", async () => {
+    await backend.mock.fetch(new Request("http://backend.test/__mock/outage", { method: "POST", body: JSON.stringify({ requests: 1 }) }));
     const res = await handler(send(valid));
     expect(res.status).toBe(502);
     expect((await res.json()).error.code).toBe("DELIVERY_FAILED");
+    expect(delivered()).toEqual([]);
+    expect((await handler(send(valid))).status).toBe(202);
   });
 
-  it("route module จริงใช้ Session Cookie ของ Auth.js", async () => {
+  it("route module จริงใช้ Session Cookie ของ Auth.js (Backend จำลองในตัว)", async () => {
     const res = await contactRoute.POST(
       new Request("http://localhost/api/contact", {
         method: "POST",

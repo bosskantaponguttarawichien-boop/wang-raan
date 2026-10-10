@@ -15,8 +15,8 @@ const STATUS = { ready: "Ready", warning: "Warning", blocked: "Blocked" } as con
 const STATUS_COLOR = { ready: "#2e9b78", warning: "#c08a2a", blocked: "#e4685d" } as const;
 
 export default async function OpengraphImage({ params }: { params: Promise<{ shareKey: string }> }) {
-  const shared = await shareRepository.get((await params).shareKey);
-  if (!shared) {
+  const shared = await shareRepository.getPublic((await params).shareKey).catch(() => "not-found" as const);
+  if (typeof shared === "string") {
     return new ImageResponse(
       (
         <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f8ff", color: "#1e2b40", fontSize: 56 }}>

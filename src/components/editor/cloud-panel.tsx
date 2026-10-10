@@ -14,15 +14,20 @@ import {
   useLoadLayout,
   useSaveLayoutMutation,
   useShareMutation,
+  useSharesQuery,
 } from "@/lib/layout-queries";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
+import { ExpirySelect, ShareLinks, expiresAtFor, type ExpiryChoice } from "./share-links";
 
-const errorText = (error: unknown) =>
-  error instanceof ApiError
-    ? error.code === "LAYOUT_BLOCKED"
-      ? "ผังยังไม่ผ่านกฎจำเป็น จึงบันทึกไม่ได้ — แก้ตามแถบสถานะก่อน"
-      : error.message
-    : "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง";
+/** ระบบจัดเก็บล่ม/ติดต่อไม่ได้ — ร่างผังยังอยู่ใน localStorage ของเครื่องนี้ (บันทึกอัตโนมัติ) */
+const KEEPS_DRAFT = new Set(["BACKEND_ERROR", "BACKEND_NOT_CONFIGURED", "NETWORK_ERROR", "HTTP_502", "HTTP_503", "HTTP_504"]);
+
+const errorText = (error: unknown) => {
+  if (!(error instanceof ApiError)) return "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง";
+  if (error.code === "LAYOUT_BLOCKED") return "ผังยังไม่ผ่านกฎจำเป็น จึงบันทึกไม่ได้ — แก้ตามแถบสถานะก่อน";
+  if (KEEPS_DRAFT.has(error.code)) return `${error.message} — ผังยังอยู่ในเครื่องนี้ ไม่หาย`;
+  return error.message;
+};
 
 const timeText = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
@@ -75,8 +80,17 @@ function SignedIn({ name }: { name: string }) {
   const load = useLoadLayout();
   const [loadState, setLoadState] = React.useState<{ id: string; error?: string } | null>(null);
   const [copied, setCopied] = React.useState(false);
+  const [expiry, setExpiry] = React.useState<ExpiryChoice>("none");
+  const expiryId = React.useId();
 
   const saved = layouts.data?.some((l) => l.id === layoutId) ?? false;
+  // รอให้บันทึกเสร็จจริงก่อนโหลดลิงก์: รายการผังอัปเดตล่วงหน้า (optimistic) ทำให้ saved เป็นจริงก่อน Backend สร้างผังเสร็จ
+  const fetchShares = saved && !save.isPending;
+  const shareList = useSharesQuery(layoutId, fetchShares);
+  // ลิงก์ที่เพิ่งสร้าง: แสดงเฉพาะของผังที่เปิดอยู่ และใช้สถานะล่าสุดจากรายการ (ยกเลิก/หมดอายุแล้ว → ซ่อน)
+  const created =
+    share.data && share.data.layoutId === layoutId ? (shareList.data?.find((s) => s.shareKey === share.data.shareKey) ?? share.data) : null;
+  const createdLink = created?.status === "active" ? created : null;
 
   const open = async (id: string) => {
     setLoadState({ id });
@@ -92,7 +106,7 @@ function SignedIn({ name }: { name: string }) {
   const shareCurrent = async () => {
     setCopied(false);
     const stored = await save.mutateAsync(layoutStore.getState().layout).catch(() => null);
-    if (stored) share.mutate(stored.layout.id);
+    if (stored) share.mutate({ layoutId: stored.layout.id, expiresAt: expiresAtFor(expiry) });
   };
 
   const copy = async (url: string) => {
@@ -118,6 +132,12 @@ function SignedIn({ name }: { name: string }) {
           {share.isPending ? "กำลังสร้างลิงก์…" : "แชร์ลิงก์"}
         </Button>
       </div>
+      <div className="mt-2 grid grid-cols-[auto_minmax(0,1fr)] items-center gap-2 text-[12px]">
+        <label htmlFor={expiryId} className="text-secondary-strong">
+          อายุลิงก์ใหม่
+        </label>
+        <ExpirySelect id={expiryId} value={expiry} onChange={setExpiry} label="อายุลิงก์ใหม่" />
+      </div>
 
       <div aria-live="polite" className="text-[12px] leading-[1.75]" data-testid="cloud-message">
         {save.isError && (
@@ -125,24 +145,29 @@ function SignedIn({ name }: { name: string }) {
             {errorText(save.error)}
           </p>
         )}
-        {save.isSuccess && !share.data && <p className="m-0 mt-2 text-secondary-strong">บันทึกแล้วเมื่อ {timeText(save.data.updatedAt)}</p>}
+        {save.isSuccess && !createdLink && <p className="m-0 mt-2 text-secondary-strong">บันทึกแล้วเมื่อ {timeText(save.data.updatedAt)}</p>}
         {share.isError && (
           <p className="m-0 mt-2 text-[#b8433b]" role="alert">
             {errorText(share.error)}
           </p>
         )}
-        {share.data && (
+        {createdLink && (
           <div className="mt-2 rounded-[8px] bg-blue-soft px-3 py-2">
             <p className="m-0 font-semibold text-ink">ลิงก์แชร์ (ดูได้โดยไม่ต้องเข้าสู่ระบบ)</p>
-            <a href={share.data.url} className="block break-all text-blue-hover underline" data-testid="share-link" target="_blank" rel="noopener">
-              {share.data.url}
+            <p className="m-0 text-ink">
+              {createdLink.expiresAt ? `ใช้งานได้ถึง ${timeText(createdLink.expiresAt)}` : "ไม่หมดอายุ — ยกเลิกได้ที่รายการด้านล่าง"}
+            </p>
+            <a href={createdLink.url} className="block break-all text-blue-hover underline" data-testid="share-link" target="_blank" rel="noopener">
+              {createdLink.url}
             </a>
-            <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={() => copy(share.data.url)}>
+            <Button variant="secondary" size="sm" className="mt-2 w-full" onClick={() => copy(createdLink.url)}>
               {copied ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
             </Button>
           </div>
         )}
       </div>
+
+      <ShareLinks layoutId={layoutId} visible={saved} fetchEnabled={fetchShares} />
 
       <h3 className="m-0 mb-2 mt-4 text-[13px] font-semibold">ผังที่บันทึกไว้</h3>
       <SavedList

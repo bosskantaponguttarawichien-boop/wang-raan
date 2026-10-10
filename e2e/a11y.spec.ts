@@ -69,6 +69,7 @@ for (const viewport of [
     });
 
     test("Playground: แผงบัญชีหลังเข้าสู่ระบบ + หน้าแชร์", async ({ page, browser }) => {
+      test.slow(); // หลายหน้า + axe 3 รอบ — บน wrangler dev (workerd ในเครื่อง) เกิน 30 วินาทีได้
       await page.goto("/playground");
       await page.getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" }).click();
       await expect(page.getByTestId("signed-in-as")).toBeVisible();

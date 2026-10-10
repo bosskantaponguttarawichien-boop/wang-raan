@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { cafeLayout } from "@/test/fixtures/layouts";
-import { validateLayout } from "@/core/validation";
+import { BackendConfigError, send } from "./backend";
 import { createLayoutHandlers } from "./layout-handlers";
 import { BackendError, createRemoteLayoutRepository, type LayoutRepository } from "./layout-repository";
 import { createShareHandlers } from "./share-handlers";
-import { createMemoryShareRepository } from "./share-repository";
-import { createBackendClient, createInternalToken, verifyInternalToken } from "./token-relay";
+import { createRemoteShareRepository } from "./share-repository";
+import { createBackendClient, createInternalToken, verifyInternalToken, type BackendClient } from "./token-relay";
 
 const SECRET = "internal-test-secret";
 const now = new Date("2026-10-10T03:00:00Z");
@@ -41,7 +41,7 @@ describe("Token Relay ไป Backend (feat-031 gate)", () => {
       calls.push(request);
       return handler(request);
     }) as typeof fetch;
-    return { calls, client: createBackendClient({ baseUrl: "https://be.internal/api/", secret: SECRET, fetch: fetchImpl, now: () => now }) };
+    return { calls, client: createBackendClient({ baseUrl: "https://be.internal/api/", secret: SECRET, fetch: fetchImpl, now: () => now, retryDelayMs: 0 }) };
   }
 
   it("แนบ Authorization: Bearer <internal token ของผู้ใช้> และไม่ส่ง Cookie ต่อ", async () => {
@@ -57,79 +57,130 @@ describe("Token Relay ไป Backend (feat-031 gate)", () => {
     expect((await verifyInternalToken(auth.slice(7), SECRET, now))?.sub).toBe("guest-42");
   });
 
-  it("Remote repository เรียก Backend ครบทุกเมธอดในนามผู้ใช้", async () => {
-    const layout = cafeLayout();
-    const validation = validateLayout(layout);
-    const stored = { layout, validation, createdAt: "a", updatedAt: "b" };
-    const { calls, client } = fakeBackend((req) => {
-      const path = new URL(req.url).pathname;
-      if (req.method === "GET" && path.endsWith("/layouts")) return Response.json({ layouts: [{ id: layout.id }] });
-      if (req.method === "GET" && path.endsWith("/missing")) return new Response(null, { status: 404 });
-      if (req.method === "POST") return Response.json(stored, { status: 201 });
-      if (req.method === "PUT" && path.endsWith("/gone")) return new Response(null, { status: 404 });
-      if (req.method === "DELETE") return new Response(null, { status: 204 });
-      if (req.method === "GET" && path.includes("/boom")) return new Response(null, { status: 503 });
-      return Response.json(stored);
+  it("ไม่มีผู้ใช้ (null) → token sub = anonymous", async () => {
+    const { calls, client } = fakeBackend(() => Response.json({}));
+    await client.request(null, "/v1/public/shares/x");
+    expect((await verifyInternalToken(calls[0]!.headers.get("authorization")!.slice(7), SECRET, now))?.sub).toBe("anonymous");
+  });
+
+  it("GET ลองซ้ำ 1 ครั้งเมื่อ 503 หรือเครือข่ายล้ม — POST/PUT/DELETE ไม่ลองซ้ำ (กันบันทึกซ้อน)", async () => {
+    let n = 0;
+    const flaky = fakeBackend(() => (n++ === 0 ? new Response(null, { status: 503 }) : Response.json({ ok: true })));
+    expect((await flaky.client.request("u", "/v1/layouts")).status).toBe(200);
+    expect(flaky.calls).toHaveLength(2);
+
+    let m = 0;
+    const down = fakeBackend(() => {
+      if (m++ === 0) throw new TypeError("fetch failed");
+      return Response.json({ ok: true });
     });
-    const repo = createRemoteLayoutRepository(client);
-    expect(await repo.list("u1")).toEqual([{ id: layout.id }]);
-    expect(await repo.get("u1", layout.id)).toEqual(stored);
-    expect(await repo.get("u1", "missing")).toBeNull();
-    expect(await repo.create("u1", layout, validation)).toEqual(stored);
-    expect(await repo.update("u1", layout, validation)).toEqual(stored);
-    expect(await repo.update("u1", { ...layout, id: "gone" }, validation)).toBe("not-found");
-    expect(await repo.remove("u1", layout.id)).toBe(true);
-    await expect(repo.get("u1", "boom")).rejects.toThrow("Backend 503");
-    for (const call of calls) {
-      expect((await verifyInternalToken(call.headers.get("authorization")!.slice(7), SECRET, now))?.sub).toBe("u1");
+    expect((await down.client.request("u", "/v1/layouts")).status).toBe(200);
+
+    const post = fakeBackend(() => new Response(null, { status: 503 }));
+    expect((await post.client.request("u", "/v1/layouts", { method: "POST", body: "{}" })).status).toBe(503);
+    expect(post.calls).toHaveLength(1);
+  });
+
+  it("หมดเวลา → ยกเลิกคำขอ (AbortSignal) แล้ว send() แปลงเป็น BackendError status 0 — ไม่ลองซ้ำ (Backend ช้าอยู่แล้ว)", async () => {
+    let calls = 0;
+    const hang = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      calls++;
+      return new Promise<Response>((_, reject) => init?.signal?.addEventListener("abort", () => reject(init.signal!.reason)));
+    }) as typeof fetch;
+    const client = createBackendClient({ baseUrl: "https://be.internal/", secret: SECRET, fetch: hang, timeoutMs: 20, retryDelayMs: 0 });
+    await expect(send(client, "u", "/v1/layouts")).rejects.toMatchObject({ name: "BackendError", status: 0, path: "/v1/layouts" });
+    expect(calls).toBe(1);
+  });
+
+  it("Backend ขัดข้องแบบที่ผู้ใช้ไม่ควรเห็นรายละเอียด → log สถานะ/code/path ไว้ไล่ปัญหา", async () => {
+    const errors: unknown[][] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]) => void errors.push(args);
+    try {
+      const client = createBackendClient({
+        baseUrl: "https://be.internal/",
+        secret: SECRET,
+        fetch: (async () => Response.json({ error: { code: "UNAUTHORIZED", message: "bad token" } }, { status: 401 })) as typeof fetch,
+      });
+      const handlers = createLayoutHandlers(createRemoteLayoutRepository(client), async () => ({ id: "u", name: null }));
+      expect((await handlers.list(new Request("http://localhost/api/layouts"))).status).toBe(502);
+    } finally {
+      console.error = original;
     }
-    const created = calls.find((c) => c.method === "POST")!;
-    expect(await created.json()).toEqual({ layout, validation });
+    expect(errors).toEqual([["[wang-raan] Backend error", { status: 401, code: "UNAUTHORIZED", path: "/v1/layouts", cause: undefined }]]);
   });
 });
 
 describe("Remote repository: Backend ตอบ error ต้องไม่ถูกนับเป็นข้อมูลผัง", () => {
   const layout = cafeLayout();
-  const validation = validateLayout(layout);
-  const repoReturning = (status: number, body: unknown = { error: { code: "X" } }) => {
-    const client = createBackendClient({
+  const clientReturning = (status: number, body: unknown = { error: { code: "X", message: "x" } }) =>
+    createBackendClient({
       baseUrl: "https://be.internal/",
       secret: SECRET,
-      fetch: (async () => new Response(JSON.stringify(body), { status })) as typeof fetch,
+      retryDelayMs: 0,
+      fetch: (async () => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } })) as typeof fetch,
     });
-    return createRemoteLayoutRepository(client);
-  };
+  const repoReturning = (status: number, body?: unknown) => createRemoteLayoutRepository(clientReturning(status, body));
 
   it.each([401, 403, 400, 422, 500, 503])("สถานะ %s → BackendError ทุกเมธอด", async (status) => {
     const repo = repoReturning(status);
     await expect(repo.list("u")).rejects.toBeInstanceOf(BackendError);
     await expect(repo.get("u", "a")).rejects.toBeInstanceOf(BackendError);
-    await expect(repo.create("u", layout, validation)).rejects.toMatchObject({ status });
-    await expect(repo.update("u", layout, validation)).rejects.toMatchObject({ status });
+    await expect(repo.create("u", layout)).rejects.toMatchObject({ status });
+    await expect(repo.update("u", layout)).rejects.toMatchObject({ status });
     await expect(repo.remove("u", "a")).rejects.toBeInstanceOf(BackendError);
   });
 
-  it("สถานะที่คาดไว้: 404 → null / not-found / false, 409 → conflict", async () => {
+  it("สถานะที่คาดไว้: 404 → null / not-found / false, 409 LAYOUT_EXISTS → conflict", async () => {
     expect(await repoReturning(404).get("u", "a")).toBeNull();
-    expect(await repoReturning(404).update("u", layout, validation)).toBe("not-found");
+    expect(await repoReturning(404).update("u", layout)).toBe("not-found");
     expect(await repoReturning(404).remove("u", "a")).toBe(false);
-    expect(await repoReturning(409).create("u", layout, validation)).toBe("conflict");
+    expect(await repoReturning(409, { error: { code: "LAYOUT_EXISTS", message: "x" } }).create("u", layout)).toBe("conflict");
   });
 
-  it("list ได้ 200 แต่ไม่มี layouts → BackendError (ไม่ส่ง undefined ให้หน้าเว็บ)", async () => {
+  it("409 LAYOUT_LIMIT_REACHED ไม่ใช่ conflict → ส่งต่อให้ผู้ใช้เป็น 409 พร้อมข้อความไทย", async () => {
+    const repo = repoReturning(409, { error: { code: "LAYOUT_LIMIT_REACHED", message: "limit" } });
+    await expect(repo.create("u", layout)).rejects.toMatchObject({ status: 409, code: "LAYOUT_LIMIT_REACHED" });
+    const handlers = createLayoutHandlers(repo, async () => ({ id: "u", name: null }));
+    const res = await handlers.create(
+      new Request("http://localhost/api/layouts", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ layout }) }),
+    );
+    expect(res.status).toBe(409);
+    expect((await res.json()).error).toEqual({ code: "LAYOUT_LIMIT_REACHED", message: "บัญชีนี้บันทึกผังครบ 200 ผังแล้ว — ลบผังที่ไม่ใช้ก่อน" });
+  });
+
+  it("Backend ตอบ 429 → ส่งต่อ 429 + Retry-After", async () => {
+    const handlers = createLayoutHandlers(repoReturning(429, { error: { code: "RATE_LIMITED", message: "x", retryAfter: 120 } }), async () => ({ id: "u", name: null }));
+    const res = await handlers.list(new Request("http://localhost/api/layouts"));
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBe("120");
+    expect((await res.json()).error.message).toBe("ส่งคำขอถี่เกินไป กรุณารออีก 2 นาที");
+  });
+
+  it("list ได้ 200 แต่ไม่มี layouts / ไม่ใช่ JSON → BackendError (ไม่ส่งข้อมูลเสียให้หน้าเว็บ)", async () => {
     await expect(repoReturning(200, { ok: true }).list("u")).rejects.toBeInstanceOf(BackendError);
+    const notJson = createBackendClient({ baseUrl: "https://be.internal/", secret: SECRET, fetch: (async () => new Response("<html>")) as typeof fetch });
+    await expect(createRemoteLayoutRepository(notJson).get("u", "a")).rejects.toBeInstanceOf(BackendError);
   });
 
-  it("Route Handler แปลง BackendError เป็น 502 โดยไม่เปิดเผยรายละเอียด", async () => {
+  it("Route Handler แปลง BackendError ที่ผู้ใช้ไม่ควรเห็นเป็น 502 โดยไม่เปิดเผยรายละเอียด", async () => {
     const handlers = createLayoutHandlers(repoReturning(403), async () => ({ id: "u", name: null }));
     const res = await handlers.list(new Request("http://localhost/api/layouts"));
     expect(res.status).toBe(502);
     expect((await res.json()).error).toEqual({ code: "BACKEND_ERROR", message: "ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง" });
-    const share = createShareHandlers(repoReturning(403), createMemoryShareRepository(), async () => ({ id: "u", name: null }));
+    const share = createShareHandlers(createRemoteShareRepository(clientReturning(500)), async () => ({ id: "u", name: null }));
     const shareRes = await share.create(
       new Request("http://localhost/api/share", { method: "POST", headers: { "content-type": "application/json" }, body: '{"layoutId":"a"}' }),
     );
     expect(shareRes.status).toBe(502);
+  });
+
+  it("production ไม่ได้ตั้งค่า Backend → 503 BACKEND_NOT_CONFIGURED (ไม่แอบเก็บในหน่วยความจำ)", async () => {
+    const unconfigured: BackendClient = { request: async () => { throw new BackendConfigError(); } };
+    const handlers = createLayoutHandlers(createRemoteLayoutRepository(unconfigured), async () => ({ id: "u", name: null }));
+    const res = await handlers.list(new Request("http://localhost/api/layouts"));
+    expect(res.status).toBe(503);
+    expect((await res.json()).error.code).toBe("BACKEND_NOT_CONFIGURED");
   });
 
   it("error อื่นที่ไม่ใช่ BackendError ถูกโยนต่อ (ไม่กลบบั๊ก)", async () => {

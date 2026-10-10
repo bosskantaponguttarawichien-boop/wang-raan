@@ -19,10 +19,17 @@ export interface StoredLayoutDto {
   updatedAt: string;
 }
 
+export type ShareStatus = "active" | "expired" | "revoked";
+
 export interface ShareDto {
   shareKey: string;
   url: string;
+  layoutId: string;
+  status: ShareStatus;
   createdAt: string;
+  /** null = ไม่หมดอายุ */
+  expiresAt: string | null;
+  revokedAt: string | null;
 }
 
 export class ApiError extends Error {
@@ -41,6 +48,8 @@ const FALLBACK: Record<number, string> = {
   401: "กรุณาเข้าสู่ระบบก่อน",
   404: "ไม่พบข้อมูล",
   429: "ส่งคำขอถี่เกินไป กรุณารอสักครู่",
+  502: "ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง",
+  503: "ระบบจัดเก็บข้อมูลไม่พร้อมใช้งานชั่วคราว ลองใหม่ภายหลัง",
 };
 
 async function request<T>(fetchImpl: typeof fetch, path: string, init: RequestInit = {}): Promise<T> {
@@ -82,7 +91,13 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
       }
     },
     deleteLayout: (id: string) => request<void>(fetchImpl, `/api/layouts/${encodeURIComponent(id)}`, { method: "DELETE" }),
-    createShare: (layoutId: string) => request<ShareDto>(fetchImpl, "/api/share", { method: "POST", body: JSON.stringify({ layoutId }) }),
+    createShare: (layoutId: string, expiresAt: string | null = null) =>
+      request<ShareDto>(fetchImpl, "/api/share", { method: "POST", body: JSON.stringify(expiresAt ? { layoutId, expiresAt } : { layoutId }) }),
+    listShares: (layoutId: string) =>
+      request<{ shares: ShareDto[] }>(fetchImpl, `/api/layouts/${encodeURIComponent(layoutId)}/shares`).then((r) => r.shares),
+    updateShare: (shareKey: string, expiresAt: string | null) =>
+      request<ShareDto>(fetchImpl, `/api/share/${encodeURIComponent(shareKey)}`, { method: "PATCH", body: JSON.stringify({ expiresAt }) }),
+    revokeShare: (shareKey: string) => request<void>(fetchImpl, `/api/share/${encodeURIComponent(shareKey)}`, { method: "DELETE" }),
   };
 }
 

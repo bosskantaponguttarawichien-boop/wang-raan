@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe } from "./helpers";
+import AxeBuilder from "@axe-core/playwright";
+import { buildReadyCafe, mockControl, sessionUserId } from "./helpers";
 
 /** feat-030 / 031 / 032 / 033: เข้าสู่ระบบ → บันทึกผ่าน React Query → แชร์ลิงก์สาธารณะ, ฟอร์มติดต่อ + Rate limit */
 const cloud = (page: Page) => page.getByTestId("cloud-panel");
@@ -95,6 +96,8 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
     await buildReadyCafe(page);
     await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
+    // รอแผงลิงก์แชร์โหลดเสร็จ (ไม่งั้นปุ่มด้านล่างเลื่อนระหว่างคลิก)
+    await expect(cloud(page).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
 
     page.once("dialog", (d) => d.accept());
     await page.getByRole("button", { name: "เริ่มผังใหม่" }).click();
@@ -115,6 +118,118 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
     await cloud(page).getByRole("button", { name: "ออกจากระบบ" }).click();
     await expect(cloud(page).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" })).toBeVisible();
     expect((await page.request.get("/api/layouts")).status()).toBe(401);
+  });
+});
+
+test.describe("จัดการลิงก์แชร์ (feat-040)", () => {
+  const items = (page: Page) => page.getByTestId("share-links").getByTestId("share-item");
+  const axe = (page: Page) => new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
+
+  test("ตั้งอายุลิงก์ → ยกเลิก → หน้าแชร์แจ้งว่ายกเลิก; ลิงก์หมดอายุ → ต่ออายุแล้วเปิดได้อีก", async ({ page, browser }) => {
+    test.slow(); // flow ยาว (2 บริบท, 6 การนำทาง, axe 2 รอบ) — บน wrangler dev เกิน 30 วินาทีได้
+    await signInAsGuest(page);
+    await buildReadyCafe(page);
+    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
+    await expect(cloud(page).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
+
+    // ลิงก์ 7 วัน
+    await cloud(page).getByLabel("อายุลิงก์ใหม่").selectOption("7");
+    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await expect(page.getByTestId("cloud-message")).toContainText("ใช้งานได้ถึง");
+    await expect(items(page)).toHaveCount(1);
+    await expect(items(page).first()).toHaveAttribute("data-status", "active");
+    await expect(items(page).first().getByTestId("share-status")).toContainText("ใช้งานได้ถึง");
+    const firstUrl = (await page.getByTestId("share-link").getAttribute("href"))!;
+
+    const anonymous = await browser.newContext();
+    const viewer = await anonymous.newPage();
+    await viewer.goto(firstUrl);
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ผังร้าน 8 × 6 เมตร");
+    await expect(viewer.getByText(/ลิงก์ใช้ได้ถึง/)).toBeVisible();
+
+    // ยกเลิก (ยืนยัน)
+    page.once("dialog", (d) => d.accept());
+    await items(page).first().getByRole("button", { name: /^ยกเลิกลิงก์ที่สร้างเมื่อ/ }).click();
+    await expect(items(page).first()).toHaveAttribute("data-status", "revoked");
+    await expect(items(page).first().getByRole("button")).toHaveCount(0); // ลิงก์ที่ยกเลิกแล้วแก้ไม่ได้
+    await expect(page.getByTestId("share-link")).toHaveCount(0); // กล่องลิงก์ที่เพิ่งสร้างต้องไม่โชว์ลิงก์ที่ยกเลิกแล้วให้คัดลอก
+    await viewer.reload();
+    await expect(viewer.getByTestId("share-gone")).toHaveAttribute("data-reason", "revoked");
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ลิงก์นี้ถูกยกเลิกแล้ว");
+    expect((await axe(viewer)).violations).toEqual([]);
+    const api = await viewer.request.get(firstUrl.replace("/share/", "/api/share/"));
+    expect(api.status()).toBe(410);
+    expect((await api.json()).error.code).toBe("SHARE_REVOKED");
+
+    // ลิงก์ใหม่ไม่หมดอายุ → Backend ทำให้หมดอายุ → หน้าแชร์แจ้ง → ต่ออายุ 30 วัน → เปิดได้
+    await cloud(page).getByLabel("อายุลิงก์ใหม่").selectOption("none");
+    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await expect(items(page)).toHaveCount(2);
+    const secondUrl = (await page.getByTestId("share-link").getAttribute("href"))!;
+    await mockControl(page.request, `shares/${secondUrl.split("/").pop()}/expire`);
+    await viewer.goto(secondUrl);
+    await expect(viewer.getByTestId("share-gone")).toHaveAttribute("data-reason", "expired");
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ลิงก์นี้หมดอายุแล้ว");
+
+    await page.reload();
+    const expired = items(page).filter({ has: page.locator('[data-testid="share-item-link"]', { hasText: secondUrl }) });
+    await expect(expired).toHaveAttribute("data-status", "expired");
+    await expect(expired.getByTestId("share-status")).toHaveText("หมดอายุแล้ว");
+    // ต้องเลือกอายุก่อน — กดโดยไม่เลือกไม่ได้ (กันลิงก์กลายเป็นถาวรโดยไม่ตั้งใจ)
+    await expect(expired.getByRole("button", { name: "ตั้งอายุใหม่" })).toBeDisabled();
+    await expired.getByRole("combobox").selectOption("30");
+    await expired.getByRole("button", { name: "ตั้งอายุใหม่" }).click();
+    await expect(expired).toHaveAttribute("data-status", "active");
+    await viewer.reload();
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ผังร้าน 8 × 6 เมตร");
+    await anonymous.close();
+
+    expect((await axe(page)).violations).toEqual([]);
+  });
+});
+
+test.describe("Backend ล่ม (feat-039)", () => {
+  test("เปิดลิงก์แชร์ตอน Backend ล่ม → หน้าแจ้งภาษาไทย (ไม่ใช่หน้า error) → กลับมาแล้วเปิดได้", async ({ page, browser }) => {
+    await signInAsGuest(page);
+    await buildReadyCafe(page);
+    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    const url = (await page.getByTestId("share-link").getAttribute("href"))!;
+    const path = `/v1/public/shares/${url.split("/").pop()}`;
+    await mockControl(page.request, "outage", { path });
+
+    const anonymous = await browser.newContext();
+    const viewer = await anonymous.newPage();
+    await viewer.goto(url);
+    await expect(viewer.getByTestId("share-gone")).toHaveAttribute("data-reason", "unavailable");
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("เปิดผังไม่ได้ชั่วคราว");
+
+    await mockControl(page.request, "outage", { path, requests: 0 });
+    await viewer.reload();
+    await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ผังร้าน 8 × 6 เมตร");
+    await anonymous.close();
+  });
+
+  test("บันทึกไม่สำเร็จ → แจ้งเป็นภาษาไทยว่าผังยังอยู่ → รีโหลดแล้วร่างผังยังอยู่ → Backend กลับมาแล้วบันทึกได้", async ({ page }) => {
+    await signInAsGuest(page);
+    await buildReadyCafe(page);
+    const subject = await sessionUserId(page);
+    await mockControl(page.request, "outage", { subject });
+
+    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await expect(page.getByTestId("cloud-message")).toContainText("ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง — ผังยังอยู่ในเครื่องนี้ ไม่หาย");
+    await expect(page.getByTestId("saved-layouts-error")).toContainText("โหลดรายการไม่สำเร็จ", { timeout: 15_000 });
+
+    await page.reload();
+    await expect(page.getByTestId("artboard-stage").locator('[data-type="chair"]')).toHaveCount(4);
+    await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
+
+    // Backend กลับมา → รายการโหลดได้ (React Query ลองซ้ำเอง หรือกด "ลองอีกครั้ง") แล้วบันทึกได้
+    await mockControl(page.request, "outage", { subject, requests: 0 });
+    await page.reload();
+    await expect(cloud(page).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
   });
 });
 
