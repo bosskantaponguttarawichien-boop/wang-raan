@@ -232,7 +232,7 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
 });
 
 test.describe("พิมพ์ / PDF (feat-026)", () => {
-  test("@media print ซ่อนเครื่องมือ แสดงรายงานผังพร้อมสรุปที่นั่ง", async ({ page }) => {
+  test("@media print ซ่อนเครื่องมือ แสดงรายงานผังพร้อมสรุปที่นั่ง", async ({ page, browserName }) => {
     await buildReadyCafe(page);
     const report = page.getByTestId("print-report");
     await expect(report).toBeHidden();
@@ -247,11 +247,13 @@ test.describe("พิมพ์ / PDF (feat-026)", () => {
     await expect(page.getByTestId("print-status")).toHaveText("พร้อมจำลอง");
     const noScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
     expect(noScroll).toBe(true);
+    await page.screenshot({ path: `e2e/.results/screens/print-report-${browserName}.png`, fullPage: true });
 
+    // page.pdf() มีเฉพาะ Headless Chromium — เบราว์เซอร์อื่นตรวจถึงการแสดงผลตอนพิมพ์ด้านบน
+    if (browserName !== "chromium") return;
     const pdf = await page.pdf({ path: "e2e/.results/screens/print-report.pdf", format: "A4", landscape: true, printBackground: true });
     expect(pdf.subarray(0, 4).toString()).toBe("%PDF");
     // ผัง + สรุปจบใน A4 แนวนอนหน้าเดียว
     expect(pdf.toString("latin1").match(/\/Type\s*\/Page[^s]/g)).toHaveLength(1);
-    await page.screenshot({ path: "e2e/.results/screens/print-report.png", fullPage: true });
   });
 });
