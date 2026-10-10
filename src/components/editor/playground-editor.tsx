@@ -13,6 +13,7 @@ import { SimulationPanel, formatSimTime } from "@/components/simulation/simulati
 import { PanelTitle } from "./panel-title";
 import { ObjectInspector } from "./forms/object-inspector";
 import { RoomSettingsForm } from "./forms/room-settings-form";
+import { CloudPanel } from "./cloud-panel";
 import { FilePanel } from "./file-panel";
 import { PrintReport } from "./print-report";
 import { useLiveValidation, type LiveValidation } from "@/components/validation/use-live-validation";
@@ -129,6 +130,13 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
       <section className="min-w-0">
         <PanelTitle>ขนาดร้านและทางเข้า</PanelTitle>
         <RoomSettingsForm />
+      </section>
+
+      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
+
+      <section className="min-w-0">
+        <PanelTitle>บัญชีและผังออนไลน์</PanelTitle>
+        <CloudPanel />
       </section>
 
       <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />

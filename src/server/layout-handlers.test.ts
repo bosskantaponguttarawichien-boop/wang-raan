@@ -4,17 +4,32 @@ import * as listRoute from "../../app/api/layouts/route";
 import * as itemRoute from "../../app/api/layouts/[id]/route";
 import { MAX_BODY_BYTES, createLayoutHandlers } from "./layout-handlers";
 import { createMemoryLayoutRepository } from "./layout-repository";
+import type { ResolveUser } from "./session";
+import { sessionCookie } from "@/test/session";
 
 const url = "http://localhost/api/layouts";
-const post = (body: unknown, type = "application/json") =>
-  new Request(url, { method: "POST", headers: { "content-type": type }, body: typeof body === "string" ? body : JSON.stringify(body) });
-const put = (id: string, body: unknown) =>
-  new Request(`${url}/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+/** ผู้ใช้ในเทสต์ระบุด้วย header x-user (handlers รับ resolver ที่ inject ได้) */
+const asUser: ResolveUser = async (r) => {
+  const id = r.headers.get("x-user");
+  return id ? { id, name: null } : null;
+};
+const req = (path: string, init: RequestInit = {}, user: string | null = "alice") => {
+  const headers = new Headers(init.headers);
+  if (user) headers.set("x-user", user);
+  return new Request(`${url}${path}`, { ...init, headers });
+};
+const post = (body: unknown, type = "application/json", user: string | null = "alice") =>
+  req("", { method: "POST", headers: { "content-type": type }, body: typeof body === "string" ? body : JSON.stringify(body) }, user);
+const put = (id: string, body: unknown, user: string | null = "alice") =>
+  req(`/${id}`, { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }, user);
+const get = (id: string, user: string | null = "alice") => req(`/${id}`, {}, user);
+const del = (id: string, user: string | null = "alice") => req(`/${id}`, { method: "DELETE" }, user);
+const list = (user: string | null = "alice") => req("", {}, user);
 
 let handlers: ReturnType<typeof createLayoutHandlers>;
 beforeEach(() => {
   let tick = 0;
-  handlers = createLayoutHandlers(createMemoryLayoutRepository(() => new Date(Date.UTC(2026, 9, 10, 1, 0, tick++))));
+  handlers = createLayoutHandlers(createMemoryLayoutRepository(() => new Date(Date.UTC(2026, 9, 10, 1, 0, tick++))), asUser);
 });
 
 describe("POST /api/layouts", () => {
@@ -38,7 +53,7 @@ describe("POST /api/layouts", () => {
       expect.objectContaining({ id: "completeness/missing-counter", severity: "blocked", message: "ยังไม่มีเคาน์เตอร์" }),
     ]);
     expect(error.validation.status).toBe("blocked");
-    expect((await (await handlers.list()).json()).layouts).toEqual([]);
+    expect((await (await handlers.list(list())).json()).layouts).toEqual([]);
   });
 
   it("ไม่เชื่อผลตรวจจาก Client: ฟิลด์ validation ใน body ถูกปฏิเสธด้วย schema", async () => {
@@ -76,7 +91,7 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
   it("วงจรครบ: สร้าง → อ่าน → อัปเดต → รายการ → ลบ", async () => {
     const layout = cafeLayout();
     await handlers.create(post({ layout }));
-    expect((await (await handlers.get(layout.id)).json()).layout).toEqual(layout);
+    expect((await (await handlers.get(get(layout.id), layout.id)).json()).layout).toEqual(layout);
 
     const updated = { ...layout, width: 9 };
     const res = await handlers.update(put(layout.id, { layout: updated }), layout.id);
@@ -85,12 +100,12 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
     expect(body.layout.width).toBe(9);
     expect(body.updatedAt > body.createdAt).toBe(true);
 
-    const list = (await (await handlers.list()).json()).layouts;
-    expect(list).toEqual([expect.objectContaining({ id: layout.id, width: 9, status: "ready", objectCount: layout.objects.length })]);
+    const summaries = (await (await handlers.list(list())).json()).layouts;
+    expect(summaries).toEqual([expect.objectContaining({ id: layout.id, width: 9, status: "ready", objectCount: layout.objects.length })]);
 
-    expect((await handlers.remove(layout.id)).status).toBe(204);
-    expect((await handlers.get(layout.id)).status).toBe(404);
-    expect((await handlers.remove(layout.id)).status).toBe(404);
+    expect((await handlers.remove(del(layout.id), layout.id)).status).toBe(204);
+    expect((await handlers.get(get(layout.id), layout.id)).status).toBe(404);
+    expect((await handlers.remove(del(layout.id), layout.id)).status).toBe(404);
   });
 
   it("PUT ผัง Blocked → 422 และข้อมูลเดิมไม่เปลี่ยน", async () => {
@@ -98,7 +113,7 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
     await handlers.create(post({ layout }));
     const res = await handlers.update(put(layout.id, { layout: withoutType(layout, "kitchen") }), layout.id);
     expect(res.status).toBe(422);
-    expect((await (await handlers.get(layout.id)).json()).layout).toEqual(layout);
+    expect((await (await handlers.get(get(layout.id), layout.id)).json()).layout).toEqual(layout);
   });
 
   it("PUT id ใน URL ไม่ตรง → 400, ไม่มีผัง → 404", async () => {
@@ -108,14 +123,50 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
   });
 });
 
-describe("Next.js route modules", () => {
-  it("ต่อสายกับ handlers จริง (POST → GET → PUT → DELETE)", async () => {
+describe("Session & ความเป็นเจ้าของ (feat-031)", () => {
+  it("ไม่มี Session → 401 ทุก endpoint", async () => {
+    const layout = cafeLayout();
+    const results = await Promise.all([
+      handlers.list(list(null)),
+      handlers.create(post({ layout }, "application/json", null)),
+      handlers.get(get(layout.id, null), layout.id),
+      handlers.update(put(layout.id, { layout }, null), layout.id),
+      handlers.remove(del(layout.id, null), layout.id),
+    ]);
+    for (const res of results) {
+      expect(res.status).toBe(401);
+      expect((await res.json()).error.code).toBe("UNAUTHORIZED");
+    }
+  });
+
+  it("ผู้ใช้อื่นมองไม่เห็น/แก้/ลบผังที่ไม่ใช่ของตน (ตอบ 404 ไม่บอกว่ามีอยู่)", async () => {
+    const layout = cafeLayout();
+    await handlers.create(post({ layout }));
+    expect((await (await handlers.list(list("bob"))).json()).layouts).toEqual([]);
+    expect((await handlers.get(get(layout.id, "bob"), layout.id)).status).toBe(404);
+    expect((await handlers.update(put(layout.id, { layout }, "bob"), layout.id)).status).toBe(404);
+    expect((await handlers.remove(del(layout.id, "bob"), layout.id)).status).toBe(404);
+    expect((await handlers.get(get(layout.id), layout.id)).status).toBe(200);
+  });
+});
+
+describe("Next.js route modules (Session Cookie จริงของ Auth.js)", () => {
+  it("ต่อสายกับ handlers จริง (POST → GET → PUT → DELETE) และไม่มี cookie → 401", async () => {
     const layout = { ...cafeLayout(), id: `route-${Date.now()}` };
+    const cookie = await sessionCookie("guest-route-test");
+    const withCookie = (path: string, init: RequestInit = {}) => {
+      const headers = new Headers(init.headers);
+      headers.set("cookie", cookie);
+      return new Request(`${url}${path}`, { ...init, headers });
+    };
+    const json = { "content-type": "application/json" };
     const params = Promise.resolve({ id: layout.id });
-    expect((await listRoute.POST(post({ layout }))).status).toBe(201);
-    expect((await listRoute.GET()).status).toBe(200);
-    expect((await itemRoute.GET(new Request(`${url}/${layout.id}`), { params })).status).toBe(200);
-    expect((await itemRoute.PUT(put(layout.id, { layout }), { params })).status).toBe(200);
-    expect((await itemRoute.DELETE(new Request(`${url}/${layout.id}`), { params })).status).toBe(204);
+    expect((await listRoute.GET(new Request(url))).status).toBe(401);
+    expect((await listRoute.POST(withCookie("", { method: "POST", headers: json, body: JSON.stringify({ layout }) }))).status).toBe(201);
+    const listed = await (await listRoute.GET(withCookie(""))).json();
+    expect(listed.layouts).toEqual([expect.objectContaining({ id: layout.id })]);
+    expect((await itemRoute.GET(withCookie(`/${layout.id}`), { params })).status).toBe(200);
+    expect((await itemRoute.PUT(withCookie(`/${layout.id}`, { method: "PUT", headers: json, body: JSON.stringify({ layout }) }), { params })).status).toBe(200);
+    expect((await itemRoute.DELETE(withCookie(`/${layout.id}`, { method: "DELETE" }), { params })).status).toBe(204);
   });
 });

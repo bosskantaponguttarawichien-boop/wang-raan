@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { AppProviders } from "@/components/providers/app-providers";
 
 export const metadata: Metadata = { title: "Playground — จัดผังร้าน" };
 
@@ -21,7 +22,9 @@ export default function PlaygroundLayout({ children }: Readonly<{ children: Reac
           โหมดออกแบบ · จัดร้านก่อน แล้วค่อยจำลองลูกค้า
         </span>
       </header>
-      <main>{children}</main>
+      <main>
+        <AppProviders>{children}</AppProviders>
+      </main>
     </div>
   );
 }
