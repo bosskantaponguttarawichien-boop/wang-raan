@@ -1,0 +1,92 @@
+# CI (feat-043) — ทุก PR และทุก push เข้า main ต้องผ่านครบก่อน merge
+# คำสั่งในแต่ละขั้นเหมือนที่รันในเครื่อง (Makefile / npm scripts)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# push ใหม่ใน branch เดิม → ยกเลิกรอบเก่า
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  WRANGLER_SEND_METRICS: "false"
+
+jobs:
+  checks:
+    name: Lint + Unit + Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Harness (schema / dependencies ของ feature list)
+        run: make status
+      - name: Lint (ESLint + TypeScript + boundary ของ src/core + สัญญา API)
+        run: make lint
+      - name: Unit tests (รวม contract test และ Backend จำลอง)
+        run: make test
+      - name: Smoke test ของ package core
+        run: npm run core:smoke
+
+  e2e:
+    name: E2E (Node — Chromium + WebKit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Chromium ใช้ Google Chrome ที่มากับ runner (playwright.config.ts → channel: "chrome")
+      - name: ติดตั้ง WebKit
+        run: npx playwright install --with-deps webkit
+      - name: E2E + Responsive + Accessibility
+        run: make e2e
+        env:
+          E2E_WEBKIT: "1"
+      - name: เก็บรายงานเมื่อไม่ผ่าน
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-node
+          path: |
+            e2e/.report
+            e2e/.results
+          retention-days: 7
+
+  e2e-cloudflare:
+    name: E2E (Cloudflare Workers runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: E2E บน workerd (wrangler dev)
+        run: make e2e-cf
+      - name: เก็บรายงานเมื่อไม่ผ่าน
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-cloudflare
+          path: |
+            e2e/.report
+            e2e/.results
+          retention-days: 7
