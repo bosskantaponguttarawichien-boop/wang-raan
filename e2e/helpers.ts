@@ -1,4 +1,19 @@
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
+
+/** Backend จำลองที่ playwright.config.ts เปิดไว้ — มีคำสั่งควบคุม /__mock/* สำหรับเทสต์ */
+export const MOCK_BACKEND = "http://localhost:4010";
+
+/** สั่ง Backend จำลอง (เช่น `mockControl(request, "outage", { subject })`) */
+export async function mockControl(request: APIRequestContext, path: string, data?: unknown) {
+  const res = await request.post(`${MOCK_BACKEND}/__mock/${path}`, data === undefined ? {} : { data });
+  if (!res.ok()) throw new Error(`mock control ${path} → ${res.status()}`);
+}
+
+/** id ผู้ใช้ของ session ปัจจุบัน (ใช้สั่ง outage เฉพาะผู้ใช้) */
+export async function sessionUserId(page: Page): Promise<string> {
+  const session = await (await page.request.get("/api/auth/session")).json();
+  return session.user.id as string;
+}
 
 /** 6 breakpoints ตาม AGENTS.md / PRD */
 export const BREAKPOINTS = [320, 375, 480, 768, 1024, 1440] as const;

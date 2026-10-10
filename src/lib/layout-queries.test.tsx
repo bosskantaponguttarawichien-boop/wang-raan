@@ -13,7 +13,10 @@ import {
   useLayoutsQuery,
   useLoadLayout,
   useSaveLayoutMutation,
+  useRevokeShareMutation,
   useShareMutation,
+  useSharesQuery,
+  useUpdateShareMutation,
 } from "./layout-queries";
 
 type Route = (req: { method: string; path: string; body: unknown }) => Response | Promise<Response>;
@@ -171,7 +174,9 @@ describe("React Query hooks (feat-033 gate: Loading/Error แม่นยำ)", 
     const layout = cafeLayout();
     const stored = { layout, validation: validateLayout(layout), createdAt: "a", updatedAt: "b" };
     const { calls, client } = fakeBff(({ path }) =>
-      path === "/api/share" ? Response.json({ shareKey: "k", url: "http://x/share/k", createdAt: "c" }, { status: 201 }) : Response.json(stored),
+      path === "/api/share"
+        ? Response.json({ shareKey: "k", url: "http://x/share/k", layoutId: layout.id, status: "active", createdAt: "c", expiresAt: "e", revokedAt: null }, { status: 201 })
+        : Response.json(stored),
     );
     const { wrapper } = setup();
     const load = renderHook(() => useLoadLayout(client), { wrapper });
@@ -180,9 +185,32 @@ describe("React Query hooks (feat-033 gate: Loading/Error แม่นยำ)", 
     expect(calls.filter((c) => c.path.startsWith("/api/layouts/"))).toHaveLength(1);
 
     const share = renderHook(() => useShareMutation(client), { wrapper });
-    act(() => share.result.current.mutate(layout.id));
+    act(() => share.result.current.mutate({ layoutId: layout.id, expiresAt: "2026-10-17T06:00:00.000Z" }));
     await waitFor(() => expect(share.result.current.data?.url).toBe("http://x/share/k"));
-    expect(calls.at(-1)).toMatchObject({ method: "POST", body: { layoutId: layout.id } });
+    expect(calls.at(-1)).toMatchObject({ method: "POST", body: { layoutId: layout.id, expiresAt: "2026-10-17T06:00:00.000Z" } });
+  });
+
+  it("ลิงก์แชร์ (feat-040): รายการ → ตั้งอายุใหม่แทนในแคช → ยกเลิกแล้วสถานะเป็น revoked ทันที", async () => {
+    const base = { url: "http://x/share/k", layoutId: "l1", createdAt: "c", expiresAt: null, revokedAt: null };
+    const link = { ...base, shareKey: "k", status: "active" };
+    const { calls, client } = fakeBff(({ path, method }) => {
+      if (method === "GET" && path === "/api/layouts/l1/shares") return Response.json({ shares: [link] });
+      if (method === "PATCH") return Response.json({ ...link, expiresAt: "2026-10-11T06:00:00.000Z" });
+      if (method === "DELETE") return new Response(null, { status: 204 });
+      return Response.json({}, { status: 500 });
+    });
+    const { wrapper } = setup();
+    const hooks = renderHook(
+      () => ({ list: useSharesQuery("l1", true, client), update: useUpdateShareMutation(client), revoke: useRevokeShareMutation(client) }),
+      { wrapper },
+    );
+    await waitFor(() => expect(hooks.result.current.list.data).toEqual([link]));
+    act(() => hooks.result.current.update.mutate({ shareKey: "k", expiresAt: "2026-10-11T06:00:00.000Z" }));
+    await waitFor(() => expect(hooks.result.current.list.data?.[0]?.expiresAt).toBe("2026-10-11T06:00:00.000Z"));
+    expect(calls.find((c) => c.method === "PATCH")).toMatchObject({ path: "/api/share/k", body: { expiresAt: "2026-10-11T06:00:00.000Z" } });
+    act(() => hooks.result.current.revoke.mutate(hooks.result.current.list.data![0]!));
+    await waitFor(() => expect(hooks.result.current.revoke.isSuccess).toBe(true));
+    expect(calls.some((c) => c.method === "DELETE" && c.path === "/api/share/k")).toBe(true);
   });
 
   it("retry: 5xx ลองซ้ำ, 4xx ไม่ลอง", () => {

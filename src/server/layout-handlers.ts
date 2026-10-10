@@ -7,7 +7,9 @@ import "server-only";
  */
 import type { ZodError } from "zod";
 import { SaveLayoutRequestSchema, validateLayout } from "@/core/validation";
-import { BackendError, type LayoutRepository } from "./layout-repository";
+import { BackendConfigError, BackendError } from "./backend";
+import { LAYOUT_LIMIT, SHARE_LIMIT } from "./limits";
+import type { LayoutRepository } from "./layout-repository";
 import type { ResolveUser } from "./session";
 
 export const MAX_BODY_BYTES = 512 * 1024;
@@ -92,12 +94,52 @@ async function parseAndValidate(request: Request) {
 
 export const unauthorized = () => problem(401, "UNAUTHORIZED", "กรุณาเข้าสู่ระบบก่อน");
 
-/** Backend ตอบผิดปกติ → 502 (ไม่ส่งรายละเอียดภายในออกไป) */
+const minutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60));
+
+/**
+ * error จาก Backend ที่ผู้ใช้ควรเห็น (ส่งต่อสถานะ + code พร้อมข้อความภาษาไทย) — code อื่นทั้งหมดถือว่า Backend ขัดข้อง
+ * อ้างอิงรายการ code: contracts/openapi.yaml → ErrorCode
+ */
+const FORWARDED: Record<string, (detail: Record<string, unknown>) => string> = {
+  LAYOUT_BLOCKED: () => "ผังยังไม่ผ่านกฎจำเป็น จึงบันทึกหรือแชร์ไม่ได้",
+  LAYOUT_LIMIT_REACHED: () => `บัญชีนี้บันทึกผังครบ ${LAYOUT_LIMIT} ผังแล้ว — ลบผังที่ไม่ใช้ก่อน`,
+  SHARE_LIMIT_REACHED: () => `ผังนี้มีลิงก์แชร์ที่ใช้งานได้ครบ ${SHARE_LIMIT} ลิงก์แล้ว — ยกเลิกลิงก์เก่าก่อน`,
+  SHARE_REVOKED: () => "ลิงก์นี้ถูกยกเลิกแล้ว",
+  SHARE_EXPIRED: () => "ลิงก์นี้หมดอายุแล้ว",
+  PAYLOAD_TOO_LARGE: () => "ข้อมูลมีขนาดใหญ่เกินกำหนด",
+  INVALID_REQUEST: () => "ข้อมูลไม่ถูกต้อง",
+  INVALID_LAYOUT_SCHEMA: () => "โครงสร้างข้อมูลผังไม่ถูกต้อง",
+  RATE_LIMITED: (d) => `ส่งคำขอถี่เกินไป กรุณารออีก ${minutes(Number(d.retryAfter) || 60)} นาที`,
+};
+const FORWARDED_STATUS = new Set([400, 409, 410, 413, 422, 429]);
+
+/** ตอบ 429 พร้อม Retry-After */
+export function tooManyRequests(message: string, retryAfter: number): Response {
+  const res = problem(429, "RATE_LIMITED", message, { retryAfter });
+  res.headers.set("Retry-After", String(retryAfter));
+  return res;
+}
+
+export function backendProblem(error: BackendError): Response {
+  const message = error.code && FORWARDED_STATUS.has(error.status) ? FORWARDED[error.code] : undefined;
+  if (!message) {
+    // ผู้ใช้เห็นแค่ข้อความกลาง ๆ — รายละเอียดอยู่ใน log (เช่น 401 = INTERNAL_TOKEN_SECRET ไม่ตรงกับ Backend, 0 = ติดต่อไม่ได้/หมดเวลา)
+    console.error("[wang-raan] Backend error", { status: error.status, code: error.code, path: error.path, cause: error.detail.cause });
+    return problem(502, "BACKEND_ERROR", "ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง");
+  }
+  const text = message(error.detail);
+  if (error.code === "RATE_LIMITED") return tooManyRequests(text, Number(error.detail.retryAfter) || 60);
+  const { validation, issues } = error.detail;
+  return problem(error.status, error.code!, text, error.code === "LAYOUT_BLOCKED" ? { validation, issues } : {});
+}
+
+/** Backend ตอบผิดปกติ → แปลงเป็น response ที่ปลอดภัย (ไม่ส่งรายละเอียดภายในออกไป) */
 export async function withBackendErrors(run: () => Promise<Response>): Promise<Response> {
   try {
     return await run();
   } catch (error) {
-    if (error instanceof BackendError) return problem(502, "BACKEND_ERROR", "ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง");
+    if (error instanceof BackendError) return backendProblem(error);
+    if (error instanceof BackendConfigError) return problem(503, "BACKEND_NOT_CONFIGURED", "ระบบจัดเก็บข้อมูลยังไม่พร้อมใช้งาน");
     throw error;
   }
 }
@@ -115,7 +157,7 @@ export function createLayoutHandlers(repo: LayoutRepository, resolveUser: Resolv
       if (!user) return unauthorized();
       const result = await parseAndValidate(request);
       if (!result.ok) return result.response;
-      const stored = await repo.create(user.id, result.layout, result.validation);
+      const stored = await repo.create(user.id, result.layout);
       if (stored === "conflict") return problem(409, "LAYOUT_EXISTS", "มีผังรหัสนี้อยู่แล้ว ใช้ PUT เพื่ออัปเดต");
       return json(stored, 201);
     },
@@ -133,7 +175,7 @@ export function createLayoutHandlers(repo: LayoutRepository, resolveUser: Resolv
       const result = await parseAndValidate(request);
       if (!result.ok) return result.response;
       if (result.layout.id !== id) return problem(400, "ID_MISMATCH", "รหัสผังใน URL ไม่ตรงกับข้อมูล");
-      const stored = await repo.update(user.id, result.layout, result.validation);
+      const stored = await repo.update(user.id, result.layout);
       return stored === "not-found" ? problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้") : json(stored);
     },
 

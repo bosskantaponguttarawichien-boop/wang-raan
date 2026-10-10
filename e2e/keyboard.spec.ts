@@ -14,11 +14,13 @@ async function focusedOutline(page: Page) {
 }
 
 test.describe("Landing", () => {
-  test("Tab ผ่านเมนูไปถึงปุ่มเริ่มจัดร้าน และทุกจุดมี focus ring 3px", async ({ page }) => {
+  test("Tab ผ่านเมนูไปถึงปุ่มเริ่มจัดร้าน และทุกจุดมี focus ring 3px", async ({ page, browserName }) => {
     await page.goto("/");
+    // Safari ค่าเริ่มต้น: Tab โฟกัสเฉพาะช่องกรอกฟอร์ม — ลิงก์/ปุ่มต้องใช้ Option+Tab (ผู้ใช้คีย์บอร์ดบน Safari ใช้แบบนี้)
+    const tab = browserName === "webkit" ? "Alt+Tab" : "Tab";
     const seen: string[] = [];
     for (let i = 0; i < 8; i++) {
-      await page.keyboard.press("Tab");
+      await page.keyboard.press(tab);
       const f = await focusedOutline(page);
       expect(f.outline).toMatch(/solid 3px/);
       seen.push(String(f.name));

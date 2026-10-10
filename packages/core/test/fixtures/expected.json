@@ -1,0 +1,21 @@
+{
+  "ready": {
+    "status": "ready",
+    "layoutRevision": "rev-3a8c492fb6592995",
+    "issueIds": []
+  },
+  "warning": {
+    "status": "warning",
+    "layoutRevision": "rev-e09d0488504e1826",
+    "issueIds": [
+      "completeness/table-without-chairs/table-01"
+    ]
+  },
+  "blocked": {
+    "status": "blocked",
+    "layoutRevision": "rev-12ed1708c72de5fe",
+    "issueIds": [
+      "completeness/missing-entrance"
+    ]
+  }
+}

@@ -79,19 +79,48 @@ export interface BackendClientOptions {
   secret: string;
   fetch?: typeof fetch;
   now?: () => Date;
+  /** หมดเวลารอ Backend ต่อครั้ง (ค่าเริ่มต้น 8 วินาที) */
+  timeoutMs?: number;
+  /** หน่วงก่อนลองซ้ำ (เทสต์ตั้งเป็น 0) */
+  retryDelayMs?: number;
 }
 
-/** Fetch ไป Backend พร้อมแนบ Bearer token ของผู้ใช้ทุกครั้ง (ไม่ส่ง Cookie ของผู้ใช้ต่อ) */
+/** `sub` ของคำขอที่ไม่มีผู้ใช้ล็อกอิน (contracts/openapi.yaml — ใช้ได้เฉพาะ endpoint ที่ x-allow-anonymous) */
+export const ANONYMOUS_SUBJECT = "anonymous";
+export const BACKEND_TIMEOUT_MS = 8000;
+const RETRYABLE = new Set([502, 503, 504]);
+
+/**
+ * Fetch ไป Backend พร้อมแนบ Bearer token ของผู้ใช้ทุกครั้ง (ไม่ส่ง Cookie ของผู้ใช้ต่อ)
+ * - userId = null → token `sub: anonymous`
+ * - GET ลองซ้ำ 1 ครั้งเมื่อเครือข่ายล้ม หรือ Backend ตอบ 502/503/504 (คำขอที่แก้ข้อมูลไม่ลองซ้ำ กันบันทึกซ้อน)
+ * - หมดเวลาไม่ลองซ้ำ: Backend ที่ช้าอยู่แล้วจะยิ่งช้า และผู้ใช้ต้องรอเป็นสองเท่า
+ */
 export function createBackendClient(options: BackendClientOptions) {
   const doFetch = options.fetch ?? fetch;
+  const timeoutMs = options.timeoutMs ?? BACKEND_TIMEOUT_MS;
+  const retryDelayMs = options.retryDelayMs ?? 150;
   return {
-    async request(userId: string, path: string, init: RequestInit = {}): Promise<Response> {
-      const headers = new Headers(init.headers);
-      headers.delete("cookie");
-      headers.set("authorization", `Bearer ${await createInternalToken(userId, options.secret, { now: options.now?.() })}`);
-      headers.set("x-request-id", globalThis.crypto.randomUUID());
-      if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
-      return doFetch(new URL(path, options.baseUrl), { ...init, headers, cache: "no-store" });
+    async request(userId: string | null, path: string, init: RequestInit = {}): Promise<Response> {
+      const subject = userId ?? ANONYMOUS_SUBJECT;
+      const attempt = async () => {
+        const headers = new Headers(init.headers);
+        headers.delete("cookie");
+        headers.set("authorization", `Bearer ${await createInternalToken(subject, options.secret, { now: options.now?.() })}`);
+        headers.set("x-request-id", globalThis.crypto.randomUUID());
+        if (init.body && !headers.has("content-type")) headers.set("content-type", "application/json");
+        return doFetch(new URL(path, options.baseUrl), { ...init, headers, cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+      };
+      if ((init.method ?? "GET").toUpperCase() !== "GET") return attempt();
+      const retry = () => new Promise<void>((r) => setTimeout(r, retryDelayMs)).then(attempt);
+      let res: Response;
+      try {
+        res = await attempt();
+      } catch (error) {
+        if (error instanceof Error && error.name === "TimeoutError") throw error;
+        return retry();
+      }
+      return RETRYABLE.has(res.status) ? retry() : res;
     },
   };
 }

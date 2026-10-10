@@ -12,7 +12,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "core:build": "tsup --config packages/core/tsup.config.ts",
+    "core:smoke": "bash scripts/smoke-core-package.sh",
+    "mock:build": "tsup --config mock-backend/tsup.config.ts",
+    "mock:start": "node mock-backend/dist/server.mjs",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "wrangler dev --env local"
   },
   "engines": {
     "node": ">=20"
@@ -37,7 +43,9 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
     "@eslint/eslintrc": "^3.3.7",
+    "@opennextjs/cloudflare": "^1.20.10",
     "@playwright/test": "^1.64.0",
+    "@redocly/cli": "2.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/jest-dom": "^7.0.1",
@@ -48,11 +56,16 @@
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
     "@vitest/coverage-v8": "^5.0.3",
+    "ajv": "8.20.0",
+    "ajv-formats": "2.1.1",
     "eslint": "^9.39.5",
     "eslint-config-next": "^15.5.27",
     "jsdom": "^30.1.2",
     "tailwindcss": "^4.3.3",
+    "tsup": "8.5.1",
     "typescript": "^5.9.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.3",
+    "wrangler": "^4.149.0",
+    "yaml": "2.9.1"
   }
 }

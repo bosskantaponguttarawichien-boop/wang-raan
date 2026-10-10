@@ -9,12 +9,13 @@ import { QueryClient, useMutation, useQuery, useQueryClient } from "@tanstack/re
 import { useState } from "react";
 import type { StoreLayout } from "@/core/layout";
 import { validateLayout } from "@/core/validation";
-import { ApiError, api, type ApiClient, type LayoutSummaryDto } from "./api-client";
+import { ApiError, api, type ApiClient, type LayoutSummaryDto, type ShareDto } from "./api-client";
 
 export const layoutKeys = {
   all: ["layouts"] as const,
   list: () => [...layoutKeys.all, "list"] as const,
   detail: (id: string) => [...layoutKeys.all, "detail", id] as const,
+  shares: (id: string) => [...layoutKeys.all, "shares", id] as const,
 };
 
 export function createQueryClient() {
@@ -66,7 +67,11 @@ export function useSaveLayoutMutation(client: ApiClient = api) {
     onError: (_error, _layout, context) => {
       if (context?.previous) queryClient.setQueryData(layoutKeys.list(), context.previous);
     },
-    onSuccess: (stored) => queryClient.setQueryData(layoutKeys.detail(stored.layout.id), stored),
+    onSuccess: (stored) => {
+      queryClient.setQueryData(layoutKeys.detail(stored.layout.id), stored);
+      // ผังเพิ่งมีใน Backend — โหลดรายการลิงก์ใหม่ (ถ้าเคยโหลดก่อนบันทึกเสร็จจะค้าง 404)
+      void queryClient.invalidateQueries({ queryKey: layoutKeys.shares(stored.layout.id) });
+    },
     onSettled: () => queryClient.invalidateQueries({ queryKey: layoutKeys.list() }),
   });
 }
@@ -95,6 +100,37 @@ export function useLoadLayout(client: ApiClient = api) {
   return (id: string) => queryClient.fetchQuery({ queryKey: layoutKeys.detail(id), queryFn: () => client.getLayout(id) });
 }
 
+/** ลิงก์แชร์ของผัง (feat-040) — เปิดใช้เมื่อผังถูกบันทึกในบัญชีแล้ว */
+export function useSharesQuery(layoutId: string, enabled: boolean, client: ApiClient = api) {
+  return useQuery({ queryKey: layoutKeys.shares(layoutId), queryFn: () => client.listShares(layoutId), enabled });
+}
+
 export function useShareMutation(client: ApiClient = api) {
-  return useMutation({ mutationFn: (layoutId: string) => client.createShare(layoutId) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ layoutId, expiresAt = null }: { layoutId: string; expiresAt?: string | null }) => client.createShare(layoutId, expiresAt),
+    onSuccess: (share) => queryClient.invalidateQueries({ queryKey: layoutKeys.shares(share.layoutId) }),
+  });
+}
+
+/** แทนลิงก์ในแคชรายการด้วยค่าล่าสุดจาก server */
+function replaceShare(queryClient: ReturnType<typeof useQueryClient>, share: ShareDto) {
+  queryClient.setQueryData<ShareDto[]>(layoutKeys.shares(share.layoutId), (list) => list?.map((s) => (s.shareKey === share.shareKey ? share : s)));
+}
+
+export function useUpdateShareMutation(client: ApiClient = api) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ shareKey, expiresAt }: { shareKey: string; expiresAt: string | null }) => client.updateShare(shareKey, expiresAt),
+    onSuccess: (share) => replaceShare(queryClient, share),
+  });
+}
+
+export function useRevokeShareMutation(client: ApiClient = api) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (share: ShareDto) => client.revokeShare(share.shareKey),
+    onSuccess: (_data, share) => replaceShare(queryClient, { ...share, status: "revoked", revokedAt: new Date().toISOString() }),
+    onSettled: (_data, _error, share) => queryClient.invalidateQueries({ queryKey: layoutKeys.shares(share.layoutId) }),
+  });
 }

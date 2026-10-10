@@ -1,10 +1,10 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cafeLayout, withoutType } from "@/test/fixtures/layouts";
 import * as listRoute from "../../app/api/layouts/route";
 import * as itemRoute from "../../app/api/layouts/[id]/route";
 import { MAX_BODY_BYTES, createLayoutHandlers } from "./layout-handlers";
-import { createMemoryLayoutRepository } from "./layout-repository";
 import type { ResolveUser } from "./session";
+import { testBackend } from "@/test/backend";
 import { sessionCookie } from "@/test/session";
 
 const url = "http://localhost/api/layouts";
@@ -27,10 +27,14 @@ const del = (id: string, user: string | null = "alice") => req(`/${id}`, { metho
 const list = (user: string | null = "alice") => req("", {}, user);
 
 let handlers: ReturnType<typeof createLayoutHandlers>;
+let backend: ReturnType<typeof testBackend>;
 beforeEach(() => {
   let tick = 0;
-  handlers = createLayoutHandlers(createMemoryLayoutRepository(() => new Date(Date.UTC(2026, 9, 10, 1, 0, tick++))), asUser);
+  backend = testBackend({ now: () => new Date(Date.UTC(2026, 9, 10, 1, 0, tick++)) });
+  handlers = createLayoutHandlers(backend.layouts, asUser);
 });
+// ทุกคำขอที่ BFF ส่งไป Backend ต้องตรงสัญญา contracts/openapi.yaml
+afterEach(() => expect(backend.violations).toEqual([]));
 
 describe("POST /api/layouts", () => {
   it("ผัง Ready → 201 พร้อมผลตรวจที่ server คำนวณเอง", async () => {

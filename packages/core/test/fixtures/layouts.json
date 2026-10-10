@@ -1,0 +1,321 @@
+{
+  "ready": {
+    "id": "layout-01",
+    "version": 1,
+    "units": "m",
+    "width": 8,
+    "depth": 6,
+    "entrance": {
+      "id": "entrance-01",
+      "wall": "south",
+      "position": 1.25,
+      "width": 1.2
+    },
+    "objects": [
+      {
+        "id": "kitchen-01",
+        "type": "kitchen",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 2,
+        "depth": 1.5,
+        "rotation": 0
+      },
+      {
+        "id": "counter-01",
+        "type": "counter",
+        "x": 5,
+        "y": 0.5,
+        "width": 2.4,
+        "depth": 0.7,
+        "rotation": 0
+      },
+      {
+        "id": "table-01",
+        "type": "table",
+        "preset": "table-4-seats",
+        "x": 3,
+        "y": 3,
+        "width": 1.2,
+        "depth": 1.2,
+        "rotation": 0,
+        "chairIds": [
+          "chair-01",
+          "chair-02",
+          "chair-03",
+          "chair-04"
+        ]
+      },
+      {
+        "id": "chair-01",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 3.35,
+        "y": 2.6,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 180
+      },
+      {
+        "id": "chair-02",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 4.1,
+        "y": 3.35,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 270
+      },
+      {
+        "id": "chair-03",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 3.35,
+        "y": 4.1,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 0
+      },
+      {
+        "id": "chair-04",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 2.6,
+        "y": 3.35,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 90
+      },
+      {
+        "id": "table-02",
+        "type": "table",
+        "preset": "table-2-seats",
+        "x": 6,
+        "y": 3.5,
+        "width": 0.8,
+        "depth": 0.8,
+        "rotation": 0,
+        "chairIds": [
+          "chair-05",
+          "chair-06"
+        ]
+      },
+      {
+        "id": "chair-05",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 3.1,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 180
+      },
+      {
+        "id": "chair-06",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 4.2,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 0
+      }
+    ]
+  },
+  "warning": {
+    "id": "layout-01",
+    "version": 1,
+    "units": "m",
+    "width": 8,
+    "depth": 6,
+    "entrance": {
+      "id": "entrance-01",
+      "wall": "south",
+      "position": 1.25,
+      "width": 1.2
+    },
+    "objects": [
+      {
+        "id": "kitchen-01",
+        "type": "kitchen",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 2,
+        "depth": 1.5,
+        "rotation": 0
+      },
+      {
+        "id": "counter-01",
+        "type": "counter",
+        "x": 5,
+        "y": 0.5,
+        "width": 2.4,
+        "depth": 0.7,
+        "rotation": 0
+      },
+      {
+        "id": "table-01",
+        "type": "table",
+        "preset": "table-4-seats",
+        "x": 3,
+        "y": 3,
+        "width": 1.2,
+        "depth": 1.2,
+        "rotation": 0,
+        "chairIds": []
+      },
+      {
+        "id": "table-02",
+        "type": "table",
+        "preset": "table-2-seats",
+        "x": 6,
+        "y": 3.5,
+        "width": 0.8,
+        "depth": 0.8,
+        "rotation": 0,
+        "chairIds": [
+          "chair-05",
+          "chair-06"
+        ]
+      },
+      {
+        "id": "chair-05",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 3.1,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 180
+      },
+      {
+        "id": "chair-06",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 4.2,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 0
+      }
+    ]
+  },
+  "blocked": {
+    "id": "layout-01",
+    "version": 1,
+    "units": "m",
+    "width": 8,
+    "depth": 6,
+    "entrance": null,
+    "objects": [
+      {
+        "id": "kitchen-01",
+        "type": "kitchen",
+        "x": 0.5,
+        "y": 0.5,
+        "width": 2,
+        "depth": 1.5,
+        "rotation": 0
+      },
+      {
+        "id": "counter-01",
+        "type": "counter",
+        "x": 5,
+        "y": 0.5,
+        "width": 2.4,
+        "depth": 0.7,
+        "rotation": 0
+      },
+      {
+        "id": "table-01",
+        "type": "table",
+        "preset": "table-4-seats",
+        "x": 3,
+        "y": 3,
+        "width": 1.2,
+        "depth": 1.2,
+        "rotation": 0,
+        "chairIds": [
+          "chair-01",
+          "chair-02",
+          "chair-03",
+          "chair-04"
+        ]
+      },
+      {
+        "id": "chair-01",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 3.35,
+        "y": 2.6,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 180
+      },
+      {
+        "id": "chair-02",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 4.1,
+        "y": 3.35,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 270
+      },
+      {
+        "id": "chair-03",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 3.35,
+        "y": 4.1,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 0
+      },
+      {
+        "id": "chair-04",
+        "type": "chair",
+        "tableId": "table-01",
+        "x": 2.6,
+        "y": 3.35,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 90
+      },
+      {
+        "id": "table-02",
+        "type": "table",
+        "preset": "table-2-seats",
+        "x": 6,
+        "y": 3.5,
+        "width": 0.8,
+        "depth": 0.8,
+        "rotation": 0,
+        "chairIds": [
+          "chair-05",
+          "chair-06"
+        ]
+      },
+      {
+        "id": "chair-05",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 3.1,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 180
+      },
+      {
+        "id": "chair-06",
+        "type": "chair",
+        "tableId": "table-02",
+        "x": 6.15,
+        "y": 4.2,
+        "width": 0.5,
+        "depth": 0.5,
+        "rotation": 0
+      }
+    ]
+  }
+}

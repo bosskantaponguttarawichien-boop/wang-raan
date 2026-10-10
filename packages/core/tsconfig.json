@@ -1,0 +1,15 @@
+{
+  // ใช้สร้าง .d.ts ของ package — lib ไม่มี "dom" โดยตั้งใจ: โค้ดที่ export ต้องรันบน Node/Worker ได้โดยไม่พึ่ง DOM
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "include": ["src/**/*.ts"]
+}

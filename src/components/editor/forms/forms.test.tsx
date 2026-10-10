@@ -208,4 +208,20 @@ describe("ObjectInspector", () => {
     await user.click(screen.getByRole("button", { name: /ลบทั้งชุดโต๊ะ/ }));
     expect(state().layout.objects.some((o) => o.id === table.id || (o.type === "chair" && o.tableId === table.id))).toBe(false);
   });
+
+  it("เลือกเก้าอี้แล้วกดลบ → ลบเฉพาะเก้าอี้ตัวนั้น โต๊ะและเก้าอี้ตัวอื่นยังอยู่ (feat-034)", async () => {
+    const user = userEvent.setup();
+    const table = state().layout.objects.find((o) => o.type === "table" && o.chairIds.length > 1)!;
+    if (table.type !== "table") throw new Error("fixture");
+    const [chairId, ...otherChairs] = table.chairIds;
+    act(() => state().selectObject(chairId!));
+    render(<ObjectInspector />);
+    expect(screen.queryByRole("button", { name: /ลบทั้งชุดโต๊ะ/ })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "× ลบเก้าอี้ตัวนี้" }));
+    const objects = state().layout.objects;
+    expect(objects.some((o) => o.id === chairId)).toBe(false);
+    const remaining = objects.find((o) => o.id === table.id);
+    expect(remaining?.type === "table" && remaining.chairIds).toEqual(otherChairs);
+    expect(otherChairs.every((id) => objects.some((o) => o.id === id))).toBe(true);
+  });
 });

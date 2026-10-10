@@ -42,3 +42,13 @@ next-env.d.ts
 # python
 __pycache__/
 *.pyc
+
+# package core (feat-037) — build ด้วย npm run core:build
+/packages/*/dist/
+/mock-backend/dist/
+
+# Cloudflare (feat-035)
+/.open-next/
+/.wrangler/
+.dev.vars*
+!.dev.vars.example

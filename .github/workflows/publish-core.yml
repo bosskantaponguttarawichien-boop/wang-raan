@@ -1,0 +1,45 @@
+# เผยแพร่ package core ไป GitHub Packages (feat-037)
+# วิธีปล่อยเวอร์ชันใหม่: แก้ version ใน packages/core/package.json + CHANGELOG.md → merge → push tag `core-v<version>` เช่น core-v1.0.0
+name: Publish core package
+
+on:
+  push:
+    tags: ["core-v*"]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@bosskantaponguttarawichien-boop"
+
+      - run: npm ci
+
+      - name: tag ต้องตรงกับ version ใน package.json
+        run: |
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          if [ "${GITHUB_REF_NAME}" != "core-v${VERSION}" ]; then
+            echo "tag ${GITHUB_REF_NAME} ไม่ตรงกับ version ${VERSION}"; exit 1
+          fi
+
+      - name: เทสต์ทั้งหมด (กฎใน src/core ต้องผ่านก่อนเผยแพร่)
+        run: npm test
+
+      - name: Smoke test (build + pack + ติดตั้งในโปรเจกต์เปล่า)
+        run: npm run core:smoke
+
+      - name: Publish
+        working-directory: packages/core
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

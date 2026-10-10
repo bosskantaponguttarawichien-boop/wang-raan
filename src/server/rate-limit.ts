@@ -1,7 +1,8 @@
 import "server-only";
 /**
  * Rate Limiter แบบ Fixed Window ในหน่วยความจำ (feat-032)
- * พอสำหรับ server เดียว — ถ้าขยายหลายเครื่องต้องย้ายตัวนับไปที่ Redis/KV โดยคง interface `hit()` เดิม
+ * ตั้งแต่ feat-039 BFF ไม่นับเองแล้ว (Backend เป็นคนนับ) — ใช้ใน Backend จำลอง (mock-backend) เท่านั้น
+ * `clientIp()` ยังใช้ที่ BFF เพื่อส่ง X-Client-IP ให้ Backend
  */
 export interface RateLimitResult {
   allowed: boolean;
@@ -51,11 +52,16 @@ export type RateLimiter = ReturnType<typeof createRateLimiter>;
  * proxy N ชั้น (TRUSTED_PROXY_HOPS, เช่น Vercel / Nginx = 1) → ค่าลำดับที่ N นับจากขวา
  * ไม่มี proxy (0) → ค่าขวาสุด ซึ่งยังปลอมได้ จึงต้องมีเพดานรวม (global limiter) ใน handler เสมอ
  */
-export function clientIp(request: Request, trustedHops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0)): string {
-  const chain = (request.headers.get("x-forwarded-for") ?? "")
+export function clientIp(request: Request, trustedHops?: number): string {
+  return clientIpFrom(request.headers, trustedHops);
+}
+
+/** เหมือน clientIp แต่รับ Headers (ใช้ใน Server Component ผ่าน `headers()` ของ Next.js) */
+export function clientIpFrom(headers: Headers, trustedHops = Number(process.env.TRUSTED_PROXY_HOPS ?? 0)): string {
+  const chain = (headers.get("x-forwarded-for") ?? "")
     .split(",")
     .map((ip) => ip.trim())
     .filter(Boolean);
   const hops = Number.isFinite(trustedHops) && trustedHops > 0 ? Math.floor(trustedHops) : 1;
-  return chain[Math.max(0, chain.length - hops)] || request.headers.get("x-real-ip")?.trim() || "unknown";
+  return chain[Math.max(0, chain.length - hops)] || headers.get("x-real-ip")?.trim() || "unknown";
 }

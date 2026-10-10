@@ -3,6 +3,75 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-10 19:30] แก้ตาม Code Review ก่อน commit (8 จาก 9 ข้อ)
+
+- กล่องลิงก์ที่เพิ่งสร้าง: แสดงเฉพาะของผังที่เปิดอยู่และยังใช้งานได้ (ยกเลิก/หมดอายุ/เปลี่ยนผัง → ซ่อน)
+- ปุ่ม "ตั้งอายุใหม่": ต้องเลือกอายุก่อน (เดิมค่าเริ่มต้น "ไม่หมดอายุ" ทำให้ลิงก์ที่ตั้งเวลาไว้กลายเป็นถาวรได้ในคลิกเดียว)
+- BFF log สถานะ/code/path/สาเหตุ เมื่อ Backend ขัดข้องแบบที่ผู้ใช้ไม่เห็นรายละเอียด (BackendError มี path)
+- หน้า /share ตอน Backend ล่ม → หน้าแจ้ง "เปิดผังไม่ได้ชั่วคราว" (เดิมเป็นหน้า error ของ Next.js)
+- แผงลิงก์แชร์ไม่ยุบระหว่างบันทึก (แยก visible / fetchEnabled) — แก้ที่ต้นเหตุของการคลิกพลาดใน E2E
+- GET ไม่ลองซ้ำเมื่อหมดเวลา (ลองซ้ำเฉพาะเครือข่ายล้ม / 502–504)
+- โควตา 200 / 20 / 365 อยู่ที่ `src/server/limits.ts` ที่เดียว + contract test ตรวจว่าตรงสัญญา
+- production สร้าง URL ของ OG image จาก `SITE_URL` เท่านั้น (ไม่เชื่อ Host header)
+- ไม่แก้: หน้าลิงก์ที่ยกเลิกตอบ 200 — App Router ตั้งสถานะ 410 ให้หน้าไม่ได้ ต้องใช้ middleware ที่เรียก Backend ซ้ำทุกครั้ง (API ตอบ 410 ถูกต้องแล้ว, หน้าเป็น noindex)
+- E2E โหมด Cloudflare จำกัด 2 workers: wrangler dev (workerd ตัวเดียว) รับคำขอขนานจาก 4 workers × 2 เบราว์เซอร์ไม่ไหวจนล้มแบบสุ่ม
+- mock: outage เฉพาะ path (`{ path }`) สำหรับ E2E หน้าแชร์ตอน Backend ล่ม
+- QA: make test 622/622, make lint ผ่าน, core:smoke ผ่าน, E2E Node 100/100 และ Cloudflare 100/100 (Chromium + WebKit)
+
+## [2026-10-10 18:00] feat-035 Cloudflare spike เสร็จ + feat-043 CI (รอรันบน GitHub)
+
+- ผู้ใช้สั่งพัก feat-041 → feat-048 จนกว่า Backend จริงจะขึ้น (ยกเว้น feat-043 ที่ปลดพักให้ทำ)
+- feat-035: @opennextjs/cloudflare + wrangler — E2E ทั้งชุดผ่านบน workerd (`make e2e-cf`) 98/98; bundle 7.4 MB / gzip 1.8 MB; แก้ metadataBase ของหน้าแชร์ (Workers เดา origin ไม่ได้); ผล + สิ่งที่ต้องทดสอบบนบัญชีจริงอยู่ใน harness/sprint-2.md
+- feat-043: `.github/workflows/ci.yml` 3 job (checks / e2e Node / e2e Cloudflare) — ทุกคำสั่งผ่านในเครื่อง, npm ci จาก lockfile ผ่าน; รอ push + branch protection
+- devDeps ใหม่: @opennextjs/cloudflare, wrangler; ignore .open-next / .wrangler / .dev.vars
+- QA: make test 619/619, make lint ผ่าน, make e2e 49/49 (Chromium), E2E_WEBKIT=1 make e2e-cf 98/98
+
+## [2026-10-10 16:30] feat-038 → feat-040: Backend จำลอง, BFF ต่อ Backend ตามสัญญา, จัดการลิงก์แชร์
+
+- feat-038: `mock-backend/` (fetch handler + HTTP server port 4010) ทำงานตามสัญญาครบ; `contracts/contract-checker.ts` ห่อ fetch ตรวจทั้ง request/response
+- สัญญา 1.1.0: เพิ่ม `5XX` ทุก operation — เจอตอนเทสต์ฟอร์มติดต่อกับ Backend ล่ม (สัญญาเดิมไม่ได้บอกว่า Backend ตอบ 503 ได้)
+- feat-039: ลบ memory repository/delivery/limiter ฝั่ง BFF ทั้งหมด — dev/test ใช้ Backend จำลองในตัว, production ไม่มี env → 503; timeout + GET retry; ส่งต่อ error code ที่ผู้ใช้ควรเห็นเป็นภาษาไทย
+- feat-040: ตั้งอายุ/ต่ออายุ/ยกเลิกลิงก์ใน UI + หน้า /share แจ้งยกเลิก/หมดอายุ
+- บั๊กที่เจอ: แผงลิงก์แชร์โหลดก่อน Backend สร้างผังเสร็จ (เพราะรายการผัง optimistic) → 404 ค้าง; แก้แล้ว + E2E ครอบ
+- เทสต์ BFF เปลี่ยนจาก memory repo เป็น `src/test/backend.ts` (mock + contract checker) ทุกไฟล์ตรวจ violations ว่างตอนจบ
+- Playwright เปิด mock server อัตโนมัติ (webServer 2 ตัว) และตั้ง WANGRAAN_BACKEND_URL ให้ next start
+- QA: make test 619/619, make lint (รวม contract) ผ่าน, `E2E_WEBKIT=1 make e2e` 98/98, รันซ้ำ spec ที่เกี่ยวข้อง 2 รอบ 84/84, core:smoke ผ่าน
+
+## [2026-10-10 14:30] feat-036 ปิด (ผู้ใช้อนุมัติ) + feat-037 แยก core เป็น package
+
+- feat-036: ผู้ใช้ review สัญญาแล้ว → done
+- feat-037: `packages/core` = `@bosskantaponguttarawichien-boop/wang-raan-core@1.0.0` — re-export จาก `src/core` (layout + validation) และ `ContactSchema`; หน้าเว็บยัง import `@/core/...` ตามเดิม
+- ชื่อ package: GitHub Packages บังคับ scope = เจ้าของ repo → ผู้ใช้เลือกใช้ scope บัญชีตัวเอง (แทน `@wang-raan/core` ที่วางแผนไว้)
+- build ด้วย tsup (ESM + CJS + d.ts) และ tsconfig ของ package ไม่มี lib "dom" — โค้ด core ที่แตะ DOM จะ build package ไม่ผ่าน (ประกาศ `crypto` ไว้ใน `packages/core/src/globals.d.ts`)
+- `npm run core:smoke`: build → pack → ติดตั้งในโปรเจกต์เปล่า (นอก repo) → ESM/CJS/type ต้องได้ผลตรง `packages/core/test/fixtures/expected.json`
+- `.github/workflows/publish-core.yml`: publish เมื่อ push tag `core-v<version>` — ยังไม่ได้ publish จริง
+- devDeps ใหม่: tsup; vitest include `packages/*/test/**/*.test.ts`; ignore `packages/*/dist`
+- QA: make test 571/571, make lint ผ่าน, core:smoke ผ่าน (และ fail เมื่อ fixture เพี้ยน)
+
+## [2026-10-10 13:50] feat-036 สัญญา API (OpenAPI) — รอผู้ใช้ review
+
+- `contracts/openapi.yaml`: layouts CRUD, shares (สร้าง/รายการ/เปลี่ยนวันหมดอายุ/ยกเลิก/เปิดสาธารณะ), contact-messages, me (โปรไฟล์/ส่งออก/ลบ/merge-guest), /health
+- ตัดสินใจในสัญญา: path มี `/v1` ในตัว (เลี่ยง `new URL("/x", base)` ทิ้ง base path), body บันทึกผังเป็น `{ layout }` อย่างเดียว (Backend คำนวณผลตรวจเอง), `sub=anonymous` สำหรับคำขอไม่มีผู้ใช้, ของคนอื่นตอบ 404, ยกเลิก/หมดอายุลิงก์ตอบ 410, ลบผัง = ยกเลิกลิงก์ของผังนั้น, โควตา 200 ผัง/ผู้ใช้ และ 20 ลิงก์/ผัง
+- `contracts/openapi.test.ts`: เทียบ JSON Schema กับ Zod จริงด้วย ajv 2020 (51 เคส); vitest include `contracts/**/*.test.ts`
+- `make contract` (Redocly recommended-strict) + เรียกจาก `make lint`; devDeps ใหม่: @redocly/cli, yaml, ajv, ajv-formats
+- QA: make test 568/568, make lint ผ่าน
+
+## [2026-10-10 13:10] Sprint 2 ด่าน 0 — feat-024 + feat-034 เสร็จ
+
+- feat-034 (คำตัดสินจากผู้ใช้): Inspector ลบตามชิ้นที่เลือกจริง — เลือกเก้าอี้ = "× ลบเก้าอี้ตัวนี้" (ตรงกับ Delete บน Artboard), เลือกโต๊ะ = ลบทั้งชุด; นิยามเส้นทางและค่าลูกค้าจำลองยืนยันตามเดิม (คอมเมนต์ในโค้ด + PRD §9 ข้อ 6–8); design-system.md: `--muted` ห้ามใช้กับข้อความ, เพิ่ม `--secondary-strong`
+- feat-024: ติดตั้ง WebKit (ผู้ใช้อนุญาต) → E2E ผ่านทั้ง Chromium และ WebKit; ปรับเทสต์ตามพฤติกรรม Safari (Option+Tab, page.pdf เฉพาะ Chromium)
+- พบ: `.next` cache ค้างทำให้ CSS ของ playground ไม่มีคลาส Tailwind บางตัว (print:hidden) → เคสพิมพ์ fail; `rm -rf .next` แล้วหาย
+- QA: make test 517/517, make lint ผ่าน, `E2E_WEBKIT=1 make e2e` 94/94
+
+## [2026-10-10 07:00] วางแผน Sprint 2 — หน้าเว็บพร้อมขึ้น Production (FE เท่านั้น)
+
+- เปลี่ยนการเรียกจาก phase เป็น sprint: เพิ่มฟิลด์ `"sprint"` ใน feature_list; งาน Sprint 1 ที่เสร็จ (33 งาน) ย้ายรายละเอียดเต็มไป `feature_list.archive.json` และเก็บแบบย่อในไฟล์หลัก (`harness_state.load_features()` merge กลับให้)
+- feat-024 ยกมา Sprint 2 (`carried_over_from: 1`) — ยังรอ WebKit
+- เพิ่ม feat-034 → feat-048 (feat-048 = stretch) — ขอบเขต FE + BFF เท่านั้น; Backend/DB ผู้ใช้สร้างใน repo แยก (TypeScript) แล้วต่อตาม `contracts/openapi.yaml`
+- ตกลงสแตก: Cloudflare Workers (FE ผ่าน OpenNext, Workers Paid) + Railway Singapore (BE Docker + Postgres) + backup ทุกคืนไป R2 + กฎตรวจผังร่วมผ่าน private package `@wang-raan/core` (GitHub Packages)
+- เป้าหมาย, สแตก, ค่าใช้จ่ายประมาณการ (~550–750 บาท/เดือนเมื่อมี staging) และ Production Gate ฝั่ง FE/BE อยู่ที่ `harness/sprint-2.md`
+- QA: `python3 scripts/validate_harness.py` ผ่าน 49 งาน ไม่มี dependency ขาด/วน
+
 ## [2026-10-10 06:00] แก้ตาม Code Review 10 ข้อ (feat-024 → feat-033)
 
 - Remote repository: สถานะที่ไม่คาดไว้ = `BackendError` → Route Handler ตอบ 502 (เดิม error body ถูกนับเป็นผังที่บันทึก)

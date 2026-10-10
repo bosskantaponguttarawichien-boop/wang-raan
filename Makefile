@@ -4,7 +4,7 @@
 # =============================================================================
 PYTHON  := python3
 
-.PHONY: help init test lint status dev build e2e
+.PHONY: help init test lint status dev build e2e e2e-cf contract
 
 help:           ## แสดงคำสั่ง (targets) ทั้งหมด
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -29,6 +29,12 @@ lint:           ## ตรวจสอบ Architectural Boundaries และ Lint
 	  fi \
 	fi
 	@if [ -f package.json ]; then npm run --silent lint && npm run --silent typecheck && echo "✅ ESLint + TypeScript ผ่าน"; fi
+	@$(MAKE) --no-print-directory contract
+
+contract:       ## ตรวจรูปแบบสัญญา API (contracts/openapi.yaml) ด้วย Redocly
+	@npx --no-install redocly lint contracts/openapi.yaml --config contracts/redocly.yaml --format=summary >/dev/null 2>&1 \
+	  && echo "✅ สัญญา API (contracts/openapi.yaml) ผ่าน" \
+	  || (npx --no-install redocly lint contracts/openapi.yaml --config contracts/redocly.yaml; exit 1)
 
 dev:            ## เริ่มต้น Development Server
 	@if [ -f package.json ]; then npm run dev; else echo "ยังไม่มี package.json กรุณารัน feat-001 ก่อน"; fi
@@ -38,3 +44,6 @@ build:          ## สร้าง Production Bundle
 
 e2e:            ## รัน E2E + Responsive 6 breakpoints + Accessibility (Playwright + axe, ใช้ Google Chrome ในเครื่อง)
 	@if [ -f package.json ]; then npx playwright test; else echo "ยังไม่มี package.json"; fi
+
+e2e-cf:         ## รัน E2E ชุดเดียวกันบน runtime ของ Cloudflare Workers (workerd ผ่าน wrangler dev)
+	@E2E_TARGET=cloudflare npx playwright test

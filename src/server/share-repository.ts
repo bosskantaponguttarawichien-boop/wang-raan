@@ -1,46 +1,82 @@
 import "server-only";
 /**
- * Public Share (feat-030) — เก็บ "สำเนา" ของผังตอนกดแชร์ (snapshot) ผูกกับ share key สุ่ม
- * แก้ผังภายหลังไม่กระทบลิงก์เดิม (แชร์ใหม่ได้ลิงก์ใหม่) จึงแคชหน้าแชร์ได้นาน
+ * ลิงก์แชร์ (feat-030, feat-040) — เรียก Backend ตามสัญญา contracts/openapi.yaml
+ * Backend เก็บ "สำเนา" ของผังตอนกดแชร์ (snapshot) และเป็นคนสร้าง share key
  */
 import type { StoreLayout, ValidationResult } from "@/core/layout";
+import { backendClient, readBody, send } from "./backend";
+import { SHARE_KEY_PATTERN } from "./share-key";
+import type { BackendClient } from "./token-relay";
 
-export interface SharedLayout {
+export { SHARE_KEY_PATTERN, createShareKey } from "./share-key";
+
+export type ShareStatus = "active" | "expired" | "revoked";
+
+export interface ShareLink {
   shareKey: string;
-  ownerId: string;
+  layoutId: string;
+  status: ShareStatus;
+  createdAt: string;
+  expiresAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface PublicShare {
   layout: StoreLayout;
   validation: ValidationResult;
   createdAt: string;
-}
-
-/** 32 ไบต์สุ่มจาก CSPRNG (256 บิต) เข้ารหัส base64url = 43 ตัวอักษร — เดาไม่ได้ */
-export const SHARE_KEY_PATTERN = /^[A-Za-z0-9_-]{43}$/;
-
-export function createShareKey(): string {
-  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32));
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  expiresAt: string | null;
 }
 
 export interface ShareRepository {
-  create(entry: Omit<SharedLayout, "shareKey" | "createdAt">): Promise<SharedLayout>;
-  get(shareKey: string): Promise<SharedLayout | null>;
+  create(ownerId: string, layoutId: string, expiresAt: string | null): Promise<ShareLink | "not-found">;
+  list(ownerId: string, layoutId: string): Promise<ShareLink[] | "not-found">;
+  update(ownerId: string, shareKey: string, expiresAt: string | null): Promise<ShareLink | "not-found" | "revoked">;
+  revoke(ownerId: string, shareKey: string): Promise<boolean>;
+  /** เปิดแบบสาธารณะ (ไม่มีผู้ใช้) — clientIp ใช้นับ rate limit ที่ Backend */
+  getPublic(shareKey: string, clientIp?: string): Promise<PublicShare | "not-found" | "revoked" | "expired">;
 }
 
-export function createMemoryShareRepository(now: () => Date = () => new Date(), newKey: () => string = createShareKey): ShareRepository {
-  const items = new Map<string, SharedLayout>();
+const layoutShares = (layoutId: string) => `/v1/layouts/${encodeURIComponent(layoutId)}/shares`;
+const share = (key: string) => `/v1/shares/${encodeURIComponent(key)}`;
+
+async function errorCode(res: Response): Promise<string | null> {
+  const body = (await res.json().catch(() => null)) as { error?: { code?: unknown } } | null;
+  return typeof body?.error?.code === "string" ? body.error.code : null;
+}
+
+export function createRemoteShareRepository(client: BackendClient = backendClient): ShareRepository {
   return {
-    async create(entry) {
-      const shared = { ...entry, shareKey: newKey(), createdAt: now().toISOString() };
-      items.set(shared.shareKey, shared);
-      return shared;
+    async create(ownerId, layoutId, expiresAt) {
+      const body = JSON.stringify(expiresAt ? { expiresAt } : {});
+      const res = await send(client, ownerId, layoutShares(layoutId), { method: "POST", body }, [404]);
+      return res.status === 404 ? "not-found" : readBody<ShareLink>(res);
     },
-    async get(shareKey) {
-      return SHARE_KEY_PATTERN.test(shareKey) ? (items.get(shareKey) ?? null) : null;
+    async list(ownerId, layoutId) {
+      const res = await send(client, ownerId, layoutShares(layoutId), {}, [404]);
+      if (res.status === 404) return "not-found";
+      return (await readBody<{ shares: ShareLink[] }>(res)).shares;
+    },
+    async update(ownerId, shareKey, expiresAt) {
+      if (!SHARE_KEY_PATTERN.test(shareKey)) return "not-found";
+      const res = await send(client, ownerId, share(shareKey), { method: "PATCH", body: JSON.stringify({ expiresAt }) }, [404, 410]);
+      if (res.status === 404) return "not-found";
+      if (res.status === 410) return "revoked";
+      return readBody<ShareLink>(res);
+    },
+    async revoke(ownerId, shareKey) {
+      if (!SHARE_KEY_PATTERN.test(shareKey)) return false;
+      const res = await send(client, ownerId, share(shareKey), { method: "DELETE" }, [404]);
+      return res.ok;
+    },
+    async getPublic(shareKey, clientIp = "unknown") {
+      if (!SHARE_KEY_PATTERN.test(shareKey)) return "not-found";
+      const res = await send(client, null, `/v1/public/shares/${shareKey}`, { headers: { "x-client-ip": clientIp } }, [404, 410]);
+      if (res.status === 404) return "not-found";
+      if (res.status === 410) return (await errorCode(res)) === "SHARE_EXPIRED" ? "expired" : "revoked";
+      return readBody<PublicShare>(res);
     },
   };
 }
 
-const globalForShare = globalThis as unknown as { __wangRaanShareRepo?: ShareRepository };
-export const shareRepository: ShareRepository = (globalForShare.__wangRaanShareRepo ??= createMemoryShareRepository());
+export const shareRepository: ShareRepository = createRemoteShareRepository();
