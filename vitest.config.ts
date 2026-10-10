@@ -14,7 +14,7 @@ export default defineConfig({
   test: {
     // src/core รันใน node (ยืนยันว่าไม่พึ่ง DOM) ส่วน component ใช้ jsdom
     environment: "node",
-    include: ["src/**/*.test.{ts,tsx}", "app/**/*.test.{ts,tsx}"],
+    include: ["src/**/*.test.{ts,tsx}", "app/**/*.test.{ts,tsx}", "contracts/**/*.test.ts", "packages/*/test/**/*.test.ts", "mock-backend/**/*.test.ts"],
     setupFiles: ["./src/test/setup.ts"],
     coverage: {
       provider: "v8",
