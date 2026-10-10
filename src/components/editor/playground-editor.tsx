@@ -301,7 +301,7 @@ function DraftNotice() {
   if (!restoredAt) return null;
   const time = new Date(restoredAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
   return (
-    <p className="m-0 mb-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-secondary-strong" data-testid="draft-notice">
+    <p className="m-0 mb-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-ink" data-testid="draft-notice">
       กู้คืนผังที่บันทึกไว้เมื่อ {time}
     </p>
   );

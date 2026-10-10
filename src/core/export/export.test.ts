@@ -114,3 +114,16 @@ describe("renderPlanSvg (feat-025 gate: สัดส่วนตรงตาม�
     expect(count(renderPlanSvg(layout), /<circle /g)).toBe(chairs.length);
   });
 });
+
+describe("severityByObject", () => {
+  it("เลือกระดับที่หนักที่สุดต่อวัตถุ", async () => {
+    const { severityByObject } = await import("./plan-svg");
+    const map = severityByObject([
+      { severity: "warning", objectIds: ["a", "b"] },
+      { severity: "blocked", objectIds: ["a"] },
+      { severity: "warning", objectIds: ["a"] },
+    ]);
+    expect(map.get("a")).toBe("blocked");
+    expect(map.get("b")).toBe("warning");
+  });
+});

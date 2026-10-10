@@ -133,7 +133,7 @@ function SignedIn({ name }: { name: string }) {
         )}
         {share.data && (
           <div className="mt-2 rounded-[8px] bg-blue-soft px-3 py-2">
-            <p className="m-0 font-semibold text-secondary-strong">ลิงก์แชร์ (ดูได้โดยไม่ต้องเข้าสู่ระบบ)</p>
+            <p className="m-0 font-semibold text-ink">ลิงก์แชร์ (ดูได้โดยไม่ต้องเข้าสู่ระบบ)</p>
             <a href={share.data.url} className="block break-all text-blue-hover underline" data-testid="share-link" target="_blank" rel="noopener">
               {share.data.url}
             </a>

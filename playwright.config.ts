@@ -32,6 +32,8 @@ export default defineConfig({
     command: `npm run build && npm run start -- -p ${PORT}`,
     url: `http://localhost:${PORT}`,
     reuseExistingServer: !process.env.CI,
+    // Auth.js ต้องมี secret ใน production build — ค่านี้ใช้เฉพาะการทดสอบ
+    env: { AUTH_SECRET: process.env.AUTH_SECRET ?? "e2e-only-secret-not-for-production-0123456789", AUTH_TRUST_HOST: "true" },
     timeout: 240_000,
   },
 });

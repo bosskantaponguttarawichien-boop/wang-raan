@@ -4,7 +4,7 @@
  * สีตาม design-system.md §2.3 (Plan palette) — ใส่ค่า hex ตรง ๆ เพราะไฟล์ SVG ที่ส่งออกไม่มี CSS Variables
  */
 import { footprint, objectCenter } from "../layout/geometry";
-import type { IssueSeverity, LayoutObject, StoreLayout, Wall } from "../layout/types";
+import type { IssueSeverity, LayoutObject, StoreLayout, ValidationIssue, Wall } from "../layout/types";
 
 export const PLAN_COLORS = {
   background: "#ffffff",
@@ -35,6 +35,15 @@ export interface PlanSvgOptions {
   severityById?: ReadonlyMap<string, IssueSeverity>;
   /** ข้อความ <title> สำหรับ Screen Reader */
   title?: string;
+}
+
+/** ระดับปัญหาที่หนักที่สุดของแต่ละวัตถุ (สำหรับ Issue Rings) */
+export function severityByObject(issues: ReadonlyArray<Pick<ValidationIssue, "severity" | "objectIds">>): Map<string, IssueSeverity> {
+  const map = new Map<string, IssueSeverity>();
+  for (const issue of issues) {
+    for (const id of issue.objectIds) if (map.get(id) !== "blocked") map.set(id, issue.severity);
+  }
+  return map;
 }
 
 export function escapeXml(text: string): string {

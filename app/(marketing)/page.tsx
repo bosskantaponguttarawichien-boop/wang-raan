@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./landing.css";
 import { LandingMotion } from "./landing-motion";
+import { ContactForm } from "./contact-form";
 
 /**
  * Landing Page — React Server Component ที่ port จาก design-html/index.html
@@ -358,26 +359,7 @@ export default function HomePage() {
                 </span>
               </div>
             </div>
-            {/* ฟอร์มยังไม่เปิดใช้ (เชื่อม API ใน feat-032) — คงสถานะ disabled ตาม prototype */}
-            <form className="contact-form" aria-label="แบบฟอร์มติดต่อ">
-              <fieldset disabled>
-                <label htmlFor="contactName">
-                  ชื่อ
-                  <input id="contactName" type="text" placeholder="ชื่อของคุณ" autoComplete="name" />
-                </label>
-                <label htmlFor="contactReply">
-                  อีเมล
-                  <input id="contactReply" type="email" placeholder="name@example.com" autoComplete="email" />
-                </label>
-                <label htmlFor="contactMessage">
-                  ข้อความ
-                  <textarea id="contactMessage" rows={3} placeholder="อยากให้เราช่วยเรื่องอะไร" />
-                </label>
-                <button className="cta" type="button" disabled>
-                  ส่งข้อความ (เร็ว ๆ นี้)
-                </button>
-              </fieldset>
-            </form>
+            <ContactForm />
           </div>
         </section>
       </main>

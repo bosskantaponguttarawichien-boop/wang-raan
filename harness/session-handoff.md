@@ -3,6 +3,30 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-10 05:00 ICT — feat-030 → feat-033 เสร็จ
+
+### Core & Dev
+- Editor มีแผง "บัญชีและผังออนไลน์": เข้าสู่ระบบแบบผู้ใช้ทั่วไป → บันทึก/เปิด/ลบผัง (React Query) → "แชร์ลิงก์" ได้ URL `/share/<key>` ที่เปิดได้โดยไม่ต้องล็อกอิน
+- Landing: ฟอร์มติดต่อส่งได้จริง (`POST /api/contact`)
+- env: ดู `.env.example` — production ต้องมี `AUTH_SECRET`; E2E ตั้งให้อัตโนมัติใน `playwright.config.ts`
+- เทสต์ Route Handler ที่ต้องมี session: `sessionCookie(userId)` จาก `src/test/session.ts`
+
+### QA
+- unit 492, e2e 47 (Chromium), axe 0 violations
+
+### Active Blockers / Open Questions
+- ผัง / ลิงก์แชร์ / ตัวนับ rate limit / ข้อความติดต่อ อยู่ในหน่วยความจำ — หายเมื่อรีสตาร์ต และใช้ได้แค่ server เครื่องเดียว (รอ Backend จริง: ตั้ง `WANGRAAN_BACKEND_URL` + `INTERNAL_TOKEN_SECRET`)
+- ยังไม่มี Identity Provider จริง — ใช้ Guest (บัญชีผูกกับ cookie; ลบ cookie = เสียสิทธิ์ผังเดิม) หรือ GitHub ถ้าตั้ง env
+- Rate limit อ่าน IP จาก `x-forwarded-for` — ต้อง deploy หลัง proxy ที่เขียนทับ header นี้ (Vercel/Nginx) ไม่งั้นผู้ส่งปลอม IP ได้
+- ลิงก์แชร์ยังยกเลิกไม่ได้และไม่มีวันหมดอายุ
+- OG image เป็นภาษาอังกฤษ (ฟอนต์ไทยต้องฝังไฟล์ฟอนต์เพิ่ม)
+- feat-024 ยังรอรันบน WebKit
+
+### Next Steps
+1. ปิด feat-024 ด้วย WebKit
+2. ที่เก็บข้อมูลถาวร / Backend Layout Service
+3. ยกเลิกลิงก์แชร์ + วันหมดอายุ
+
 ## 2026-10-10 04:00 ICT — feat-025 → feat-029 เสร็จ, feat-024 รอ WebKit
 
 ### Core & Dev
@@ -91,24 +115,3 @@
 1. feat-012 2D Canvas Artboard Editor
 2. feat-015 BFF Layout API Route Handlers
 3. feat-017 P2 Web Worker Setup
-
-## 2026-10-10 01:15 ICT — feat-001 → feat-005 เสร็จสมบูรณ์
-
-### Core & Dev
-- Next.js 15.5 + React 19 + Tailwind v4 + Vitest พร้อมใช้งาน (`npm run dev|build|lint|typecheck|test`)
-- Design tokens ครบใน `app/globals.css` มีเทสต์เทียบ design-system.md อัตโนมัติ — ถ้าแก้เอกสารสี ต้องแก้ CSS ให้ตรง ไม่งั้นเทสต์ fail
-- UI primitives ใน `src/components/ui/` (import จาก `@/components/ui`)
-- Core domain ใน `src/core/layout/` (import จาก `@/core/layout`) — Table Set lifecycle เป็น pure/immutable คืน reference เดิมเมื่อไม่มีการเปลี่ยนแปลง (Store ใช้ตรวจ no-op ได้)
-
-### QA
-- `make test` 99/99, `make lint`, `npm run build`, `./harness/init.sh` ผ่านทั้งหมด
-
-### Active Blockers / Open Questions
-- โครงไฟล์ใน AGENTS.md (`src/core/types|geometry|entities`) ต่างจาก architecture.md (`src/core/layout/`) — เลือกตาม architecture.md; ควรอัปเดต AGENTS.md ให้ตรงกัน
-- ขนาดเก้าอี้ใช้ 0.5 × 0.5 ม. (design-system ระบุ 0.45–0.50 ม.) — ปรับได้ที่ `DEFAULT_SIZES.chair`
-- `.claude/launch.json` (dev server port 3123) สร้างไว้สำหรับ preview ในแอป
-
-### Next Steps
-1. feat-006 Completeness Gate
-2. feat-007 Collision Detection (ต้องการ feat-005 ✅)
-3. feat-011 Zustand Editor Store & History

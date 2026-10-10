@@ -1,13 +1,19 @@
 "use client";
 
 import { useMemo } from "react";
+import type { StoreLayout } from "@/core/layout";
 import { buildIsoScene, ISO_PALETTE } from "@/core/preview/isometric";
 import { useLayoutStore } from "@/store/use-layout-store";
 
-/** มุมมอง 3D Isometric ด้วย SVG ล้วน (design-system.md §7.3) — ไม่ใช้ WebGL / Three.js */
+/** มุมมอง 3D Isometric ของผังใน Editor (อ่านจาก store) */
 export function IsometricView() {
   const layout = useLayoutStore((s) => s.layout);
   const zoom = useLayoutStore((s) => s.zoom);
+  return <IsometricScene layout={layout} zoom={zoom} />;
+}
+
+/** มุมมอง 3D Isometric ด้วย SVG ล้วน (design-system.md §7.3) — ไม่ใช้ WebGL / Three.js; ใช้ซ้ำในหน้าแชร์ */
+export function IsometricScene({ layout, zoom = 1 }: { layout: StoreLayout; zoom?: number }) {
   const scene = useMemo(() => buildIsoScene(layout), [layout]);
   const counts = {
     table: layout.objects.filter((o) => o.type === "table").length,

@@ -105,7 +105,7 @@ export function FilePanel() {
           <div
             className={
               message.tone === "ok"
-                ? "mt-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-secondary-strong"
+                ? "mt-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-ink"
                 : "mt-3 rounded-[8px] bg-[#fdeeed] px-3 py-2 text-[12px] leading-[1.75] text-[#9d3a33]"
             }
           >

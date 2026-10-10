@@ -426,8 +426,8 @@
         "feat-015"
       ],
       "gate": "เปิด URL แชร์แบบไม่ล็อกอินแล้วดูผังได้แบบ Read-only และมี Dynamic OG Image",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "POST /api/share (ต้องมี Session + เป็นเจ้าของ, share key สุ่ม 256 บิต base64url, snapshot) + GET /api/share/[shareKey] (สาธารณะ, cache public) + หน้า app/(app)/share/[shareKey] (RSC, 2D SVG/3D Isometric read-only, noindex) + opengraph-image.tsx (PNG 1200×630 วาดผังจริง) — share-handlers.test.ts 11 เคส + e2e เปิดลิงก์ในเบราว์เซอร์ที่ไม่มี cookie, OG image 200 image/png, axe 0",
       "role": "bff",
       "summary": "สร้างระบบสร้างลิงก์แชร์ผังร้านแบบสาธารณะและหน้าดูตัวอย่างผังร้าน"
     },
@@ -440,8 +440,8 @@
         "feat-015"
       ],
       "gate": "จัดการ Session และ Relay Token ใน Request Headers สำเร็จ",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "Auth.js v5 (next-auth@5.0.0-beta.32) app/api/auth/[...nextauth] — Guest provider (id สุ่มฝั่ง server) + GitHub ถ้าตั้ง env; Session JWT ใน Cookie HttpOnly SameSite=Lax (e2e ตรวจ); /api/layouts ต้องมี Session (401) และแยกผังตามเจ้าของ; src/server/token-relay.ts ออก internal JWT HS256 อายุ 5 นาทีแนบ Authorization: Bearer และตัด Cookie ก่อนส่ง Backend — token-relay.test.ts ตรวจ header ทุกเมธอดของ Remote repository",
       "role": "bff",
       "summary": "ติดตั้งระบบยืนยันตัวตน NextAuth และจัดการ Session สำหรับเชื่อมต่อ API ภายนอก"
     },
@@ -454,8 +454,8 @@
         "feat-021"
       ],
       "gate": "ส่งแบบฟอร์มสำเร็จพร้อม Rate Limit บล็อกการส่งถี่เกินกำหนด",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "ContactForm (RHF + Zod schema เดียวกับ BFF) + POST /api/contact: Rate limit 5 ครั้ง/10 นาที ต่อ IP และต่อผู้ใช้ (429 + Retry-After), honeypot, จำกัด 8 KB, ส่งต่อ Webhook (CONTACT_WEBHOOK_URL) หรือเก็บในหน่วยความจำ — contact-handlers.test.ts 15 เคส + e2e ส่งสำเร็จแล้วครั้งที่ 6 ได้ 429 ในฟอร์มจริง",
       "role": "bff",
       "summary": "พัฒนาฟอร์มติดต่อสอบถามและ API ฝั่งเซิร์ฟเวอร์พร้อมระบบป้องกันการยิงถี่ (Rate Limit)"
     },
@@ -468,8 +468,8 @@
         "feat-015"
       ],
       "gate": "โหลดและบันทึกผังร้านผ่าน React Query พร้อมสถานะ Loading/Error แม่นยำ",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "@tanstack/react-query 5 — src/lib/layout-queries.ts (list/detail cache, Optimistic save/delete + rollback, retry เฉพาะ 5xx) + แผง 'บัญชีและผังออนไลน์' แสดง Loading/Error/Empty/Refetching — layout-queries.test.tsx 9 เคส (pending→success, 401 ไม่ retry, 422 rollback, ลบล้มเหลว rollback) + e2e บันทึก/โหลด/ลบ/รีโหลด",
       "role": "frontend",
       "summary": "เชื่อมต่อการดึงและบันทึกข้อมูลผังร้านด้วย TanStack Query พร้อมระบบแคช"
     }
