@@ -230,6 +230,15 @@
   <style>
     .brand-logo{width:42px;height:42px;object-fit:contain;display:block}
     .brand-logo--footer{width:38px;height:38px}
+  
+    /* feat-032: สถานะของฟอร์มติดต่อเมื่อเปิดใช้งาน (ข้อความ error / ผลการส่ง / honeypot) */
+    .contact-form input:not(:disabled),.contact-form textarea:not(:disabled){-webkit-text-fill-color:var(--ink)}
+    .contact-form input[aria-invalid=true],.contact-form textarea[aria-invalid=true]{border-color:#d9574d}
+    .contact-form .field-error{display:block;margin-top:6px;font-size:13px;line-height:1.6;color:#b8433b}
+    .contact-form .form-note{margin:14px 0 0;font-size:14px;line-height:1.75}
+    .contact-form .form-note.is-ok{color:#23795e}
+    .contact-form .form-note.is-error{color:#b8433b}
+    .contact-form .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
   </style>
 </head>
 <body>

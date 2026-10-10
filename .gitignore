@@ -38,3 +38,7 @@ next-env.d.ts
 # playwright
 /e2e/.results/
 /e2e/.report/
+
+# python
+__pycache__/
+*.pyc

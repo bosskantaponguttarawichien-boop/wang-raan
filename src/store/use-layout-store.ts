@@ -89,6 +89,12 @@ export interface LayoutStoreState {
   undo: () => void;
   redo: () => void;
   loadLayout: (layout: StoreLayout) => void;
+  /** แทนผังทั้งฉบับ (เช่น นำเข้าไฟล์) เป็นการแก้ไขหนึ่งขั้น — Undo กลับผังเดิมได้ */
+  replaceLayout: (layout: StoreLayout) => void;
+  /** กู้คืนผังพร้อมประวัติ Undo/Redo (Draft) — ตัดประวัติให้ไม่เกิน HISTORY_LIMIT */
+  restoreHistory: (history: StoreLayout[], historyIndex: number) => void;
+  /** เริ่มผังใหม่ (ผังเริ่มต้น) และล้างประวัติ */
+  resetLayout: () => void;
 }
 
 export interface LayoutStoreOptions {
@@ -247,6 +253,27 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
           historyIndex: 0,
           interactionBase: null,
         }),
+
+      replaceLayout: (layout) => commit(layout, null),
+
+      restoreHistory: (history, historyIndex) => {
+        if (history.length === 0) return;
+        const start = Math.max(0, history.length - (HISTORY_LIMIT + 1));
+        const kept = history.slice(start);
+        const index = Math.min(kept.length - 1, Math.max(0, historyIndex - start));
+        const layout = kept[index]!;
+        set({
+          layout,
+          layoutRevision: computeLayoutRevision(layout),
+          validation: null,
+          selectedObjectId: null,
+          history: kept,
+          historyIndex: index,
+          interactionBase: null,
+        });
+      },
+
+      resetLayout: () => get().loadLayout(createInitialLayout(newId)),
     };
   });
 }

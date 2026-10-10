@@ -343,8 +343,8 @@
         "feat-022"
       ],
       "gate": "Playwright E2E รันผ่านทุกเคสบน Chromium และ WebKit",
-      "status": "not-started",
-      "evidence": "",
+      "status": "in-progress",
+      "evidence": "e2e/editor-flow.spec.ts (10 เคส: จัดร้าน→Ready→จำลอง→วางทับ Blocked + Undo, Cascade Delete, ย้าย/หมุนทั้งชุด, Inspector, Auto-save รีโหลด, JSON, SVG/PNG, พิมพ์/PDF) + a11y/keyboard/responsive เดิม — `make e2e` 37/37 ผ่านบน Chromium; ยังไม่ได้รันบน WebKit (เครื่องนี้ไม่มี WebKit และห้ามดาวน์โหลดเบราว์เซอร์) — เปิดด้วย E2E_WEBKIT=1 หลังติดตั้ง",
       "role": "qa",
       "summary": "เขียนแบบทดสอบ E2E ตรวจสอบพฤติกรรมการใช้งานจริงตั้งแต่เริ่มจัดร้านจนถึงจำลอง"
     },
@@ -357,8 +357,8 @@
         "feat-014"
       ],
       "gate": "ไฟล์ส่งออกแสดงผลสวยงามและสัดส่วนตรงตามผังจริง",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "src/core/export/plan-svg.ts (SVG สัดส่วนจริง 60 px/ม. + Issue Rings) + summary.ts (ที่นั่ง/พื้นที่/ผลตรวจ) — 11 unit tests; e2e ตรวจ SVG 552×432 และ PNG 2× (1104×864 จาก IHDR); รายงาน PDF ผ่านการพิมพ์ (feat-026)",
       "role": "frontend",
       "summary": "พัฒนาระบบส่งออกภาพผังร้าน (PNG/SVG) และรายงานสรุปผังร้าน"
     },
@@ -370,8 +370,8 @@
         "feat-025"
       ],
       "gate": "สั่งพิมพ์ (Ctrl+P / Cmd+P) แล้วหน้าตาเอกสารสะอาดและคมชัด",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "@page A4 landscape + print:hidden ที่ Editor/Header + src/components/editor/print-report.tsx (ผังซ้าย สรุปที่นั่ง+ผลตรวจขวา) — e2e emulateMedia('print') + page.pdf() ได้ 1 หน้า (e2e/.results/screens/print-report.pdf)",
       "role": "design",
       "summary": "ปรับแต่งสไตล์การพิมพ์ (@media print) สำหรับพิมพ์ผังร้านลงกระดาษ"
     },
@@ -384,8 +384,8 @@
         "feat-011"
       ],
       "gate": "ฟอร์มไม่ re-render ทั้ง Canvas เมื่อมีการพิมพ์หรือปรับค่า",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "src/components/editor/forms/ (React Hook Form + Zod, uncontrolled) — Room & Entrance Settings + Object Inspector; เทสต์ยืนยันว่าพิมพ์แล้ว store ไม่ถูกแจ้งเตือน (0 notifications) จนกด 'นำไปใช้' และ 1 การกด = Undo 1 ขั้น (forms.test.tsx 20 เคส) + e2e",
       "role": "frontend",
       "summary": "สร้างแถบเครื่องมือและฟอร์มปรับแต่งขนาดร้าน ประตู และคุณสมบัติของเฟอร์นิเจอร์"
     },
@@ -397,8 +397,8 @@
         "feat-011"
       ],
       "gate": "รีเฟรชหน้าจอแล้วผังเดิมและประวัติกลับมาครบถ้วน",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "src/lib/draft-storage.ts + draft-autosave.ts — localStorage (ผัง + ประวัติ Undo/Redo), debounce 400 ms + flush ตอน pagehide, ตรวจด้วย Zod, Quota → ตัดประวัติ; 15 unit tests + e2e รีโหลดแล้ว Undo/Redo ใช้ได้ครบ",
       "role": "frontend",
       "summary": "สร้างระบบบันทึกร่างผังร้านลงเบราว์เซอร์อัตโนมัติและกู้คืนเมื่อเข้าใช้งานใหม่"
     },
@@ -411,8 +411,8 @@
         "feat-016"
       ],
       "gate": "นำเข้าไฟล์ JSON แล้วแปลงเป็น Entity และสร้าง Table-Chair Hierarchy ถูกต้อง",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "src/core/io/layout-file.ts — export p1-layout-v1 (ผ่าน P1LayoutContractSchema เมื่อ Ready), import 3 รูปแบบ (contract / StoreLayout / ตัวอย่าง PRD §4.4) สร้าง chairIds ใหม่จาก tableId และตัดเก้าอี้กำพร้า; 17 unit tests (coverage 100% lines) + e2e นำเข้า/ส่งออก/Undo",
       "role": "core",
       "summary": "พัฒนาระบบนำเข้าและส่งออกไฟล์ JSON ตามสัญญาข้อมูลมาตรฐาน P1-P2 Contract"
     },
@@ -426,8 +426,8 @@
         "feat-015"
       ],
       "gate": "เปิด URL แชร์แบบไม่ล็อกอินแล้วดูผังได้แบบ Read-only และมี Dynamic OG Image",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "POST /api/share (ต้องมี Session + เป็นเจ้าของ, share key สุ่ม 256 บิต base64url, snapshot) + GET /api/share/[shareKey] (สาธารณะ, cache public) + หน้า app/(app)/share/[shareKey] (RSC, 2D SVG/3D Isometric read-only, noindex) + opengraph-image.tsx (PNG 1200×630 วาดผังจริง) — share-handlers.test.ts 11 เคส + e2e เปิดลิงก์ในเบราว์เซอร์ที่ไม่มี cookie, OG image 200 image/png, axe 0",
       "role": "bff",
       "summary": "สร้างระบบสร้างลิงก์แชร์ผังร้านแบบสาธารณะและหน้าดูตัวอย่างผังร้าน"
     },
@@ -440,8 +440,8 @@
         "feat-015"
       ],
       "gate": "จัดการ Session และ Relay Token ใน Request Headers สำเร็จ",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "Auth.js v5 (next-auth@5.0.0-beta.32) app/api/auth/[...nextauth] — Guest provider (id สุ่มฝั่ง server) + GitHub ถ้าตั้ง env; Session JWT ใน Cookie HttpOnly SameSite=Lax (e2e ตรวจ); /api/layouts ต้องมี Session (401) และแยกผังตามเจ้าของ; src/server/token-relay.ts ออก internal JWT HS256 อายุ 5 นาทีแนบ Authorization: Bearer และตัด Cookie ก่อนส่ง Backend — token-relay.test.ts ตรวจ header ทุกเมธอดของ Remote repository",
       "role": "bff",
       "summary": "ติดตั้งระบบยืนยันตัวตน NextAuth และจัดการ Session สำหรับเชื่อมต่อ API ภายนอก"
     },
@@ -454,8 +454,8 @@
         "feat-021"
       ],
       "gate": "ส่งแบบฟอร์มสำเร็จพร้อม Rate Limit บล็อกการส่งถี่เกินกำหนด",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "ContactForm (RHF + Zod schema เดียวกับ BFF) + POST /api/contact: Rate limit 5 ครั้ง/10 นาที ต่อ IP และต่อผู้ใช้ (429 + Retry-After), honeypot, จำกัด 8 KB, ส่งต่อ Webhook (CONTACT_WEBHOOK_URL) หรือเก็บในหน่วยความจำ — contact-handlers.test.ts 15 เคส + e2e ส่งสำเร็จแล้วครั้งที่ 6 ได้ 429 ในฟอร์มจริง",
       "role": "bff",
       "summary": "พัฒนาฟอร์มติดต่อสอบถามและ API ฝั่งเซิร์ฟเวอร์พร้อมระบบป้องกันการยิงถี่ (Rate Limit)"
     },
@@ -468,8 +468,8 @@
         "feat-015"
       ],
       "gate": "โหลดและบันทึกผังร้านผ่าน React Query พร้อมสถานะ Loading/Error แม่นยำ",
-      "status": "not-started",
-      "evidence": "",
+      "status": "done",
+      "evidence": "@tanstack/react-query 5 — src/lib/layout-queries.ts (list/detail cache, Optimistic save/delete + rollback, retry เฉพาะ 5xx) + แผง 'บัญชีและผังออนไลน์' แสดง Loading/Error/Empty/Refetching — layout-queries.test.tsx 9 เคส (pending→success, 401 ไม่ retry, 422 rollback, ลบล้มเหลว rollback) + e2e บันทึก/โหลด/ลบ/รีโหลด",
       "role": "frontend",
       "summary": "เชื่อมต่อการดึงและบันทึกข้อมูลผังร้านด้วย TanStack Query พร้อมระบบแคช"
     }
