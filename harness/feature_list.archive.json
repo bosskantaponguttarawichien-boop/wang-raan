@@ -1,4 +1,495 @@
 {
   "_note": "harness/feature_list.archive.json — จัดเก็บรายละเอียดเต็มของ feature ที่เสร็จสิ้นแล้ว เพื่อรักษาขนาดไฟล์หลักให้กะทัดรัด",
-  "features": []
+  "features": [
+    {
+      "id": "feat-000",
+      "name": "Harness & Agent Operating System Setup",
+      "description": "ติดตั้งระบบ Harness, AGENTS.md, init.sh, Makefile, Validation Scripts และ Session Handoff ตามแบบฉบับ mss harness",
+      "dependencies": [],
+      "gate": "scripts/validate_harness.py และ ./harness/init.sh ผ่านฉลุย",
+      "status": "done",
+      "evidence": "harness/init.sh, scripts/validate_harness.py, Makefile, AGENTS.md",
+      "role": "core",
+      "summary": "สร้างระบบ Harness สำหรับควบคุมระเบียบการทำงานของ AI Agent และติดตามงานอย่างเป็นระบบ",
+      "sprint": 1
+    },
+    {
+      "id": "feat-001",
+      "name": "Next.js 15 App Router & Project Scaffolding",
+      "description": "ติดตั้งโครงสร้างโปรเจกต์ Next.js 15 App Router ร่วมกับ React 19, TypeScript และ ESLint ตาม architecture.md",
+      "dependencies": [
+        "feat-000"
+      ],
+      "gate": "npm run build และ dev server ทำงานได้",
+      "status": "done",
+      "evidence": "package.json, tsconfig.json, next.config.ts, eslint.config.mjs, postcss.config.mjs, vitest.config.ts, app/layout.tsx, app/(marketing)/page.tsx, app/(app)/playground/{layout,page}.tsx — `npm run build` ผ่าน (Next 15.5.27 / React 19.3), dev server ตอบ 200 ทั้ง / และ /playground, `npm run lint` + `tsc --noEmit` ผ่าน",
+      "role": "frontend",
+      "summary": "วางโครงสร้าง Next.js 15 (App Router) พร้อมการตั้งค่า TypeScript และเครื่องมือพื้นฐาน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-002",
+      "name": "Design System Tokens & CSS Variables",
+      "description": "นำโทเคนสี, ฟอนต์, สถานะ (--status-ready, --status-warning, --status-blocked) และ Issue Rings จาก design-system.md เข้าสู่ Tailwind CSS v4 / CSS Variables",
+      "dependencies": [
+        "feat-001"
+      ],
+      "gate": "โทเคนตรงตาม design-system.md 100%",
+      "status": "done",
+      "evidence": "app/globals.css (โทเคน §2.1–§2.5, §3, §4.1, §5.1–§5.3, §8 + @theme ตาม §11) — src/test/design-tokens.test.ts 27 tests ตรวจค่าเทียบ design-system.md อัตโนมัติ ผ่านทั้งหมด",
+      "role": "design",
+      "summary": "ตั้งค่า CSS Variables, ธีมสี, ฟอนต์ และโทเคนสถานะตาม design-system.md",
+      "sprint": 1
+    },
+    {
+      "id": "feat-003",
+      "name": "Accessible UI Primitives & Components",
+      "description": "สร้างคอมโพเนนต์พื้นฐานด้วย Shadcn UI / Radix UI รองรับ Focus Rings (outline: 3px solid #a4b6ff), ARIA ภาษาไทย และ prefers-reduced-motion",
+      "dependencies": [
+        "feat-002"
+      ],
+      "gate": "ทดสอบ Tab Navigation และ Focus Indicator ผ่าน",
+      "status": "done",
+      "evidence": "src/components/ui/{button,view-switch,palette-item,status-badge,visually-hidden}.tsx — src/components/ui/ui-primitives.test.tsx 11 tests (Tab order, disabled skip, Enter/Space, focus-visible ring, aria-pressed, role=status) ผ่าน; ตรวจในเบราว์เซอร์: Tab ไป CTA ได้ outline solid 3px #a4b6ff, console ไม่มี error",
+      "role": "frontend",
+      "summary": "สร้าง UI Primitives ที่ได้มาตรฐานการเข้าถึง WCAG 2.1 AA และรองรับการนำทางด้วยคีย์บอร์ด",
+      "sprint": 1
+    },
+    {
+      "id": "feat-004",
+      "name": "Core Entities & Geometry Types (Pure TypeScript)",
+      "description": "กำหนด TypeScript Interfaces และ Schema สำหรับ Entrance, Kitchen, Counter, TableSet, Chair, Room Dimension (2-30m) และ Snap Grid 0.25m ใน src/core/",
+      "dependencies": [
+        "feat-000"
+      ],
+      "gate": "ห้าม import React หรือ DOM ใน src/core/ (Boundary Check ผ่าน)",
+      "status": "done",
+      "evidence": "src/core/layout/{types,constants,geometry,entities}.ts — src/core/layout/geometry.test.ts 29 tests (snap 0.25, room 2–30, footprint/rotation, entrance, boundary scan) ผ่าน; init.sh/Makefile boundary ขยายครอบคลุม src/core/ ทั้งหมด + ESLint no-restricted-imports; ทดสอบ negative แล้วจับการ import react ได้",
+      "role": "core",
+      "summary": "นิยามโครงสร้างข้อมูลเรขาคณิตและชนิดข้อมูลของวัตถุทั้งหมดในร้านแบบ Pure TypeScript",
+      "sprint": 1
+    },
+    {
+      "id": "feat-005",
+      "name": "Table Set Lifecycle & Group Transformations",
+      "description": "สร้าง Pure TS Logic สำหรับวงจรชีวิต Table-Chair: Group Move, Group Rotate, Cascade Delete และรักษาระยะสอดใต้โต๊ะ <= 0.10 ม.",
+      "dependencies": [
+        "feat-004"
+      ],
+      "gate": "Unit test ครอบคลุม Move, Rotate, Cascade Delete",
+      "status": "done",
+      "evidence": "src/core/layout/table-set.ts — src/core/layout/table-set.test.ts 32 tests (Create preset 2/4, Group Move, Group Rotate 90/180/270/360, Cascade Delete, hierarchy integrity, chairTuck ≤ 0.10 ม. จากด้านหน้า) ผ่าน",
+      "role": "core",
+      "summary": "พัฒนาตรรกะจัดการกลุ่มโต๊ะ-เก้าอี้ การเคลื่อนที่/หมุนตามกัน และการลบแบบ Cascade",
+      "sprint": 1
+    },
+    {
+      "id": "feat-006",
+      "name": "Dual-Tier Validation: Completeness Gate",
+      "description": "พัฒนา Pure TS Rule ตรวจสอบองค์ประกอบจำเป็น 4 ชนิด: ทางเข้า (Entrance), ครัว (Kitchen), เคาน์เตอร์ (Counter) และชุดโต๊ะ (Table Set) หากขาดจะขึ้น Blocked",
+      "dependencies": [
+        "feat-004"
+      ],
+      "gate": "Unit test ครอบคลุมเคสขาดแต่ละ entity",
+      "status": "done",
+      "evidence": "src/core/validation/completeness.ts (+ issues.ts) — completeness.test.ts 12 tests: ขาด Entrance/Kitchen/Counter/Table/Chair ที่ใช้งานได้ → Blocked ทีละเคส, orphan / chair-not-listed / multi-table / dangling ref → Blocked, โต๊ะไม่มีเก้าอี้ → Warning",
+      "role": "core",
+      "summary": "พัฒนาระบบตรวจสอบความครบถ้วนขององค์ประกอบสำคัญ 4 อย่างในผังร้าน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-007",
+      "name": "Dual-Tier Validation: Collision Detection",
+      "description": "พัฒนาระบบตรวจจับการซ้อนทับ/ชนกันของวัตถุ (AABB / SAT Polygon) และตรวจการสอดใต้โต๊ะเกิน 0.10 ม. ของเก้าอี้",
+      "dependencies": [
+        "feat-004",
+        "feat-005"
+      ],
+      "gate": "ตรวจจับวัตถุชนกันได้แม่นยำทุกมุมหมุน (0, 90, 180, 270 องศา)",
+      "status": "done",
+      "evidence": "src/core/validation/collision.ts (AABB บน footprint ที่หมุนแล้ว) — collision.test.ts 28 tests ครอบคลุม 0/90/180/270° (counter, table set, out-of-bounds, chair-chair), tuck > 0.10 ม. และสอดจากด้านข้าง/หลัง → Blocked",
+      "role": "core",
+      "summary": "พัฒนาระบบตรวจจับการชนกันของเฟอร์นิเจอร์และการซ้อนทับที่ผิดเงื่อนไข",
+      "sprint": 1
+    },
+    {
+      "id": "feat-008",
+      "name": "Dual-Tier Validation: Clearance Checking",
+      "description": "พัฒนาระบบตรวจสอบระยะ Clearance: ทางเดินหลัก >= 1.20 ม., ทางเดินรอง >= 0.90 ม., ทางเข้าถึงเก้าอี้ >= 0.60 ม.",
+      "dependencies": [
+        "feat-004",
+        "feat-007"
+      ],
+      "gate": "Unit test ยืนยันระยะ clearance ตามสเปก PRD",
+      "status": "done",
+      "evidence": "src/core/validation/{walk-grid,routes,clearance}.ts — lattice 0.05 ม. + Euclidean Distance Transform + BFS; walk-grid.test.ts 16 tests (EDT เทียบ brute force), clearance.test.ts 20 tests: ทางเดินหลัก 1.20 ผ่าน / 1.15 ไม่ผ่าน, ทางเดินรอง 0.90 ผ่าน / 0.85 ไม่ผ่าน, พื้นที่เข้าถึงเก้าอี้ 0.60 ผ่าน / 0.55 ไม่ผ่าน",
+      "role": "core",
+      "summary": "พัฒนาระบบตรวจสอบความกว้างทางเดินหลัก ทางเดินรอง และพื้นที่เข้าถึงเก้าอี้",
+      "sprint": 1
+    },
+    {
+      "id": "feat-009",
+      "name": "Dual-Tier Validation: Accessibility & Service Points",
+      "description": "พัฒนาระบบคำนวณ Service Points อัตโนมัติจาก Bounding Box และตรวจเส้นทางเดิน (Flow-path) เชื่อมต่อระหว่าง Entrance -> Counter -> Table -> Kitchen",
+      "dependencies": [
+        "feat-004",
+        "feat-008"
+      ],
+      "gate": "ตรวจผังที่ทางเดินตันหรือเข้าไม่ถึงจุดบริการขึ้นสถานะ Blocked",
+      "status": "done",
+      "evidence": "src/core/validation/{service-points,accessibility}.ts — accessibility.test.ts 15 tests: ทางเดินตัน → unreachable chair/table/kitchen/counter Blocked, ของบังประตู → entrance-disconnected, ทางเข้าเลยผนัง → entrance-off-wall, service point ทุกชิ้นแตะ bounding box",
+      "role": "core",
+      "summary": "พัฒนาระบบตรวจสอบการเข้าถึงจุดบริการและเส้นทางสัญจรของลูกค้าและพนักงาน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-010",
+      "name": "Vitest Unit Test Suite for Core Validation",
+      "description": "สร้าง Unit Test Suite ครอบคลุมกฎ Validation 4 ด้าน และ Geometry Logic ใน src/core/ ให้ Coverage > 95%",
+      "dependencies": [
+        "feat-006",
+        "feat-007",
+        "feat-008",
+        "feat-009"
+      ],
+      "gate": "Vitest ผ่าน 100% ครอบคลุม Edge Cases และกฎตาม PRD",
+      "status": "done",
+      "evidence": "engine.ts + revision.ts + engine.test.ts 19 tests + edge-cases.test.ts 9 tests; @vitest/coverage-v8 threshold 95% — `npm run test:coverage`: src/core Statements/Branches/Functions/Lines 100% (561/561, 314/314, 106/106, 463/463); 30×30 ม. 60 ชุดโต๊ะตรวจเสร็จ < 1 วินาที",
+      "role": "qa",
+      "summary": "เขียนแบบทดสอบอัตโนมัติ Vitest สำหรับ Core Validation ให้ครอบคลุมมากกว่า 95%",
+      "sprint": 1
+    },
+    {
+      "id": "feat-011",
+      "name": "Zustand Editor Store & History (Undo/Redo 40 Steps)",
+      "description": "พัฒนา Zustand Store จัดการ Entities, Selection, History Stack 40 ขั้น, Snapshots และเรียก invalidateValidation() ทุกครั้งที่แก้ไข",
+      "dependencies": [
+        "feat-004",
+        "feat-005"
+      ],
+      "gate": "ทดสอบ Undo/Redo ครบ 40 ขั้น พร้อมรักษา State ถูกต้อง",
+      "status": "done",
+      "evidence": "src/store/use-layout-store.ts — use-layout-store.test.ts 19 tests: undo 40 ครั้งตรงทุก snapshot และ redo 40 ครั้งกลับครบ, ขั้นที่ 41 ไม่มีผล, ทุก edit ทำให้ validation = null และ revision ตรงผัง, P2 gate selector, cascade/undo คืนชุดโต๊ะครบ",
+      "role": "frontend",
+      "summary": "สร้าง Store จัดการ State ของผังร้านพร้อมประวัติ Undo/Redo 40 ขั้นตอน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-012",
+      "name": "2D Canvas Artboard Editor (Hybrid DOM + SVG)",
+      "description": "พัฒนา 2D Editor Canvas คมชัดด้วย Hybrid DOM (% CSS) ร่วมกับเส้นกริด SVG Linear Gradient, Snap-to-Grid 0.25m, Drag, Resize และ Rotate",
+      "dependencies": [
+        "feat-003",
+        "feat-011"
+      ],
+      "gate": "คมชัดทุกความละเอียด (Retina/4K) ไม่แตก และ Snap 0.25m ถูกต้อง",
+      "status": "done",
+      "evidence": "src/components/editor-2d/{artboard,grid-overlay,stage-math}.tsx, src/components/editor/playground-editor.tsx, app/(app)/playground — วัตถุเป็น <button> วางเป็น % (Hybrid DOM), กริด SVG vector-effect non-scaling-stroke (คมชัดทุก DPR); artboard.test.tsx 19 tests: ลาก snap 0.25 ม. + เก้าอี้ตามชุด + ลากหนึ่งครั้ง = Undo 1 ขั้น, คีย์บอร์ด (ลูกศร/Shift/R/Delete/Esc), resize handle snap 0.05 ม., ลากทางเข้าข้ามผนัง; ตรวจในเบราว์เซอร์: ลากจริง + ไม่มี horizontal scroll ที่ 320/375/480/768/1024/1440",
+      "role": "frontend",
+      "summary": "สร้างผืนผ้าใบแก้ไขผังร้าน 2D แบบ Hybrid DOM + SVG ที่คมชัดและลากวางแม่นยำ",
+      "sprint": 1
+    },
+    {
+      "id": "feat-013",
+      "name": "3D Isometric View (Pure SVG Projection)",
+      "description": "พัฒนามุมมอง 3D Isometric Projection ด้วย Pure SVG แปลงพิกัด 2D เป็น Isometric 3D เบา ไม่โหลด WebGL/Three.js",
+      "dependencies": [
+        "feat-011",
+        "feat-012"
+      ],
+      "gate": "ไม่ใช้ WebGL / Three.js และแสดงผล Isometric ถูกต้อง",
+      "status": "done",
+      "evidence": "src/core/preview/isometric.ts (Pure TS, สูตร design-system §7.3 + จานสี §2.4) + src/components/preview-3d/isometric-view.tsx — isometric.test.ts 12 tests (projection, depth sort, เงาอยู่ใต้ชิ้นงาน, พนักพิงทุกมุมหมุน, viewBox ครอบร้าน 30×2, ไม่มี three/getContext) + jsdom: ไม่มี <canvas>; ตรวจภาพในเบราว์เซอร์แล้ว",
+      "role": "frontend",
+      "summary": "พัฒนาระบบแสดงผล 3D Isometric ด้วย SVG ล้วนโดยไม่ต้องโหลด Three.js",
+      "sprint": 1
+    },
+    {
+      "id": "feat-014",
+      "name": "Validation Status Bar & Live Issue Overlay",
+      "description": "พัฒนาแถบแสดงสถานะ Ready (เขียว) / Warning (เหลือง) / Blocked (แดง) พร้อม Issue Rings บน Canvas และ Drawer สรุปรายการข้อผิดพลาด",
+      "dependencies": [
+        "feat-011",
+        "feat-012",
+        "feat-010"
+      ],
+      "gate": "Instant Feedback 0ms บน Client เมื่อผังเปลี่ยน",
+      "status": "done",
+      "evidence": "src/components/validation/{use-live-validation.ts,validation-status-bar.tsx} — ตรวจแบบ synchronous ใน render เดียวกับที่ผังเปลี่ยน; validation-ui.test.tsx: ลบครัว → Blocked ทันทีใน act() เดียว, Warning/Ready, Drawer (Radix Dialog) จัดกลุ่มตามหมวดและเลือกรายการแล้วไปยังชิ้นงาน, Issue Rings (data-issue) บนชิ้นงานและป้ายทางเข้า",
+      "role": "frontend",
+      "summary": "สร้างแถบแสดงผลความถูกต้องของผังร้าน พร้อมวงแหวนชี้เป้าจุดที่มีปัญหา",
+      "sprint": 1
+    },
+    {
+      "id": "feat-015",
+      "name": "BFF Layout API Route Handlers",
+      "description": "สร้าง Route Handlers app/api/layouts/ สำหรับจัดเก็บ, โหลด และ Re-validate ผังร้านที่ฝั่งเซิร์ฟเวอร์ก่อนบันทึก",
+      "dependencies": [
+        "feat-006",
+        "feat-007",
+        "feat-008",
+        "feat-009"
+      ],
+      "gate": "API ส่งคืน HTTP 422 พร้อม Error รายข้อหาก Re-validation พบ Blocked",
+      "status": "done",
+      "evidence": "app/api/layouts/route.ts, app/api/layouts/[id]/route.ts, src/server/{layout-handlers,layout-repository}.ts (in-memory, interface พร้อมสลับเป็น BE) — layout-handlers.test.ts 14 tests: Blocked → 422 + error.issues รายข้อและไม่บันทึก, schema ผิด → 400 + path, 409/404/413/415, CRUD ครบ; curl บน dev server: 201 / 422 / 400 / 204",
+      "role": "bff",
+      "summary": "พัฒนา API Route Handlers ฝั่ง BFF สำหรับบันทึก/โหลดและตรวจความถูกต้องซ้ำ",
+      "sprint": 1
+    },
+    {
+      "id": "feat-016",
+      "name": "Layout Schema Validation with Zod",
+      "description": "สร้าง Zod Schema สำหรับตรวจโครงสร้าง Request Body และ Layout JSON ร่วมกันระหว่าง Client และ BFF",
+      "dependencies": [
+        "feat-004",
+        "feat-015"
+      ],
+      "gate": "Type-safe runtime schema validation ผ่านฉลุย",
+      "status": "done",
+      "evidence": "src/core/validation/layout.schema.ts — expectTypeOf: z.infer ตรงกับ StoreLayout / LayoutObject / ValidationResult; layout.schema.test.ts 17 tests (round-trip, ปฏิเสธ shelf / rotation 45 / id ซ้ำ / ฟิลด์แปลก / Infinity, P1→P2 contract ปฏิเสธ Blocked); ใช้ร่วมกันที่ BFF และ Worker",
+      "role": "bff",
+      "summary": "สร้าง Schema ด้วย Zod สำหรับตรวจสอบความถูกต้องของข้อมูลระหว่าง Client และ BFF",
+      "sprint": 1
+    },
+    {
+      "id": "feat-017",
+      "name": "P2 Simulation Engine: Web Worker Setup",
+      "description": "ติดตั้ง Web Worker สำหรับรัน Simulation นอก Main UI Thread พร้อมสร้าง Occupancy Grid 0.25m จาก Layout Entities",
+      "dependencies": [
+        "feat-004",
+        "feat-011"
+      ],
+      "gate": "Worker สื่อสารผ่าน postMessage ได้ราบรื่นและสร้าง Grid ถูกต้อง",
+      "status": "done",
+      "evidence": "src/workers/simulation.worker.ts + src/core/simulation/{occupancy-grid,protocol,worker-runtime}.ts + src/lib/simulation-client.ts — simulation.test.ts 14 tests (กริด 0.25 ม. ขอบตรง, ช่องทางเข้า 4 ผนัง, STALE/BLOCKED/INVALID), simulation-client.test.ts ผ่าน MessageChannel จริง (requestId, structured clone, timeout); เบราว์เซอร์: Worker ตอบ 'กริดจำลอง 32 × 24 ช่อง'",
+      "role": "p2",
+      "summary": "สร้าง Web Worker และแปลงผังร้านเป็น Occupancy Grid ความละเอียด 0.25 เมตร",
+      "sprint": 1
+    },
+    {
+      "id": "feat-018",
+      "name": "P2 Simulation Engine: Flow-Field Pathfinding",
+      "description": "พัฒนา Flow-Field Pathfinding (Dijkstra/Vector Field) ใน Web Worker จำลองลูกค้าเดินจากทางเข้า -> เคาน์เตอร์ -> โต๊ะ -> ทางออก",
+      "dependencies": [
+        "feat-017"
+      ],
+      "gate": "ลูกค้าหลีกเลี่ยงสิ่งกีดขวางและเดินถึงจุดหมายอย่างสมจริง",
+      "status": "done",
+      "evidence": "src/core/simulation/{flow-field,engine}.ts — Dijkstra flow field 8 ทิศ ห้ามตัดมุม + ลูกค้า: ประตู → เคาน์เตอร์ (คิว 2 ช่อง/เคาน์เตอร์) → เก้าอี้ว่าง → ออก; engine.test.ts + flow-field.test.ts 18 tests: 2 ชม.จำลอง ไม่มีลูกค้าที่กำลังเดินอยู่ในช่องสิ่งกีดขวางหรือทะลุระหว่างก้าว (>10,000 ตำแหน่ง), octile distance ถูกต้อง, เวลาเดินประตู→เคาน์เตอร์ < 1.5× ระยะตรง, เก้าอี้ 1 ตัว/คน, ผลซ้ำได้ด้วย seed; Worker protocol START/PAUSE/RESUME/STOP/SET_SPEED/TICK",
+      "role": "p2",
+      "summary": "พัฒนาขั้นตอนวิธี Flow-Field Pathfinding สำหรับจำลองการเดินของลูกค้า",
+      "sprint": 1
+    },
+    {
+      "id": "feat-019",
+      "name": "Canvas Simulation Overlay & Heatmap",
+      "description": "พัฒนา Canvas Overlay ทับบน 2D Artboard แสดงจุดลูกค้าเคลื่อนไหวและ Heatmap บริเวณที่มีการใช้งานหนาแน่น",
+      "dependencies": [
+        "feat-012",
+        "feat-018"
+      ],
+      "gate": "รันได้ราบรื่นที่ 60 FPS บน Canvas Layer",
+      "status": "done",
+      "evidence": "src/components/simulation/simulation-overlay.tsx — Canvas ตาม devicePixelRatio, heatmap จาก ImageData ขนาดกริด, interpolate tick 20 Hz ด้วย rAF; เบราว์เซอร์จริง: data-fps = 60.1 ระหว่างจำลอง 80 คน/ชม., canvas 816px สำหรับ 408 CSS px (DPR 2); reduced motion วาดไม่เกิน 1 ครั้ง/วินาที",
+      "role": "frontend",
+      "summary": "สร้าง Layer แสดงผลการจำลองลูกค้าและแผนที่ความหนาแน่น (Heatmap) บน Canvas",
+      "sprint": 1
+    },
+    {
+      "id": "feat-020",
+      "name": "P2 Simulation Gate Guard Enforcement",
+      "description": "บังคับใช้กฎ P2 Validation Gate: หากสถานะเป็น Blocked ปุ่มเริ่มจำลองต้อง Disabled เมื่อสถานะเป็น Ready หรือ Warning จึงจะกดจำลองได้",
+      "dependencies": [
+        "feat-014",
+        "feat-019"
+      ],
+      "gate": "ปุ่มจำลองไม่สามารถกดได้เมื่อมีข้อผิดพลาดระดับ Blocked",
+      "status": "done",
+      "evidence": "src/components/simulation/{simulation-controller.ts,simulation-panel.tsx} — ปุ่มเริ่มจำลอง disabled เมื่อ Blocked พร้อมเหตุผล (aria-describedby); controller runValidation() ซ้ำ + P1LayoutContractSchema ก่อน SYNC/START; แก้ผังระหว่างจำลอง → หยุดทันที; simulation-gate.test.tsx 13 tests + e2e keyboard: ปุ่ม Blocked ถูกข้ามในลำดับ Tab และคลิก/Enter ไม่เริ่ม; Worker ปฏิเสธผัง Blocked แม้ผลตรวจถูกปลอม",
+      "role": "frontend",
+      "summary": "ล็อคปุ่มเริ่มจำลองลูกค้าเมื่อผังร้านยังมีข้อผิดพลาดระดับ Blocked",
+      "sprint": 1
+    },
+    {
+      "id": "feat-021",
+      "name": "Landing Page Migration to Next.js RSC",
+      "description": "แปลง design-html/index.html เป็น React Server Components ใน app/(marketing)/page.tsx พร้อม SEO Meta และภาพประกอบ",
+      "dependencies": [
+        "feat-002",
+        "feat-003"
+      ],
+      "gate": "หน้าตาและ Responsive เหมือน prototype design-html 100%",
+      "status": "done",
+      "evidence": "app/(marketing)/{page.tsx,landing.css,landing-motion.tsx} + scripts/scope_landing_css.py (สร้าง CSS จาก prototype ครอบด้วย .landing) — วัดเทียบ prototype ด้วยสคริปต์ 24 องค์ประกอบ × ตำแหน่ง/ขนาด/ฟอนต์/display ตรงกันทุกค่าที่ 320/375/480/768/1024/1440 (hash เท่ากัน); ปรับตาม V1: ชั้นวาง → ครัว (ข้อความ + ผังตัวอย่าง + สเก็ตช์) และสีข้อความเข้มขึ้นเล็กน้อยให้ผ่าน WCAG",
+      "role": "frontend",
+      "summary": "ย้ายหน้า Landing Page จาก HTML ต้นแบบมาเป็น Next.js Server Components",
+      "sprint": 1
+    },
+    {
+      "id": "feat-022",
+      "name": "Responsive Audit across 6 Breakpoints",
+      "description": "ตรวจสอบการแสดงผลบน 6 Breakpoints (320px, 375px, 480px, 768px, 1024px, 1440px) แบบ Desktop-First ปราศจาก Horizontal Scrollbar",
+      "dependencies": [
+        "feat-012",
+        "feat-021"
+      ],
+      "gate": "ผ่านการตรวจสอบ Viewport ครบทั้ง 6 ขนาดโดยไม่มีจุดแตก",
+      "status": "done",
+      "evidence": "e2e/responsive.spec.ts (Playwright, production build, Google Chrome) — Landing + Playground × 6 breakpoints: scrollWidth ≤ innerWidth, ไม่มีองค์ประกอบล้นขวา, Artboard อยู่ในจอ, แผงควบคุมครบ; 12/12 ผ่าน + screenshot ทุกขนาดใน e2e/.results/screens",
+      "role": "qa",
+      "summary": "ทดสอบและปรับแก้การแสดงผลบนหน้าจอทั้ง 6 ขนาดตามเกณฑ์ดีไซน์",
+      "sprint": 1
+    },
+    {
+      "id": "feat-023",
+      "name": "Accessibility (WCAG 2.1 AA) & Keyboard Audit",
+      "description": "ตรวจสอบการเข้าถึงทุกจุด: คีย์บอร์ด Tab ทั่วทั้งแอป, Focus Indicator ชัดเจน, คำบรรยายภาษาไทย, รองรับ prefers-reduced-motion",
+      "dependencies": [
+        "feat-003",
+        "feat-012",
+        "feat-021"
+      ],
+      "gate": "Axe / Lighthouse Accessibility score >= 95",
+      "status": "done",
+      "evidence": "e2e/a11y.spec.ts (axe WCAG 2.1 A/AA: 0 violations ใน 8 สถานะ — Landing, Playground ว่าง+Drawer, ระหว่างจำลอง+Drawer, 3D ที่ 1440/375) + e2e/keyboard.spec.ts (Tab/focus ring 3px ทุกจุด, ใช้งานจนเริ่ม/หยุดจำลองด้วยคีย์บอร์ด, reduced-motion); Lighthouse 12: Accessibility 100 / Best Practices 100 / SEO 100 ทั้งสองหน้า",
+      "role": "qa",
+      "summary": "ตรวจสอบมาตรฐานการเข้าถึง WCAG 2.1 AA และการใช้งานด้วยคีย์บอร์ดอย่างสมบูรณ์",
+      "sprint": 1
+    },
+    {
+      "id": "feat-025",
+      "name": "Layout Export Engine (PNG / SVG / PDF Summary)",
+      "description": "พัฒนาระบบส่งออกผังร้านเป็นภาพ PNG คมชัด, เวกเตอร์ SVG และเอกสารสรุปผลการตรวจผังร้านพร้อมสถิติที่นั่ง",
+      "dependencies": [
+        "feat-012",
+        "feat-014"
+      ],
+      "gate": "ไฟล์ส่งออกแสดงผลสวยงามและสัดส่วนตรงตามผังจริง",
+      "status": "done",
+      "evidence": "src/core/export/plan-svg.ts (SVG สัดส่วนจริง 60 px/ม. + Issue Rings) + summary.ts (ที่นั่ง/พื้นที่/ผลตรวจ) — 11 unit tests; e2e ตรวจ SVG 552×432 และ PNG 2× (1104×864 จาก IHDR); รายงาน PDF ผ่านการพิมพ์ (feat-026)",
+      "role": "frontend",
+      "summary": "พัฒนาระบบส่งออกภาพผังร้าน (PNG/SVG) และรายงานสรุปผังร้าน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-026",
+      "name": "Print Styling & Presentation Mode",
+      "description": "จัดระเบียบ CSS @media print ซ่อนแถบเครื่องมือ ปรับสัดส่วนกระดาษ และแสดงผังร้านพร้อมตารางสรุปที่นั่งอย่างมืออาชีพ",
+      "dependencies": [
+        "feat-025"
+      ],
+      "gate": "สั่งพิมพ์ (Ctrl+P / Cmd+P) แล้วหน้าตาเอกสารสะอาดและคมชัด",
+      "status": "done",
+      "evidence": "@page A4 landscape + print:hidden ที่ Editor/Header + src/components/editor/print-report.tsx (ผังซ้าย สรุปที่นั่ง+ผลตรวจขวา) — e2e emulateMedia('print') + page.pdf() ได้ 1 หน้า (e2e/.results/screens/print-report.pdf)",
+      "role": "design",
+      "summary": "ปรับแต่งสไตล์การพิมพ์ (@media print) สำหรับพิมพ์ผังร้านลงกระดาษ",
+      "sprint": 1
+    },
+    {
+      "id": "feat-027",
+      "name": "Editor Control Panels & Object Inspector",
+      "description": "พัฒนาแผงเครื่องมือด้านข้างและฟอร์มควบคุมด้วย React Hook Form + Zod: Room & Entrance Settings (2-30m), Object Inspector, Tool Palette และ Preset Selection",
+      "dependencies": [
+        "feat-003",
+        "feat-011"
+      ],
+      "gate": "ฟอร์มไม่ re-render ทั้ง Canvas เมื่อมีการพิมพ์หรือปรับค่า",
+      "status": "done",
+      "evidence": "src/components/editor/forms/ (React Hook Form + Zod, uncontrolled) — Room & Entrance Settings + Object Inspector; เทสต์ยืนยันว่าพิมพ์แล้ว store ไม่ถูกแจ้งเตือน (0 notifications) จนกด 'นำไปใช้' และ 1 การกด = Undo 1 ขั้น (forms.test.tsx 20 เคส) + e2e",
+      "role": "frontend",
+      "summary": "สร้างแถบเครื่องมือและฟอร์มปรับแต่งขนาดร้าน ประตู และคุณสมบัติของเฟอร์นิเจอร์",
+      "sprint": 1
+    },
+    {
+      "id": "feat-028",
+      "name": "Auto-Save Draft & Local Storage Persistence",
+      "description": "พัฒนาระบบบันทึกผังร้านลง Local Storage / IndexedDB อัตโนมัติ (PRD ข้อ 3.1) พร้อมระบบตรวจจับและกู้คืนร่างเดิมเมื่อเปิดเบราว์เซอร์ใหม่",
+      "dependencies": [
+        "feat-011"
+      ],
+      "gate": "รีเฟรชหน้าจอแล้วผังเดิมและประวัติกลับมาครบถ้วน",
+      "status": "done",
+      "evidence": "src/lib/draft-storage.ts + draft-autosave.ts — localStorage (ผัง + ประวัติ Undo/Redo), debounce 400 ms + flush ตอน pagehide, ตรวจด้วย Zod, Quota → ตัดประวัติ; 15 unit tests + e2e รีโหลดแล้ว Undo/Redo ใช้ได้ครบ",
+      "role": "frontend",
+      "summary": "สร้างระบบบันทึกร่างผังร้านลงเบราว์เซอร์อัตโนมัติและกู้คืนเมื่อเข้าใช้งานใหม่",
+      "sprint": 1
+    },
+    {
+      "id": "feat-029",
+      "name": "P1-P2 JSON Contract File Import & Export",
+      "description": "พัฒนาระบบ Import และ Export ไฟล์ .json ตาม StoreLayoutPayloadSchema (PRD ข้อ 4.4 p1-layout-v1 contract) สำหรับแลกเปลี่ยนผังร้าน",
+      "dependencies": [
+        "feat-004",
+        "feat-016"
+      ],
+      "gate": "นำเข้าไฟล์ JSON แล้วแปลงเป็น Entity และสร้าง Table-Chair Hierarchy ถูกต้อง",
+      "status": "done",
+      "evidence": "src/core/io/layout-file.ts — export p1-layout-v1 (ผ่าน P1LayoutContractSchema เมื่อ Ready), import 3 รูปแบบ (contract / StoreLayout / ตัวอย่าง PRD §4.4) สร้าง chairIds ใหม่จาก tableId และตัดเก้าอี้กำพร้า; 17 unit tests (coverage 100% lines) + e2e นำเข้า/ส่งออก/Undo",
+      "role": "core",
+      "summary": "พัฒนาระบบนำเข้าและส่งออกไฟล์ JSON ตามสัญญาข้อมูลมาตรฐาน P1-P2 Contract",
+      "sprint": 1
+    },
+    {
+      "id": "feat-030",
+      "name": "Public Share System & Read-Only Preview",
+      "description": "สร้างระบบแชร์ผังร้านสาธารณะ: POST /api/share ออก Token สุ่ม, หน้า app/(app)/share/[layoutId] แบบ Read-only พรีวิว 2D/3D และ Dynamic OG Image",
+      "dependencies": [
+        "feat-012",
+        "feat-013",
+        "feat-015"
+      ],
+      "gate": "เปิด URL แชร์แบบไม่ล็อกอินแล้วดูผังได้แบบ Read-only และมี Dynamic OG Image",
+      "status": "done",
+      "evidence": "POST /api/share (ต้องมี Session + เป็นเจ้าของ, share key สุ่ม 256 บิต base64url, snapshot) + GET /api/share/[shareKey] (สาธารณะ, cache public) + หน้า app/(app)/share/[shareKey] (RSC, 2D SVG/3D Isometric read-only, noindex) + opengraph-image.tsx (PNG 1200×630 วาดผังจริง) — share-handlers.test.ts 11 เคส + e2e เปิดลิงก์ในเบราว์เซอร์ที่ไม่มี cookie, OG image 200 image/png, axe 0",
+      "role": "bff",
+      "summary": "สร้างระบบสร้างลิงก์แชร์ผังร้านแบบสาธารณะและหน้าดูตัวอย่างผังร้าน",
+      "sprint": 1
+    },
+    {
+      "id": "feat-031",
+      "name": "NextAuth.js Session Management & Auth BFF Relay",
+      "description": "ติดตั้ง NextAuth.js (Auth.js v5) ใน app/api/auth/[...nextauth]/route.ts สำหรับจัดการ Session Cookie (HttpOnly) และ Relay Token ไปยัง Backend Service",
+      "dependencies": [
+        "feat-001",
+        "feat-015"
+      ],
+      "gate": "จัดการ Session และ Relay Token ใน Request Headers สำเร็จ",
+      "status": "done",
+      "evidence": "Auth.js v5 (next-auth@5.0.0-beta.32) app/api/auth/[...nextauth] — Guest provider (id สุ่มฝั่ง server) + GitHub ถ้าตั้ง env; Session JWT ใน Cookie HttpOnly SameSite=Lax (e2e ตรวจ); /api/layouts ต้องมี Session (401) และแยกผังตามเจ้าของ; src/server/token-relay.ts ออก internal JWT HS256 อายุ 5 นาทีแนบ Authorization: Bearer และตัด Cookie ก่อนส่ง Backend — token-relay.test.ts ตรวจ header ทุกเมธอดของ Remote repository",
+      "role": "bff",
+      "summary": "ติดตั้งระบบยืนยันตัวตน NextAuth และจัดการ Session สำหรับเชื่อมต่อ API ภายนอก",
+      "sprint": 1
+    },
+    {
+      "id": "feat-032",
+      "name": "Contact Inquiry Form & Rate-Limited API",
+      "description": "พัฒนาแบบฟอร์มติดต่อบน Landing Page ด้วย React Hook Form + Zod และ BFF POST /api/contact พร้อมระบบ Rate Limit (IP/User)",
+      "dependencies": [
+        "feat-003",
+        "feat-021"
+      ],
+      "gate": "ส่งแบบฟอร์มสำเร็จพร้อม Rate Limit บล็อกการส่งถี่เกินกำหนด",
+      "status": "done",
+      "evidence": "ContactForm (RHF + Zod schema เดียวกับ BFF) + POST /api/contact: Rate limit 5 ครั้ง/10 นาที ต่อ IP และต่อผู้ใช้ (429 + Retry-After), honeypot, จำกัด 8 KB, ส่งต่อ Webhook (CONTACT_WEBHOOK_URL) หรือเก็บในหน่วยความจำ — contact-handlers.test.ts 15 เคส + e2e ส่งสำเร็จแล้วครั้งที่ 6 ได้ 429 ในฟอร์มจริง",
+      "role": "bff",
+      "summary": "พัฒนาฟอร์มติดต่อสอบถามและ API ฝั่งเซิร์ฟเวอร์พร้อมระบบป้องกันการยิงถี่ (Rate Limit)",
+      "sprint": 1
+    },
+    {
+      "id": "feat-033",
+      "name": "TanStack Query BFF Client Integration",
+      "description": "ติดตั้ง TanStack Query (React Query v5) เชื่อมต่อ Client กับ BFF /api/layouts รองรับ Caching, Background Refetching และ Optimistic Updates",
+      "dependencies": [
+        "feat-011",
+        "feat-015"
+      ],
+      "gate": "โหลดและบันทึกผังร้านผ่าน React Query พร้อมสถานะ Loading/Error แม่นยำ",
+      "status": "done",
+      "evidence": "@tanstack/react-query 5 — src/lib/layout-queries.ts (list/detail cache, Optimistic save/delete + rollback, retry เฉพาะ 5xx) + แผง 'บัญชีและผังออนไลน์' แสดง Loading/Error/Empty/Refetching — layout-queries.test.tsx 9 เคส (pending→success, 401 ไม่ retry, 422 rollback, ลบล้มเหลว rollback) + e2e บันทึก/โหลด/ลบ/รีโหลด",
+      "role": "frontend",
+      "summary": "เชื่อมต่อการดึงและบันทึกข้อมูลผังร้านด้วย TanStack Query พร้อมระบบแคช",
+      "sprint": 1
+    }
+  ]
 }
