@@ -1,0 +1,23 @@
+{
+  // หน้าเว็บ + BFF บน Cloudflare Workers ผ่าน OpenNext (feat-035) — ต้องใช้ Workers Paid (แผนฟรีจำกัด CPU 10 ms/คำขอ)
+  // build: `npm run cf:build` · ทดสอบในเครื่อง (workerd): `npm run cf:preview`
+  // secret (AUTH_SECRET, INTERNAL_TOKEN_SECRET, OAuth) ตั้งด้วย `wrangler secret put` — ห้ามใส่ในไฟล์นี้
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wang-raan-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  // global_fetch_strictly_public: fetch ไปได้เฉพาะปลายทางสาธารณะ (กัน SSRF เข้าเครือข่ายภายใน)
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  "env": {
+    // ทดสอบในเครื่อง: BFF ต้อง fetch ไป Backend จำลองที่ localhost ได้ จึงไม่ใช้ global_fetch_strictly_public
+    "local": {
+      "name": "wang-raan-web-local",
+      "compatibility_flags": ["nodejs_compat"]
+    }
+  }
+}
