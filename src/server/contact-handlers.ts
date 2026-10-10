@@ -1,16 +1,21 @@
 import "server-only";
 /**
  * BFF POST /api/contact (architecture.md §4.3, feat-032)
- * ลำดับ: Rate limit (IP + ผู้ใช้ที่ล็อกอิน) → จำกัดขนาด → Zod → honeypot → ส่งต่อ (webhook หรือกล่องข้อความในหน่วยความจำ)
+ * ลำดับ: Rate limit (IP + ผู้ใช้ที่ล็อกอิน + เพดานรวม) → จำกัดขนาด → Zod → honeypot → ส่งต่อ (webhook หรือกล่องข้อความในหน่วยความจำ)
  */
 import { ContactSchema, type ContactInput } from "@/lib/contact-schema";
-import { json, problem } from "./layout-handlers";
+import { json, problem, readJson } from "./layout-handlers";
 import { clientIp, createRateLimiter, type RateLimiter } from "./rate-limit";
 import type { ResolveUser } from "./session";
 
 export const CONTACT_MAX_BYTES = 8 * 1024;
 /** 5 ครั้ง / 10 นาที ต่อ IP และต่อผู้ใช้ */
 export const CONTACT_LIMIT = { limit: 5, windowMs: 10 * 60 * 1000 };
+/**
+ * เพดานรวมทั้งระบบ 50 ครั้ง / 10 นาที — กันกรณีปลอม IP ทุกคำขอ (ข้อความไม่ท่วมปลายทาง และจำนวน key ใน limiter ไม่โต)
+ * แลกกับ: ถ้ามีคนยิงจนเต็ม ผู้ใช้จริงต้องรอรอบถัดไป
+ */
+export const CONTACT_GLOBAL_LIMIT = { limit: 50, windowMs: 10 * 60 * 1000 };
 
 export interface ContactMessage extends Omit<ContactInput, "website"> {
   receivedAt: string;
@@ -48,12 +53,14 @@ export interface ContactHandlerDeps {
   resolveUser: ResolveUser;
   ipLimiter?: RateLimiter;
   userLimiter?: RateLimiter;
+  globalLimiter?: RateLimiter;
   now?: () => Date;
 }
 
 export function createContactHandler(deps: ContactHandlerDeps) {
   const ipLimiter = deps.ipLimiter ?? createRateLimiter(CONTACT_LIMIT);
   const userLimiter = deps.userLimiter ?? createRateLimiter(CONTACT_LIMIT);
+  const globalLimiter = deps.globalLimiter ?? createRateLimiter(CONTACT_GLOBAL_LIMIT);
   const now = deps.now ?? (() => new Date());
 
   const tooMany = (retryAfter: number) => {
@@ -70,18 +77,12 @@ export function createContactHandler(deps: ContactHandlerDeps) {
       const byUser = userLimiter.hit(`user:${user.id}`);
       if (!byUser.allowed) return tooMany(byUser.retryAfter);
     }
+    const overall = globalLimiter.hit("global");
+    if (!overall.allowed) return tooMany(overall.retryAfter);
 
-    if (!(request.headers.get("content-type") ?? "").includes("application/json")) {
-      return problem(415, "UNSUPPORTED_MEDIA_TYPE", "ต้องส่งข้อมูลเป็น application/json");
-    }
-    const text = await request.text();
-    if (new TextEncoder().encode(text).byteLength > CONTACT_MAX_BYTES) return problem(413, "PAYLOAD_TOO_LARGE", "ข้อความยาวเกินกำหนด");
-    let body: unknown;
-    try {
-      body = JSON.parse(text);
-    } catch {
-      return problem(400, "INVALID_JSON", "รูปแบบ JSON ไม่ถูกต้อง");
-    }
+    const read = await readJson(request, CONTACT_MAX_BYTES);
+    if (!read.ok) return read.response;
+    const body = read.body;
     const parsed = ContactSchema.safeParse(body);
     if (!parsed.success) {
       return problem(400, "INVALID_CONTACT", "กรอกข้อมูลไม่ครบหรือไม่ถูกต้อง", {

@@ -74,6 +74,28 @@ describe("POST /api/layouts", () => {
     ["JSON เสีย", () => post("{oops"), 400, "INVALID_JSON"],
     ["ไม่ใช่ JSON", () => post("a=1", "application/x-www-form-urlencoded"), 415, "UNSUPPORTED_MEDIA_TYPE"],
     ["ใหญ่เกิน", () => post(`{"pad":"${"x".repeat(MAX_BODY_BYTES)}"}`), 413, "PAYLOAD_TOO_LARGE"],
+    [
+      "Content-Length บอกว่าใหญ่เกิน (ปฏิเสธก่อนอ่าน)",
+      () => req("", { method: "POST", headers: { "content-type": "application/json", "content-length": String(MAX_BODY_BYTES + 1) }, body: "{}" }),
+      413,
+      "PAYLOAD_TOO_LARGE",
+    ],
+    [
+      "stream ใหญ่เกินโดยไม่บอกขนาด (หยุดอ่านกลางทาง)",
+      () =>
+        req("", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: new ReadableStream({
+            pull(controller) {
+              controller.enqueue(new Uint8Array(64 * 1024).fill(32)); // ส่งไม่หยุด — ต้องถูกตัดเมื่อเกินขนาด
+            },
+          }),
+          duplex: "half",
+        } as RequestInit),
+      413,
+      "PAYLOAD_TOO_LARGE",
+    ],
   ] as const)("%s → %s", async (_, request, status, code) => {
     const res = await handlers.create(request());
     expect(res.status).toBe(status);
@@ -137,6 +159,17 @@ describe("Session & ความเป็นเจ้าของ (feat-031)", (
       expect(res.status).toBe(401);
       expect((await res.json()).error.code).toBe("UNAUTHORIZED");
     }
+  });
+
+  it("ผู้ใช้คนละคนใช้ id ผังเดียวกันได้ (เช่น นำเข้าไฟล์ของคนอื่น) — ไม่ได้ 409 ที่บอกว่าอีกคนมีผังนี้", async () => {
+    const layout = cafeLayout();
+    expect((await handlers.create(post({ layout }))).status).toBe(201);
+    const bobs = { ...layout, width: 9 };
+    expect((await handlers.create(post({ layout: bobs }, "application/json", "bob"))).status).toBe(201);
+    expect((await (await handlers.get(get(layout.id), layout.id)).json()).layout.width).toBe(8);
+    expect((await (await handlers.get(get(layout.id, "bob"), layout.id)).json()).layout.width).toBe(9);
+    expect((await handlers.remove(del(layout.id, "bob"), layout.id)).status).toBe(204);
+    expect((await handlers.get(get(layout.id), layout.id)).status).toBe(200);
   });
 
   it("ผู้ใช้อื่นมองไม่เห็น/แก้/ลบผังที่ไม่ใช่ของตน (ตอบ 404 ไม่บอกว่ามีอยู่)", async () => {

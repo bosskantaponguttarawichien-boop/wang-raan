@@ -62,6 +62,7 @@ describe("POST /api/share → GET /api/share/[shareKey] (feat-030)", () => {
     ["ไม่มี Session", post({ layoutId: "x" }, null), 401],
     ["JSON เสีย", post("{"), 400],
     ["ไม่มี layoutId", post({}), 400],
+    ["body ใหญ่เกิน 1 KB", post({ layoutId: "layout-01", pad: "x".repeat(2000) }), 413],
     [
       "ไม่ใช่ JSON (form POST ข้ามโดเมน)",
       new Request("https://wangraan.example/api/share", { method: "POST", headers: { "content-type": "text/plain", "x-user": "alice" }, body: '{"layoutId":"layout-01"}' }),

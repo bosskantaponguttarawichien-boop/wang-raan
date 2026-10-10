@@ -10,12 +10,14 @@
  *   - เก้าอี้สังกัดโต๊ะตาม `tableId`; ถ้าไม่มี `tableId` แต่อยู่ใน `chairIds` ของโต๊ะเดียว → ใช้โต๊ะนั้น
  *   - `chairIds` ของโต๊ะคำนวณใหม่จากเก้าอี้ที่สังกัดจริง (ห้ามมีเก้าอี้หลายโต๊ะ / id ค้าง)
  *   - เก้าอี้ที่หาโต๊ะไม่ได้ถูกตัดทิ้ง (ห้ามเกิด Orphan Chair) และแจ้งในรายการหมายเหตุ
+ *   - พิกัดลงกริด 0.25 ม. (เก้าอี้ขยับตามโต๊ะ), ขนาดครัว/เคาน์เตอร์ลงทีละ 0.05 ม.
+ *   - ได้ id ผังใหม่เสมอ (นำเข้า = เอกสารใหม่)
  *   - ผลตรวจในไฟล์ไม่ถูกเชื่อถือ — ผู้เรียกต้องตรวจผังใหม่เอง
  */
 import { z } from "zod";
-import { ENTRANCE_DEFAULT_WIDTH, ROOM_MAX, ROOM_MIN } from "../layout/constants";
+import { ENTRANCE_DEFAULT_WIDTH, OBJECT_MIN_SIZE, ROOM_MAX, ROOM_MIN, SIZE_STEP } from "../layout/constants";
 import { createEntrance } from "../layout/entities";
-import { clampRoomDimension, normalizeRotation, roundMeters } from "../layout/geometry";
+import { clampRoomDimension, normalizeRotation, roundMeters, snapToGrid } from "../layout/geometry";
 import type { IdFactory, LayoutObject, StoreLayout, ValidationResult } from "../layout/types";
 import { OBJECT_LABEL } from "../validation/issues";
 import { StoreLayoutSchema, ValidationResultSchema } from "../validation/layout.schema";
@@ -188,23 +190,37 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
     return [...new Set(ordered)];
   };
 
+  // ── ลงกริด 0.25 ม. (AGENTS.md) — เก้าอี้ขยับตามโต๊ะด้วยระยะเดียวกัน เพื่อคงระยะสอดใต้โต๊ะ ──
+  const tableShift = new Map<string, { dx: number; dy: number }>();
+  for (const table of tables.values()) {
+    tableShift.set(table.id, { dx: roundMeters(snapToGrid(table.x) - table.x), dy: roundMeters(snapToGrid(table.y) - table.y) });
+  }
+  const sizeOf = (obj: LooseObject, v: number) =>
+    // ครัว/เคาน์เตอร์ปรับขนาดทีละ 0.05 ม. เหมือนใน Editor; โต๊ะ/เก้าอี้คงขนาดตาม preset
+    obj.type === "kitchen" || obj.type === "counter" ? Math.min(ROOM_MAX, Math.max(OBJECT_MIN_SIZE, snapToGrid(v, SIZE_STEP))) : roundMeters(v);
+
   let fixedChairIds = 0;
+  let snapped = 0;
   const objects: LayoutObject[] = [];
   for (const obj of withIds) {
     if (obj.type === "chair" && !ownerOf.has(obj.id)) continue;
+    const shift = obj.type === "chair" ? tableShift.get(ownerOf.get(obj.id)!)! : null;
     const base = {
       id: obj.id,
-      x: roundMeters(obj.x),
-      y: roundMeters(obj.y),
-      width: roundMeters(obj.width),
-      depth: roundMeters(obj.depth),
+      x: shift ? roundMeters(obj.x + shift.dx) : snapToGrid(obj.x),
+      y: shift ? roundMeters(obj.y + shift.dy) : snapToGrid(obj.y),
+      width: sizeOf(obj, obj.width),
+      depth: sizeOf(obj, obj.depth),
       rotation: normalizeRotation(obj.rotation ?? 0),
     };
+    const eps = 1e-6;
+    if ([base.x - obj.x, base.y - obj.y, base.width - obj.width, base.depth - obj.depth].some((d) => Math.abs(d) > eps)) snapped++;
     if (obj.rotation !== undefined && obj.rotation !== base.rotation) {
       notes.push(`ปรับมุมหมุนของ${OBJECT_LABEL[obj.type]} ${obj.id} เป็น ${base.rotation}°`);
     }
     objects.push(buildObject(obj, base, chairsOf, ownerOf, () => fixedChairIds++));
   }
+  if (snapped > 0) notes.push(`ปรับตำแหน่ง/ขนาด ${snapped} ชิ้นให้ลงกริด 0.25 ม. (เก้าอี้ขยับตามโต๊ะ)`);
   if (fixedChairIds > 0) notes.push(`สร้างรายการเก้าอี้ (chairIds) ของโต๊ะใหม่ตามเก้าอี้ที่สังกัดจริง ${fixedChairIds} โต๊ะ`);
 
   // ── ทางเข้า ──
@@ -220,7 +236,8 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
   }
 
   const layout: StoreLayout = {
-    id: raw.id ?? newId("layout"),
+    // ผังที่นำเข้าเป็นเอกสารใหม่เสมอ: id ใหม่ → ไม่ชนกับผังเดิม (ของตนเองหรือของคนที่ส่งไฟล์มา) ตอนบันทึก
+    id: newId("layout"),
     version: raw.version ?? 1,
     units: "m",
     width,

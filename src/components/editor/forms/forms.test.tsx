@@ -103,6 +103,47 @@ describe("RoomSettingsForm (feat-027 gate: พิมพ์แล้วไม่ 
   });
 });
 
+describe("RoomSettingsForm: ผังที่ยังไม่มีทางเข้า", () => {
+  it("ปรับขนาดร้านอย่างเดียว → ไม่สร้างทางเข้าให้เอง", async () => {
+    const user = userEvent.setup();
+    act(() => state().loadLayout({ ...cafeLayout(), entrance: null }));
+    render(<RoomSettingsForm />);
+    await user.clear(screen.getByLabelText("กว้าง (ม.)"));
+    await user.type(screen.getByLabelText("กว้าง (ม.)"), "9");
+    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    expect(state().layout.width).toBe(9);
+    expect(state().layout.entrance).toBeNull();
+  });
+
+  it("แก้ช่องทางเข้า → สร้างทางเข้าตามที่กรอก", async () => {
+    const user = userEvent.setup();
+    act(() => state().loadLayout({ ...cafeLayout(), entrance: null }));
+    render(<RoomSettingsForm />);
+    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "north");
+    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    expect(state().layout.entrance).toMatchObject({ wall: "north", position: 0 });
+  });
+});
+
+describe("ObjectInspector: ชิ้นที่พิกัด/ขนาดไม่ลงกริด (ข้อมูลเก่า)", () => {
+  it("เปลี่ยนแค่การหมุนได้ — ช่อง x/ขนาดที่ไม่ได้แตะไม่ทำให้ฟอร์มไม่ผ่าน และไม่ถูกย้าย/ปรับขนาด", async () => {
+    const user = userEvent.setup();
+    const base = cafeLayout();
+    const counter = base.objects.find((o) => o.type === "counter")!;
+    const odd = { ...counter, x: 5.13, width: 2.42 };
+    act(() => state().loadLayout({ ...base, objects: base.objects.map((o) => (o.id === counter.id ? odd : o)) }));
+    act(() => state().selectObject(counter.id));
+    render(<ObjectInspector />);
+    expect(screen.getByLabelText("ตำแหน่ง x (ม.)")).toHaveValue(5.25);
+    await user.selectOptions(screen.getByLabelText("หมุน"), "180");
+    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    expect(screen.queryByRole("alert")).toBeNull();
+    const after = state().layout.objects.find((o) => o.id === counter.id)!;
+    expect(after.rotation).toBe(180);
+    expect(after.width).toBe(2.42); // ไม่ได้แตะช่องขนาด → ไม่ปรับ
+  });
+});
+
 describe("ObjectInspector", () => {
   it("ยังไม่เลือก → แสดงคำแนะนำ", () => {
     render(<ObjectInspector />);

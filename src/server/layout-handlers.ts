@@ -7,7 +7,7 @@ import "server-only";
  */
 import type { ZodError } from "zod";
 import { SaveLayoutRequestSchema, validateLayout } from "@/core/validation";
-import type { LayoutRepository } from "./layout-repository";
+import { BackendError, type LayoutRepository } from "./layout-repository";
 import type { ResolveUser } from "./session";
 
 export const MAX_BODY_BYTES = 512 * 1024;
@@ -23,15 +23,41 @@ function zodDetails(error: ZodError) {
   return error.issues.map((i) => ({ path: i.path.join("."), message: i.message }));
 }
 
-async function readJson(request: Request): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
+/** อ่าน body ทีละ chunk และหยุดทันทีเมื่อเกิน maxBytes (ไม่เก็บทั้งก้อนลงหน่วยความจำก่อนวัด) */
+async function readBounded(request: Request, maxBytes: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(bytes);
+}
+
+/** อ่าน JSON body: บังคับ content-type JSON (กัน CSRF แบบ form POST) และจำกัดขนาด */
+export async function readJson(request: Request, maxBytes = MAX_BODY_BYTES): Promise<{ ok: true; body: unknown } | { ok: false; response: Response }> {
   const type = request.headers.get("content-type") ?? "";
   if (!type.includes("application/json")) {
     return { ok: false, response: problem(415, "UNSUPPORTED_MEDIA_TYPE", "ต้องส่งข้อมูลเป็น application/json") };
   }
-  const text = await request.text();
-  if (new TextEncoder().encode(text).byteLength > MAX_BODY_BYTES) {
-    return { ok: false, response: problem(413, "PAYLOAD_TOO_LARGE", "ข้อมูลผังมีขนาดใหญ่เกินกำหนด") };
-  }
+  const tooLarge = { ok: false as const, response: problem(413, "PAYLOAD_TOO_LARGE", "ข้อมูลมีขนาดใหญ่เกินกำหนด") };
+  if (Number(request.headers.get("content-length") ?? 0) > maxBytes) return tooLarge;
+  const text = await readBounded(request, maxBytes);
+  if (text === null) return tooLarge;
   try {
     return { ok: true, body: JSON.parse(text) };
   } catch {
@@ -66,8 +92,18 @@ async function parseAndValidate(request: Request) {
 
 export const unauthorized = () => problem(401, "UNAUTHORIZED", "กรุณาเข้าสู่ระบบก่อน");
 
+/** Backend ตอบผิดปกติ → 502 (ไม่ส่งรายละเอียดภายในออกไป) */
+export async function withBackendErrors(run: () => Promise<Response>): Promise<Response> {
+  try {
+    return await run();
+  } catch (error) {
+    if (error instanceof BackendError) return problem(502, "BACKEND_ERROR", "ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง");
+    throw error;
+  }
+}
+
 export function createLayoutHandlers(repo: LayoutRepository, resolveUser: ResolveUser) {
-  return {
+  const handlers = {
     async list(request: Request) {
       const user = await resolveUser(request);
       if (!user) return unauthorized();
@@ -106,5 +142,12 @@ export function createLayoutHandlers(repo: LayoutRepository, resolveUser: Resolv
       if (!user) return unauthorized();
       return (await repo.remove(user.id, id)) ? new Response(null, { status: 204 }) : problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้");
     },
+  };
+  return {
+    list: (request: Request) => withBackendErrors(() => handlers.list(request)),
+    create: (request: Request) => withBackendErrors(() => handlers.create(request)),
+    get: (request: Request, id: string) => withBackendErrors(() => handlers.get(request, id)),
+    update: (request: Request, id: string) => withBackendErrors(() => handlers.update(request, id)),
+    remove: (request: Request, id: string) => withBackendErrors(() => handlers.remove(request, id)),
   };
 }

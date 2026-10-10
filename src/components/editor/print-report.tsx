@@ -3,8 +3,10 @@
 /**
  * รายงานผังร้านสำหรับพิมพ์ / บันทึกเป็น PDF (feat-025, feat-026)
  * ซ่อนบนจอ (`hidden print:block`) และแสดงแทน Editor ตอนพิมพ์ — ผังวาดจาก SVG เวกเตอร์จึงคมทุกความละเอียด
+ * สร้างเนื้อหาเฉพาะตอนกำลังพิมพ์ (beforeprint / media "print") เพื่อไม่ให้การลากชิ้นงานต้องสร้าง SVG ทั้งผังใหม่ทุกครั้ง
  */
 import * as React from "react";
+import { flushSync } from "react-dom";
 import { renderPlanSvg, summarizeLayout } from "@/core/export";
 import { STATUS_LABEL } from "@/components/ui";
 import { WALL_LABEL } from "@/components/editor-2d/stage-math";
@@ -14,7 +16,33 @@ import { useLayoutStore } from "@/store/use-layout-store";
 
 const fmt = (v: number) => v.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 
+/** true ระหว่างพิมพ์: beforeprint (Ctrl+P / window.print) และ media query "print" (การจำลองสื่อสิ่งพิมพ์) */
+function usePrinting(): boolean {
+  const [printing, setPrinting] = React.useState(false);
+  React.useEffect(() => {
+    const media = window.matchMedia?.("print");
+    // ต้อง render ให้เสร็จก่อนเบราว์เซอร์ถ่ายหน้าไปพิมพ์ จึงใช้ flushSync
+    const start = () => flushSync(() => setPrinting(true));
+    const end = () => setPrinting(media?.matches ?? false);
+    const onMedia = (e: MediaQueryListEvent) => (e.matches ? start() : end());
+    window.addEventListener("beforeprint", start);
+    window.addEventListener("afterprint", end);
+    media?.addEventListener?.("change", onMedia);
+    if (media?.matches) setPrinting(true);
+    return () => {
+      window.removeEventListener("beforeprint", start);
+      window.removeEventListener("afterprint", end);
+      media?.removeEventListener?.("change", onMedia);
+    };
+  }, []);
+  return printing;
+}
+
 export function PrintReport({ live }: { live: LiveValidation }) {
+  return usePrinting() ? <PrintReportContent live={live} /> : null;
+}
+
+function PrintReportContent({ live }: { live: LiveValidation }) {
   const layout = useLayoutStore((s) => s.layout);
   const { result, severityById } = live;
   const svg = React.useMemo(
@@ -22,13 +50,8 @@ export function PrintReport({ live }: { live: LiveValidation }) {
     [layout, severityById],
   );
   const summary = React.useMemo(() => summarizeLayout(layout, result), [layout, result]);
-  // เวลาที่พิมพ์จริง (อัปเดตตอนเปิดหน้าต่างพิมพ์)
-  const [printedAt, setPrintedAt] = React.useState(() => new Date());
-  React.useEffect(() => {
-    const update = () => setPrintedAt(new Date());
-    window.addEventListener("beforeprint", update);
-    return () => window.removeEventListener("beforeprint", update);
-  }, []);
+  // สร้างตอนเริ่มพิมพ์ = เวลาที่พิมพ์จริง
+  const [printedAt] = React.useState(() => new Date());
 
   const rows: Array<[string, string]> = [
     ["ขนาดร้าน", `${fmt(summary.width)} × ${fmt(summary.depth)} ม. (${fmt(summary.area)} ตร.ม.)`],

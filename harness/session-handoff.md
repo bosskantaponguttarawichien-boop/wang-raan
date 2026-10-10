@@ -17,7 +17,8 @@
 ### Active Blockers / Open Questions
 - ผัง / ลิงก์แชร์ / ตัวนับ rate limit / ข้อความติดต่อ อยู่ในหน่วยความจำ — หายเมื่อรีสตาร์ต และใช้ได้แค่ server เครื่องเดียว (รอ Backend จริง: ตั้ง `WANGRAAN_BACKEND_URL` + `INTERNAL_TOKEN_SECRET`)
 - ยังไม่มี Identity Provider จริง — ใช้ Guest (บัญชีผูกกับ cookie; ลบ cookie = เสียสิทธิ์ผังเดิม) หรือ GitHub ถ้าตั้ง env
-- Rate limit อ่าน IP จาก `x-forwarded-for` — ต้อง deploy หลัง proxy ที่เขียนทับ header นี้ (Vercel/Nginx) ไม่งั้นผู้ส่งปลอม IP ได้
+- Rate limit: ตั้ง `TRUSTED_PROXY_HOPS` ตามจำนวน proxy หน้าเว็บ (Vercel/Nginx = 1) เพื่อแยก IP จริง; ถ้าไม่มี proxy ยังมีเพดานรวม 50 ครั้ง/10 นาที (ยิงจนเต็มแล้วผู้ใช้จริงต้องรอ)
+- (แก้ตาม review 06:00) นำเข้าไฟล์ได้ id ผังใหม่เสมอ — บันทึกไฟล์ที่ export แล้ว import กลับจะเป็นผังใหม่ในบัญชี ไม่ทับผังเดิม
 - ลิงก์แชร์ยังยกเลิกไม่ได้และไม่มีวันหมดอายุ
 - OG image เป็นภาษาอังกฤษ (ฟอนต์ไทยต้องฝังไฟล์ฟอนต์เพิ่ม)
 - feat-024 ยังรอรันบน WebKit

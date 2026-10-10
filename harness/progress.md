@@ -3,6 +3,19 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-10 06:00] แก้ตาม Code Review 10 ข้อ (feat-024 → feat-033)
+
+- Remote repository: สถานะที่ไม่คาดไว้ = `BackendError` → Route Handler ตอบ 502 (เดิม error body ถูกนับเป็นผังที่บันทึก)
+- Auth: `subjectFor()` ใช้ `<provider>-<providerAccountId>` เป็นเจ้าของผังสำหรับ OAuth (Auth.js ไม่มี adapter สุ่ม user.id ใหม่ทุกครั้งที่ล็อกอิน)
+- Memory repository แยก Map ตามเจ้าของ → id ซ้ำข้ามผู้ใช้ได้ ไม่เปิดเผยด้วย 409; นำเข้าไฟล์ได้ id ผังใหม่เสมอ
+- Rate limit: `clientIp` ใช้ค่าที่ proxy ต่อท้ายใน X-Forwarded-For (`TRUSTED_PROXY_HOPS`) + เพดานรวม 50 ครั้ง/10 นาที กันการปลอม IP
+- นำเข้าไฟล์: snap พิกัด 0.25 ม. (เก้าอี้ขยับตามโต๊ะ), ขนาดครัว/เคาน์เตอร์ทีละ 0.05 ม.
+- Inspector: ค่าเริ่มต้นลงกริด + ปรับขนาดเฉพาะเมื่อแก้ช่องขนาด; ฟอร์มขนาดร้านแตะทางเข้าเฉพาะเมื่อแก้ช่องทางเข้า
+- `readJson` ใช้ร่วมกันทุก endpoint: เช็ก Content-Length + อ่าน stream แบบหยุดเมื่อเกิน; `/api/share` จำกัด 1 KB
+- PrintReport สร้างเนื้อหาเฉพาะตอนพิมพ์ (beforeprint / media print)
+- ลบ `scripts/__pycache__` ออกจาก git + `.gitignore`
+- QA: unit 515/515, coverage core 99.6%, `make lint`, `make e2e` 47/47 (Chromium)
+
 ## [2026-10-10 05:00] Auth, React Query, Public Share และ Contact (feat-030 → feat-033)
 
 ### BFF / Auth

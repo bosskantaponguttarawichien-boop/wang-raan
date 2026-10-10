@@ -44,73 +44,78 @@ export function toSummary({ layout, validation, updatedAt }: StoredLayout): Layo
 }
 
 export function createMemoryLayoutRepository(now: () => Date = () => new Date()): LayoutRepository {
-  const items = new Map<string, StoredLayout & { ownerId: string }>();
-  // ผังของคนอื่น = "ไม่พบ" (ไม่บอกว่ามีอยู่)
-  const owned = (ownerId: string, id: string) => {
-    const item = items.get(id);
-    return item && item.ownerId === ownerId ? item : null;
+  // แยกตามเจ้าของ → ผู้ใช้ต่างคนใช้ id เดียวกันได้ (เช่น นำเข้าไฟล์ของคนอื่น) และไม่รู้ว่าคนอื่นมี id นั้นหรือไม่
+  const owners = new Map<string, Map<string, StoredLayout>>();
+  const itemsOf = (ownerId: string) => {
+    let items = owners.get(ownerId);
+    if (!items) owners.set(ownerId, (items = new Map()));
+    return items;
   };
-  const strip = ({ layout, validation, createdAt, updatedAt }: StoredLayout): StoredLayout => ({ layout, validation, createdAt, updatedAt });
   return {
     async list(ownerId) {
-      return [...items.values()]
-        .filter((i) => i.ownerId === ownerId)
-        .map(toSummary)
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+      return [...(owners.get(ownerId)?.values() ?? [])].map(toSummary).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     },
     async get(ownerId, id) {
-      const item = owned(ownerId, id);
-      return item ? strip(item) : null;
+      return owners.get(ownerId)?.get(id) ?? null;
     },
     async create(ownerId, layout, validation) {
+      const items = itemsOf(ownerId);
       if (items.has(layout.id)) return "conflict";
       const at = now().toISOString();
       const stored = { layout, validation, createdAt: at, updatedAt: at };
-      items.set(layout.id, { ...stored, ownerId });
+      items.set(layout.id, stored);
       return stored;
     },
     async update(ownerId, layout, validation) {
-      const existing = owned(ownerId, layout.id);
+      const existing = owners.get(ownerId)?.get(layout.id);
       if (!existing) return "not-found";
-      const stored = { ...strip(existing), layout, validation, updatedAt: now().toISOString() };
-      items.set(layout.id, { ...stored, ownerId });
+      const stored = { ...existing, layout, validation, updatedAt: now().toISOString() };
+      itemsOf(ownerId).set(layout.id, stored);
       return stored;
     },
     async remove(ownerId, id) {
-      return owned(ownerId, id) ? items.delete(id) : false;
+      return owners.get(ownerId)?.delete(id) ?? false;
     },
   };
 }
 
+/** Backend ตอบผิดปกติ (สถานะที่ BFF ไม่ได้คาดไว้) — Route Handler แปลงเป็น 502 */
+export class BackendError extends Error {
+  constructor(readonly status: number) {
+    super(`Backend ${status}`);
+    this.name = "BackendError";
+  }
+}
+
 /** Repository ที่เรียก Backend Layout Service — สิทธิ์ความเป็นเจ้าของตรวจที่ Backend จาก sub ใน Bearer token */
 export function createRemoteLayoutRepository(client: BackendClient): LayoutRepository {
-  const send = async (ownerId: string, path: string, init?: RequestInit) => {
+  /** ส่งคำขอ; สถานะที่ไม่ใช่ 2xx และไม่อยู่ใน `expected` = BackendError (ห้ามอ่าน error body เป็นข้อมูลผัง) */
+  const send = async (ownerId: string, path: string, init: RequestInit = {}, expected: number[] = []) => {
     const res = await client.request(ownerId, path, init);
-    if (res.status >= 500) throw new Error(`Backend ${res.status}`);
+    if (!res.ok && !expected.includes(res.status)) throw new BackendError(res.status);
     return res;
   };
+  const item = (id: string) => `/layouts/${encodeURIComponent(id)}`;
   return {
     async list(ownerId) {
-      const res = await send(ownerId, "/layouts");
-      return ((await res.json()) as { layouts: LayoutSummary[] }).layouts;
+      const body = (await (await send(ownerId, "/layouts")).json()) as { layouts?: unknown };
+      if (!Array.isArray(body.layouts)) throw new BackendError(502);
+      return body.layouts as LayoutSummary[];
     },
     async get(ownerId, id) {
-      const res = await send(ownerId, `/layouts/${encodeURIComponent(id)}`);
-      return res.ok ? ((await res.json()) as StoredLayout) : null;
+      const res = await send(ownerId, item(id), {}, [404]);
+      return res.status === 404 ? null : ((await res.json()) as StoredLayout);
     },
     async create(ownerId, layout, validation) {
-      const res = await send(ownerId, "/layouts", { method: "POST", body: JSON.stringify({ layout, validation }) });
+      const res = await send(ownerId, "/layouts", { method: "POST", body: JSON.stringify({ layout, validation }) }, [409]);
       return res.status === 409 ? "conflict" : ((await res.json()) as StoredLayout);
     },
     async update(ownerId, layout, validation) {
-      const res = await send(ownerId, `/layouts/${encodeURIComponent(layout.id)}`, {
-        method: "PUT",
-        body: JSON.stringify({ layout, validation }),
-      });
+      const res = await send(ownerId, item(layout.id), { method: "PUT", body: JSON.stringify({ layout, validation }) }, [404]);
       return res.status === 404 ? "not-found" : ((await res.json()) as StoredLayout);
     },
     async remove(ownerId, id) {
-      const res = await send(ownerId, `/layouts/${encodeURIComponent(id)}`, { method: "DELETE" });
+      const res = await send(ownerId, item(id), { method: "DELETE" }, [404]);
       return res.ok;
     },
   };

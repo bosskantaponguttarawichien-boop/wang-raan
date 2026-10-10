@@ -38,7 +38,7 @@ function RoomSettingsFormInner() {
   const {
     register,
     handleSubmit,
-    formState: { errors, isDirty },
+    formState: { errors, isDirty, dirtyFields },
   } = useForm<RoomSettingsValues>({
     resolver: zodResolver(RoomSettingsSchema),
     defaultValues: currentValues(),
@@ -51,7 +51,10 @@ function RoomSettingsFormInner() {
     // ขนาดร้าน + ทางเข้า = Undo ขั้นเดียว
     store.beginInteraction();
     store.setRoomDimensions(values.width, values.depth);
-    store.setEntrance({ wall: values.entranceWall, position: values.entrancePosition, width: values.entranceWidth });
+    // แตะทางเข้าเฉพาะเมื่อผู้ใช้แก้ช่องทางเข้า — ผังที่ยังไม่มีทางเข้าต้องไม่ได้ทางเข้าโผล่มาเองตอนปรับขนาดร้าน
+    if (dirtyFields.entranceWall || dirtyFields.entrancePosition || dirtyFields.entranceWidth) {
+      store.setEntrance({ wall: values.entranceWall, position: values.entrancePosition, width: values.entranceWidth });
+    }
     store.endInteraction();
   };
 

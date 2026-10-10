@@ -11,7 +11,7 @@ import NextAuth from "next-auth";
 import type { Provider } from "next-auth/providers";
 import Credentials from "next-auth/providers/credentials";
 import GitHub from "next-auth/providers/github";
-import { SESSION_MAX_AGE, authSecret } from "./auth-config";
+import { SESSION_MAX_AGE, authSecret, subjectFor } from "./auth-config";
 
 declare module "next-auth" {
   interface Session {
@@ -35,8 +35,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   providers,
   callbacks: {
-    jwt({ token, user }) {
-      if (user?.id) token.sub = user.id;
+    jwt({ token, user, account }) {
+      const subject = subjectFor(user, account);
+      if (subject) token.sub = subject;
       return token;
     },
     session({ session, token }) {

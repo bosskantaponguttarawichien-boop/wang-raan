@@ -7,7 +7,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { footprint, type LayoutObject, type Rotation } from "@/core/layout";
+import { OBJECT_MIN_SIZE, SIZE_STEP, footprint, snapToGrid, type LayoutObject, type Rotation } from "@/core/layout";
 import { Button } from "@/components/ui";
 import { objectLabel } from "@/components/editor-2d/stage-math";
 import { layoutStore, selectSelectedObject, useLayoutStore } from "@/store/use-layout-store";
@@ -41,7 +41,14 @@ function InspectorForm({ obj }: { obj: LayoutObject }) {
     formState: { errors, isDirty, dirtyFields },
   } = useForm<ObjectInspectorValues>({
     resolver: zodResolver(ObjectInspectorSchema),
-    defaultValues: { x: obj.x, y: obj.y, rotation: String(obj.rotation) as ObjectInspectorValues["rotation"], width: obj.width, depth: obj.depth },
+    // ค่าเริ่มต้นลงกริดเสมอ: ชิ้นที่พิกัด/ขนาดไม่ลงกริด (เช่น ข้อมูลเก่า) ยังแก้ช่องอื่นได้โดยช่องที่ไม่ได้แตะไม่ทำให้ฟอร์มไม่ผ่าน
+    defaultValues: {
+      x: snapToGrid(obj.x),
+      y: snapToGrid(obj.y),
+      rotation: String(obj.rotation) as ObjectInspectorValues["rotation"],
+      width: Math.max(OBJECT_MIN_SIZE, snapToGrid(obj.width, SIZE_STEP)),
+      depth: Math.max(OBJECT_MIN_SIZE, snapToGrid(obj.depth, SIZE_STEP)),
+    },
   });
 
   const onSubmit = (values: ObjectInspectorValues) => {
@@ -49,7 +56,7 @@ function InspectorForm({ obj }: { obj: LayoutObject }) {
     store.beginInteraction();
     const rotation = Number(values.rotation) as Rotation;
     if (rotation !== obj.rotation) store.rotateObject(obj.id, rotation - obj.rotation);
-    if (resizable) store.resizeObject(obj.id, values.width, values.depth);
+    if (resizable && (dirtyFields.width || dirtyFields.depth)) store.resizeObject(obj.id, values.width, values.depth);
     // ย้ายเฉพาะเมื่อผู้ใช้แก้ x/y — การหมุนอย่างเดียวต้องหมุนรอบจุดศูนย์กลางตาม Core ไม่ใช่กลับไปมุมเดิม
     if (dirtyFields.x || dirtyFields.y) {
       const now = store.layout.objects.find((o) => o.id === obj.id) ?? obj;

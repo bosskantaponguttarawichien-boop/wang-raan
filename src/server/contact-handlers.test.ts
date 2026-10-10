@@ -15,19 +15,21 @@ const send = (body: unknown, opts: { ip?: string; user?: string; type?: string }
     method: "POST",
     headers: {
       "content-type": opts.type ?? "application/json",
-      "x-forwarded-for": `${opts.ip ?? "203.0.113.5"}, 10.0.0.1`,
+      // ผู้ส่งปลอมค่าซ้ายสุดได้ — proxy ต่อท้าย IP จริง
+      "x-forwarded-for": `6.6.6.6, ${opts.ip ?? "203.0.113.5"}`,
       ...(opts.user ? { "x-user": opts.user } : {}),
     },
     body: typeof body === "string" ? body : JSON.stringify(body),
   });
 
-function setup(now = () => 0) {
+function setup(now = () => 0, globalLimit = 50) {
   const delivery = createMemoryDelivery();
   const handler = createContactHandler({
     delivery,
     resolveUser: asUser,
     ipLimiter: createRateLimiter({ limit: 5, windowMs: 600_000, now }),
     userLimiter: createRateLimiter({ limit: 5, windowMs: 600_000, now }),
+    globalLimiter: createRateLimiter({ limit: globalLimit, windowMs: 600_000, now }),
     now: () => new Date("2026-10-10T03:00:00Z"),
   });
   return { delivery, handler };
@@ -59,10 +61,17 @@ describe("rate limiter", () => {
     expect(limiter.size).toBe(2);
   });
 
-  it("clientIp อ่าน x-forwarded-for ตัวแรก → x-real-ip → unknown", () => {
-    expect(clientIp(new Request("http://x", { headers: { "x-forwarded-for": "1.1.1.1, 2.2.2.2" } }))).toBe("1.1.1.1");
-    expect(clientIp(new Request("http://x", { headers: { "x-real-ip": "3.3.3.3" } }))).toBe("3.3.3.3");
-    expect(clientIp(new Request("http://x"))).toBe("unknown");
+  it("clientIp ไม่เชื่อค่าซ้ายสุดที่ผู้ส่งปลอมได้: ใช้ค่าที่ proxy ที่ไว้ใจต่อท้าย", () => {
+    const xff = (value: string) => new Request("http://x", { headers: { "x-forwarded-for": value } });
+    // ผู้ส่งใส่ "6.6.6.6" เอง, Nginx (1 ชั้น) ต่อท้าย IP จริง
+    expect(clientIp(xff("6.6.6.6, 1.1.1.1"), 1)).toBe("1.1.1.1");
+    // CDN + Nginx (2 ชั้น): ค่าลำดับที่ 2 จากขวา
+    expect(clientIp(xff("6.6.6.6, 1.1.1.1, 10.0.0.2"), 2)).toBe("1.1.1.1");
+    // ไม่มี proxy (0) → ขวาสุด; chain สั้นกว่าจำนวนชั้น → ค่าแรก
+    expect(clientIp(xff("6.6.6.6, 1.1.1.1"), 0)).toBe("1.1.1.1");
+    expect(clientIp(xff("1.1.1.1"), 3)).toBe("1.1.1.1");
+    expect(clientIp(new Request("http://x", { headers: { "x-real-ip": "3.3.3.3" } }), 1)).toBe("3.3.3.3");
+    expect(clientIp(new Request("http://x"), 1)).toBe("unknown");
   });
 });
 
@@ -87,6 +96,25 @@ describe("POST /api/contact (feat-032 gate)", () => {
     expect((await handler(send(valid, { ip: "198.51.100.9" }))).status).toBe(202); // IP อื่นไม่โดน
     t = 600_000;
     expect((await handler(send(valid))).status).toBe(202);
+  });
+
+  it("ปลอม IP ทุกคำขอ → ไม่หลบ limiter ต่อ IP ได้ (ใช้ IP ที่ proxy ต่อท้าย) และติดเพดานรวม", async () => {
+    const { delivery, handler } = setup(() => 0, 8);
+    const spoofed = (i: number) =>
+      new Request("http://localhost/api/contact", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-forwarded-for": `10.9.9.${i}, 203.0.113.77` },
+        body: JSON.stringify(valid),
+      });
+    const statuses = [];
+    for (let i = 0; i < 7; i++) statuses.push((await handler(spoofed(i))).status);
+    expect(statuses).toEqual([202, 202, 202, 202, 202, 429, 429]);
+
+    // ไม่มี proxy ช่วย (ปลอมค่าขวาสุดได้) → เพดานรวมหยุดการท่วม
+    const statuses2 = [];
+    for (let i = 0; i < 6; i++) statuses2.push((await handler(send(valid, { ip: `192.0.2.${i}` }))).status);
+    expect(statuses2).toEqual([202, 202, 202, 429, 429, 429]);
+    expect(delivery.messages).toHaveLength(8);
   });
 
   it("ผู้ใช้ที่ล็อกอินถูกจำกัดต่อบัญชีด้วย แม้เปลี่ยน IP", async () => {

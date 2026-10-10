@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkTableSetIntegrity, createSequentialIds, type StoreLayout } from "@/core/layout";
+import { checkTableSetIntegrity, createSequentialIds, type IdFactory, type StoreLayout } from "@/core/layout";
 import { P1LayoutContractSchema, computeLayoutRevision, validateLayout } from "@/core/validation";
 import { cafeLayout } from "@/test/fixtures/layouts";
 import {
@@ -11,7 +11,11 @@ import {
 } from "./layout-file";
 
 const now = () => new Date("2026-10-10T03:00:00.000Z");
-const ids = () => createSequentialIds();
+/** id ของผังที่นำเข้าต้องต่างจากไฟล์ต้นทาง → ใช้ตัวสร้าง id ที่มี prefix ต่างจาก fixture */
+const ids = (): IdFactory => {
+  const seq = createSequentialIds();
+  return (kind) => `new-${seq(kind)}`;
+};
 
 function roundTrip(layout: StoreLayout) {
   const file = createLayoutFile(layout, validateLayout(layout, { now }));
@@ -59,7 +63,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     const result = roundTrip(layout);
     expect(result).toMatchObject({ ok: true, source: "contract", notes: [] });
     if (!result.ok) return;
-    expect(result.layout).toEqual(layout);
+    expect(result.layout).toEqual({ ...layout, id: "new-layout-01" }); // ได้ id ผังใหม่ ส่วนอื่นเหมือนเดิมทุกประการ
     expect(result.fileValidation?.status).toBe("ready");
     expect(checkTableSetIntegrity(result.layout)).toEqual([]);
   });
@@ -67,7 +71,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
   it("รับ StoreLayout เปล่า ๆ (ไม่มี contract)", () => {
     const layout = cafeLayout();
     const result = importLayoutFile(JSON.stringify(layout), ids());
-    expect(result).toMatchObject({ ok: true, source: "layout", fileValidation: null, layout });
+    expect(result).toMatchObject({ ok: true, source: "layout", fileValidation: null, layout: { ...layout, id: "new-layout-01" } });
   });
 
   it("ตัวอย่าง PRD §4.4: เติม version / ความกว้างประตู และได้ hierarchy ครบ", () => {
@@ -75,7 +79,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.layout.version).toBe(1);
-    expect(result.layout.entrance).toEqual({ id: "entrance-01", wall: "south", position: 1.25, width: 1.2 });
+    expect(result.layout.entrance).toEqual({ id: "entrance-01", wall: "south", position: 1.25, width: 1.2 }); // id วัตถุ/ทางเข้าคงเดิม
     expect(result.layout.objects.find((o) => o.id === "table-01")).toMatchObject({ chairIds: ["chair-01"] });
     expect(result.layout.objects.find((o) => o.id === "chair-01")).toMatchObject({ tableId: "table-01" });
     expect(checkTableSetIntegrity(result.layout)).toEqual([]);
@@ -114,7 +118,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(notes).toContain("ผูกเก้าอี้ c3 กับโต๊ะ t2");
     expect(notes).toContain("c4 อยู่ในหลายโต๊ะ");
     expect(notes).toContain("chairIds");
-    expect(result.layout.id).toBe("layout-01");
+    expect(result.layout.id).toBe("new-layout-01");
   });
 
   it("ปรับค่าให้ถูกต้อง: ขนาดร้านลงกริด, มุมหมุน, id ที่ขาด, ทางเข้าเลยผนัง, ไม่มีทางเข้า", () => {
@@ -131,7 +135,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.layout).toMatchObject({ width: 8, entrance: { wall: "east", position: 4.75 } });
-    expect(result.layout.objects.map((o) => o.id)).toEqual(["kitchen-01", "table-01"]);
+    expect(result.layout.objects.map((o) => o.id)).toEqual(["new-kitchen-01", "new-table-01"]);
     expect(result.layout.objects[0]!.rotation).toBe(90);
     const notes = result.notes.join("\n");
     for (const text of ["ลงกริด 0.25", "สร้าง id", "มุมหมุน", "ทางเข้า"]) expect(notes).toContain(text);
@@ -172,5 +176,29 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
   it("ไฟล์ใหญ่เกิน 2 MB ถูกปฏิเสธก่อน parse", () => {
     const result = importLayoutFile(" ".repeat(LAYOUT_FILE_MAX_BYTES + 1), ids());
     expect(result).toEqual({ ok: false, errors: ["ไฟล์ใหญ่เกิน 2 MB"] });
+  });
+
+  it("พิกัดไม่ลงกริด → snap 0.25 ม.; เก้าอี้ขยับตามโต๊ะด้วยระยะเดียวกัน (คงระยะสอด); ขนาดครัว/เคาน์เตอร์ลงทีละ 0.05", () => {
+    const raw = {
+      width: 8,
+      depth: 6,
+      entrance: { wall: "south", position: 1, width: 1.2 },
+      objects: [
+        { id: "c", type: "counter", x: 1.13, y: 0.4, width: 2.42, depth: 0.71 },
+        { id: "t", type: "table", x: 3.1, y: 3.05, width: 0.8, depth: 0.8, chairIds: ["s"] },
+        { id: "s", type: "chair", tableId: "t", x: 3.25, y: 2.65, width: 0.5, depth: 0.5 },
+      ],
+    };
+    const result = importLayoutFile(JSON.stringify(raw), ids());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const byId = new Map(result.layout.objects.map((o) => [o.id, o]));
+    expect(byId.get("c")).toMatchObject({ x: 1.25, y: 0.5, width: 2.4, depth: 0.7 });
+    expect(byId.get("t")).toMatchObject({ x: 3, y: 3, width: 0.8, depth: 0.8 });
+    expect(byId.get("s")).toMatchObject({ x: 3.15, y: 2.6 }); // ขยับ (−0.10, −0.05) เท่าโต๊ะ
+    expect(result.notes.join("\n")).toContain("ปรับตำแหน่ง/ขนาด 3 ชิ้นให้ลงกริด 0.25 ม.");
+
+    const tiny = importLayoutFile(JSON.stringify({ ...raw, objects: [{ type: "kitchen", x: 0, y: 0, width: 0.1, depth: 0.1 }] }), ids());
+    expect(tiny.ok && tiny.layout.objects[0]).toMatchObject({ width: 0.3, depth: 0.3 });
   });
 });
