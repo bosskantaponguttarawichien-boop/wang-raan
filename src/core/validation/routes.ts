@@ -24,6 +24,7 @@ import {
 
 export type AisleKind = "main" | "secondary" | "chair";
 
+/** นิยามเส้นทางที่จำเป็น — ยืนยันโดยเจ้าของผลิตภัณฑ์ 2026-10-10 (PRD §9 ข้อ 7, feat-034) */
 export const ROUTE_REQUIREMENTS: Record<LayoutObjectType, { aisle: AisleKind; width: Meters }> = {
   counter: { aisle: "main", width: CLEARANCE.mainAisle },
   table: { aisle: "secondary", width: CLEARANCE.secondaryAisle },

@@ -40,6 +40,7 @@ export interface SimulationConfig {
   servingSlotsPerCounter: number;
 }
 
+/** ค่าตั้งต้น — ยืนยันโดยเจ้าของผลิตภัณฑ์ 2026-10-10 (PRD §9 ข้อ 8, feat-034) */
 export const DEFAULT_SIMULATION_CONFIG: SimulationConfig = {
   customersPerHour: 40,
   seed: 1,

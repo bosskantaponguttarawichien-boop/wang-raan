@@ -3,6 +3,7 @@
 /**
  * Object Inspector (architecture.md §5.4 ข้อ 2) — แก้ตำแหน่ง/การหมุน (ทุกชิ้น) และขนาด (ครัว/เคาน์เตอร์)
  * โต๊ะ/เก้าอี้ย้ายและหมุนทั้งชุดตาม Core; การกด "นำไปใช้" ครั้งหนึ่ง = Undo หนึ่งขั้น
+ * ลบ (feat-034): เลือกเก้าอี้ = ลบเก้าอี้ตัวนั้น (เหมือนกด Delete บน Artboard), เลือกโต๊ะ = ลบทั้งชุด (Cascade Delete)
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
@@ -26,14 +27,15 @@ export function ObjectInspector() {
     return <p className="m-0 text-[13px] leading-[1.75] text-secondary">เลือกชิ้นงานบนผังเพื่อแก้ตำแหน่ง ขนาด หมุน หรือลบ</p>;
   }
   // key: สร้างฟอร์มใหม่เมื่อชิ้นงานถูกย้าย/หมุน/ปรับขนาดจากที่อื่น
-  const key = `${selected.id}|${selected.x}|${selected.y}|${selected.rotation}|${selected.width}|${selected.depth}`;
-  return <InspectorForm key={key} obj={selected} />;
+  const key = `${picked!.id}|${selected.id}|${selected.x}|${selected.y}|${selected.rotation}|${selected.width}|${selected.depth}`;
+  return <InspectorForm key={key} obj={selected} deleteTarget={picked!} />;
 }
 
-function InspectorForm({ obj }: { obj: LayoutObject }) {
+function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget: LayoutObject }) {
   const formId = React.useId();
   const resizable = obj.type === "kitchen" || obj.type === "counter";
   const isSet = obj.type === "table" || obj.type === "chair";
+  const deletesChair = deleteTarget.type === "chair";
   const fp = footprint(obj);
   const {
     register,
@@ -114,11 +116,17 @@ function InspectorForm({ obj }: { obj: LayoutObject }) {
         <Button variant="secondary" size="sm" onClick={() => actions().rotateObject(obj.id, 90)}>
           ↻ 90°
         </Button>
-        <Button variant="danger" size="sm" className="col-span-2" onClick={() => actions().deleteObject(obj.id)}>
-          × ลบ{isSet ? "ทั้งชุดโต๊ะ" : "ชิ้นงานนี้"}
+        <Button variant="danger" size="sm" className="col-span-2" onClick={() => actions().deleteObject(deleteTarget.id)}>
+          × ลบ{deletesChair ? "เก้าอี้ตัวนี้" : isSet ? "ทั้งชุดโต๊ะ" : "ชิ้นงานนี้"}
         </Button>
       </div>
-      {isSet && <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">ย้าย หมุน และลบ ทำกับโต๊ะและเก้าอี้ทั้งชุด · ขนาดโต๊ะใช้ตามชุดที่เลือก</p>}
+      {isSet && (
+        <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">
+          {deletesChair
+            ? "ย้ายและหมุนทำกับทั้งชุด · ปุ่มลบลบเฉพาะเก้าอี้ที่เลือก — เลือกโต๊ะเพื่อลบทั้งชุด"
+            : "ย้าย หมุน และลบ ทำกับโต๊ะและเก้าอี้ทั้งชุด · ขนาดโต๊ะใช้ตามชุดที่เลือก"}
+        </p>
+      )}
     </div>
   );
 }
