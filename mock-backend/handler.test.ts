@@ -223,6 +223,20 @@ describe("ลิงก์แชร์", () => {
     await call("DELETE", `/v1/shares/${key0}`);
     expect((await call("POST", `/v1/layouts/${layout.id}/shares`, { body: {} })).status).toBe(201);
   });
+
+  it("ต่ออายุลิงก์ที่หมดอายุนับโควตาด้วย — ครบแล้วตอบ 409", async () => {
+    const layout = cafeLayout();
+    await save(layout);
+    const shareUrl = `/v1/layouts/${layout.id}/shares`;
+    await call("POST", shareUrl, { body: { expiresAt: new Date(T0 + 60_000).toISOString() } });
+    for (let i = 1; i < SHARE_LIMIT; i++) await call("POST", shareUrl, { body: {} });
+    clock += 61_000;
+    const replacement = (await call("POST", shareUrl, { body: {} })).body.shareKey;
+    const renew = () => call("PATCH", `/v1/shares/${key0}`, { body: { expiresAt: null } });
+    expect((await renew()).body.error.code).toBe("SHARE_LIMIT_REACHED");
+    await call("DELETE", `/v1/shares/${replacement}`);
+    expect((await renew()).body).toMatchObject({ status: "active", expiresAt: null });
+  });
 });
 
 describe("ฟอร์มติดต่อ", () => {

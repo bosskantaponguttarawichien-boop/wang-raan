@@ -4,7 +4,7 @@
 # =============================================================================
 PYTHON  := python3
 
-.PHONY: help init test lint status dev build e2e e2e-cf contract
+.PHONY: help init test lint status dev build e2e e2e-cf e2e-real contract
 
 help:           ## แสดงคำสั่ง (targets) ทั้งหมด
 	@grep -E '^[a-zA-Z0-9_-]+:.*?## .*$$' $(MAKEFILE_LIST) \
@@ -47,3 +47,8 @@ e2e:            ## รัน E2E + Responsive 6 breakpoints + Accessibility (Pla
 
 e2e-cf:         ## รัน E2E ชุดเดียวกันบน runtime ของ Cloudflare Workers (workerd ผ่าน wrangler dev)
 	@E2E_TARGET=cloudflare npx playwright test
+
+e2e-real:       ## รัน E2E กับ Backend จริง (ต้องตั้ง REAL_BACKEND_URL, E2E_DATABASE_URL, INTERNAL_TOKEN_SECRET ให้ตรงกับ Backend)
+	@if [ -z "$$REAL_BACKEND_URL" ] || [ -z "$$E2E_DATABASE_URL" ] || [ -z "$$INTERNAL_TOKEN_SECRET" ]; then \
+	  echo "❌ ต้องตั้ง REAL_BACKEND_URL, E2E_DATABASE_URL และ INTERNAL_TOKEN_SECRET"; exit 1; fi
+	@npx playwright test
