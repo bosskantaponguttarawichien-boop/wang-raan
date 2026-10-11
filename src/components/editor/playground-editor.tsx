@@ -6,7 +6,7 @@
  */
 import * as React from "react";
 import { cn } from "@/lib/cn";
-import { Button, PaletteItem, ViewSwitch } from "@/components/ui";
+import { Button, PaletteItem, StatusDot, ViewSwitch } from "@/components/ui";
 import { Artboard } from "@/components/editor-2d/artboard";
 import { IsometricView } from "@/components/preview-3d/isometric-view";
 import { SimulationPanel, formatSimTime } from "@/components/simulation/simulation-panel";
@@ -21,6 +21,7 @@ import { ValidationStatusBar } from "@/components/validation/validation-status-b
 import {
   ZOOM_MAX,
   ZOOM_MIN,
+  layoutActions as actions,
   layoutStore,
   selectCanRedo,
   selectCanUndo,
@@ -29,8 +30,7 @@ import {
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getDraftStorage } from "@/lib/draft-storage";
 import { restoreDraft, startAutosave, startNewLayout, useDraftStatus } from "@/lib/draft-autosave";
-
-const actions = () => layoutStore.getState();
+import { formatDateTime } from "@/lib/format";
 
 const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round" as const };
 
@@ -107,6 +107,19 @@ function ToolPanel() {
   );
 }
 
+/** หัวข้อในแผงขวา — มีเส้นคั่นด้านบน (ซ่อนเมื่อแผงเป็น 2 คอลัมน์ที่ ≤ 1020px) */
+function PanelSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <>
+      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
+      <section className="min-w-0">
+        <PanelTitle>{title}</PanelTitle>
+        {children}
+      </section>
+    </>
+  );
+}
+
 function SelectionPanel({ live }: { live: LiveValidation }) {
   const canUndo = useLayoutStore(selectCanUndo);
   const canRedo = useLayoutStore(selectCanRedo);
@@ -118,38 +131,15 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
     >
       <SimulationPanel live={live} />
 
-      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
+      <PanelSection title="ชิ้นงานที่เลือก"><ObjectInspector /></PanelSection>
 
-      <section className="min-w-0">
-        <PanelTitle>ชิ้นงานที่เลือก</PanelTitle>
-        <ObjectInspector />
-      </section>
+      <PanelSection title="ขนาดร้านและทางเข้า"><RoomSettingsForm /></PanelSection>
 
-      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
+      <PanelSection title="บัญชีและผังออนไลน์"><CloudPanel /></PanelSection>
 
-      <section className="min-w-0">
-        <PanelTitle>ขนาดร้านและทางเข้า</PanelTitle>
-        <RoomSettingsForm />
-      </section>
+      <PanelSection title="ไฟล์และการส่งออก"><FilePanel /></PanelSection>
 
-      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
-
-      <section className="min-w-0">
-        <PanelTitle>บัญชีและผังออนไลน์</PanelTitle>
-        <CloudPanel />
-      </section>
-
-      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
-
-      <section className="min-w-0">
-        <PanelTitle>ไฟล์และการส่งออก</PanelTitle>
-        <FilePanel />
-      </section>
-
-      <hr className="-mx-5 my-5 border-line max-[1020px]:hidden max-[700px]:block" />
-
-      <section className="min-w-0">
-        <PanelTitle>ประวัติการแก้ไข</PanelTitle>
+      <PanelSection title="ประวัติการแก้ไข">
         <DraftNotice />
         <div className="grid grid-cols-2 gap-2">
           <Button variant="secondary" size="sm" disabled={!canUndo} onClick={() => actions().undo()} aria-keyshortcuts="Control+Z Meta+Z">
@@ -170,7 +160,7 @@ function SelectionPanel({ live }: { live: LiveValidation }) {
           </Button>
         </div>
         <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">ผังและประวัติบันทึกในเบราว์เซอร์นี้อัตโนมัติ</p>
-      </section>
+      </PanelSection>
     </aside>
   );
 }
@@ -188,10 +178,9 @@ function SimulationStatusText({ blocked }: { blocked: boolean }) {
           : "พร้อมจำลองลูกค้า";
   const tone = status === "running" ? "bg-[var(--save-saved-dot)]" : blocked && status === "idle" ? "bg-status-blocked" : "bg-[var(--save-saving)]";
   return (
-    <span className="flex items-center gap-1.5" data-testid="simulation-status">
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", tone)} />
+    <StatusDot tone={tone} data-testid="simulation-status">
       {text}
-    </span>
+    </StatusDot>
   );
 }
 
@@ -199,6 +188,7 @@ function CanvasCard({ live }: { live: LiveValidation }) {
   const is3D = useLayoutStore((s) => s.is3DView);
   const zoom = useLayoutStore((s) => s.zoom);
   const size = useLayoutStore((s) => `${s.layout.width} × ${s.layout.depth} เมตร`);
+  const zoomBy = (step: number) => actions().setZoom(Math.round((zoom + step) * 10) / 10);
   const navButton =
     "grid h-[27px] w-[27px] place-items-center border-r border-[#e5eaf2] bg-white text-[17px] leading-none text-[#526985] hover:bg-[#f3f6ff] hover:text-blue disabled:opacity-45 focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:-outline-offset-2";
 
@@ -223,13 +213,13 @@ function CanvasCard({ live }: { live: LiveValidation }) {
             ]}
           />
           <div role="group" aria-label="ซูม Artboard" className="flex items-center overflow-hidden rounded-[7px] border border-[#dfe6f1] bg-white">
-            <button type="button" aria-label="ซูมออก" className={navButton} disabled={zoom <= ZOOM_MIN} onClick={() => actions().setZoom(Math.round((zoom - 0.1) * 10) / 10)}>
+            <button type="button" aria-label="ซูมออก" className={navButton} disabled={zoom <= ZOOM_MIN} onClick={() => zoomBy(-0.1)}>
               −
             </button>
             <output aria-live="polite" className="min-w-[45px] border-r border-[#e5eaf2] text-center text-[11px] tabular-nums text-secondary">
               {Math.round(zoom * 100)}%
             </output>
-            <button type="button" aria-label="ซูมเข้า" className={navButton} disabled={zoom >= ZOOM_MAX} onClick={() => actions().setZoom(Math.round((zoom + 0.1) * 10) / 10)}>
+            <button type="button" aria-label="ซูมเข้า" className={navButton} disabled={zoom >= ZOOM_MAX} onClick={() => zoomBy(0.1)}>
               +
             </button>
             <button type="button" aria-label="ปรับให้พอดี" className={cn(navButton, "w-[37px] border-r-0 text-[11px] font-semibold")} onClick={() => actions().setZoom(1)}>
@@ -288,10 +278,9 @@ function DraftStatusText() {
   const status = useDraftStatus((s) => s.status);
   const tone = status === "saved" ? "bg-[var(--save-saved-dot)]" : status === "error" ? "bg-status-blocked" : status === "saving" ? "bg-[var(--save-saving)]" : "bg-[#c5cfdd]";
   return (
-    <span className="flex items-center gap-1.5" data-testid="draft-status" data-status={status}>
-      <span aria-hidden="true" className={cn("size-1.5 rounded-full", tone)} />
+    <StatusDot tone={tone} data-testid="draft-status" data-status={status}>
       {SAVE_TEXT[status]}
-    </span>
+    </StatusDot>
   );
 }
 
@@ -299,10 +288,9 @@ function DraftStatusText() {
 function DraftNotice() {
   const restoredAt = useDraftStatus((s) => s.restoredAt);
   if (!restoredAt) return null;
-  const time = new Date(restoredAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
   return (
     <p className="m-0 mb-3 rounded-[8px] bg-blue-soft px-3 py-2 text-[12px] leading-[1.75] text-ink" data-testid="draft-notice">
-      กู้คืนผังที่บันทึกไว้เมื่อ {time}
+      กู้คืนผังที่บันทึกไว้เมื่อ {formatDateTime(restoredAt)}
     </p>
   );
 }

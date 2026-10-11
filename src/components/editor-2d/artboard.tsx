@@ -8,9 +8,9 @@
  * - Non-blocking: วางทับหรือตกขอบได้ ผลตรวจแสดงเป็น Issue Rings
  */
 import * as React from "react";
-import { GRID_STEP, SIZE_STEP, footprint, type IssueSeverity, type LayoutObject, type Rect } from "@/core/layout";
+import { GRID_STEP, SIZE_STEP, footprint, type Entrance, type IssueSeverity, type LayoutObject, type Rect } from "@/core/layout";
 import { cn } from "@/lib/cn";
-import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
+import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { SimulationOverlay } from "@/components/simulation/simulation-overlay";
 import { GridOverlay } from "./grid-overlay";
@@ -28,8 +28,6 @@ type DragState =
   | { mode: "move"; id: string; pointerId: number; start: { x: number; y: number }; origin: { x: number; y: number } }
   | { mode: "resize"; id: string; pointerId: number; start: { x: number; y: number }; size: { width: number; depth: number } }
   | { mode: "entrance"; pointerId: number };
-
-const actions = () => layoutStore.getState();
 
 function boxStyle(rect: Rect, room: { width: number; depth: number }): React.CSSProperties {
   return {
@@ -339,7 +337,7 @@ export function Artboard({ live }: ArtboardProps) {
 }
 
 interface EntranceMarkerProps {
-  entrance: NonNullable<ReturnType<typeof layoutStore.getState>["layout"]["entrance"]>;
+  entrance: Entrance;
   room: { width: number; depth: number };
   severity?: IssueSeverity;
   message?: string;

@@ -6,13 +6,12 @@
  * กรณีเดินไปไม่ถึงเลย เป็นหน้าที่ของ Accessibility (ไม่รายงานซ้ำที่นี่)
  */
 import { CLEARANCE } from "../layout/constants";
+import { EPSILON } from "../layout/epsilon";
 import { directionVector, footprint, rectsIntersect } from "../layout/geometry";
 import type { Chair, LayoutObject, Rect, StoreLayout, ValidationIssue } from "../layout/types";
 import { isInsideRoom } from "./collision";
 import { OBJECT_LABEL, createIssue } from "./issues";
 import { analyzeRoutes, type RouteAnalysis } from "./routes";
-
-const EPSILON = 1e-9;
 
 /**
  * แถบพื้นที่เข้าถึงเก้าอี้ลึก 0.60 ม.: ด้านหลัง และด้านข้างสองฝั่ง

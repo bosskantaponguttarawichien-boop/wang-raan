@@ -14,11 +14,11 @@
  * การไหลเข้าจากประตู: จุดเริ่มคือจุดที่วงกลมกว้าง w ยืนได้และแตะช่องประตู
  * (ประตูแคบกว่า w จึงไม่ทำให้ทางเดินด้านในล้มเหลวเอง — ความกว้างประตูมีขอบเขตของตัวเอง)
  */
+import { EPSILON } from "../layout/epsilon";
 import { footprint, roundMeters } from "../layout/geometry";
 import type { Entrance, Meters, Point, Rect, StoreLayout } from "../layout/types";
 
 export const GRID_RESOLUTION: Meters = 0.05;
-const EPSILON = 1e-9;
 const FAR = 1e20;
 
 export interface WalkGrid {

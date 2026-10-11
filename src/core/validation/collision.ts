@@ -8,12 +8,11 @@
  * - วัตถุออกนอกขอบร้าน → Blocked
  */
 import { CLEARANCE } from "../layout/constants";
+import { EPSILON } from "../layout/epsilon";
 import { footprint, rectOverlap } from "../layout/geometry";
 import { chairTuck } from "../layout/table-set";
 import type { Chair, LayoutObject, Rect, StoreLayout, Table, ValidationIssue } from "../layout/types";
 import { OBJECT_LABEL, createIssue } from "./issues";
-
-const EPSILON = 1e-9;
 
 export function isInsideRoom(rect: Rect, layout: Pick<StoreLayout, "width" | "depth">): boolean {
   return (

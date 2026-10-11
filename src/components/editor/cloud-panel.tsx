@@ -6,8 +6,9 @@
  */
 import { signIn, signOut, useSession } from "next-auth/react";
 import * as React from "react";
-import { STATUS_LABEL, Button } from "@/components/ui";
-import { ApiError } from "@/lib/api-client";
+import { STATUS_LABEL, Button, ErrorText, LoadError } from "@/components/ui";
+import { ApiError, apiErrorText } from "@/lib/api-client";
+import { formatDateTime } from "@/lib/format";
 import {
   useDeleteLayoutMutation,
   useLayoutsQuery,
@@ -16,6 +17,7 @@ import {
   useShareMutation,
   useSharesQuery,
 } from "@/lib/layout-queries";
+import { useCopyToClipboard } from "@/lib/use-copy-to-clipboard";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
 import { ExpirySelect, ShareLinks, expiresAtFor, type ExpiryChoice } from "./share-links";
 
@@ -23,13 +25,11 @@ import { ExpirySelect, ShareLinks, expiresAtFor, type ExpiryChoice } from "./sha
 const KEEPS_DRAFT = new Set(["BACKEND_ERROR", "BACKEND_NOT_CONFIGURED", "NETWORK_ERROR", "HTTP_502", "HTTP_503", "HTTP_504"]);
 
 const errorText = (error: unknown) => {
-  if (!(error instanceof ApiError)) return "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง";
+  if (!(error instanceof ApiError)) return apiErrorText(error);
   if (error.code === "LAYOUT_BLOCKED") return "ผังยังไม่ผ่านกฎจำเป็น จึงบันทึกไม่ได้ — แก้ตามแถบสถานะก่อน";
   if (KEEPS_DRAFT.has(error.code)) return `${error.message} — ผังยังอยู่ในเครื่องนี้ ไม่หาย`;
   return error.message;
 };
-
-const timeText = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
 
 export function CloudPanel() {
   const { data: session, status } = useSession();
@@ -59,11 +59,7 @@ export function CloudPanel() {
         <Button variant="secondary" size="sm" className="w-full" disabled={signingIn} onClick={guest}>
           {signingIn ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบแบบผู้ใช้ทั่วไป"}
         </Button>
-        {signInError && (
-          <p role="alert" className="m-0 mt-2 text-[12px] text-[#b8433b]">
-            {signInError}
-          </p>
-        )}
+        {signInError && <ErrorText className="mt-2 text-[12px]">{signInError}</ErrorText>}
       </div>
     );
   }
@@ -79,7 +75,7 @@ function SignedIn({ name }: { name: string }) {
   const share = useShareMutation();
   const load = useLoadLayout();
   const [loadState, setLoadState] = React.useState<{ id: string; error?: string } | null>(null);
-  const [copied, setCopied] = React.useState(false);
+  const { copied, copy, reset: resetCopied } = useCopyToClipboard();
   const [expiry, setExpiry] = React.useState<ExpiryChoice>("none");
   const expiryId = React.useId();
 
@@ -104,13 +100,9 @@ function SignedIn({ name }: { name: string }) {
   };
 
   const shareCurrent = async () => {
-    setCopied(false);
+    resetCopied();
     const stored = await save.mutateAsync(layoutStore.getState().layout).catch(() => null);
     if (stored) share.mutate({ layoutId: stored.layout.id, expiresAt: expiresAtFor(expiry) });
-  };
-
-  const copy = async (url: string) => {
-    await navigator.clipboard?.writeText(url).then(() => setCopied(true), () => setCopied(false));
   };
 
   return (
@@ -140,22 +132,14 @@ function SignedIn({ name }: { name: string }) {
       </div>
 
       <div aria-live="polite" className="text-[12px] leading-[1.75]" data-testid="cloud-message">
-        {save.isError && (
-          <p className="m-0 mt-2 text-[#b8433b]" role="alert">
-            {errorText(save.error)}
-          </p>
-        )}
-        {save.isSuccess && !createdLink && <p className="m-0 mt-2 text-secondary-strong">บันทึกแล้วเมื่อ {timeText(save.data.updatedAt)}</p>}
-        {share.isError && (
-          <p className="m-0 mt-2 text-[#b8433b]" role="alert">
-            {errorText(share.error)}
-          </p>
-        )}
+        {save.isError && <ErrorText className="mt-2">{errorText(save.error)}</ErrorText>}
+        {save.isSuccess && !createdLink && <p className="m-0 mt-2 text-secondary-strong">บันทึกแล้วเมื่อ {formatDateTime(save.data.updatedAt)}</p>}
+        {share.isError && <ErrorText className="mt-2">{errorText(share.error)}</ErrorText>}
         {createdLink && (
           <div className="mt-2 rounded-[8px] bg-blue-soft px-3 py-2">
             <p className="m-0 font-semibold text-ink">ลิงก์แชร์ (ดูได้โดยไม่ต้องเข้าสู่ระบบ)</p>
             <p className="m-0 text-ink">
-              {createdLink.expiresAt ? `ใช้งานได้ถึง ${timeText(createdLink.expiresAt)}` : "ไม่หมดอายุ — ยกเลิกได้ที่รายการด้านล่าง"}
+              {createdLink.expiresAt ? `ใช้งานได้ถึง ${formatDateTime(createdLink.expiresAt)}` : "ไม่หมดอายุ — ยกเลิกได้ที่รายการด้านล่าง"}
             </p>
             <a href={createdLink.url} className="block break-all text-blue-hover underline" data-testid="share-link" target="_blank" rel="noopener">
               {createdLink.url}
@@ -203,12 +187,11 @@ function SavedList({ layouts, currentId, loadState, onOpen, onDelete, deleteErro
   }
   if (layouts.isError) {
     return (
-      <div role="alert" className="text-[12px] text-[#b8433b]" data-testid="saved-layouts-error">
-        <p className="m-0">โหลดรายการไม่สำเร็จ: {errorText(layouts.error)}</p>
-        <Button variant="secondary" size="sm" className="mt-2" onClick={() => layouts.refetch()}>
-          ลองอีกครั้ง
-        </Button>
-      </div>
+      <LoadError
+        message={`โหลดรายการไม่สำเร็จ: ${errorText(layouts.error)}`}
+        onRetry={() => layouts.refetch()}
+        data-testid="saved-layouts-error"
+      />
     );
   }
   return (
@@ -223,7 +206,7 @@ function SavedList({ layouts, currentId, loadState, onOpen, onDelete, deleteErro
                 ร้าน {l.width} × {l.depth} ม. · {l.objectCount} ชิ้น{l.id === currentId ? " · กำลังเปิดอยู่" : ""}
               </p>
               <p className="m-0 text-secondary">
-                {STATUS_LABEL[l.status]} · {timeText(l.updatedAt)}
+                {STATUS_LABEL[l.status]} · {formatDateTime(l.updatedAt)}
               </p>
               <div className="mt-1.5 grid grid-cols-2 gap-2">
                 <Button variant="secondary" size="sm" disabled={loadState?.id === l.id && !loadState.error} onClick={() => onOpen(l.id)}>
@@ -233,20 +216,12 @@ function SavedList({ layouts, currentId, loadState, onOpen, onDelete, deleteErro
                   ลบ
                 </Button>
               </div>
-              {loadState?.id === l.id && loadState.error && (
-                <p role="alert" className="m-0 mt-1 text-[#b8433b]">
-                  {loadState.error}
-                </p>
-              )}
+              {loadState?.id === l.id && loadState.error && <ErrorText className="mt-1">{loadState.error}</ErrorText>}
             </li>
           ))}
         </ul>
       )}
-      {deleteError && (
-        <p role="alert" className="m-0 mt-2 text-[12px] text-[#b8433b]">
-          ลบไม่สำเร็จ: {deleteError}
-        </p>
-      )}
+      {deleteError && <ErrorText className="mt-2 text-[12px]">ลบไม่สำเร็จ: {deleteError}</ErrorText>}
       {layouts.isFetching && (
         <p role="status" className="m-0 mt-2 text-[11px] text-secondary">
           กำลังอัปเดตรายการ…

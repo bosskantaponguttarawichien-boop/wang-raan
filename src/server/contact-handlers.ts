@@ -6,7 +6,7 @@ import "server-only";
  */
 import { ContactSchema } from "@/lib/contact-schema";
 import { BackendConfigError, BackendError, backendClient, send } from "./backend";
-import { json, problem, readJson, tooManyRequests } from "./layout-handlers";
+import { json, problem, readJson, retryMinutes, tooManyRequests, zodDetails } from "./http";
 import { clientIp } from "./rate-limit";
 import type { ResolveUser } from "./session";
 import type { BackendClient } from "./token-relay";
@@ -19,7 +19,7 @@ export interface ContactHandlerDeps {
 }
 
 const contactTooMany = (retryAfter: number) =>
-  tooManyRequests(`ส่งข้อความถี่เกินไป กรุณารออีก ${Math.max(1, Math.ceil(retryAfter / 60))} นาที`, retryAfter);
+  tooManyRequests(`ส่งข้อความถี่เกินไป กรุณารออีก ${retryMinutes(retryAfter)} นาที`, retryAfter);
 
 export function createContactHandler(deps: ContactHandlerDeps) {
   const client = deps.client ?? backendClient;
@@ -31,7 +31,7 @@ export function createContactHandler(deps: ContactHandlerDeps) {
     const parsed = ContactSchema.safeParse(read.body);
     if (!parsed.success) {
       return problem(400, "INVALID_CONTACT", "กรอกข้อมูลไม่ครบหรือไม่ถูกต้อง", {
-        details: parsed.error.issues.map((i) => ({ path: i.path.join("."), message: i.message })),
+        details: zodDetails(parsed.error),
       });
     }
     const { website, ...input } = parsed.data;

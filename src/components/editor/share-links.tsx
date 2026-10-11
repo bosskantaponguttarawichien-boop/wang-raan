@@ -5,12 +5,12 @@
  * ลิงก์ที่ยกเลิกแล้วแก้ไม่ได้ (สร้างลิงก์ใหม่แทน)
  */
 import * as React from "react";
-import { Button } from "@/components/ui";
-import { ApiError, type ShareDto } from "@/lib/api-client";
+import { Button, ErrorText, LoadError } from "@/components/ui";
+import { apiErrorText, type ShareDto } from "@/lib/api-client";
+import { DAY_MS, formatDateTime } from "@/lib/format";
 import { useRevokeShareMutation, useSharesQuery, useUpdateShareMutation } from "@/lib/layout-queries";
+import { useCopyToClipboard } from "@/lib/use-copy-to-clipboard";
 import { inputClass } from "./forms/field";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 export const EXPIRY_OPTIONS = [
   { value: "none", label: "ไม่หมดอายุ", days: null },
@@ -27,12 +27,10 @@ export function expiresAtFor(choice: ExpiryChoice, now = Date.now()): string | n
   return days === null ? null : new Date(now + days * DAY_MS).toISOString();
 }
 
-const dateText = (iso: string) => new Date(iso).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" });
-
 export function shareStatusText(share: Pick<ShareDto, "status" | "expiresAt">): string {
   if (share.status === "revoked") return "ยกเลิกแล้ว";
   if (share.status === "expired") return "หมดอายุแล้ว";
-  return share.expiresAt ? `ใช้งานได้ถึง ${dateText(share.expiresAt)}` : "ใช้งานได้ · ไม่หมดอายุ";
+  return share.expiresAt ? `ใช้งานได้ถึง ${formatDateTime(share.expiresAt)}` : "ใช้งานได้ · ไม่หมดอายุ";
 }
 
 const STATUS_COLOR: Record<ShareDto["status"], string> = {
@@ -40,8 +38,6 @@ const STATUS_COLOR: Record<ShareDto["status"], string> = {
   expired: "text-[#8a5a00]",
   revoked: "text-[#b8433b]",
 };
-
-const errorText = (error: unknown) => (error instanceof ApiError ? error.message : "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง");
 
 interface ExpirySelectProps<T extends string> {
   id: string;
@@ -89,12 +85,7 @@ export function ShareLinks({ layoutId, visible, fetchEnabled }: { layoutId: stri
           กำลังโหลดลิงก์แชร์…
         </p>
       ) : shares.isError ? (
-        <div role="alert" className="text-[12px] text-[#b8433b]">
-          <p className="m-0">โหลดลิงก์แชร์ไม่สำเร็จ: {errorText(shares.error)}</p>
-          <Button variant="secondary" size="sm" className="mt-2" onClick={() => shares.refetch()}>
-            ลองอีกครั้ง
-          </Button>
-        </div>
+        <LoadError message={`โหลดลิงก์แชร์ไม่สำเร็จ: ${apiErrorText(shares.error)}`} onRetry={() => shares.refetch()} />
       ) : shares.data.length === 0 ? (
         <p className="m-0 text-[12px] text-secondary">ยังไม่มีลิงก์แชร์</p>
       ) : (
@@ -114,14 +105,10 @@ export function ShareLinks({ layoutId, visible, fetchEnabled }: { layoutId: stri
       )}
       <div aria-live="polite" className="text-[12px]">
         {update.isError && (
-          <p role="alert" className="m-0 mt-2 text-[#b8433b]">
-            ตั้งอายุลิงก์ไม่สำเร็จ: {errorText(update.error)}
-          </p>
+          <ErrorText className="mt-2">ตั้งอายุลิงก์ไม่สำเร็จ: {apiErrorText(update.error)}</ErrorText>
         )}
         {revoke.isError && (
-          <p role="alert" className="m-0 mt-2 text-[#b8433b]">
-            ยกเลิกลิงก์ไม่สำเร็จ: {errorText(revoke.error)}
-          </p>
+          <ErrorText className="mt-2">ยกเลิกลิงก์ไม่สำเร็จ: {apiErrorText(revoke.error)}</ErrorText>
         )}
       </div>
     </section>
@@ -139,12 +126,8 @@ function ShareItem({ share, busy, onUpdate, onRevoke }: ShareItemProps) {
   const id = React.useId();
   // เริ่มที่ "ยังไม่เลือก" — ค่าเริ่มต้น "ไม่หมดอายุ" ทำให้กดทีเดียวลิงก์ที่ตั้งเวลาไว้กลายเป็นถาวร
   const [choice, setChoice] = React.useState<ExpiryChoice | "">("");
-  const [copied, setCopied] = React.useState(false);
-  const created = dateText(share.createdAt);
-
-  const copy = async () => {
-    await navigator.clipboard?.writeText(share.url).then(() => setCopied(true), () => setCopied(false));
-  };
+  const { copied, copy } = useCopyToClipboard();
+  const created = formatDateTime(share.createdAt);
 
   return (
     <li className="rounded-[8px] border border-[#e4e9f2] px-3 py-2 text-[12px] leading-[1.6]" data-testid="share-item" data-status={share.status}>
@@ -177,7 +160,7 @@ function ShareItem({ share, busy, onUpdate, onRevoke }: ShareItemProps) {
             ตั้งอายุใหม่
           </Button>
           {share.status === "active" && (
-            <Button variant="secondary" size="sm" onClick={copy}>
+            <Button variant="secondary" size="sm" onClick={() => copy(share.url)}>
               {copied ? "คัดลอกแล้ว" : "คัดลอก"}
             </Button>
           )}
