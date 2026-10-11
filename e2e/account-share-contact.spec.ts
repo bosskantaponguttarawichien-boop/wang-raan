@@ -263,9 +263,13 @@ test.describe("ฟอร์มติดต่อ (feat-032)", () => {
     }
     await fill();
     await form.getByRole("button", { name: "ส่งข้อความ" }).click();
-    await expect(page.getByTestId("contact-result")).toContainText("ส่งข้อความถี่เกินไป กรุณารออีก 10 นาที");
+    // หน้าต่าง 10 นาที: mock นับจากคำขอแรก (รอ ~10 นาที) แต่ Backend จริงตัดตามนาฬิกา (:00, :10, …) จึงรอได้ 1–10 นาที
+    const result = page.getByTestId("contact-result");
+    await expect(result).toContainText(/^ส่งข้อความถี่เกินไป กรุณารออีก (10|[1-9]) นาที$/);
     const blocked = await page.request.post("/api/contact", { headers: { "x-forwarded-for": ip }, data: { name: "a", email: "a@b.co", message: "1234567890" } });
     expect(blocked.status()).toBe(429);
-    expect(Number(blocked.headers()["retry-after"])).toBeGreaterThan(500);
+    const retryAfter = Number(blocked.headers()["retry-after"]);
+    expect(retryAfter).toBeGreaterThan(0);
+    expect(retryAfter).toBeLessThanOrEqual(600);
   });
 });

@@ -23,7 +23,8 @@ const cellOf = (sim: Simulation, x: number, y: number) =>
   Math.floor(y / sim.grid.cellSize) * sim.grid.cols + Math.floor(x / sim.grid.cellSize);
 
 describe("Customer flow simulation (feat-018)", () => {
-  it("ลูกค้าที่กำลังเดินไม่เคยอยู่ในช่องสิ่งกีดขวาง และไม่ทะลุสิ่งกีดขวางระหว่างก้าว", () => {
+  // จำลอง 2 ชม. ทีละ 0.25 วินาทีและตรวจทุกก้าว (~4.5 วินาทีในเครื่อง) — runner ของ CI ช้ากว่าเพดาน 5 วินาที
+  it("ลูกค้าที่กำลังเดินไม่เคยอยู่ในช่องสิ่งกีดขวาง และไม่ทะลุสิ่งกีดขวางระหว่างก้าว", { timeout: 30_000 }, () => {
     const sim = new Simulation(cafeLayout(), { customersPerHour: 120, seed: 7 });
     let previous = new Map<number, { x: number; y: number; state: string }>();
     let checked = 0;
