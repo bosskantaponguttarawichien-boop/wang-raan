@@ -44,6 +44,11 @@ export class ApiError extends Error {
   }
 }
 
+const GENERIC_ERROR = "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง";
+
+/** ข้อความภาษาไทยของ error ใด ๆ — ApiError ใช้ข้อความจาก BFF, อย่างอื่นใช้ข้อความกลาง */
+export const apiErrorText = (error: unknown) => (error instanceof ApiError ? error.message : GENERIC_ERROR);
+
 const FALLBACK: Record<number, string> = {
   401: "กรุณาเข้าสู่ระบบก่อน",
   404: "ไม่พบข้อมูล",
@@ -67,7 +72,7 @@ async function request<T>(fetchImpl: typeof fetch, path: string, init: RequestIn
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const error = (body as { error?: { code?: string; message?: string } } | null)?.error;
-    throw new ApiError(res.status, error?.code ?? `HTTP_${res.status}`, error?.message ?? FALLBACK[res.status] ?? "เกิดข้อผิดพลาด ลองใหม่อีกครั้ง", body);
+    throw new ApiError(res.status, error?.code ?? `HTTP_${res.status}`, error?.message ?? FALLBACK[res.status] ?? GENERIC_ERROR, body);
   }
   return body as T;
 }

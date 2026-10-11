@@ -8,13 +8,12 @@
 import * as React from "react";
 import { flushSync } from "react-dom";
 import { renderPlanSvg, summarizeLayout } from "@/core/export";
-import { STATUS_LABEL } from "@/components/ui";
+import { STATUS_LABEL, SummaryTable } from "@/components/ui";
 import { WALL_LABEL } from "@/components/editor-2d/stage-math";
 import { CATEGORY_LABEL } from "@/components/validation/validation-status-bar";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
+import { formatDateTime, formatNumber as fmt } from "@/lib/format";
 import { useLayoutStore } from "@/store/use-layout-store";
-
-const fmt = (v: number) => v.toLocaleString("th-TH", { maximumFractionDigits: 2 });
 
 /** true ระหว่างพิมพ์: beforeprint (Ctrl+P / window.print) และ media query "print" (การจำลองสื่อสิ่งพิมพ์) */
 function usePrinting(): boolean {
@@ -80,7 +79,7 @@ function PrintReportContent({ live }: { live: LiveValidation }) {
           </h1>
         </div>
         <p className="m-0 text-right text-[11px] leading-[1.6] text-secondary-strong">
-          พิมพ์เมื่อ {printedAt.toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })}
+          พิมพ์เมื่อ {formatDateTime(printedAt, "long")}
           <br />
           สถานะผัง: <strong data-testid="print-status">{STATUS_LABEL[summary.status]}</strong>
         </p>
@@ -93,18 +92,7 @@ function PrintReportContent({ live }: { live: LiveValidation }) {
         <div className="print-avoid-break grid gap-5">
           <section>
             <h2 className="m-0 mb-2 text-[14px] font-semibold">สรุปผัง</h2>
-            <table className="w-full border-collapse text-[12px] leading-[1.7]">
-              <tbody>
-                {rows.map(([label, value]) => (
-                  <tr key={label} className="border-b border-[#e3e9f2]">
-                    <th scope="row" className="py-1 pr-3 text-left font-medium text-secondary-strong">
-                      {label}
-                    </th>
-                    <td className="py-1 tabular-nums">{value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <SummaryTable rows={rows} compact />
           </section>
           <section>
             <h2 className="m-0 mb-2 text-[14px] font-semibold">ผลตรวจผัง</h2>

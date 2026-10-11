@@ -3,6 +3,23 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-10 20:30 ICT — Refactor รวมโค้ดซ้ำ (ยังไม่ commit)
+
+### Core & Dev
+- helper HTTP ของ BFF อยู่ที่ `src/server/http.ts` (เดิมอยู่ใน layout-handlers) — endpoint ที่ต้องล็อกอินใช้ `withUser(resolveUser, (user, request, ...args) => …)`
+- จัดรูปแบบวันที่/ตัวเลขไทยใช้ `src/lib/format.ts`; error ของ API ใช้ `apiErrorText()`; UI แจ้ง error ใช้ `ErrorText` / `LoadError` จาก `@/components/ui`
+- เรียก action ของ store นอก render ใช้ `layoutActions()`
+
+### QA
+- unit 623, lint + contract + build + core:smoke ผ่าน; E2E ผ่านทั้งหมดยกเว้นเคส flaky ใน `e2e/account-share-contact.spec.ts` (เป็นมาก่อน refactor, ผ่าน 8/8 เมื่อ `--workers=1`)
+
+### Active Blockers / Open Questions
+- E2E `account-share-contact.spec.ts` ล้มแบบสุ่มเมื่อรันขนาน 4 workers ในเครื่องนี้ (โค้ดก่อน refactor ก็ล้ม) — ควรหาสาเหตุแยกต่างหาก
+
+### Next Steps
+1. ผู้ใช้รีวิว diff แล้วตัดสินใจ commit
+2. ตามเดิม: CI รันจริง → ปิด feat-043; รอ Backend จริง → ปลดพัก feat-041 → feat-048
+
 ## 2026-10-10 18:00 ICT — feat-035 เสร็จ, feat-043 รอรันบน GitHub
 
 ### Core & Dev

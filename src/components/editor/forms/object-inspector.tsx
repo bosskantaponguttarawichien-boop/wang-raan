@@ -11,11 +11,9 @@ import { useForm } from "react-hook-form";
 import { OBJECT_MIN_SIZE, SIZE_STEP, footprint, snapToGrid, type LayoutObject, type Rotation } from "@/core/layout";
 import { Button } from "@/components/ui";
 import { objectLabel } from "@/components/editor-2d/stage-math";
-import { layoutStore, selectSelectedObject, useLayoutStore } from "@/store/use-layout-store";
+import { layoutActions as actions, selectSelectedObject, useLayoutStore } from "@/store/use-layout-store";
 import { Field, inputClass } from "./field";
 import { ObjectInspectorSchema, type ObjectInspectorValues } from "./schemas";
-
-const actions = () => layoutStore.getState();
 
 export function ObjectInspector() {
   const picked = useLayoutStore(selectSelectedObject);

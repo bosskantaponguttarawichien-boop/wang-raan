@@ -3,6 +3,17 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-10 20:30] Refactor รวมโค้ดซ้ำ (ไม่เปลี่ยนพฤติกรรม)
+
+- BFF: helper HTTP (`json`, `problem`, `readJson`, `withBackendErrors`, `tooManyRequests`, `zodDetails`, `retryMinutes`) ย้ายจาก `layout-handlers.ts` ไป `src/server/http.ts`; เพิ่ม `withUser()` (401 + แปลง error Backend) ใช้แทนโค้ดตรวจ Session ที่ซ้ำใน layout/share handlers
+- `src/lib/format.ts`: `formatDateTime`, `formatNumber`, `DAY_MS` (แทน `toLocaleString("th-TH")` ที่กระจาย 6 จุด และ `DAY_MS` 2 จุด)
+- `apiErrorText()` ใน `api-client.ts`, `useCopyToClipboard()` ใน `src/lib/use-copy-to-clipboard.ts`
+- UI ใหม่ใน `src/components/ui`: `ErrorText`, `LoadError`, `StatusDot`, `SummaryTable` (หน้าแชร์ + รายงานพิมพ์ใช้ร่วม); playground ใช้ `PanelSection` แทน hr+section ซ้ำ 5 ชุด
+- store: `layoutActions()` ใช้แทน `const actions = () => layoutStore.getState()` ใน 3 component
+- core: `EPSILON` อยู่ `src/core/layout/epsilon.ts` (ภายใน ไม่ export ผ่าน index → API ของแพ็กเกจ core ไม่เปลี่ยน)
+- ไม่แตะ `mock-backend/` (ตั้งใจให้แยกจาก BFF เพื่อเป็นตัวแทน Backend อิสระ)
+- QA: make test 623/623 (+1 = เคส boundary ของไฟล์ core ใหม่), make lint ผ่าน, build ผ่าน, core:smoke ผ่าน, E2E Node 47/50 แบบขนาน → 3 เคสที่ล้มอยู่ใน account-share-contact และล้มแบบสุ่ม (โค้ดก่อน refactor ล้ม 6/8 ในไฟล์เดียวกัน); รันไฟล์นั้นแบบ `--workers=1` ผ่าน 8/8
+
 ## [2026-10-10 19:30] แก้ตาม Code Review ก่อน commit (8 จาก 9 ข้อ)
 
 - กล่องลิงก์ที่เพิ่งสร้าง: แสดงเฉพาะของผังที่เปิดอยู่และยังใช้งานได้ (ยกเลิก/หมดอายุ/เปลี่ยนผัง → ซ่อน)

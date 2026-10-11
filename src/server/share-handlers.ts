@@ -8,7 +8,8 @@ import "server-only";
  * - GET    /api/share/[shareKey]                 — สาธารณะ อ่านอย่างเดียว ไม่ต้องเข้าสู่ระบบ
  */
 import { z } from "zod";
-import { json, problem, readJson, unauthorized, withBackendErrors } from "./layout-handlers";
+import { DAY_MS } from "@/lib/format";
+import { json, problem, readJson, withBackendErrors, withUser } from "./http";
 import { SHARE_MAX_DAYS } from "./limits";
 import { clientIp } from "./rate-limit";
 import type { ResolveUser } from "./session";
@@ -16,7 +17,6 @@ import type { ShareLink, ShareRepository } from "./share-repository";
 
 /** body มีแค่ layoutId / expiresAt — 1 KB ก็เกินพอ */
 export const SHARE_MAX_BYTES = 1024;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
 const ExpiresAt = z.string().datetime({ offset: true }).nullable();
 const CreateShareSchema = z.object({ layoutId: z.string().min(1).max(128), expiresAt: ExpiresAt.optional() }).strict();
@@ -41,52 +41,40 @@ function invalidExpiry(expiresAt: string | null | undefined, now: number): Respo
 
 export function createShareHandlers(shares: ShareRepository, resolveUser: ResolveUser, now: () => number = Date.now) {
   return {
-    create: (request: Request) =>
-      withBackendErrors(async () => {
-        const user = await resolveUser(request);
-        if (!user) return unauthorized();
-        const read = await readJson(request, SHARE_MAX_BYTES);
-        if (!read.ok) return read.response;
-        const parsed = CreateShareSchema.safeParse(read.body);
-        if (!parsed.success) return problem(400, "INVALID_REQUEST", "ต้องระบุ layoutId ของผังที่บันทึกแล้ว");
-        const bad = invalidExpiry(parsed.data.expiresAt, now());
-        if (bad) return bad;
-        const link = await shares.create(user.id, parsed.data.layoutId, parsed.data.expiresAt ?? null);
-        if (link === "not-found") return problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้ — บันทึกผังก่อนแชร์");
-        return json(withUrl(request, link), 201);
-      }),
+    create: withUser(resolveUser, async (user, request) => {
+      const read = await readJson(request, SHARE_MAX_BYTES);
+      if (!read.ok) return read.response;
+      const parsed = CreateShareSchema.safeParse(read.body);
+      if (!parsed.success) return problem(400, "INVALID_REQUEST", "ต้องระบุ layoutId ของผังที่บันทึกแล้ว");
+      const bad = invalidExpiry(parsed.data.expiresAt, now());
+      if (bad) return bad;
+      const link = await shares.create(user.id, parsed.data.layoutId, parsed.data.expiresAt ?? null);
+      if (link === "not-found") return problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้ — บันทึกผังก่อนแชร์");
+      return json(withUrl(request, link), 201);
+    }),
 
-    list: (request: Request, layoutId: string) =>
-      withBackendErrors(async () => {
-        const user = await resolveUser(request);
-        if (!user) return unauthorized();
-        const links = await shares.list(user.id, layoutId);
-        if (links === "not-found") return problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้");
-        return json({ shares: links.map((l) => withUrl(request, l)) });
-      }),
+    list: withUser(resolveUser, async (user, request, layoutId: string) => {
+      const links = await shares.list(user.id, layoutId);
+      if (links === "not-found") return problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้");
+      return json({ shares: links.map((l) => withUrl(request, l)) });
+    }),
 
-    update: (request: Request, shareKey: string) =>
-      withBackendErrors(async () => {
-        const user = await resolveUser(request);
-        if (!user) return unauthorized();
-        const read = await readJson(request, SHARE_MAX_BYTES);
-        if (!read.ok) return read.response;
-        const parsed = UpdateShareSchema.safeParse(read.body);
-        if (!parsed.success) return problem(400, "INVALID_REQUEST", "ต้องระบุ expiresAt (หรือ null = ไม่หมดอายุ)");
-        const bad = invalidExpiry(parsed.data.expiresAt, now());
-        if (bad) return bad;
-        const link = await shares.update(user.id, shareKey, parsed.data.expiresAt);
-        if (link === "not-found") return problem(404, "NOT_FOUND", "ไม่พบลิงก์แชร์นี้");
-        if (link === "revoked") return problem(410, "SHARE_REVOKED", "ลิงก์นี้ถูกยกเลิกแล้ว แก้วันหมดอายุไม่ได้");
-        return json(withUrl(request, link));
-      }),
+    update: withUser(resolveUser, async (user, request, shareKey: string) => {
+      const read = await readJson(request, SHARE_MAX_BYTES);
+      if (!read.ok) return read.response;
+      const parsed = UpdateShareSchema.safeParse(read.body);
+      if (!parsed.success) return problem(400, "INVALID_REQUEST", "ต้องระบุ expiresAt (หรือ null = ไม่หมดอายุ)");
+      const bad = invalidExpiry(parsed.data.expiresAt, now());
+      if (bad) return bad;
+      const link = await shares.update(user.id, shareKey, parsed.data.expiresAt);
+      if (link === "not-found") return problem(404, "NOT_FOUND", "ไม่พบลิงก์แชร์นี้");
+      if (link === "revoked") return problem(410, "SHARE_REVOKED", "ลิงก์นี้ถูกยกเลิกแล้ว แก้วันหมดอายุไม่ได้");
+      return json(withUrl(request, link));
+    }),
 
-    revoke: (request: Request, shareKey: string) =>
-      withBackendErrors(async () => {
-        const user = await resolveUser(request);
-        if (!user) return unauthorized();
-        return (await shares.revoke(user.id, shareKey)) ? new Response(null, { status: 204 }) : problem(404, "NOT_FOUND", "ไม่พบลิงก์แชร์นี้");
-      }),
+    revoke: withUser(resolveUser, async (user, _request, shareKey: string) =>
+      (await shares.revoke(user.id, shareKey)) ? new Response(null, { status: 204 }) : problem(404, "NOT_FOUND", "ไม่พบลิงก์แชร์นี้"),
+    ),
 
     get: (request: Request, shareKey: string) =>
       withBackendErrors(async () => {

@@ -290,6 +290,9 @@ export const selectCanStartSimulation = (s: LayoutStoreState) => canStartSimulat
 // ── Singleton สำหรับ Editor (Client Components เท่านั้น) ──────────────────────
 export const layoutStore = createLayoutStore();
 
+/** เรียก action ของ store นอก React render (event handler) โดยไม่ subscribe */
+export const layoutActions = () => layoutStore.getState();
+
 export function useLayoutStore<T>(selector: (state: LayoutStoreState) => T): T {
   return useStore(layoutStore, selector);
 }

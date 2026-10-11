@@ -3,6 +3,7 @@
  * ช่องที่มีวัตถุทับ (พื้นที่ทับ > 0) = ไม่ว่าง; ช่องแถวติดผนังตรงช่องประตู = ช่องทางเข้า
  */
 import { GRID_STEP } from "../layout/constants";
+import { EPSILON } from "../layout/epsilon";
 import { footprint } from "../layout/geometry";
 import type { Meters, StoreLayout } from "../layout/types";
 import { entranceSegment } from "../validation/walk-grid";
@@ -10,8 +11,6 @@ import { entranceSegment } from "../validation/walk-grid";
 export const SIM_CELL_SIZE: Meters = GRID_STEP;
 export const CELL_FREE = 0;
 export const CELL_BLOCKED = 1;
-
-const EPSILON = 1e-9;
 
 export interface OccupancyGrid {
   cellSize: Meters;

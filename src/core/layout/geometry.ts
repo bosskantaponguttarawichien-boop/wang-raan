@@ -1,7 +1,6 @@
 import { GRID_STEP, ROOM_MAX, ROOM_MIN } from "./constants";
+import { EPSILON } from "./epsilon";
 import type { LayoutObject, Meters, Point, Rect, Rotation } from "./types";
-
-const EPSILON = 1e-9;
 
 /** ปัดเศษทศนิยมจาก floating point (ความละเอียด 1 ไมโครเมตร) */
 export function roundMeters(value: Meters): Meters {

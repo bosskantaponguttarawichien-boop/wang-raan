@@ -4,8 +4,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { renderPlanSvg, severityByObject, summarizeLayout } from "@/core/export";
-import { StatusBadge, buttonVariants } from "@/components/ui";
+import { StatusBadge, SummaryTable, buttonVariants } from "@/components/ui";
 import { ShareViewer } from "@/components/share/share-viewer";
+import { formatDateTime, formatNumber as fmt } from "@/lib/format";
 import { BackendError } from "@/server/backend";
 import { clientIpFrom } from "@/server/rate-limit";
 import { shareRepository } from "@/server/share-repository";
@@ -75,8 +76,6 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-const fmt = (v: number) => v.toLocaleString("th-TH", { maximumFractionDigits: 2 });
-
 function ShareHeader() {
   return (
     <header className="flex h-[60px] items-center justify-between gap-4 border-b border-[#e5eaf2] bg-white px-[22px] max-[700px]:px-4">
@@ -141,24 +140,13 @@ export default async function SharePage({ params }: Props) {
         </section>
         <aside aria-label="สรุปผังร้าน" className="h-max rounded-[14px] border border-line bg-white p-5">
           <StatusBadge status={summary.status} className="mb-4" />
-          <table className="w-full border-collapse text-[13px] leading-[1.75]">
-            <tbody>
-              {rows.map(([label, value]) => (
-                <tr key={label} className="border-b border-[#e3e9f2]">
-                  <th scope="row" className="py-1.5 pr-3 text-left font-medium text-secondary-strong">
-                    {label}
-                  </th>
-                  <td className="py-1.5 tabular-nums">{value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <SummaryTable rows={rows} />
           <p className="mb-4 mt-3 text-[12px] leading-[1.75] text-secondary-strong">
-            แชร์เมื่อ {new Date(shared.createdAt).toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })} · ภาพนี้เป็นสำเนา ณ เวลาที่แชร์
+            แชร์เมื่อ {formatDateTime(shared.createdAt, "long")} · ภาพนี้เป็นสำเนา ณ เวลาที่แชร์
             {shared.expiresAt && (
               <>
                 {" "}
-                · ลิงก์ใช้ได้ถึง {new Date(shared.expiresAt).toLocaleString("th-TH", { dateStyle: "long", timeStyle: "short" })}
+                · ลิงก์ใช้ได้ถึง {formatDateTime(shared.expiresAt, "long")}
               </>
             )}
           </p>
