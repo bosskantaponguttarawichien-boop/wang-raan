@@ -9,6 +9,8 @@ on:
 
 permissions:
   contents: read
+  # e2e-real ติดตั้ง Backend ซึ่งต้องโหลด wang-raan-core จาก GitHub Packages
+  packages: read
 
 # push ใหม่ใน branch เดิม → ยกเลิกรอบเก่า
 concurrency:
@@ -89,4 +91,75 @@ jobs:
           path: |
             e2e/.report
             e2e/.results
+          retention-days: 7
+
+  e2e-real:
+    name: E2E (Backend จริง)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wang_raan
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d wang_raan"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      # Backend (main ล่าสุดของ wang-raan-service) ↔ fault proxy (:4010) ↔ หน้าเว็บ — ทุกฝั่งใช้ secret ชุดเดียวกัน
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wang_raan
+      E2E_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wang_raan
+      REAL_BACKEND_URL: http://127.0.0.1:4000
+      INTERNAL_TOKEN_SECRET: e2e-only-internal-secret-not-for-production
+      NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: bosskantaponguttarawichien-boop/wang-raan-service
+          ref: main
+          path: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            backend/package-lock.json
+          registry-url: https://npm.pkg.github.com
+          scope: "@bosskantaponguttarawichien-boop"
+      # ย้ายออกนอกโฟลเดอร์หน้าเว็บ — tsconfig ของหน้าเว็บ include **/*.ts จึงจะ type-check โค้ด Backend ตอน next build
+      - name: ย้าย Backend ออกนอก workspace
+        run: mv backend "$RUNNER_TEMP/backend"
+      - run: npm ci
+      - name: ติดตั้งและ build Backend
+        working-directory: ${{ runner.temp }}/backend
+        run: npm ci && npm run build
+      - name: Migration + เปิด Backend
+        working-directory: ${{ runner.temp }}/backend
+        run: |
+          node dist/db/migrate.js up
+          HOST=127.0.0.1 PORT=4000 nohup node dist/server.js > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          for _ in $(seq 1 30); do
+            curl -sf http://127.0.0.1:4000/health && exit 0
+            sleep 1
+          done
+          cat "$GITHUB_WORKSPACE/backend.log"
+          exit 1
+      # Chromium ใช้ Google Chrome ที่มากับ runner (playwright.config.ts → channel: "chrome")
+      - name: E2E กับ Backend จริง (ผ่าน fault proxy)
+        run: make e2e-real
+      - name: เก็บรายงานเมื่อไม่ผ่าน
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-real-backend
+          path: |
+            e2e/.report
+            e2e/.results
+            backend.log
           retention-days: 7
