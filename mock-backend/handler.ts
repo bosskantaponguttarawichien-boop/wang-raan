@@ -330,7 +330,13 @@ export function createMockBackend(options: MockBackendOptions) {
         const body = parse(UpdateShareSchema, await readBody(request, KB));
         const share = ownShare(user, key!);
         if (share.revokedAt) throw new HttpProblem(410, "SHARE_REVOKED", "share was revoked");
-        share.expiresAt = expiresAtFrom(body.expiresAt);
+        const expiresAt = expiresAtFrom(body.expiresAt);
+        // ต่ออายุลิงก์ที่หมดอายุ = กลับมาใช้งานได้ จึงนับโควตาเหมือนสร้างใหม่
+        if (shareStatus(share) === "expired") {
+          const active = [...shares.values()].filter((s) => s.ownerId === user && s.layoutId === share.layoutId && shareStatus(s) === "active");
+          if (active.length >= SHARE_LIMIT) throw new HttpProblem(409, "SHARE_LIMIT_REACHED", `limit ${SHARE_LIMIT} active shares`);
+        }
+        share.expiresAt = expiresAt;
         return json(shareLink(share));
       },
     },

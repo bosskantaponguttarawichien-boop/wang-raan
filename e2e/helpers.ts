@@ -1,9 +1,9 @@
 import type { APIRequestContext, Page } from "@playwright/test";
 
-/** Backend จำลองที่ playwright.config.ts เปิดไว้ — มีคำสั่งควบคุม /__mock/* สำหรับเทสต์ */
+/** Backend จำลอง (หรือ fault proxy หน้า Backend จริง) ที่ playwright.config.ts เปิดไว้ — มีคำสั่งควบคุม /__mock/* สำหรับเทสต์ */
 export const MOCK_BACKEND = "http://localhost:4010";
 
-/** สั่ง Backend จำลอง (เช่น `mockControl(request, "outage", { subject })`) */
+/** สั่ง Backend จำลอง / fault proxy (เช่น `mockControl(request, "outage", { subject })`) */
 export async function mockControl(request: APIRequestContext, path: string, data?: unknown) {
   const res = await request.post(`${MOCK_BACKEND}/__mock/${path}`, data === undefined ? {} : { data });
   if (!res.ok()) throw new Error(`mock control ${path} → ${res.status()}`);

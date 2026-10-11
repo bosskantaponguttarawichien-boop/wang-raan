@@ -9,11 +9,14 @@ import { defineConfig, devices, type Project } from "@playwright/test";
  * ทดสอบกับ production build (next start) เพื่อให้ตรงกับของจริง
  * BFF ต่อ Backend จำลอง (mock-backend/server, port 4010) ผ่าน HTTP จริง — ตั้ง WANGRAAN_BACKEND_URL ให้แอป
  * E2E_TARGET=cloudflare: รันแอปบน workerd (runtime ของ Cloudflare Workers) ผ่าน `wrangler dev` แทน next start (feat-035)
+ * REAL_BACKEND_URL + E2E_DATABASE_URL: ต่อ Backend จริงผ่าน proxy ฉีดความขัดข้อง (mock-backend/fault-proxy.ts) แทน Backend จำลอง
+ *   ที่ port เดิม — คำสั่ง /__mock/* ใช้ได้เหมือนเดิม; INTERNAL_TOKEN_SECRET ต้องตรงกับ Backend จริง (`make e2e-real`)
  */
 const PORT = 3210;
 export const MOCK_BACKEND_PORT = 4010;
 const INTERNAL_TOKEN_SECRET = process.env.INTERNAL_TOKEN_SECRET ?? "e2e-only-internal-secret-not-for-production";
 const CLOUDFLARE = process.env.E2E_TARGET === "cloudflare";
+const REAL_BACKEND_URL = process.env.REAL_BACKEND_URL;
 const BASE_URL = CLOUDFLARE ? `http://127.0.0.1:${PORT}` : `http://localhost:${PORT}`;
 const APP_ENV = {
   // Auth.js ต้องมี secret ใน production build — ค่านี้ใช้เฉพาะการทดสอบ
@@ -57,10 +60,14 @@ export default defineConfig({
   projects,
   webServer: [
     {
-      command: "npm run mock:build && npm run mock:start",
+      command: REAL_BACKEND_URL ? "npm run mock:build && node mock-backend/dist/fault-proxy.mjs" : "npm run mock:build && npm run mock:start",
       url: `http://localhost:${MOCK_BACKEND_PORT}/health`,
       reuseExistingServer: !process.env.CI,
-      env: { INTERNAL_TOKEN_SECRET, MOCK_BACKEND_PORT: String(MOCK_BACKEND_PORT) },
+      env: {
+        INTERNAL_TOKEN_SECRET,
+        MOCK_BACKEND_PORT: String(MOCK_BACKEND_PORT),
+        ...(REAL_BACKEND_URL && { REAL_BACKEND_URL, E2E_DATABASE_URL: process.env.E2E_DATABASE_URL ?? "" }),
+      },
       timeout: 60_000,
     },
     { ...appServer, reuseExistingServer: !process.env.CI, timeout: 300_000 },
