@@ -14,6 +14,7 @@ import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-sto
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { SimulationOverlay } from "@/components/simulation/simulation-overlay";
 import { GridOverlay } from "./grid-overlay";
+import { SelectionToolbar } from "./selection-toolbar";
 import {
   WALL_LABEL,
   clientToMeters,
@@ -94,6 +95,7 @@ export function Artboard({ live }: ArtboardProps) {
   const selectedId = useLayoutStore((s) => s.selectedObjectId);
   const zoom = useLayoutStore((s) => s.zoom);
   const stageRef = React.useRef<HTMLDivElement>(null);
+  const boxRef = React.useRef<HTMLDivElement>(null);
   const drag = React.useRef<DragState | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const hintId = React.useId();
@@ -223,6 +225,7 @@ export function Artboard({ live }: ArtboardProps) {
         <span className="h-px flex-1 bg-[#ccd6e4]" />
       </div>
       <div
+        ref={boxRef}
         className="relative rounded-[2px] border-4 border-[var(--plan-wall)] bg-white"
         style={{
           width: `calc(min(100%, 760px, 64dvh * ${ratio}) * ${zoom})`,
@@ -328,6 +331,9 @@ export function Artboard({ live }: ArtboardProps) {
             />
           )}
         </div>
+        {selected && !draggingId && (
+          <SelectionToolbar boxRef={boxRef} room={room} objects={layout.objects} selected={selected} groupRect={groupRect} />
+        )}
       </div>
       <p id={hintId} className="mt-3 max-w-[560px] text-center text-[12px] leading-[1.75] text-secondary-strong">
         ลากเพื่อย้าย · ลูกศรเลื่อนทีละ 0.25 ม. (Shift = 1 ม.) · R หมุน 90° · Delete ลบ · กริดย่อย 0.25 ม. กริดหลัก 1 ม.

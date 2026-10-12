@@ -2,7 +2,8 @@
 
 /**
  * Object Inspector (architecture.md §5.4 ข้อ 2) — แก้ตำแหน่ง/การหมุน (ทุกชิ้น) และขนาด (ครัว/เคาน์เตอร์)
- * โต๊ะ/เก้าอี้ย้ายและหมุนทั้งชุดตาม Core; การกด "นำไปใช้" ครั้งหนึ่ง = Undo หนึ่งขั้น
+ * โต๊ะ/เก้าอี้ย้ายและหมุนทั้งชุดตาม Core; นำไปใช้ทันทีเมื่อออกจากฟอร์ม/กด Enter/เปลี่ยนการหมุน = Undo หนึ่งขั้น
+ * ปุ่มหมุนด่วนอยู่ในแถบเครื่องมือลอยบนผัง (selection-toolbar.tsx)
  * ลบ (feat-034): เลือกเก้าอี้ = ลบเก้าอี้ตัวนั้น (เหมือนกด Delete บน Artboard), เลือกโต๊ะ = ลบทั้งชุด (Cascade Delete)
  */
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,6 +13,7 @@ import { OBJECT_MIN_SIZE, SIZE_STEP, footprint, snapToGrid, type LayoutObject, t
 import { Button } from "@/components/ui";
 import { objectLabel } from "@/components/editor-2d/stage-math";
 import { layoutActions as actions, selectSelectedObject, useLayoutStore } from "@/store/use-layout-store";
+import { autoApplyProps, useRestoreFocus } from "./auto-apply";
 import { Field, inputClass } from "./field";
 import { ObjectInspectorSchema, type ObjectInspectorValues } from "./schemas";
 
@@ -30,16 +32,14 @@ export function ObjectInspector() {
 }
 
 function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget: LayoutObject }) {
-  const formId = React.useId();
+  // id คงที่ (มีฟอร์มนี้ชุดเดียวในหน้า) เพื่อคืนโฟกัสได้หลังฟอร์มถูกสร้างใหม่
+  const formId = "inspector";
+  useRestoreFocus();
   const resizable = obj.type === "kitchen" || obj.type === "counter";
   const isSet = obj.type === "table" || obj.type === "chair";
   const deletesChair = deleteTarget.type === "chair";
   const fp = footprint(obj);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isDirty, dirtyFields },
-  } = useForm<ObjectInspectorValues>({
+  const form = useForm<ObjectInspectorValues>({
     resolver: zodResolver(ObjectInspectorSchema),
     // ค่าเริ่มต้นลงกริดเสมอ: ชิ้นที่พิกัด/ขนาดไม่ลงกริด (เช่น ข้อมูลเก่า) ยังแก้ช่องอื่นได้โดยช่องที่ไม่ได้แตะไม่ทำให้ฟอร์มไม่ผ่าน
     defaultValues: {
@@ -50,17 +50,24 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
       depth: Math.max(OBJECT_MIN_SIZE, snapToGrid(obj.depth, SIZE_STEP)),
     },
   });
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = form;
 
+  // อ่านสถานะ "แก้แล้ว" สด ๆ จาก control (formState ที่ได้จาก render อาจช้ากว่าเหตุการณ์ select ที่เพิ่งเปลี่ยน)
+  const dirty = (name: keyof ObjectInspectorValues) => form.getFieldState(name).isDirty;
   const onSubmit = (values: ObjectInspectorValues) => {
     const store = actions();
     store.beginInteraction();
     const rotation = Number(values.rotation) as Rotation;
     if (rotation !== obj.rotation) store.rotateObject(obj.id, rotation - obj.rotation);
-    if (resizable && (dirtyFields.width || dirtyFields.depth)) store.resizeObject(obj.id, values.width, values.depth);
+    if (resizable && (dirty("width") || dirty("depth"))) store.resizeObject(obj.id, values.width, values.depth);
     // ย้ายเฉพาะเมื่อผู้ใช้แก้ x/y — การหมุนอย่างเดียวต้องหมุนรอบจุดศูนย์กลางตาม Core ไม่ใช่กลับไปมุมเดิม
-    if (dirtyFields.x || dirtyFields.y) {
+    if (dirty("x") || dirty("y")) {
       const now = store.layout.objects.find((o) => o.id === obj.id) ?? obj;
-      store.updateObjectPosition(obj.id, dirtyFields.x ? values.x : now.x, dirtyFields.y ? values.y : now.y);
+      store.updateObjectPosition(obj.id, dirty("x") ? values.x : now.x, dirty("y") ? values.y : now.y);
     }
     store.endInteraction();
   };
@@ -73,7 +80,12 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
       <p className="m-0 mb-3 text-[12px] leading-[1.75] text-secondary">
         พื้นที่บนผัง {fp.width.toFixed(2)} × {fp.depth.toFixed(2)} ม.
       </p>
-      <form onSubmit={handleSubmit(onSubmit)} noValidate aria-label={`แก้ไข${objectLabel(obj)}`}>
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        {...autoApplyProps(handleSubmit(onSubmit), () => (["x", "y", "rotation", "width", "depth"] as const).some(dirty))}
+        noValidate
+        aria-label={`แก้ไข${objectLabel(obj)}`}
+      >
         <div className="grid grid-cols-2 gap-x-2 gap-y-3">
           <Field id={`${formId}-x`} label="ตำแหน่ง x (ม.)" error={errors.x?.message}>
             {(aria) => <input {...aria} {...numberProps} step={0.25} {...register("x", { valueAsNumber: true })} />}
@@ -103,18 +115,10 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
             )}
           </Field>
         </div>
-        <Button type="submit" variant="secondary" size="sm" className="mt-3 w-full" disabled={!isDirty}>
-          นำไปใช้
-        </Button>
+        <p className="mb-0 mt-2 text-[12px] leading-[1.75] text-secondary">ผังเปลี่ยนเมื่อกด Enter หรือออกจากช่องกรอก · ย้อนกลับได้ด้วย Ctrl+Z</p>
       </form>
-      <div className="mt-2 grid grid-cols-2 gap-2">
-        <Button variant="secondary" size="sm" onClick={() => actions().rotateObject(obj.id, -90)}>
-          ↺ 90°
-        </Button>
-        <Button variant="secondary" size="sm" onClick={() => actions().rotateObject(obj.id, 90)}>
-          ↻ 90°
-        </Button>
-        <Button variant="danger" size="sm" className="col-span-2" onClick={() => actions().deleteObject(deleteTarget.id)}>
+      <div className="mt-3 grid gap-2">
+        <Button variant="danger" size="sm" onClick={() => actions().deleteObject(deleteTarget.id)}>
           × ลบ{deletesChair ? "เก้าอี้ตัวนี้" : isSet ? "ทั้งชุดโต๊ะ" : "ชิ้นงานนี้"}
         </Button>
       </div>

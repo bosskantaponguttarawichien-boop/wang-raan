@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe } from "./helpers";
+import { buildReadyCafe, openAllSections } from "./helpers";
 
 /**
  * feat-024: เส้นทางการใช้งานจริง — จัดร้าน → ตรวจ → จำลอง, Cascade Delete, P2 Gate,
@@ -13,6 +13,7 @@ const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
 test.beforeEach(async ({ page }) => {
   await page.goto("/playground");
   await expect(stage(page)).toBeVisible();
+  await openAllSections(page);
 });
 
 test.describe("จัดร้าน → ตรวจผัง → จำลอง", () => {
@@ -43,7 +44,7 @@ test.describe("จัดร้าน → ตรวจผัง → จำลอ�
     await expect(table).toHaveAttribute("data-issue", "blocked");
 
     // Undo หนึ่งครั้ง = ย้อนการลากทั้งครั้ง
-    await page.getByRole("button", { name: "↶ ย้อนกลับ" }).click();
+    await page.getByRole("button", { name: "ย้อนกลับ", exact: true }).click();
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
   });
 });
@@ -94,18 +95,19 @@ test.describe("Table Set Lifecycle", () => {
 test.describe("Inspector & Room Settings (feat-027)", () => {
   test("ปรับขนาดร้านและทางเข้าผ่านฟอร์ม", async ({ page }) => {
     const form = page.getByTestId("room-settings-form");
+    await expect(form.getByRole("button", { name: "นำไปใช้" })).toHaveCount(0);
     await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("10");
     await form.getByLabel("ลึก (ม.)", { exact: true }).fill("7.5");
-    await form.getByLabel("ผนังทางเข้า").selectOption("west");
     await form.getByLabel("ระยะจากมุม (ม.)").fill("2");
-    // ระหว่างพิมพ์ ผังยังไม่เปลี่ยน
+    // ระหว่างพิมพ์และย้ายช่องในฟอร์ม ผังยังไม่เปลี่ยน
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 8 × 6 เมตร");
-    await form.getByRole("button", { name: "นำไปใช้" }).click();
+    // เปลี่ยนตัวเลือกผนัง = นำทุกช่องที่แก้ไปใช้พร้อมกัน
+    await form.getByLabel("ผนังทางเข้า").selectOption("west");
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
     await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ทิศตะวันตก.*ตำแหน่ง 2\.00 ม\./);
 
     await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("31");
-    await form.getByRole("button", { name: "นำไปใช้" }).click();
+    await form.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");
     await expect(form.getByRole("alert")).toHaveText("ความกว้างร้านไม่เกิน 30 ม.");
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
   });
@@ -116,7 +118,7 @@ test.describe("Inspector & Room Settings (feat-027)", () => {
     await inspector.getByLabel("ตำแหน่ง x (ม.)").fill("0.5");
     await inspector.getByLabel("ตำแหน่ง y (ม.)").fill("0.5");
     await inspector.getByLabel("กว้าง (ม.)", { exact: true }).fill("3");
-    await inspector.getByRole("button", { name: "นำไปใช้" }).click();
+    await inspector.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");
     await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
     await expect(inspector).toContainText("พื้นที่บนผัง 3.00 × 1.50 ม.");
   });
@@ -137,11 +139,11 @@ test.describe("Auto-save Draft (feat-028)", () => {
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
 
     // ประวัติกลับมาด้วย: ย้อนจนผังว่างได้ และทำซ้ำกลับได้
-    const undo = page.getByRole("button", { name: "↶ ย้อนกลับ" });
+    const undo = page.getByRole("button", { name: "ย้อนกลับ", exact: true });
     await expect(undo).toBeEnabled();
     while (await undo.isEnabled()) await undo.click();
     await expect(pieces(page, "table")).toHaveCount(0);
-    await page.getByRole("button", { name: "↷ ทำซ้ำ" }).click();
+    await page.getByRole("button", { name: "ทำซ้ำ", exact: true }).click();
     await expect(pieces(page, "kitchen")).toHaveCount(1);
 
     // เริ่มผังใหม่ (ยืนยัน) → ล้างร่าง และรีเฟรชแล้วยังว่าง
@@ -209,7 +211,7 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
     await expect(pieces(page, "chair")).toHaveCount(4);
 
     // Undo ย้อนการนำเข้าได้
-    await page.getByRole("button", { name: "↶ ย้อนกลับ" }).click();
+    await page.getByRole("button", { name: "ย้อนกลับ", exact: true }).click();
     await expect(pieces(page, "chair")).toHaveCount(1);
   });
 

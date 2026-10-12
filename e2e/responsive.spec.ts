@@ -37,8 +37,11 @@ for (const width of BREAKPOINTS) {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-      for (const name of ["เครื่องมือจัดร้าน", "การจัดการชิ้นงาน"]) {
-        await expect(page.getByRole("complementary", { name })).toBeAttached();
+      const side = page.getByRole("complementary", { name: "เครื่องมือจัดร้าน" });
+      await expect(side).toBeAttached();
+      // แถบซ้ายแบบหัวข้อ: มีครบทุกหัวข้อ (ชิ้นงานที่เลือกโผล่เมื่อเลือกชิ้นงานเท่านั้น)
+      for (const key of ["room", "add", "simulation", "file", "cloud"]) {
+        await expect(side.locator(`[data-section-toggle="${key}"]`)).toBeVisible();
       }
       await expect(page.getByTestId("validation-status-bar")).toBeVisible();
       await page.screenshot({ path: `e2e/.results/screens/playground-${width}.png`, fullPage: true });

@@ -7,7 +7,6 @@
  */
 import * as React from "react";
 import { Button } from "@/components/ui";
-import { PanelTitle } from "@/components/editor/panel-title";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { cn } from "@/lib/cn";
 import { layoutStore } from "@/store/use-layout-store";
@@ -25,6 +24,12 @@ export function formatSimTime(seconds: number): string {
 const selectClass =
   "mt-1.5 block min-h-10 w-full rounded-[7px] border border-[#dce4ef] bg-white px-2 text-[14px] text-ink focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus";
 
+/** เริ่มจำลอง (ใช้ร่วมกันระหว่างแผงจำลองและแถบสถานะ) — สลับกลับมุมมอง 2D ก่อน เพราะลูกค้าแสดงบนผัง 2D */
+export async function startSimulation() {
+  if (layoutStore.getState().is3DView) layoutStore.getState().set3DView(false);
+  await getSimulationController().start();
+}
+
 export function SimulationPanel({ live }: { live: LiveValidation }) {
   const status = useSimulationStore((s) => s.status);
   const message = useSimulationStore((s) => s.message);
@@ -38,18 +43,13 @@ export function SimulationPanel({ live }: { live: LiveValidation }) {
   const idle = status === "idle" || status === "starting";
   const controller = () => getSimulationController();
 
-  const start = async () => {
-    if (layoutStore.getState().is3DView) layoutStore.getState().set3DView(false);
-    await controller().start();
-  };
 
   const note = blocked
     ? `ต้องแก้ผัง ${live.blockedCount} ข้อก่อน ปุ่มเริ่มจำลองจะกดได้เมื่อผังพร้อม`
     : message ?? (status === "starting" ? "กำลังตรวจผังและเตรียมการจำลอง…" : status === "idle" ? "ผังพร้อมจำลองลูกค้าแล้ว" : null);
 
   return (
-    <section className="min-w-0" aria-labelledby="simulation-title">
-      <PanelTitle id="simulation-title">จำลองลูกค้า</PanelTitle>
+    <div className="min-w-0">
       <div className="grid grid-cols-2 gap-2">
         <label className="block text-[12px] text-secondary">
           ลูกค้า / ชั่วโมง
@@ -80,7 +80,7 @@ export function SimulationPanel({ live }: { live: LiveValidation }) {
             disabled={blocked || status === "starting"}
             aria-describedby={reasonId}
             data-testid="start-simulation"
-            onClick={() => void start()}
+            onClick={() => void startSimulation()}
           >
             {blocked ? "เริ่มจำลอง (ต้องแก้ผังก่อน)" : status === "starting" ? "กำลังเตรียม…" : "▶ เริ่มจำลอง"}
           </Button>
@@ -137,6 +137,6 @@ export function SimulationPanel({ live }: { live: LiveValidation }) {
           </li>
         </ul>
       )}
-    </section>
+    </div>
   );
 }

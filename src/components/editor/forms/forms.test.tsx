@@ -47,6 +47,16 @@ describe("ObjectInspectorSchema", () => {
 });
 
 describe("RoomSettingsForm (feat-027 gate: พิมพ์แล้วไม่ re-render Canvas)", () => {
+  it("ไม่มีปุ่ม นำไปใช้ — กด Enter แล้วผังเปลี่ยนทันทีและโฟกัสยังอยู่ที่ช่องเดิม", async () => {
+    const user = userEvent.setup();
+    render(<RoomSettingsForm />);
+    expect(screen.queryByRole("button", { name: "นำไปใช้" })).toBeNull();
+    await user.clear(screen.getByLabelText("ลึก (ม.)"));
+    await user.type(screen.getByLabelText("ลึก (ม.)"), "7{Enter}");
+    expect(state().layout.depth).toBe(7);
+    expect(screen.getByLabelText("ลึก (ม.)")).toHaveFocus();
+  });
+
   it("ระหว่างพิมพ์ store ไม่ถูกแจ้งเตือนเลย → Canvas ที่ subscribe store ไม่ re-render", async () => {
     const user = userEvent.setup();
     render(<RoomSettingsForm />);
@@ -60,7 +70,7 @@ describe("RoomSettingsForm (feat-027 gate: พิมพ์แล้วไม่ 
     expect(notifications).toBe(0);
     expect(state().layout.width).toBe(8);
 
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.click(document.body); // ออกจากฟอร์ม = นำไปใช้
     unsubscribe();
     expect(state().layout).toMatchObject({ width: 10, depth: 7.5 });
   });
@@ -71,10 +81,11 @@ describe("RoomSettingsForm (feat-027 gate: พิมพ์แล้วไม่ 
     const before = state().historyIndex;
     await user.clear(screen.getByLabelText("กว้าง (ม.)"));
     await user.type(screen.getByLabelText("กว้าง (ม.)"), "12");
-    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "west");
     await user.clear(screen.getByLabelText("ระยะจากมุม (ม.)"));
     await user.type(screen.getByLabelText("ระยะจากมุม (ม.)"), "1");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    // ย้ายช่องภายในฟอร์มยังไม่นำไปใช้ → เปลี่ยนตัวเลือกผนังแล้วนำไปใช้ทุกช่องพร้อมกัน
+    expect(state().layout.width).toBe(8);
+    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "west");
     expect(state().layout.width).toBe(12);
     expect(state().layout.entrance).toMatchObject({ wall: "west", position: 1 });
     expect(state().historyIndex).toBe(before + 1);
@@ -88,8 +99,7 @@ describe("RoomSettingsForm (feat-027 gate: พิมพ์แล้วไม่ 
     render(<RoomSettingsForm />);
     const width = screen.getByLabelText("กว้าง (ม.)");
     await user.clear(width);
-    await user.type(width, "45");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.type(width, "45{Enter}");
     expect(await screen.findByRole("alert")).toHaveTextContent("ไม่เกิน 30 ม.");
     expect(width).toHaveAttribute("aria-invalid", "true");
     expect(width.getAttribute("aria-describedby")).toContain("error");
@@ -110,7 +120,7 @@ describe("RoomSettingsForm: ผังที่ยังไม่มีทาง�
     render(<RoomSettingsForm />);
     await user.clear(screen.getByLabelText("กว้าง (ม.)"));
     await user.type(screen.getByLabelText("กว้าง (ม.)"), "9");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.click(document.body); // ออกจากฟอร์ม = นำไปใช้
     expect(state().layout.width).toBe(9);
     expect(state().layout.entrance).toBeNull();
   });
@@ -119,8 +129,7 @@ describe("RoomSettingsForm: ผังที่ยังไม่มีทาง�
     const user = userEvent.setup();
     act(() => state().loadLayout({ ...cafeLayout(), entrance: null }));
     render(<RoomSettingsForm />);
-    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "north");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "north"); // เปลี่ยนตัวเลือก = นำไปใช้ทันที
     expect(state().layout.entrance).toMatchObject({ wall: "north", position: 0 });
   });
 });
@@ -136,7 +145,6 @@ describe("ObjectInspector: ชิ้นที่พิกัด/ขนาดไ�
     render(<ObjectInspector />);
     expect(screen.getByLabelText("ตำแหน่ง x (ม.)")).toHaveValue(5.25);
     await user.selectOptions(screen.getByLabelText("หมุน"), "180");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
     expect(screen.queryByRole("alert")).toBeNull();
     const after = state().layout.objects.find((o) => o.id === counter.id)!;
     expect(after.rotation).toBe(180);
@@ -163,7 +171,7 @@ describe("ObjectInspector", () => {
     await user.type(screen.getByLabelText("ตำแหน่ง y (ม.)"), "1");
     expect(notifications).toBe(0);
     const before = state().historyIndex;
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.click(document.body); // ออกจากฟอร์ม = นำไปใช้
     unsubscribe();
     expect(state().layout.objects.find((o) => o.id === kitchen.id)).toMatchObject({ width: 1.8, y: 1, x: kitchen.x });
     expect(state().historyIndex).toBe(before + 1);
@@ -178,8 +186,7 @@ describe("ObjectInspector", () => {
     expect(screen.queryByLabelText("กว้าง (ม.)")).toBeNull();
     expect(screen.getByLabelText("ตำแหน่ง x (ม.)")).toHaveValue(table.x);
     await user.clear(screen.getByLabelText("ตำแหน่ง x (ม.)"));
-    await user.type(screen.getByLabelText("ตำแหน่ง x (ม.)"), String(table.x - 1));
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
+    await user.type(screen.getByLabelText("ตำแหน่ง x (ม.)"), `${table.x - 1}{Enter}`);
     const movedChair = state().layout.objects.find((o) => o.id === chair.id)!;
     expect(movedChair.x).toBeCloseTo(chair.x - 1);
     expect(state().layout.objects.find((o) => o.id === table.id)!.x).toBe(table.x - 1);
@@ -191,7 +198,6 @@ describe("ObjectInspector", () => {
     act(() => state().selectObject(counter.id));
     render(<ObjectInspector />);
     await user.selectOptions(screen.getByLabelText("หมุน"), "90");
-    await user.click(screen.getByRole("button", { name: "นำไปใช้" }));
     const rotated = state().layout.objects.find((o) => o.id === counter.id)!;
     expect(rotated.rotation).toBe(90);
     // หมุนผ่านปุ่มให้ผลเท่ากัน

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { HeaderActions } from "@/components/editor/header-actions";
 import { AppProviders } from "@/components/providers/app-providers";
 
 export const metadata: Metadata = { title: "Playground — จัดผังร้าน" };
@@ -17,10 +18,7 @@ export default function PlaygroundLayout({ children }: Readonly<{ children: Reac
           <img src="/assets/logos/logo-wangraan-clear-channel.svg" alt="" aria-hidden="true" width={38} height={38} className="block size-[38px]" />
           วางร้าน
         </Link>
-        <span className="flex items-center gap-2 text-[12px] text-secondary max-[700px]:hidden">
-          <span aria-hidden="true" className="size-[7px] rounded-full bg-blue" />
-          โหมดออกแบบ · จัดร้านก่อน แล้วค่อยจำลองลูกค้า
-        </span>
+        <HeaderActions />
       </header>
       <main>
         <AppProviders>{children}</AppProviders>

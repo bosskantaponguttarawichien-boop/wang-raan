@@ -41,3 +41,14 @@ async function moveSelected(page: Page, dx: number, dy: number) {
   await press(dx >= 0 ? "ArrowRight" : "ArrowLeft", Math.abs(dx));
   await press(dy >= 0 ? "ArrowDown" : "ArrowUp", Math.abs(dy));
 }
+
+/** เปิดหัวข้อในแถบซ้ายของ Playground (Accordion) — หัวข้อที่เปิดถูกจำไว้ใน localStorage แม้รีเฟรช */
+export async function openSection(page: Page, key: "selected" | "room" | "add" | "simulation" | "file" | "cloud") {
+  const toggle = page.locator(`[data-section-toggle="${key}"]`);
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+}
+
+/** เปิดทุกหัวข้อ (ยกเว้น "ชิ้นงานที่เลือก" ที่เปิดเองเมื่อเลือกชิ้นงาน) ให้เทสต์เข้าถึงทุกแผงได้ */
+export async function openAllSections(page: Page) {
+  for (const key of ["room", "add", "simulation", "file", "cloud"] as const) await openSection(page, key);
+}

@@ -1,13 +1,14 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { buildReadyCafe, mockControl, sessionUserId } from "./helpers";
+import { buildReadyCafe, mockControl, openAllSections, sessionUserId } from "./helpers";
 
 /** feat-030 / 031 / 032 / 033: เข้าสู่ระบบ → บันทึกผ่าน React Query → แชร์ลิงก์สาธารณะ, ฟอร์มติดต่อ + Rate limit */
 const cloud = (page: Page) => page.getByTestId("cloud-panel");
 
 async function signInAsGuest(page: Page) {
   await page.goto("/playground");
+  await openAllSections(page);
   await cloud(page).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" }).click();
   await expect(page.getByTestId("signed-in-as")).toContainText("ผู้ใช้ทั่วไป");
 }
