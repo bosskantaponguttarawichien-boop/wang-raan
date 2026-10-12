@@ -3,6 +3,18 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-12 12:40 ICT — ต่อ FE กับ `/v1/me`
+
+### Core & Dev
+- บัญชีผู้ใช้: BFF `/api/me` + `/api/me/export` → Backend `/v1/me*`; ซิงก์โปรไฟล์และย้ายผัง Guest ตอนล็อกอินอยู่ใน `src/server/account-sync.ts` (เรียกจาก jwt callback ใน `auth.ts`)
+- UI ส่วน "บัญชีของฉัน" อยู่ท้าย cloud panel (`account-panel.tsx`)
+
+### QA
+- unit 642, lint ผ่าน, E2E 50/50 (5 ไฟล์ที่เกี่ยวข้อง)
+
+### Active Blockers / Open Questions
+- feat-041/042 ยัง blocked ตามสถานะเดิม — งานนี้ทำเฉพาะส่วนที่ผู้ใช้ขอ (ดู progress.md สำหรับสิ่งที่ยังขาด)
+
 ## 2026-10-10 20:30 ICT — Refactor รวมโค้ดซ้ำ (ยังไม่ commit)
 
 ### Core & Dev
@@ -88,42 +100,3 @@
 2. feat-035 ลองรันบน Cloudflare
 3. feat-039 ต่อ BFF กับ Backend ตามสัญญา
 
-## 2026-10-10 13:50 ICT — feat-036 สัญญา API เสร็จ รอผู้ใช้ review
-
-### Core & Dev
-- สัญญา BFF ↔ Backend: `contracts/openapi.yaml` + คู่มือ `contracts/README.md` (ส่งให้คนทำ Backend อ่านไฟล์นี้ก่อน)
-- แก้สัญญา → `make contract` + `make test` (contract test เทียบกับ Zod) ต้องผ่าน และแจ้งฝั่ง Backend
-- โค้ด BFF (`src/server/layout-repository.ts` แบบ remote) **ยังไม่ตรงสัญญา** — path ยังไม่มี `/v1` และส่ง `validation` ไปด้วย; แก้ใน feat-039 (รายละเอียดใน description ของ feat-039)
-
-### QA
-- unit 568 (contract 51), lint + contract lint ผ่าน
-
-### Active Blockers / Open Questions
-- feat-036 gate: ผู้ใช้ต้อง review สัญญาก่อนเปลี่ยนเป็น done
-- ยังไม่ตัดสินใจ: คง Guest ไว้ไหม (feat-041), ชื่อโดเมน (feat-044), ช่องทางแจ้งเตือน (feat-045)
-
-### Next Steps
-1. ผู้ใช้ review `contracts/` → ปิด feat-036
-2. feat-037 แยก core เป็น package
-3. feat-038 Backend จำลองตามสัญญา
-
-## 2026-10-10 13:10 ICT — Sprint 2 ด่าน 0 เสร็จ (feat-024, feat-034)
-
-### Core & Dev
-- ลบเก้าอี้: เลือกเก้าอี้แล้วลบ (Artboard หรือ Inspector) = ลบเฉพาะตัวนั้น; ลบทั้งชุดต้องเลือกโต๊ะ
-- นิยามเส้นทาง (`ROUTE_REQUIREMENTS`) และ `DEFAULT_SIMULATION_CONFIG` ยืนยันแล้ว — แก้ต้องถามเจ้าของผลิตภัณฑ์ (PRD §9 ข้อ 7–8)
-- ข้อความรองใช้ `--secondary` / `--secondary-strong` เท่านั้น — `--muted` ใช้กับเส้น/ไอคอน
-- WebKit ติดตั้งแล้วในเครื่องนี้: `E2E_WEBKIT=1 make e2e`
-- เทสต์ที่กด Tab บน WebKit ต้องใช้ `Alt+Tab` (Safari ค่าเริ่มต้น Tab ข้ามลิงก์/ปุ่ม); `page.pdf()` ใช้ได้เฉพาะ Chromium
-
-### QA
-- unit 517, E2E 94/94 (Chromium + WebKit), lint ผ่าน
-
-### Active Blockers / Open Questions
-- E2E fail แปลก ๆ เรื่อง CSS (คลาส Tailwind หาย) → `rm -rf .next` ก่อน — CI (feat-043) ควร build จากศูนย์เสมอ
-- ยังไม่ตัดสินใจ: คง Guest ไว้ไหม (feat-041), ชื่อโดเมน (feat-044), ช่องทางแจ้งเตือน (feat-045)
-
-### Next Steps
-1. feat-036 สัญญา API (OpenAPI)
-2. feat-037 แยก core เป็น package
-3. feat-035 ลองรันบน Cloudflare

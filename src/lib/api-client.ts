@@ -32,6 +32,16 @@ export interface ShareDto {
   revokedAt: string | null;
 }
 
+export interface UserDto {
+  id: string;
+  provider: "guest" | "google" | "line" | "github";
+  name: string | null;
+  email: string | null;
+  image: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -103,6 +113,10 @@ export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...
     updateShare: (shareKey: string, expiresAt: string | null) =>
       request<ShareDto>(fetchImpl, `/api/share/${encodeURIComponent(shareKey)}`, { method: "PATCH", body: JSON.stringify({ expiresAt }) }),
     revokeShare: (shareKey: string) => request<void>(fetchImpl, `/api/share/${encodeURIComponent(shareKey)}`, { method: "DELETE" }),
+    getMe: () => request<UserDto>(fetchImpl, "/api/me"),
+    deleteMe: () => request<void>(fetchImpl, "/api/me", { method: "DELETE" }),
+    /** ข้อมูลทั้งหมดของบัญชี (PDPA) — Client แปลงเป็นไฟล์ให้ดาวน์โหลดเอง */
+    exportMe: () => request<Record<string, unknown> & { exportedAt: string }>(fetchImpl, "/api/me/export"),
   };
 }
 
