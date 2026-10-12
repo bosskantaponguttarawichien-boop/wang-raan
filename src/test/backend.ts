@@ -4,6 +4,7 @@
  */
 import { contractFetch } from "../../contracts/contract-checker";
 import { createMockBackend } from "../../mock-backend/handler";
+import { createRemoteAccountRepository } from "@/server/account-repository";
 import { createRemoteLayoutRepository } from "@/server/layout-repository";
 import { createRemoteShareRepository } from "@/server/share-repository";
 import { createBackendClient } from "@/server/token-relay";
@@ -20,5 +21,6 @@ export function testBackend(options: { now?: () => Date; newShareKey?: () => str
     violations: checked.violations,
     layouts: createRemoteLayoutRepository(client),
     shares: createRemoteShareRepository(client),
+    accounts: createRemoteAccountRepository(client),
   };
 }

@@ -3,6 +3,16 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-12 12:40] ต่อ FE กับ `/v1/me` (บางส่วนของ feat-041 / feat-042 ตามที่ผู้ใช้ขอ)
+
+- BFF: `src/server/account-repository.ts` (GET/PUT/DELETE `/v1/me`, `/v1/me/export`, `/v1/me/merge-guest`), route ใหม่ `GET|DELETE /api/me`, `GET /api/me/export`
+- ล็อกอิน (jwt callback, `trigger === "signIn"`): `syncSignIn()` ใน `src/server/account-sync.ts` → `PUT /v1/me` ทุกครั้ง (ล้มเหลวแค่ log) และถ้า cookie เดิมเป็น Guest แล้วล็อกอิน GitHub → `POST /v1/me/merge-guest` (ล้มเหลว = ล็อกอินไม่สำเร็จ ผัง Guest ไม่หาย)
+- `GET /api/me` ยังไม่มีโปรไฟล์ใน Backend → สร้างจาก session ให้ทันที (session เก่าก่อนมีการซิงก์)
+- UI: `src/components/editor/account-panel.tsx` (บัญชีของฉัน: ประเภท/ชื่อ/อีเมล, ดาวน์โหลดข้อมูล JSON, ลบบัญชีแล้วออกจากระบบ, ปุ่มเชื่อม GitHub สำหรับ Guest); ปุ่ม "เข้าสู่ระบบด้วย GitHub" เมื่อ server เปิด provider
+- QA: unit 642/642 (+13 ใน `account-handlers.test.ts` ผ่านตัวตรวจสัญญา), make lint ผ่าน, E2E (account-share-contact, editor-flow, a11y, responsive, keyboard) 50/50, ทดสอบบนเบราว์เซอร์จริง: Guest → เห็นโปรไฟล์ → ดาวน์โหลดไฟล์ → ลบบัญชี → ออกจากระบบ
+- ยังไม่ได้ทดสอบ Guest → GitHub แบบ end-to-end (ต้องมี GitHub OAuth app) — มี unit test ของ merge แทน
+- ที่ยังขาดของ feat-041/042: Google/LINE, หน้านโยบายความเป็นส่วนตัว, ยืนยันลบสองชั้น, E2E ของ flow บัญชี
+
 ## [2026-10-10 20:30] Refactor รวมโค้ดซ้ำ (ไม่เปลี่ยนพฤติกรรม)
 
 - BFF: helper HTTP (`json`, `problem`, `readJson`, `withBackendErrors`, `tooManyRequests`, `zodDetails`, `retryMinutes`) ย้ายจาก `layout-handlers.ts` ไป `src/server/http.ts`; เพิ่ม `withUser()` (401 + แปลง error Backend) ใช้แทนโค้ดตรวจ Session ที่ซ้ำใน layout/share handlers

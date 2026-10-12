@@ -19,6 +19,7 @@ import {
 } from "@/lib/layout-queries";
 import { useCopyToClipboard } from "@/lib/use-copy-to-clipboard";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
+import { AccountPanel, useGitHubAvailable } from "./account-panel";
 import { ExpirySelect, ShareLinks, expiresAtFor, type ExpiryChoice } from "./share-links";
 
 /** ระบบจัดเก็บล่ม/ติดต่อไม่ได้ — ร่างผังยังอยู่ใน localStorage ของเครื่องนี้ (บันทึกอัตโนมัติ) */
@@ -35,6 +36,7 @@ export function CloudPanel() {
   const { data: session, status } = useSession();
   const [signingIn, setSigningIn] = React.useState(false);
   const [signInError, setSignInError] = React.useState<string | null>(null);
+  const github = useGitHubAvailable();
 
   if (status === "loading") {
     return (
@@ -59,6 +61,11 @@ export function CloudPanel() {
         <Button variant="secondary" size="sm" className="w-full" disabled={signingIn} onClick={guest}>
           {signingIn ? "กำลังเข้าสู่ระบบ…" : "เข้าสู่ระบบแบบผู้ใช้ทั่วไป"}
         </Button>
+        {github && (
+          <Button variant="secondary" size="sm" className="mt-2 w-full" disabled={signingIn} onClick={() => signIn("github", { redirectTo: "/playground" })}>
+            เข้าสู่ระบบด้วย GitHub
+          </Button>
+        )}
         {signInError && <ErrorText className="mt-2 text-[12px]">{signInError}</ErrorText>}
       </div>
     );
@@ -164,6 +171,8 @@ function SignedIn({ name }: { name: string }) {
         }}
         deleteError={remove.isError ? errorText(remove.error) : null}
       />
+
+      <AccountPanel />
     </div>
   );
 }
