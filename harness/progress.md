@@ -3,6 +3,12 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-12 20:00] ปรับ Landing Page สำหรับมือถือ (ตามที่ผู้ใช้ขอ)
+
+- เพิ่มบล็อก `@media(max-width:600px)` และ `(max-width:360px)` ใน `design-html/index.html` แล้วสร้าง `app/(marketing)/landing.css` ใหม่ด้วย `scripts/scope_landing_css.py`
+- เมนูบนหัวเว็บเป็นแถวเดียว (เดิม 2×2), ปุ่ม CTA หลัก/ส่งข้อความเต็มความกว้าง, ขั้นตอน "วิธีใช้งาน" เป็นภาพเล็กซ้าย-ข้อความขวา, ซ่อนภาพสเก็ตช์ในกล่องติดต่อ, ลดช่องว่าง → หน้าสั้นลง ~800px ที่ 375px
+- Verify: `npx playwright test e2e/responsive.spec.ts e2e/a11y.spec.ts` ผ่าน 26/26, `vitest` ผ่าน 642/642
+
 ## [2026-10-12 12:40] ต่อ FE กับ `/v1/me` (บางส่วนของ feat-041 / feat-042 ตามที่ผู้ใช้ขอ)
 
 - BFF: `src/server/account-repository.ts` (GET/PUT/DELETE `/v1/me`, `/v1/me/export`, `/v1/me/merge-guest`), route ใหม่ `GET|DELETE /api/me`, `GET /api/me/export`
