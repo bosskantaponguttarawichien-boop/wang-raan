@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe } from "./helpers";
+import { buildReadyCafe, openSection } from "./helpers";
 
 /** feat-023: ใช้งานด้วยคีย์บอร์ดล้วน + Focus Ring ชัดเจน + prefers-reduced-motion */
 
@@ -51,6 +51,7 @@ test.describe("Landing", () => {
 test.describe("Playground", () => {
   test("จัดผังจนพร้อม → เริ่ม/หยุดการจำลอง ด้วยคีย์บอร์ดล้วน", async ({ page }) => {
     await page.goto("/playground");
+    await openSection(page, "simulation");
     await buildReadyCafe(page); // เพิ่มด้วยปุ่ม + ย้ายด้วยลูกศร
     await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
     const start = page.getByTestId("start-simulation");

@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe } from "./helpers";
+import { buildReadyCafe, openAllSections } from "./helpers";
 
 /** feat-023: WCAG 2.1 AA ด้วย axe-core (ต้องไม่มี violation) */
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -30,6 +30,7 @@ for (const viewport of [
     test("Playground (ผังเปล่า / Blocked) + Drawer ที่มีรายการปัญหา", async ({ page }) => {
       await page.goto("/playground");
       await expect(page.getByRole("application")).toBeVisible();
+      await openAllSections(page);
       expect(await audit(page)).toEqual([]);
       await page.getByRole("button", { name: /ดูรายการ/ }).click();
       await expect(page.getByRole("dialog").getByText("ต้องแก้").first()).toBeVisible();
@@ -38,6 +39,7 @@ for (const viewport of [
 
     test("Playground ระหว่างจำลอง + Drawer รายการปัญหา", async ({ page }) => {
       await page.goto("/playground");
+      await openAllSections(page);
       await buildReadyCafe(page);
       await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
       await page.getByTestId("start-simulation").click();
@@ -50,11 +52,12 @@ for (const viewport of [
 
     test("Playground: Inspector + ฟอร์มขนาดร้านที่มี error + ข้อความนำเข้าไฟล์", async ({ page }) => {
       await page.goto("/playground");
+      await openAllSections(page);
       await page.getByRole("button", { name: /^เพิ่ม\s*ครัว/ }).click();
       await expect(page.getByTestId("object-inspector")).toBeVisible();
       const form = page.getByTestId("room-settings-form");
       await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("40");
-      await form.getByRole("button", { name: "นำไปใช้" }).click();
+      await form.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");
       await expect(form.getByRole("alert")).toBeVisible();
       await page.getByTestId("import-input").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{") });
       await expect(page.getByTestId("file-message")).toContainText("ไม่สำเร็จ");
@@ -71,6 +74,7 @@ for (const viewport of [
     test("Playground: แผงบัญชีหลังเข้าสู่ระบบ + หน้าแชร์", async ({ page, browser }) => {
       test.slow(); // หลายหน้า + axe 3 รอบ — บน wrangler dev (workerd ในเครื่อง) เกิน 30 วินาทีได้
       await page.goto("/playground");
+      await openAllSections(page);
       await page.getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" }).click();
       await expect(page.getByTestId("signed-in-as")).toBeVisible();
       await buildReadyCafe(page);

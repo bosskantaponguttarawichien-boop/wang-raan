@@ -5,7 +5,10 @@ import * as React from "react";
 import type { IssueCategory, ValidationIssue } from "@/core/layout";
 import { cn } from "@/lib/cn";
 import { STATUS_LABEL } from "@/components/ui";
+import { getSimulationController } from "@/components/simulation/simulation-controller";
+import { startSimulation } from "@/components/simulation/simulation-panel";
 import { layoutStore } from "@/store/use-layout-store";
+import { useSimulationStore } from "@/store/use-simulation-store";
 import type { LiveValidation } from "./use-live-validation";
 
 export const CATEGORY_LABEL: Record<IssueCategory, string> = {
@@ -46,9 +49,36 @@ export function ValidationStatusBar({ live }: { live: LiveValidation }) {
         >
           ดูรายการ ({total})
         </Dialog.Trigger>
+        <PillSimulationButton blocked={result.status === "blocked"} />
       </div>
       <IssueDrawer issues={result.issues} onPick={() => setOpen(false)} />
     </Dialog.Root>
+  );
+}
+
+const PILL_BUTTON =
+  "min-h-7 shrink-0 rounded-pill px-3 text-[12px] font-medium focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2";
+
+/** ปุ่มเริ่ม/หยุดจำลองในแถบสถานะ — ทางลัดของหัวข้อ "จำลองลูกค้า" (P2 Gate: ผัง Blocked กดไม่ได้) */
+function PillSimulationButton({ blocked }: { blocked: boolean }) {
+  const status = useSimulationStore((s) => s.status);
+  if (status === "running" || status === "paused") {
+    return (
+      <button type="button" className={cn(PILL_BUTTON, "bg-[#fdecea] text-[#b8433b] hover:bg-[#fbdcd8]")} onClick={() => void getSimulationController().stop()}>
+        ■ หยุด
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={blocked || status === "starting"}
+      title={blocked ? "แก้ผังให้ผ่านกฎจำเป็นก่อนเริ่มจำลอง" : undefined}
+      className={cn(PILL_BUTTON, "bg-blue text-white hover:bg-blue-hover disabled:cursor-not-allowed disabled:bg-[#c9d3e6] disabled:hover:bg-[#c9d3e6]")}
+      onClick={() => void startSimulation()}
+    >
+      {status === "starting" ? "กำลังเตรียม…" : "▶ จำลองลูกค้า"}
+    </button>
   );
 }
 
