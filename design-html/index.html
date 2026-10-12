@@ -240,6 +240,44 @@
     .contact-form .form-note.is-error{color:#b8433b}
     .contact-form .hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
   </style>
+  <style>
+    /* Mobile layout (≤600px): ลดความสูงที่เสียไป ให้ปุ่มกดง่ายด้วยนิ้วโป้ง และจัดเนื้อหาให้อ่านเป็นคอลัมน์เดียว */
+    @media(max-width:600px){
+      header{gap:6px 12px;padding-top:12px;padding-bottom:6px}
+      header .brand-logo{width:36px;height:36px}
+      .navigation{display:flex;flex-wrap:nowrap;justify-content:space-between;gap:0 8px;font-size:13px;margin:0 -4px}
+      .navigation a{justify-content:center;padding:0 4px;min-height:44px;white-space:nowrap}
+      .navigation a:after{bottom:8px}
+      .hero{padding-top:12px;padding-bottom:36px;gap:24px}
+      .intro-copy{padding-top:8px}
+      .eyebrow{margin-bottom:12px}
+      .intro-copy>.cta{display:flex;justify-content:center;width:100%;max-width:340px;margin-left:auto;margin-right:auto}
+      .hero-art{margin-top:18px}
+      .section-heading{margin-bottom:24px}
+      .section-heading h2{text-wrap:balance}
+      .feature-card{padding:18px 0}
+      .how-grid{gap:22px}
+      .how-step{grid-template-columns:88px minmax(0,1fr);gap:0 16px;text-align:left}
+      .how-art{grid-column:1;grid-row:1/4;width:88px;max-width:88px;margin:0;align-self:start}
+      .how-number{grid-column:2;grid-row:1;max-width:none;margin:0 0 4px}
+      .how-step h3{grid-column:2;grid-row:2;font-size:18px;margin-bottom:4px}
+      .how-step p{grid-column:2;grid-row:3;max-width:none;margin:0;font-size:14px}
+      .faq-list summary{min-height:44px}
+      .contact-box{padding:20px;gap:22px}
+      .contact-sketch{display:none}
+      .contact-channel{align-items:center}
+      .contact-form .cta{display:flex;justify-content:center;width:100%;min-height:48px;font-size:16px}
+      .footer-links{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px}
+      .footer-bottom{flex-direction:column;align-items:flex-start;gap:4px}
+    }
+    /* จอแคบมาก (≤360px): ลดขนาดเมนูให้ยังอยู่บรรทัดเดียว */
+    @media(max-width:360px){
+      .navigation{font-size:12px;gap:0 4px}
+      .navigation a{padding:0 2px}
+      .header-cta{padding:10px 12px}
+      .section-heading h2{font-size:23px}
+    }
+  </style>
 </head>
 <body>
   <header>
