@@ -99,3 +99,15 @@ export async function openSection(page: Page, key: "room" | "add" | "simulation"
 export async function openAllSections(page: Page) {
   await openTab(page, "add");
 }
+
+/** ล็อกอินด้วย credentials provider ของ Auth.js ผ่าน HTTP แบบเดียวกับ signIn() ฝั่ง client — คืน URL ปลายทาง (มี ?code= เมื่อไม่สำเร็จ) */
+export async function credentialsSignIn(request: APIRequestContext, provider: string, fields: Record<string, string> = {}) {
+  const { csrfToken } = await (await request.get("/api/auth/csrf")).json();
+  const res = await request.post(`/api/auth/callback/${provider}`, {
+    form: { csrfToken, callbackUrl: "/", ...fields },
+    headers: { "x-auth-return-redirect": "1" },
+    maxRedirects: 0,
+  });
+  const { url } = (await res.json()) as { url: string };
+  return new URL(url);
+}

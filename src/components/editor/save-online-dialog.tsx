@@ -6,6 +6,7 @@ import * as React from "react";
 import { saveDraft, getDraftStorage } from "@/lib/draft-storage";
 import { PENDING_SYNC_KEY } from "@/lib/guest-sync";
 import { useLayoutStore } from "@/store/use-layout-store";
+import { limitLayoutName } from "@/lib/layout-name";
 
 export interface SaveOnlineDialogProps {
   open: boolean;
@@ -32,7 +33,7 @@ export function SaveOnlineDialog({ open, onOpenChange }: SaveOnlineDialogProps) 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const finalName = name.trim() || currentName || `ผังร้าน ${layout.width} × ${layout.depth} ม.`;
-    const limitedName = finalName.slice(0, 80);
+    const limitedName = limitLayoutName(finalName);
     setLayoutName(limitedName);
 
     // บันทึก draft พร้อมชื่อและ flag สำหรับ sync หลัง login

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { auth } from "@/server/auth";
 import { createRemoteLayoutRepository } from "@/server/layout-repository";
 import { PlaygroundWithIdClient } from "./playground-with-id-client";
@@ -17,8 +17,9 @@ export default async function PlaygroundPage({
   const { id } = await params;
   const session = await auth();
 
+  // ยังไม่ล็อกอิน (เช่น เปิดจากบุ๊กมาร์ก) → ไปล็อกอินแล้วกลับมาที่ผังนี้ ไม่ใช่ 404 ที่ทำให้คิดว่าผังหาย
   if (!session?.user?.id) {
-    notFound();
+    redirect(`/login?next=${encodeURIComponent(`/playground/${encodeURIComponent(id)}`)}`);
   }
 
   const repo = createRemoteLayoutRepository();

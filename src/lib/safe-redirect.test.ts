@@ -21,6 +21,15 @@ describe("safeRedirectPath", () => {
     expect(safeRedirectPath("")).toBe("/projects");
   });
 
+  it("อักขระที่เบราว์เซอร์ตัดทิ้งตอน parse (tab/newline) ใช้หลบเป็น //evil.com ไม่ได้", () => {
+    expect(safeRedirectPath("/\t/evil.com")).toBe("/projects");
+    expect(safeRedirectPath("/\n/evil.com")).toBe("/projects");
+    expect(safeRedirectPath("/\r/evil.com")).toBe("/projects");
+    expect(safeRedirectPath("/ /evil.com")).toBe("/projects");
+    // ยืนยันว่าเป็นช่องโหว่จริงถ้าปล่อยผ่าน: URL parser มองเป็นโฮสต์อื่น
+    expect(new URL("/\t/evil.com", "https://wang-raan.invalid").host).toBe("evil.com");
+  });
+
   it("ใช้ custom fallback ได้", () => {
     expect(safeRedirectPath("https://evil.com", "/custom")).toBe("/custom");
   });

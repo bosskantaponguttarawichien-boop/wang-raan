@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { BREAKPOINTS } from "./helpers";
+import { BREAKPOINTS, credentialsSignIn } from "./helpers";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -95,8 +95,14 @@ test.describe("/playground/[id] และการบันทึกออนไ
     await expect(page.getByRole("heading", { name: "คาเฟ่ริมน้ำนายสุข (ปรับปรุงใหม่)" })).toBeVisible();
   });
 
+  test("ยังไม่ล็อกอินเปิด /playground/[id] → ไปหน้าเข้าสู่ระบบ แล้ว next กลับมาที่ผังนี้", async ({ page }) => {
+    await page.goto("/playground/lay_abc123");
+    await page.waitForURL((url) => url.pathname === "/login");
+    expect(new URL(page.url()).searchParams.get("next")).toBe("/playground/lay_abc123");
+  });
+
   test("เปิด /playground/[id] ที่ไม่มีอยู่จริงหรือของคนอื่น → แสดงหน้า 404 ภาษาไทย + Axe Audit", async ({ page }) => {
-    // เข้ารหัส /playground/non-existent-id
+    await credentialsSignIn(page.request, "guest");
     await page.goto("/playground/lay_does_not_exist_999");
 
     // แสดงข้อความ 404 ภาษาไทย
@@ -166,6 +172,7 @@ test.describe("/playground/[id] และการบันทึกออนไ
     for (const width of BREAKPOINTS) {
       test(`${width}px: ไม่มี horizontal scrollbar`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
+        await credentialsSignIn(page.request, "guest");
         await page.goto("/playground/lay_non_existent_check");
 
         await expect(page.getByRole("heading", { name: "ไม่พบผังร้านนี้" })).toBeVisible();

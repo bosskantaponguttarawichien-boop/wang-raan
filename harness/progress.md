@@ -3,6 +3,14 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-15] Code review FE (feat-061–064) + BE (feat-013)
+
+- **Security**: `safeRedirectPath` ปล่อย `/\t/evil.com` ผ่าน (เบราว์เซอร์ตัด tab → `//evil.com` = open redirect หลังล็อกอิน) → ปฏิเสธอักขระควบคุม/ช่องว่าง + ตรวจ origin ด้วย URL parser
+- **ข้อมูลหาย**: ผังออนไลน์ที่ Blocked ไม่ถูกบันทึกที่ไหนเลย → เตือนก่อนปิดแท็บ; ออกจาก Editor/เปิดผังอื่นระหว่าง debounce → บันทึก snapshot ทันที (+ unit test 4 เคส)
+- `/playground/[id]` ตอนยังไม่ล็อกอิน → ไป `/login?next=` แทน 404 · ตัดชื่อผังตาม code point (`src/lib/layout-name.ts`) · ลบ route ซ้ำ `/api/auth/otp`
+- BE `002-identities`: `last_login_at` NOT NULL (backfill จาก `updated_at`) ให้ตรง `Identity.lastLoginAt`
+- **QA**: FE `make test` 801, `make lint`, `make e2e` 90/90 · BE `make test` unit 58 + integration 61, `make lint`, format
+
 ## [2026-10-15] แก้ E2E ชุด UI เก่าให้ตรง Playground UX ใหม่ + บั๊กที่ E2E จับได้
 
 - **E2E**: `e2e/helpers.ts` ใหม่ (`openTab`, `addItem`, `placeSelected` ผ่านป๊อปโอเวอร์ "ปรับละเอียด", `cloud()` เปิด dialog บัญชี, `closeDialogs`) · ปรับ editor-flow / keyboard / a11y / account-share-contact ให้ใช้ Rail, เมนูโปรเจกต์/ส่งออก, toast และ P2 gate แบบ `aria-disabled` (Tab ถึงได้ กดแล้วบอกข้อที่ต้องแก้ — PRD §9 ข้อ 9)

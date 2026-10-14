@@ -3,6 +3,7 @@
 import * as React from "react";
 import { api } from "@/lib/api-client";
 import { useLayoutStore } from "@/store/use-layout-store";
+import { limitLayoutName } from "@/lib/layout-name";
 
 export interface InlineLayoutNameProps {
   onToast?: (message: string) => void;
@@ -51,7 +52,7 @@ export function InlineLayoutName({ onToast, className = "" }: InlineLayoutNamePr
       return;
     }
 
-    const finalName = trimmed.slice(0, 80);
+    const finalName = limitLayoutName(trimmed);
     setLayoutName(finalName);
 
     // ถ้าเป็นผังออนไลน์ ให้บันทึกชื่อกลับผ่าน PUT

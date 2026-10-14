@@ -5,20 +5,9 @@
  */
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { cafeLayout } from "../src/test/fixtures/layouts";
+import { credentialsSignIn } from "./helpers";
 
 const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
-
-/** ล็อกอินด้วย credentials provider ของ Auth.js แบบเดียวกับที่ signIn() ฝั่ง client ทำ */
-async function credentialsSignIn(request: APIRequestContext, provider: string, fields: Record<string, string> = {}) {
-  const { csrfToken } = await (await request.get("/api/auth/csrf")).json();
-  const res = await request.post(`/api/auth/callback/${provider}`, {
-    form: { csrfToken, callbackUrl: "/", ...fields },
-    headers: { "x-auth-return-redirect": "1" },
-    maxRedirects: 0,
-  });
-  const { url } = (await res.json()) as { url: string };
-  return new URL(url);
-}
 
 async function sessionId(request: APIRequestContext): Promise<string | undefined> {
   return (await (await request.get("/api/auth/session")).json())?.user?.id;
