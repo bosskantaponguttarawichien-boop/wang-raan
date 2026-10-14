@@ -857,11 +857,11 @@
     {
       "id": "feat-063",
       "name": "หน้ารวมโปรเจกต์ /projects",
-      "description": "หน้า /projects (ต้องล็อกอิน; ยังไม่ล็อกอิน → /login?next=/projects): รายการผังของผู้ใช้จาก GET /api/layouts เรียงตามแก้ไขล่าสุด (ชื่อ, ขนาดร้าน, แก้ไขล่าสุด) · ปุ่ม 'สร้างผังใหม่' → /playground/[id] ของผังใหม่ · ลบผังพร้อม dialog ยืนยัน (Radix) · empty state, loading, error ภาษาไทย, แจ้งเมื่อเต็มโควตา (LAYOUT_LIMIT_REACHED) · header มีเมนูบัญชี (ชื่อ/อีเมล, ออกจากระบบ) · V1 ไม่มี thumbnail/ค้นหา/เปลี่ยนชื่อ",
+      "description": "หน้า /projects (ต้องล็อกอิน; ยังไม่ล็อกอิน → /login?next=/projects): การ์ดแบบไฟล์ใน Figma — ภาพผังย่อด้านบน (วาดด้วย renderPlanSvg จาก src/core/export/plan-svg.ts แบบ grid:false บนพื้น #eef2f7) + ไอคอน ชื่อผัง ขนาด และเวลาแก้ไขล่าสุดด้านล่าง · เรียงตามแก้ไขล่าสุด · การ์ด 'สร้างผังใหม่' แบบเส้นประท้ายรายการ + ปุ่มด้านบน → /playground/[id] ของผังใหม่ · เมนู ⋯ บนการ์ด (เปิดผัง / ลบผัง; เห็นเมื่อ hover/focus และเห็นตลอดบนจอสัมผัส) ลบต้องยืนยันด้วย dialog (Radix) · empty state, skeleton ตอนโหลด, error ภาษาไทย, แจ้งเมื่อเต็มโควตา (LAYOUT_LIMIT_REACHED) · header มีเมนูบัญชี (ชื่อ/อีเมล, ออกจากระบบ) · ต้องปรับสัญญา: LayoutSummary ยังไม่มีชื่อผังและ geometry สำหรับวาดภาพย่อ · V1 ไม่มีค้นหา/เปลี่ยนชื่อ/ทำสำเนา",
       "dependencies": [
         "feat-062"
       ],
-      "gate": "E2E: สร้าง → เห็นในรายการ → เปิดได้, ลบ → หายจากรายการและเปิดลิงก์เดิมได้ 404, ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations",
+      "gate": "E2E: สร้าง → เห็นการ์ดพร้อมภาพย่อในรายการ → เปิดได้, ลบผ่านเมนู ⋯ + ยืนยัน → หายจากรายการและเปิดลิงก์เดิมได้ 404, เมนู ⋯ ใช้คีย์บอร์ดได้ (Enter/ลูกศร/Esc คืนโฟกัส), ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, make lint ผ่านรวม contract check",
       "status": "not-started",
       "role": "frontend",
       "summary": "ที่รวมผังทั้งหมดของผู้ใช้: ดู สร้าง ลบ",
