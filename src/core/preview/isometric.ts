@@ -222,3 +222,17 @@ export function buildIsoScene(layout: StoreLayout): IsoScene {
     entrance,
   };
 }
+
+/** คำนวณตำแหน่ง anchor เป็นเปอร์เซ็นต์ใน viewBox ของฉาก สำหรับวาง Floating Toolbar (feat-058) */
+export function getIsoAnchor(
+  x: Meters,
+  y: Meters,
+  scene: IsoScene,
+  z = 32,
+): { xPct: number; yPct: number } {
+  const [minX = 0, minY = 0, vbWidth = 1, vbHeight = 1] = scene.viewBox.split(" ").map(Number);
+  const [px, py] = projectPoint(x, y, z, scene.scale);
+  const xPct = Math.min(85, Math.max(15, (((px - minX) / vbWidth) * 100)));
+  const yPct = Math.min(82, Math.max(6, (((py - minY) / vbHeight) * 100)));
+  return { xPct: round(xPct), yPct: round(yPct) };
+}

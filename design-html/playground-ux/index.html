@@ -1,0 +1,759 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>วางร้าน — Playground UX Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --blue:#3b62f4;--blue-h:#2e50da;--blue-soft:#edf1ff;
+  --ink:#1e2b40;--sec:#66758a;--mut:#8492a5;--line:#e2e8f1;--surf:#f7f9fc;--white:#fff;
+  --danger:#e4685d;--danger-soft:#fdeeec;--danger-ink:#b23d33;
+  --ok:#2e9b78;--ok-soft:#e7f5f0;--ok-ink:#1f6e55;
+  --warn:#e5b762;--warn-soft:#fdf6e7;--warn-ink:#8a6414;
+  --teal:#1d9e75;--focus:#a4b6ff;
+  --font:"Noto Sans Thai",system-ui,-apple-system,Tahoma,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font-family:var(--font);color:var(--ink);background:var(--surf);font-size:14px;display:flex;flex-direction:column;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.item:focus-visible{outline:none}
+.item:focus-visible .body{stroke:var(--blue);stroke-width:3}
+
+/* mockup nav */
+.mocknav{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--ink);color:#c9d3e3;font-size:12px;overflow-x:auto;white-space:nowrap;flex:none}
+.mocknav b{color:#fff;font-weight:500;margin-right:6px}
+.mocknav button{background:transparent;border:1px solid #3a4a63;color:#dfe6f1;border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12px}
+.mocknav button.on{background:#fff;color:var(--ink);border-color:#fff}
+
+/* app grid */
+.app{flex:1;min-height:0;display:grid;grid-template-columns:72px 288px minmax(0,1fr);grid-template-rows:56px minmax(0,1fr) 56px;grid-template-areas:"hd hd hd" "rail panel stage" "rail panel status"}
+.app.sim{grid-template-columns:0 288px minmax(0,1fr)}
+.app.sim .rail{display:none}
+.app>*{min-width:0;min-height:0}
+
+/* header */
+.hd{grid-area:hd;display:flex;align-items:center;gap:10px;padding:0 14px;background:var(--white);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:18px;flex:none}
+.logo img{width:30px;height:30px}
+.proj{display:flex;align-items:center;gap:4px;border:0;background:transparent;padding:6px 8px;border-radius:8px;cursor:pointer;color:var(--sec);min-width:0}
+.proj:hover{background:var(--surf)}
+.proj span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px}
+.stepper{flex:1;display:flex;justify-content:center;align-items:center;gap:6px;min-width:0}
+.view-seg{width:200px}
+.view-seg button{padding:7px 0}
+.hd-right{display:flex;align-items:center;gap:4px;flex:none}
+.icon-btn{width:34px;height:34px;border-radius:8px;border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--sec);font-size:18px}
+.icon-btn:hover{background:var(--surf)}
+.icon-btn[aria-disabled=true]{opacity:.35;cursor:not-allowed}
+.save{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:4px;margin:0 6px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--white);border-radius:10px;padding:7px 12px;cursor:pointer;white-space:nowrap;font-size:13px}
+.btn:hover{border-color:#c8d2e2}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:var(--blue-h)}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--blue)}
+.btn.danger{color:var(--danger-ink)}
+.btn.sm{padding:4px 8px;font-size:12px;border-radius:8px}
+.menu-wrap{position:relative}
+.menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;min-width:220px;box-shadow:0 10px 30px rgba(30,43,64,.12);z-index:40;display:none}
+.menu.left{left:0;right:auto}
+.menu.open{display:block}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;border:0;background:transparent;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left}
+.menu button:hover{background:var(--surf)}
+.menu small{color:var(--mut);display:block;font-size:11px}
+.menu hr{border:0;border-top:1px solid var(--line);margin:4px}
+
+/* rail */
+.rail{grid-area:rail;background:var(--white);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0}
+.tab{position:relative;width:58px;border:0;background:transparent;border-radius:10px;padding:8px 0 6px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;color:var(--sec);font-size:11px}
+.tab i{font-size:20px}
+.tab:hover{background:var(--surf)}
+.tab.on{background:var(--blue-soft);color:var(--blue)}
+.tab .badge{position:absolute;top:2px;right:8px;min-width:17px;height:17px;border-radius:999px;background:var(--danger);color:#fff;font-size:10px;display:grid;place-items:center;padding:0 4px}
+.tab .badge.w{background:var(--warn);color:var(--ink)}
+.tab.mobile-only{display:none}
+
+/* panel */
+.panel{grid-area:panel;background:var(--white);border-right:1px solid var(--line);overflow-y:auto;padding:16px}
+.panel h2{font-size:15px;font-weight:600;margin:0 0 2px}
+.panel .sub{color:var(--sec);font-size:12px;margin:0 0 12px;line-height:1.5}
+.cat{display:flex;align-items:center;gap:10px;width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;margin-bottom:8px;cursor:pointer;text-align:left}
+.cat:hover{border-color:var(--blue);background:var(--blue-soft)}
+.cat .ic{width:40px;height:40px;border-radius:10px;background:var(--surf);display:grid;place-items:center;flex:none}
+.cat b{font-weight:500;display:block}
+.cat small{color:var(--mut);font-size:11px}
+.cat .plus{margin-left:auto;color:var(--blue);font-size:18px}
+.cat.tpl{border-style:dashed;justify-content:center;color:var(--blue)}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.field label{font-size:12px;color:var(--sec)}
+.field input,.field select{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:#fff}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;padding:7px 0;cursor:pointer;font-size:12px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--blue-soft);color:var(--blue);font-weight:500}
+.issue{display:flex;gap:10px;width:100%;text-align:left;border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px;margin-bottom:8px;cursor:pointer}
+.issue .num{width:22px;height:22px;border-radius:50%;flex:none;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;background:var(--danger)}
+.issue.w .num{background:var(--warn);color:var(--ink)}
+.issue b{font-weight:500;display:block}
+.issue small{color:var(--sec);font-size:12px;line-height:1.5}
+.issue.active{border-color:var(--danger);background:var(--danger-soft)}
+.issue.w.active{border-color:var(--warn);background:var(--warn-soft)}
+.sec-title{font-size:12px;color:var(--sec);margin:14px 0 6px;font-weight:500}
+.okline{display:flex;gap:10px;align-items:flex-start;border:1px solid #bfe3d6;background:var(--ok-soft);color:var(--ok-ink);border-radius:12px;padding:10px 12px}
+.okline i{font-size:20px}.okline b{display:block;font-weight:600}.okline small{font-size:12px}
+.step-h{display:flex;align-items:center;gap:8px;font-weight:600;margin:0 0 8px}
+.sn{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;background:var(--blue);color:#fff}
+.sn.good{background:var(--ok)}.sn.bad{background:var(--danger)}.sn.off{background:#dfe6f1;color:var(--sec)}
+.dim{opacity:.55}
+.warnbox{margin-top:10px}.warnbox summary{cursor:pointer;font-size:12px;color:var(--warn-ink);font-weight:500;margin-bottom:6px}
+.okbox{border:1px solid #bfe3d6;background:var(--ok-soft);color:var(--ok-ink);border-radius:12px;padding:14px;text-align:center}
+.okbox i{font-size:28px}
+.result{border:1px solid #f1dcae;background:var(--warn-soft);border-radius:12px;padding:12px;margin-bottom:14px}
+.result b{color:var(--warn-ink);font-weight:600}
+.result p{margin:4px 0 8px;font-size:12px;line-height:1.6}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.stat{background:var(--surf);border-radius:10px;padding:8px 10px}
+.stat small{color:var(--sec);font-size:11px;display:block}
+.stat b{font-size:18px;font-weight:600}
+.lock{display:flex;gap:8px;align-items:flex-start;background:var(--surf);border-radius:10px;padding:10px;font-size:12px;color:var(--sec);line-height:1.5}
+.check{display:flex;align-items:center;gap:8px;margin:10px 0;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--blue)}
+.tip{font-size:11px;color:var(--mut);line-height:1.6;margin-top:12px}
+
+/* stage */
+.stage{grid-area:stage;position:relative;overflow:auto;display:flex;flex-direction:column}
+.stage-top{display:flex;justify-content:center;padding:12px 12px 0;flex:none}
+.board-wrap{flex:1;min-height:0;display:flex;padding:20px}
+.board{position:relative;margin:auto;flex:none}
+.board svg{width:100%;height:100%;display:block;user-select:none;touch-action:none}
+.item{cursor:grab}
+.app.sim .item{cursor:not-allowed}
+.toolbar{position:absolute;transform:translate(-50%,calc(-100% - 10px));background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(30,43,64,.12);display:flex;align-items:center;gap:2px;padding:4px;z-index:20;white-space:nowrap}
+.toolbar.below{transform:translate(-50%,10px)}
+.toolbar button{border:0;background:transparent;border-radius:8px;padding:6px 8px;cursor:pointer;display:flex;align-items:center;gap:4px;font-size:12px}
+.toolbar button:hover{background:var(--surf)}
+.toolbar .del{color:var(--danger-ink)}
+.toolbar .sep{width:1px;height:20px;background:var(--line);margin:0 2px}
+.pop{position:absolute;top:calc(100% + 6px);right:0;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:0 6px 20px rgba(30,43,64,.12);padding:10px;width:200px}
+.pop .field input{height:32px}
+.empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none}
+.empty .card{pointer-events:auto;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px 24px;text-align:center;box-shadow:0 8px 24px rgba(30,43,64,.08);max-width:300px}
+.empty i{font-size:30px;color:var(--blue)}
+.empty b{display:block;font-weight:600;margin:6px 0 4px}
+.empty p{margin:0 0 12px;color:var(--sec);font-size:12px}
+.chip-lock{position:absolute;top:8px;left:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:12px;color:var(--sec);display:flex;gap:4px;align-items:center;z-index:5}
+.zoom{position:absolute;left:16px;bottom:12px;background:#fff;border:1px solid var(--line);border-radius:12px;display:flex;align-items:center;padding:2px;z-index:10}
+.zoom span{font-size:12px;color:var(--sec);min-width:42px;text-align:center}
+
+/* status */
+.status{grid-area:status;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--white);border-top:1px solid var(--line)}
+.status .msg{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.status .msg span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dot{width:9px;height:9px;border-radius:50%;flex:none}
+
+/* modal + toast */
+.modal-bg{position:fixed;inset:0;background:rgba(30,43,64,.45);display:flex;align-items:center;justify-content:center;z-index:60;padding:16px}
+.modal{background:#fff;border-radius:18px;padding:22px;width:min(420px,100%);box-shadow:0 20px 50px rgba(30,43,64,.25)}
+.modal h3{margin:0 0 4px;font-size:18px;font-weight:600}
+.modal .sub{color:var(--sec);font-size:13px;margin:0 0 16px}
+.door-pick{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+.mini{position:relative;width:120px;height:86px;border:2px solid #b9c6da;border-radius:4px;flex:none}
+.mini button{position:absolute;border:0;background:#dfe6f1;cursor:pointer;border-radius:3px}
+.mini button.on{background:var(--blue)}
+.mini .b-top{top:-5px;left:40px;width:40px;height:8px}.mini .b-bottom{bottom:-5px;left:40px;width:40px;height:8px}
+.mini .b-left{left:-5px;top:25px;width:8px;height:32px}.mini .b-right{right:-5px;top:25px;width:8px;height:32px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:10px;padding:9px 14px;font-size:13px;z-index:70;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.flash{animation:pulse .5s ease 3}
+@media (prefers-reduced-motion:reduce){.flash{animation:none}.toast{transition:none}}
+
+/* tablet */
+@media (max-width:1023px){
+  .app{grid-template-columns:64px 248px minmax(0,1fr)}
+  .app.sim{grid-template-columns:0 248px minmax(0,1fr)}
+  .save .t,.proj span{display:none}
+}
+/* mobile */
+@media (max-width:767px){
+  .app,.app.sim{grid-template-columns:minmax(0,1fr);grid-template-rows:52px minmax(0,1fr) auto auto auto;grid-template-areas:"hd" "stage" "panel" "status" "rail"}
+  .hd{padding:0 8px;gap:6px}
+  .logo span,.save,.export-label{display:none}
+  .rail{flex-direction:row;justify-content:space-around;border-right:0;border-top:1px solid var(--line);padding:4px 0 6px}
+  .tab.mobile-only{display:flex}
+  .panel{border-right:0;border-top:1px solid var(--line);max-height:38vh;border-radius:16px 16px 0 0;padding:10px 14px 14px;box-shadow:0 -6px 20px rgba(30,43,64,.06)}
+  .panel.collapsed{display:none}
+  .panel .grip{display:block}
+  .cat-list{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .cat-list .cat{flex:0 0 150px;margin:0}
+  .status{padding:8px 12px;flex-wrap:wrap}
+  .zoom{display:none}
+  .cat-list .cat{flex:0 0 132px;flex-direction:column;align-items:flex-start;gap:4px}
+  .cat-list .cat small,.cat-list .cat .plus,.panel .tip{display:none}
+  .cat-list .cat.tpl{flex-direction:row;align-items:center}
+  .board-wrap{padding:10px}
+}
+@media (max-width:479px){
+  .view-seg{width:96px}
+  .view-seg .lg{display:none}
+  .status .btn{flex:1;justify-content:center}
+}
+.grip{display:none;width:36px;height:4px;border-radius:2px;background:#d4dbe6;margin:0 auto 10px;border:0;padding:0;cursor:pointer}
+</style>
+</head>
+<body>
+<nav class="mocknav" aria-label="สถานะตัวอย่างของ mockup">
+  <b>Mockup UX</b>
+  <button data-sc="onboard">1 เปิดครั้งแรก</button>
+  <button data-sc="empty">2 ผังว่าง</button>
+  <button data-sc="select">3 เลือกวัตถุ</button>
+  <button data-sc="issues">4 มีปัญหา</button>
+  <button data-sc="sim">5 กำลังจำลอง</button>
+  <button data-sc="after">6 แก้หลังจำลอง</button>
+  <button data-sc="3d">7 มุมมอง 3D</button>
+  <span style="margin-left:8px;color:#8ea0bb">ย่อหน้าต่างเพื่อดูแบบมือถือ</span>
+</nav>
+
+<div class="app" id="app">
+  <header class="hd">
+    <div class="logo"><img src="../assets/logos/logo-wangraan-minimal-flat.svg" alt=""><span>วางร้าน</span></div>
+    <div class="menu-wrap">
+      <button class="proj" id="projBtn" aria-haspopup="menu" aria-expanded="false" aria-label="เมนูไฟล์ ร้านกาแฟของฉัน"><i class="ti ti-menu-2"></i><span>ร้านกาแฟของฉัน</span><i class="ti ti-chevron-down"></i></button>
+      <div class="menu left" id="projMenu" role="menu">
+        <button role="menuitem" data-act="new"><i class="ti ti-file-plus"></i><div>เริ่มผังใหม่<small>ผังปัจจุบันจะถูกแทนที่</small></div></button>
+        <button role="menuitem" data-act="open"><i class="ti ti-folder-open"></i><div>เปิดไฟล์ผัง (.json)</div></button>
+        <button role="menuitem" data-act="save"><i class="ti ti-device-floppy"></i><div>บันทึกเป็นไฟล์ (.json)<small>เก็บไว้เปิดต่อเครื่องอื่น</small></div></button>
+        <hr>
+        <button role="menuitem" data-act="shop"><i class="ti ti-home"></i><div>ขนาดร้านและทางเข้า</div></button>
+      </div>
+    </div>
+    <div class="stepper">
+      <div class="seg view-seg" role="group" aria-label="มุมมอง">
+        <button id="v2d" aria-pressed="true"><span class="lg">จัดผัง </span>2D</button>
+        <button id="v3d" aria-pressed="false"><span class="lg">ดูตัวอย่าง </span>3D</button>
+      </div>
+    </div>
+    <div class="hd-right">
+      <button class="icon-btn" id="undo" aria-label="ย้อนกลับ (Ctrl+Z)"><i class="ti ti-arrow-back-up"></i></button>
+      <button class="icon-btn" id="redo" aria-label="ทำซ้ำ (Ctrl+Shift+Z)"><i class="ti ti-arrow-forward-up"></i></button>
+      <span class="save"><i class="ti ti-cloud-check"></i><span class="t">บันทึกอัตโนมัติแล้ว</span></span>
+      <div class="menu-wrap">
+        <button class="btn" id="expBtn" aria-haspopup="menu" aria-expanded="false" aria-label="ส่งออก"><i class="ti ti-share-2"></i><span class="export-label">ส่งออก</span><i class="ti ti-chevron-down"></i></button>
+        <div class="menu" id="expMenu" role="menu">
+          <button role="menuitem" data-act="png"><i class="ti ti-photo"></i><div>ภาพ PNG<small>ส่งต่อทางไลน์ได้ทันที</small></div></button>
+          <button role="menuitem" data-act="svg"><i class="ti ti-vector"></i><div>ภาพ SVG<small>สำหรับช่างหรือผู้ออกแบบ</small></div></button>
+          <button role="menuitem" data-act="pdf"><i class="ti ti-printer"></i><div>รายงาน PDF<small>ผัง + ผลตรวจ + ผลจำลอง</small></div></button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <nav class="rail" id="rail" aria-label="เครื่องมือ"></nav>
+  <aside class="panel" id="panel" aria-live="polite"></aside>
+
+  <main class="stage" id="stage">
+    <div class="board-wrap" id="boardWrap"><div class="board" id="board"></div></div>
+    <div class="zoom" role="group" aria-label="ซูม">
+      <button class="icon-btn" id="zOut" aria-label="ซูมออก"><i class="ti ti-minus"></i></button>
+      <span id="zVal">100%</span>
+      <button class="icon-btn" id="zIn" aria-label="ซูมเข้า"><i class="ti ti-plus"></i></button>
+      <button class="icon-btn" id="zFit" aria-label="พอดีจอ"><i class="ti ti-arrows-maximize"></i></button>
+    </div>
+  </main>
+
+  <footer class="status" id="status"></footer>
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ---------- model ---------- */
+const SNAP=.25,S=50,M=34,CH=.45;
+const TYPES={
+  t2:{name:'ชุดโต๊ะ 2 ที่นั่ง',w:.8,h:.8,seats:2,size:'โต๊ะ 0.8 × 0.8 ม. + เก้าอี้ 2',icon:'ti-square'},
+  t4:{name:'ชุดโต๊ะ 4 ที่นั่ง',w:1.2,h:1.2,seats:4,size:'โต๊ะ 1.2 × 1.2 ม. + เก้าอี้ 4',icon:'ti-layout-grid'},
+  counter:{name:'เคาน์เตอร์',w:2.4,h:.7,size:'2.4 × 0.7 ม. · จุดสั่งอาหาร',icon:'ti-cash-register'},
+  kitchen:{name:'ครัว',w:2,h:1.5,size:'2.0 × 1.5 ม.',icon:'ti-tools-kitchen-2'},
+};
+let uid=1;
+const mk=(type,x,y,rot=0)=>({id:'i'+(uid++),type,x,y,rot});
+const layoutOK=()=>[mk('t4',1.25,1.25),mk('t4',4.25,1.25),mk('kitchen',7.25,1,90),mk('t2',1.25,3.75),mk('t2',4,3.75),mk('counter',7.5,4.25,90)];
+const layoutIssue=()=>[mk('t4',1.25,1.25),mk('t4',4.25,1.25),mk('kitchen',7.25,1,90),mk('t2',1.25,3.75),mk('t2',3,3.75),mk('counter',7.5,4.25,90),mk('t4',6.25,3.75)];
+
+const st={W:8,D:6,door:{side:'bottom',offset:3.5,width:1.2},items:[],sel:null,tab:'add',mode:'edit',view:'2d',zoom:1,
+  onboard:false,result:null,heat:null,showHeat:true,activeIssue:0,sheetOpen:true,popOpen:false};
+let past=[],future=[];
+const snapshot=()=>JSON.stringify({W:st.W,D:st.D,door:st.door,items:st.items});
+function commit(){past.push(lastSnap);if(past.length>40)past.shift();future=[];lastSnap=snapshot()}
+let lastSnap=snapshot();
+function restore(s){const o=JSON.parse(s);st.W=o.W;st.D=o.D;st.door=o.door;st.items=o.items;if(!st.items.find(i=>i.id===st.sel))st.sel=null;lastSnap=s}
+
+/* ---------- geometry ---------- */
+const snap=v=>Math.round(v/SNAP)*SNAP;
+const cm=m=>Math.round(m*100);
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function body(it){const T=TYPES[it.type],r=it.rot%180!==0,w=r?T.h:T.w,h=r?T.w:T.h;return{x1:it.x-w/2,y1:it.y-h/2,x2:it.x+w/2,y2:it.y+h/2,w,h}}
+function chairs(it){const T=TYPES[it.type];if(!T.seats)return[];const o=T.w/2+.2;let c=T.seats===4?[[0,-o],[0,o],[-o,0],[o,0]]:[[-o,0],[o,0]];if(it.rot%180)c=c.map(([x,y])=>[-y,x]);return c.map(([x,y])=>({x:it.x+x,y:it.y+y}))}
+function bbox(it){let{x1,y1,x2,y2}=body(it);chairs(it).forEach(c=>{x1=Math.min(x1,c.x-CH/2);y1=Math.min(y1,c.y-CH/2);x2=Math.max(x2,c.x+CH/2);y2=Math.max(y2,c.y+CH/2)});return{x1,y1,x2,y2}}
+function door(){const{side,offset,width}=st.door,W=st.W,D=st.D,d=1.2;
+  if(side==='bottom')return{a:[offset,D],b:[offset+width,D],n:[0,-1],zone:{x1:offset,y1:D-d,x2:offset+width,y2:D}};
+  if(side==='top')return{a:[offset,0],b:[offset+width,0],n:[0,1],zone:{x1:offset,y1:0,x2:offset+width,y2:d}};
+  if(side==='left')return{a:[0,offset],b:[0,offset+width],n:[1,0],zone:{x1:0,y1:offset,x2:d,y2:offset+width}};
+  return{a:[W,offset],b:[W,offset+width],n:[-1,0],zone:{x1:W-d,y1:offset,x2:W,y2:offset+width}}}
+const inter=(A,B)=>Math.min(A.x2,B.x2)-Math.max(A.x1,B.x1)>1e-6&&Math.min(A.y2,B.y2)-Math.max(A.y1,B.y1)>1e-6;
+function tableNo(){const m={};let n=0;st.items.forEach(i=>{if(TYPES[i.type].seats)m[i.id]=++n});return m}
+function nameOf(it,no){return TYPES[it.type].seats?`โต๊ะ ${no[it.id]}`:TYPES[it.type].name}
+
+/* ---------- validation (simplified mockup of the 4 pillars) ---------- */
+function validate(){
+  const out=[],its=st.items,no=tableNo();
+  if(!its.some(i=>TYPES[i.type].seats))out.push({lvl:'block',title:'ยังไม่มีโต๊ะในร้าน',hint:'เพิ่มชุดโต๊ะอย่างน้อย 1 ชุดจากแท็บ "เพิ่ม"',ids:[]});
+  its.forEach(i=>{const b=bbox(i);if(b.x1<-1e-6||b.y1<-1e-6||b.x2>st.W+1e-6||b.y2>st.D+1e-6)out.push({lvl:'block',title:`${nameOf(i,no)} ล้นออกนอกผนัง`,hint:'ลากกลับเข้ามาในร้าน',ids:[i.id],at:b})});
+  const z=door().zone;
+  its.forEach(i=>{if(inter(bbox(i),z))out.push({lvl:'block',title:`${nameOf(i,no)} ขวางทางเข้า`,hint:'หน้าประตูต้องเว้นว่างลึก 1.2 ม. ให้ลูกค้าเดินเข้าได้สะดวก',ids:[i.id],at:z})});
+  for(let a=0;a<its.length;a++)for(let b=a+1;b<its.length;b++){
+    const A=bbox(its[a]),B=bbox(its[b]),na=nameOf(its[a],no),nb=nameOf(its[b],no);
+    const ox=Math.min(A.x2,B.x2)-Math.max(A.x1,B.x1),oy=Math.min(A.y2,B.y2)-Math.max(A.y1,B.y1);
+    if(ox>1e-6&&oy>1e-6){out.push({lvl:'block',title:`${na} ชนกับ${nb}`,hint:'ลากแยกออกจากกัน',ids:[its[a].id,its[b].id],at:{x1:Math.max(A.x1,B.x1),y1:Math.max(A.y1,B.y1),x2:Math.min(A.x2,B.x2),y2:Math.min(A.y2,B.y2)}});continue}
+    let gap,at;
+    if(ox>1e-6){gap=Math.max(A.y1,B.y1)-Math.min(A.y2,B.y2);at={x1:Math.max(A.x1,B.x1),x2:Math.min(A.x2,B.x2),y1:Math.min(A.y2,B.y2),y2:Math.max(A.y1,B.y1)}}
+    else if(oy>1e-6){gap=Math.max(A.x1,B.x1)-Math.min(A.x2,B.x2);at={y1:Math.max(A.y1,B.y1),y2:Math.min(A.y2,B.y2),x1:Math.min(A.x2,B.x2),x2:Math.max(A.x1,B.x1)}}
+    else continue;
+    gap=Math.round(gap*1000)/1000;
+    if(gap<.6)out.push({lvl:'block',title:`ทางเดินแคบไป ${cm(.6-gap)} ซม.`,hint:`ระหว่าง${na}กับ${nb} เหลือ ${cm(gap)} ซม. ต้องมีอย่างน้อย 60 ซม. ให้ลูกค้าเดินถึงเก้าอี้`,ids:[its[a].id,its[b].id],at});
+    else if(gap<.9)out.push({lvl:'warn',title:'ทางเดินค่อนข้างแคบ',hint:`ระหว่าง${na}กับ${nb} เหลือ ${cm(gap)} ซม. แนะนำ 90 ซม. ขึ้นไปให้เดินสวนกันได้`,ids:[its[a].id,its[b].id],at});
+  }
+  if(its.length&&!its.some(i=>i.type==='counter'))out.push({lvl:'warn',title:'ยังไม่มีเคาน์เตอร์',hint:'ตอนจำลอง ลูกค้าจะเดินตรงไปที่โต๊ะโดยไม่แวะสั่ง',ids:[]});
+  const bl=out.filter(i=>i.lvl==='block'),wn=out.filter(i=>i.lvl==='warn');
+  return{all:[...bl,...wn],bl,wn};
+}
+
+/* ---------- helpers ---------- */
+const $=s=>document.querySelector(s);
+const app=$('#app');
+let toastT;
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2400)}
+const isMobile=()=>matchMedia('(max-width:767px)').matches;
+const locked=()=>st.mode!=='edit';
+
+/* ---------- header / rail ---------- */
+function renderHeader(){
+  const sim=st.mode!=='edit';
+  $('#undo').setAttribute('aria-disabled',sim||!past.length);
+  $('#redo').setAttribute('aria-disabled',sim||!future.length);
+  $('#v2d').classList.toggle('on',st.view==='2d');$('#v3d').classList.toggle('on',st.view==='3d');
+  $('#v2d').setAttribute('aria-pressed',st.view==='2d');$('#v3d').setAttribute('aria-pressed',st.view==='3d');
+}
+function renderRail(){
+  const v=validate();const badge=v.bl.length?`<span class="badge">${v.bl.length}</span>`:v.wn.length?`<span class="badge w">${v.wn.length}</span>`:'';
+  const tabs=[['add','ti-plus','เพิ่ม'],['shop','ti-home','ร้าน'],['check','ti-player-play','จำลอง']];
+  $('#rail').innerHTML=tabs.map(([k,i,n])=>`<button class="tab ${st.tab===k&&st.sheetOpen?'on':''}" data-tab="${k}" aria-pressed="${st.tab===k}"><i class="ti ${i}"></i>${n}${k==='check'?badge:''}</button>`).join('');
+  $('#rail').querySelectorAll('.tab').forEach(b=>b.onclick=()=>{const k=b.dataset.tab;
+    if(isMobile()&&st.tab===k)st.sheetOpen=!st.sheetOpen;else st.sheetOpen=true;st.tab=k;render()});
+}
+
+/* ---------- panel ---------- */
+function catIcon(t){const T=TYPES[t];const s=t==='t2'?`<rect x="13" y="13" width="14" height="14" rx="3" fill="#fff" stroke="#3b62f4" stroke-width="1.6"/><rect x="5" y="16" width="6" height="8" rx="2" fill="#dfe6f1"/><rect x="29" y="16" width="6" height="8" rx="2" fill="#dfe6f1"/>`
+  :t==='t4'?`<rect x="11" y="11" width="18" height="18" rx="3" fill="#fff" stroke="#3b62f4" stroke-width="1.6"/><rect x="16" y="3" width="8" height="6" rx="2" fill="#dfe6f1"/><rect x="16" y="31" width="8" height="6" rx="2" fill="#dfe6f1"/><rect x="3" y="16" width="6" height="8" rx="2" fill="#dfe6f1"/><rect x="31" y="16" width="6" height="8" rx="2" fill="#dfe6f1"/>`
+  :t==='counter'?`<rect x="4" y="15" width="32" height="10" rx="2" fill="#eef2f7" stroke="#66758a" stroke-width="1.4"/>`
+  :`<rect x="6" y="9" width="28" height="22" rx="2" fill="#f6f1e9" stroke="#a08a6a" stroke-width="1.4"/><circle cx="15" cy="20" r="3" fill="none" stroke="#a08a6a"/><circle cx="25" cy="20" r="3" fill="none" stroke="#a08a6a"/>`;
+  return `<svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true">${s}</svg>`}
+function panelAdd(){
+  const r=st.result;
+  const res=r?`<div class="result"><b><i class="ti ti-chart-dots"></i> ผลจำลองรอบล่าสุด</b><p>ลูกค้า ${r.served} คน · เดินถึงโต๊ะเฉลี่ย ${r.avgWalk} วิ · จุดหนาแน่น ${r.hot} จุด${r.lost?` · เดินกลับเพราะไม่มีที่นั่ง ${r.lost} คน`:''}</p><button class="btn sm" id="tglHeat"><i class="ti ${st.showHeat?'ti-eye-off':'ti-eye'}"></i>${st.showHeat?'ซ่อนจุดหนาแน่นบนผัง':'แสดงจุดหนาแน่นบนผัง'}</button></div>`:'';
+  return `<button class="grip" aria-label="ย่อแผง" data-grip></button>${res}<h2>เพิ่มลงผัง</h2><p class="sub">กดเพื่อวางบนผัง แล้วลากไปตำแหน่งที่ต้องการ</p>
+  <div class="cat-list">${Object.keys(TYPES).map(t=>`<button class="cat" data-add="${t}" aria-label="เพิ่ม${TYPES[t].name}"><span class="ic">${catIcon(t)}</span><span><b>${TYPES[t].name}</b><small>${TYPES[t].size}</small></span><i class="ti ti-plus plus"></i></button>`).join('')}
+  <button class="cat tpl" data-tpl><i class="ti ti-template"></i>ใช้ผังตัวอย่าง (คาเฟ่ 8×6 ม.)</button></div>
+  <p class="tip">คีย์ลัด: ลูกศรขยับ 25 ซม. (Shift = 1 ม.) · R หมุน · Delete ลบ · Esc ยกเลิกเลือก</p>`}
+function panelShop(){const d=st.door;
+  return `<button class="grip" aria-label="ย่อแผง" data-grip></button><h2>ขนาดร้านและทางเข้า</h2><p class="sub">ร้าน 2–30 ม. ปรับทีละ 25 ซม. · กด Enter หรือออกจากช่องเพื่อใช้ค่า</p>
+  <div class="row2"><div class="field"><label for="fW">กว้าง (ม.)</label><input id="fW" type="number" step=".25" min="2" max="30" value="${st.W}"></div>
+  <div class="field"><label for="fD">ลึก (ม.)</label><input id="fD" type="number" step=".25" min="2" max="30" value="${st.D}"></div></div>
+  <div class="field"><label>ประตูอยู่ผนังไหน</label><div class="seg" role="group" aria-label="ผนังทางเข้า">${[['top','บน'],['bottom','ล่าง'],['left','ซ้าย'],['right','ขวา']].map(([k,n])=>`<button data-side="${k}" class="${d.side===k?'on':''}" aria-pressed="${d.side===k}">${n}</button>`).join('')}</div></div>
+  <div class="row2"><div class="field"><label for="fO">ห่างจากมุม (ม.)</label><input id="fO" type="number" step=".25" min="0" value="${d.offset}"></div>
+  <div class="field"><label for="fDW">ประตูกว้าง (ม.)</label><input id="fDW" type="number" step=".25" min=".75" max="3" value="${d.width}"></div></div>
+  <p class="tip">ทางลัด: กดที่ป้าย "เข้า" บนผังเพื่อมาหน้านี้</p>`}
+function simSettings(){return `<div class="field"><label for="rate">ลูกค้าต่อชั่วโมง: <b id="rateV">${sim.rate}</b> คน</label><input id="rate" type="range" min="10" max="80" step="5" value="${sim.rate}"></div>
+  <div class="field"><label>ความเร็ว</label><div class="seg" role="group" aria-label="ความเร็วการจำลอง">${[1,2,4].map(x=>`<button data-spd="${x}" class="${sim.speed===x?'on':''}" aria-pressed="${sim.speed===x}">${x}×</button>`).join('')}</div></div>
+  <label class="check"><input type="checkbox" id="heatChk" ${st.showHeat?'checked':''}> แสดงจุดที่คนเดินหนาแน่น</label>`}
+function panelCheck(){const v=validate(),r=st.result;
+  let n=0;const row=i=>{const idx=v.all.indexOf(i);return `<button class="issue ${i.lvl==='warn'?'w':''} ${idx===st.activeIssue?'active':''}" data-issue="${idx}"><span class="num">${++n}</span><span><b>${i.title}</b><small>${i.hint}</small></span></button>`};
+  const blocked=v.bl.length>0;
+  const check=blocked?`<div class="sec-title" style="color:var(--danger-ink)"><i class="ti ti-circle-x"></i> ต้องแก้ก่อนจำลอง (${v.bl.length})</div><p class="sub" style="margin:0 0 8px">กดแต่ละข้อเพื่อดูจุดนั้นบนผัง</p>${v.bl.map(row).join('')}`
+    :`<div class="okline"><i class="ti ti-circle-check"></i><span><b>ผังผ่านการตรวจ</b><small>ทางเดิน ระยะเก้าอี้ ทางเข้า และการชนกัน</small></span></div>`;
+  const warn=v.wn.length?`<details class="warnbox" ${blocked?'':'open'}><summary>คำแนะนำ — ไม่แก้ก็จำลองได้ (${v.wn.length})</summary>${v.wn.map(row).join('')}</details>`:'';
+  const res=r?`<div class="result" style="margin:12px 0 0"><b><i class="ti ti-chart-dots"></i> ผลรอบล่าสุด</b><p>ลูกค้า ${r.served} คน · เดินถึงโต๊ะเฉลี่ย ${r.avgWalk} วิ · จุดหนาแน่น ${r.hot} จุด${r.lost?` · เดินกลับ ${r.lost} คน`:''}</p></div>`:'';
+  return `<button class="grip" aria-label="ย่อแผง" data-grip></button><h2>ตรวจผังและจำลอง</h2><p class="sub">ผังต้องผ่านการตรวจก่อน แล้วตั้งค่าการจำลองและกดเริ่ม</p>
+  <div class="step-h"><span class="sn ${blocked?'bad':'good'}">${blocked?'1':'<i class="ti ti-check"></i>'}</span>ตรวจผัง</div>${check}${warn}
+  <div class="step-h" style="margin-top:18px"><span class="sn ${blocked?'off':''}">2</span>ตั้งค่าการจำลอง</div>
+  <div class="${blocked?'dim':''}" ${blocked?'aria-disabled="true"':''}>${simSettings()}
+  <button class="btn ${blocked?'':'pri'}" data-start style="width:100%;justify-content:center;margin-top:4px"><i class="ti ${blocked?'ti-lock':'ti-player-play'}"></i>${blocked?`แก้อีก ${v.bl.length} ข้อก่อนเริ่ม`:r?'เริ่มจำลองรอบใหม่':'เริ่มจำลองลูกค้า'}</button></div>${res}`}
+function panelSim(){
+  if(st.mode==='summary'){const r=st.result;
+    return `<h2>สรุปรอบนี้</h2><p class="sub">ช่วงเวลาจำลอง 11:00–${clock(sim.t)} น.</p>
+    <div class="stats"><div class="stat"><small>ลูกค้าเข้าร้าน</small><b>${r.served}</b></div><div class="stat"><small>เดินถึงโต๊ะเฉลี่ย</small><b>${r.avgWalk} วิ</b></div>
+    <div class="stat"><small>จุดหนาแน่น</small><b style="color:${r.hot?'var(--danger-ink)':'inherit'}">${r.hot} จุด</b></div><div class="stat"><small>เดินกลับ (ไม่มีที่นั่ง)</small><b>${r.lost}</b></div></div>
+    <div class="lock"><i class="ti ti-bulb" style="color:var(--warn-ink);font-size:18px"></i><span>${r.hot?'บริเวณสีแดงบนผังคือทางที่คนเดินผ่านหนาแน่น ลองขยายทางเดินตรงนั้นหรือย้ายเคาน์เตอร์ให้ห่างประตู':'การสัญจรลื่นไหลดี ไม่พบจุดที่คนเดินแออัด'}${r.lost?` · ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ`:''}</span></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px"><button class="btn pri" data-back style="justify-content:center"><i class="ti ti-pencil"></i>กลับไปแก้ผัง</button><button class="btn" data-again style="justify-content:center"><i class="ti ti-refresh"></i>จำลองอีกรอบ</button></div>`}
+  return `<h2>จำลองลูกค้า</h2><p class="sub">ดูว่าลูกค้าเดินเข้า สั่งอาหาร และหาที่นั่งได้สะดวกไหม</p>
+  ${simSettings()}
+  <div style="display:flex;gap:8px"><button class="btn" id="pauseBtn" style="flex:1;justify-content:center"><i class="ti ${sim.paused?'ti-player-play':'ti-player-pause'}"></i>${sim.paused?'เล่นต่อ':'หยุดชั่วคราว'}</button><button class="btn" id="stopBtn" style="flex:1;justify-content:center"><i class="ti ti-player-stop"></i>จบรอบ</button></div>
+  <div class="stats"><div class="stat"><small>เวลาในร้าน</small><b id="sClock">11:00</b></div><div class="stat"><small>ลูกค้าในร้าน</small><b id="sIn">0</b></div><div class="stat"><small>นั่งแล้ว</small><b id="sSeat">0</b></div><div class="stat"><small>เดินกลับ</small><b id="sLost">0</b></div></div>
+  <div class="lock"><i class="ti ti-lock" style="font-size:16px"></i><span>ผังถูกล็อกระหว่างจำลอง ถ้าจะแก้ให้กด "จบรอบ" หรือ "กลับไปแก้ผัง"</span></div>`}
+function renderPanel(){
+  const p=$('#panel');
+  p.classList.toggle('collapsed',isMobile()&&!st.sheetOpen&&st.mode==='edit');
+  p.innerHTML=st.mode!=='edit'?panelSim():st.tab==='shop'?panelShop():st.tab==='check'?panelCheck():panelAdd();
+  p.querySelectorAll('[data-grip]').forEach(b=>b.onclick=()=>{st.sheetOpen=false;render()});
+  p.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>addItem(b.dataset.add));
+  p.querySelectorAll('[data-tpl]').forEach(b=>b.onclick=()=>{st.items=layoutOK();st.sel=null;commit();toast('ใส่ผังตัวอย่างแล้ว ลากปรับได้ตามร้านจริง');render()});
+  p.querySelectorAll('[data-run]').forEach(b=>b.onclick=tryStart);
+  p.querySelectorAll('[data-issue]').forEach(b=>b.onclick=()=>focusIssue(+b.dataset.issue));
+  const th=$('#tglHeat');if(th)th.onclick=()=>{st.showHeat=!st.showHeat;render()};
+  if(st.tab==='shop'&&st.mode==='edit'){
+    const ap=()=>{const W=clamp(snap(+$('#fW').value||st.W),2,30),D=clamp(snap(+$('#fD').value||st.D),2,30);st.W=W;st.D=D;
+      const dw=clamp(snap(+$('#fDW').value||1.2),.75,3);const len=['top','bottom'].includes(st.door.side)?W:D;
+      st.door.width=dw;st.door.offset=clamp(snap(+$('#fO').value||0),0,len-dw);commit();render()};
+    ['#fW','#fD','#fO','#fDW'].forEach(s=>$(s).addEventListener('change',ap));
+    p.querySelectorAll('[data-side]').forEach(b=>b.onclick=()=>{st.door.side=b.dataset.side;const len=['top','bottom'].includes(b.dataset.side)?st.W:st.D;st.door.offset=clamp(snap(len/2-st.door.width/2),0,len-st.door.width);commit();render()});
+  }
+  if($('#rate')){
+    $('#rate').oninput=e=>{sim.rate=+e.target.value;$('#rateV').textContent=sim.rate};
+    p.querySelectorAll('[data-spd]').forEach(b=>b.onclick=()=>{sim.speed=+b.dataset.spd;renderPanel()});
+    $('#heatChk').onchange=e=>{st.showHeat=e.target.checked;drawHeat()};
+  }
+  p.querySelectorAll('[data-start]').forEach(b=>b.onclick=()=>{const v=validate();if(v.bl.length){toast(`ยังเริ่มไม่ได้ — แก้อีก ${v.bl.length} ข้อ`);focusIssue(0)}else startSim()});
+  if(st.mode==='sim'){
+    $('#pauseBtn').onclick=()=>{sim.paused=!sim.paused;renderPanel();renderStatus()};
+    $('#stopBtn').onclick=endRound;
+    updateStats();
+  }
+  p.querySelectorAll('[data-back]').forEach(b=>b.onclick=backToEdit);
+  p.querySelectorAll('[data-again]').forEach(b=>b.onclick=()=>startSim());
+}
+
+/* ---------- status bar ---------- */
+function renderStatus(){
+  const s=$('#status');let msg,cta;
+  if(st.mode==='sim'){msg=`<span class="dot" style="background:var(--teal)"></span><span class="t">${sim.paused?'หยุดชั่วคราว':'กำลังจำลอง'} · <span id="stClock">${clock(sim.t)}</span> น.</span>`;cta=`<button class="btn" data-back><i class="ti ti-pencil"></i>กลับไปแก้ผัง</button>`}
+  else if(st.mode==='summary'){msg=`<span class="dot" style="background:var(--ok)"></span><span class="t">จบรอบจำลองแล้ว</span>`;cta=`<button class="btn pri" data-back><i class="ti ti-pencil"></i>กลับไปแก้ผัง</button>`}
+  else{const v=validate(),hasT=st.items.some(i=>TYPES[i.type].seats);
+    if(!hasT)msg=`<span class="dot" style="background:var(--mut)"></span><span class="t">ยังไม่มีโต๊ะ — เพิ่มชุดโต๊ะอย่างน้อย 1 ชุด</span>`;
+    else if(v.bl.length)msg=`<span class="dot" style="background:var(--danger)"></span><span class="t">ต้องแก้อีก ${v.bl.length} ข้อก่อนจำลอง</span><button class="btn ghost sm" data-next>${st.tab==='check'?'ข้อถัดไป':'พาไปดู'} <i class="ti ti-arrow-right"></i></button>`;
+    else if(v.wn.length)msg=`<span class="dot" style="background:var(--warn)"></span><span class="t">พร้อมจำลอง · มีคำแนะนำ ${v.wn.length} ข้อ</span><button class="btn ghost sm" data-next>ดูคำแนะนำ</button>`;
+    else msg=`<span class="dot" style="background:var(--ok)"></span><span class="t">พร้อมจำลอง</span>`;
+    const ready=hasT&&!v.bl.length;
+    cta=st.tab==='check'&&st.sheetOpen?'':`<button class="btn ${ready?'pri':''}" data-run aria-describedby="stMsg"><i class="ti ${ready?'ti-player-play':'ti-lock'}"></i>${ready?'ไปตั้งค่าจำลอง':'เริ่มจำลองลูกค้า'} <i class="ti ti-arrow-right"></i></button>`}
+  s.innerHTML=`<div class="msg" id="stMsg">${msg}</div>${cta}`;
+  s.querySelectorAll('[data-run]').forEach(b=>b.onclick=tryStart);
+  s.querySelectorAll('[data-back]').forEach(b=>b.onclick=backToEdit);
+  s.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>{const v=validate();const nx=st.tab==='check'?(st.activeIssue+1)%v.all.length:0;st.tab='check';st.sheetOpen=true;focusIssue(nx)});
+}
+
+/* ---------- board 2D ---------- */
+const px=m=>M+m*S;
+function vb2(){return[st.W*S+2*M,st.D*S+2*M]}
+function itemSvg(it,no){
+  const b=body(it),T=TYPES[it.type],sel=st.sel===it.id;
+  const fill=T.seats?'#fff':it.type==='counter'?'#eef2f7':'#f6f1e9',stroke=sel?'#3b62f4':T.seats?'#4a5a72':it.type==='counter'?'#66758a':'#a08a6a';
+  let g=`<g class="item" data-id="${it.id}" tabindex="${locked()?-1:0}" role="button" aria-label="${nameOf(it,no)}${sel?' (เลือกอยู่)':''} — ลูกศรเพื่อขยับ, R หมุน, Delete ลบ">`;
+  chairs(it).forEach(c=>g+=`<rect x="${px(c.x-CH/2)}" y="${px(c.y-CH/2)}" width="${CH*S}" height="${CH*S}" rx="5" fill="#fff" stroke="${sel?'#3b62f4':'#9aa8bb'}" stroke-width="1.2"/>`);
+  g+=`<rect class="body" x="${px(b.x1)}" y="${px(b.y1)}" width="${b.w*S}" height="${b.h*S}" rx="${T.seats?7:4}" fill="${sel?'#edf1ff':fill}" stroke="${stroke}" stroke-width="${sel?2.4:1.6}"/>`;
+  const label=nameOf(it,no),vert=b.h>b.w&&!T.seats;
+  g+=`<text x="${px(it.x)}" y="${px(it.y)+4}" text-anchor="middle" font-size="${T.seats?11:12}" fill="#4a5a72" ${vert?`transform="rotate(-90 ${px(it.x)} ${px(it.y)})"`:''} style="pointer-events:none">${label}</text>`;
+  if(sel){const bb=bbox(it);g+=`<rect x="${px(bb.x1)-5}" y="${px(bb.y1)-5}" width="${(bb.x2-bb.x1)*S+10}" height="${(bb.y2-bb.y1)*S+10}" rx="8" fill="none" stroke="#3b62f4" stroke-dasharray="5 4" stroke-width="1.2"/>`}
+  return g+'</g>'}
+function render2D(){
+  const[vw,vh]=vb2(),W=st.W,D=st.D,dr=door(),no=tableNo(),v=validate();
+  const end=[dr.a[0]+dr.n[0]*st.door.width,dr.a[1]+dr.n[1]*st.door.width];
+  const cross=(dr.b[0]-dr.a[0])*(end[1]-dr.a[1])-(dr.b[1]-dr.a[1])*(end[0]-dr.a[0]);
+  const mid=[(dr.a[0]+dr.b[0])/2,(dr.a[1]+dr.b[1])/2];
+  let s=`<svg id="svg" viewBox="0 0 ${vw} ${vh}" role="application" aria-label="ผังร้าน ${W} × ${D} เมตร">
+  <defs><pattern id="pm" x="${M}" y="${M}" width="${S/4}" height="${S/4}" patternUnits="userSpaceOnUse"><path d="M${S/4} 0H0V${S/4}" fill="none" stroke="#edf1f6" stroke-width="1"/></pattern>
+  <pattern id="pM" x="${M}" y="${M}" width="${S}" height="${S}" patternUnits="userSpaceOnUse"><path d="M${S} 0H0V${S}" fill="none" stroke="#dbe2ec" stroke-width="1"/></pattern></defs>
+  <text x="${vw/2}" y="${M-12}" text-anchor="middle" font-size="12" fill="#8492a5">${W} เมตร</text>
+  <text x="${M-12}" y="${vh/2}" text-anchor="middle" font-size="12" fill="#8492a5" transform="rotate(-90 ${M-12} ${vh/2})">${D} เมตร</text>
+  <rect id="floor" x="${M}" y="${M}" width="${W*S}" height="${D*S}" fill="#fff"/><rect x="${M}" y="${M}" width="${W*S}" height="${D*S}" fill="url(#pm)" style="pointer-events:none"/><rect x="${M}" y="${M}" width="${W*S}" height="${D*S}" fill="url(#pM)" style="pointer-events:none"/>
+  <g id="heat" style="pointer-events:none"></g>`;
+  if(st.mode==='edit'&&st.tab==='check'){const z=dr.zone;s+=`<rect x="${px(z.x1)}" y="${px(z.y1)}" width="${(z.x2-z.x1)*S}" height="${(z.y2-z.y1)*S}" fill="#3b62f4" fill-opacity=".06" stroke="#3b62f4" stroke-opacity=".4" stroke-dasharray="4 3" style="pointer-events:none"/>`}
+  s+=`<rect x="${M}" y="${M}" width="${W*S}" height="${D*S}" fill="none" stroke="#b9c6da" stroke-width="4" style="pointer-events:none"/>`;
+  st.items.forEach(it=>s+=itemSvg(it,no));
+  s+=`<g id="doorG" style="cursor:pointer" role="button" tabindex="${locked()?-1:0}" aria-label="ทางเข้า — กดเพื่อตั้งค่าประตู"><line x1="${px(dr.a[0])}" y1="${px(dr.a[1])}" x2="${px(dr.b[0])}" y2="${px(dr.b[1])}" stroke="#fff" stroke-width="6"/><line x1="${px(dr.a[0])}" y1="${px(dr.a[1])}" x2="${px(dr.b[0])}" y2="${px(dr.b[1])}" stroke="#3b62f4" stroke-width="3"/>
+  <path d="M${px(dr.b[0])} ${px(dr.b[1])} A${st.door.width*S} ${st.door.width*S} 0 0 ${cross>0?1:0} ${px(end[0])} ${px(end[1])} L${px(dr.a[0])} ${px(dr.a[1])}" fill="none" stroke="#8492a5" stroke-dasharray="4 3"/>
+  <rect x="${px(mid[0]+dr.n[0]*.3)-16}" y="${px(mid[1]+dr.n[1]*.3)-10}" width="32" height="18" rx="9" fill="#3b62f4"/><text x="${px(mid[0]+dr.n[0]*.3)}" y="${px(mid[1]+dr.n[1]*.3)+3}" text-anchor="middle" font-size="11" fill="#fff">เข้า</text></g>`;
+  if(st.mode==='edit')v.all.forEach((i,k)=>{if(!i.at)return;const a=i.at,c=i.lvl==='block'?'#e4685d':'#d9a441',act=st.tab==='check'&&k===st.activeIssue;
+    s+=`<g style="pointer-events:none" class="${act?'flash':''}"><rect x="${px(a.x1)-8}" y="${px(a.y1)-8}" width="${(a.x2-a.x1)*S+16}" height="${(a.y2-a.y1)*S+16}" rx="10" fill="${c}" fill-opacity="${act?.14:.06}" stroke="${c}" stroke-width="${act?2.5:1.6}" stroke-dasharray="6 4"/>
+    <circle cx="${px(a.x2)+8}" cy="${px(a.y1)-8}" r="9" fill="${c}"/><text x="${px(a.x2)+8}" y="${px(a.y1)-4}" text-anchor="middle" font-size="11" font-weight="600" fill="#fff">${k+1}</text></g>`});
+  s+=`<g id="dyn" style="pointer-events:none"></g></svg>`;
+  return s}
+
+/* ---------- board 3D (isometric SVG) ---------- */
+const K=40,C30=Math.cos(Math.PI/6);
+const iso=(x,y,z)=>[(x-y)*C30*K,(x+y)*.5*K-z*K];
+function vb3(){const P=[iso(0,0,1.1),iso(st.W,0,0),iso(0,st.D,0),iso(st.W,st.D,0),iso(st.W,0,1.1),iso(0,st.D,1.1)];
+  const xs=P.map(p=>p[0]),ys=P.map(p=>p[1]),pad=26;return{x:Math.min(...xs)-pad,y:Math.min(...ys)-pad,w:Math.max(...xs)-Math.min(...xs)+2*pad,h:Math.max(...ys)-Math.min(...ys)+2*pad}}
+const poly=(pts,f,st_,sw,extra='')=>`<polygon points="${pts.map(p=>p.join(',')).join(' ')}" fill="${f}" stroke="${st_}" stroke-width="${sw}" stroke-linejoin="round" ${extra}/>`;
+function box(x1,y1,x2,y2,h,c,sel){const s=sel?'#3b62f4':'#7d8aa0',w=sel?1.8:.8;
+  return poly([iso(x2,y1,0),iso(x2,y2,0),iso(x2,y2,h),iso(x2,y1,h)],c[2],s,w)+poly([iso(x1,y2,0),iso(x2,y2,0),iso(x2,y2,h),iso(x1,y2,h)],c[1],s,w)+poly([iso(x1,y1,h),iso(x2,y1,h),iso(x2,y2,h),iso(x1,y2,h)],c[0],s,w)}
+function render3D(){
+  const v=vb3(),W=st.W,D=st.D,H=1.1;let s=`<svg id="svg" viewBox="${v.x} ${v.y} ${v.w} ${v.h}" role="application" aria-label="ภาพตัวอย่าง 3D ของร้าน">`;
+  s+=poly([iso(0,0,0),iso(0,0,H),iso(W,0,H),iso(W,0,0)],'#e6ecf5','#c3cede',1)+poly([iso(0,0,0),iso(0,0,H),iso(0,D,H),iso(0,D,0)],'#dbe3ef','#c3cede',1);
+  s+=`<g id="floor">`+poly([iso(0,0,0),iso(W,0,0),iso(W,D,0),iso(0,D,0)],'#f8fafd','#b9c6da',2)+`</g>`;
+  for(let x=1;x<W;x++)s+=`<line x1="${iso(x,0,0)[0]}" y1="${iso(x,0,0)[1]}" x2="${iso(x,D,0)[0]}" y2="${iso(x,D,0)[1]}" stroke="#e6ebf2" style="pointer-events:none"/>`;
+  for(let y=1;y<D;y++)s+=`<line x1="${iso(0,y,0)[0]}" y1="${iso(0,y,0)[1]}" x2="${iso(W,y,0)[0]}" y2="${iso(W,y,0)[1]}" stroke="#e6ebf2" style="pointer-events:none"/>`;
+  s+=`<g id="heat" style="pointer-events:none"></g>`;
+  const dr=door();s+=`<line x1="${iso(...dr.a,0)[0]}" y1="${iso(...dr.a,0)[1]}" x2="${iso(...dr.b,0)[0]}" y2="${iso(...dr.b,0)[1]}" stroke="#3b62f4" stroke-width="4" stroke-linecap="round"/>`;
+  const boxes=[];
+  st.items.forEach(it=>{const b=body(it),sel=st.sel===it.id,T=TYPES[it.type];
+    const col=T.seats?['#ffffff','#e9edf3','#dce2eb']:it.type==='counter'?['#eef2f7','#cfd8e4','#bfc9d8']:['#f6f1e9','#e2d6c3','#d3c4ac'];
+    boxes.push({k:it.x+it.y,id:it.id,svg:box(b.x1,b.y1,b.x2,b.y2,T.seats?.75:it.type==='counter'?1.05:.95,col,sel)});
+    chairs(it).forEach(c=>boxes.push({k:c.x+c.y-.01,id:it.id,svg:box(c.x-CH/2,c.y-CH/2,c.x+CH/2,c.y+CH/2,.45,['#f2f4f8','#d9dfe8','#cbd3df'],sel)}))});
+  boxes.sort((a,b)=>a.k-b.k).forEach(b=>s+=`<g class="item" data-id="${b.id}">${b.svg}</g>`);
+  return s+`<g id="dyn" style="pointer-events:none"></g></svg>`}
+
+/* ---------- board render + toolbar ---------- */
+function renderBoard(){
+  const bd=$('#board');
+  bd.innerHTML=(st.view==='2d'?render2D():render3D());
+  fit();
+  if(locked())bd.insertAdjacentHTML('beforeend',`<div class="chip-lock"><i class="ti ti-lock"></i>ผังล็อกระหว่างจำลอง</div>`);
+  if(!st.items.length&&st.mode==='edit')bd.insertAdjacentHTML('beforeend',`<div class="empty"><div class="card"><i class="ti ti-hand-click"></i><b>เริ่มจากเลือกชุดโต๊ะ</b><p>กดชุดโต๊ะใน${isMobile()?'แผงด้านล่าง':'แผงทางซ้าย'} แล้วลากไปวางตามต้องการ</p><button class="btn" id="emptyTpl"><i class="ti ti-template"></i>หรือใช้ผังตัวอย่าง</button></div></div>`);
+  const et=$('#emptyTpl');if(et)et.onclick=()=>{st.items=layoutOK();commit();toast('ใส่ผังตัวอย่างแล้ว ลากปรับได้ตามร้านจริง');render()};
+  renderToolbar();drawHeat();drawDyn();bindBoard();
+}
+function fit(){
+  const wrap=$('#boardWrap'),bd=$('#board');const r=wrap.getBoundingClientRect();
+  let vw,vh;if(st.view==='2d')[vw,vh]=vb2();else{const v=vb3();vw=v.w;vh=v.h}
+  const aw=Math.max(100,r.width-(isMobile()?20:40)),ah=Math.max(100,r.height-(isMobile()?20:32));
+  const w=Math.min(aw,ah*vw/vh)*st.zoom;bd.style.width=w+'px';bd.style.height=w*vh/vw+'px';
+  $('#zVal').textContent=Math.round(st.zoom*100)+'%';
+}
+function anchorPct(it){
+  if(st.view==='2d'){const[vw,vh]=vb2(),bb=bbox(it);return{x:px(it.x)/vw*100,top:px(bb.y1)/vh*100,bot:px(bb.y2)/vh*100}}
+  const v=vb3(),b=body(it),p=iso(it.x,it.y,1),q=iso(it.x,it.y,0);return{x:(p[0]-v.x)/v.w*100,top:(p[1]-v.y-14)/v.h*100,bot:(q[1]-v.y+20)/v.h*100}}
+function renderToolbar(){
+  const it=st.items.find(i=>i.id===st.sel);if(!it||locked())return;
+  const a=anchorPct(it),below=a.top<14,T=TYPES[it.type];
+  const html=`<div class="toolbar ${below?'below':''}" style="left:${clamp(a.x,18,82)}%;top:${below?a.bot:a.top}%" role="toolbar" aria-label="คำสั่งสำหรับ${TYPES[it.type].name}">
+   <button data-t="rot" aria-label="หมุน 90 องศา"><i class="ti ti-rotate-clockwise-2"></i>หมุน</button>
+   <button data-t="dup" aria-label="ทำซ้ำ"><i class="ti ti-copy"></i>ทำซ้ำ</button>
+   ${T.seats?`<button data-t="seat" aria-label="เปลี่ยนจำนวนที่นั่ง"><i class="ti ti-armchair"></i>${T.seats} ที่นั่ง <i class="ti ti-switch-horizontal" style="font-size:12px"></i></button>`:''}
+   <span class="sep"></span>
+   <div style="position:relative"><button data-t="more" aria-label="ปรับละเอียด" aria-expanded="${st.popOpen}"><i class="ti ti-dots"></i></button>
+   ${st.popOpen?`<div class="pop"><div style="font-size:12px;font-weight:600;margin-bottom:8px">ตำแหน่ง (ม.)</div><div class="row2"><div class="field"><label for="pX">ซ้าย-ขวา</label><input id="pX" type="number" step=".25" value="${it.x}"></div><div class="field"><label for="pY">บน-ล่าง</label><input id="pY" type="number" step=".25" value="${it.y}"></div></div><div style="font-size:11px;color:var(--mut)">นับจากมุมซ้ายบนของร้าน ถึงจุดกึ่งกลาง</div></div>`:''}</div>
+   <button data-t="del" class="del" aria-label="ลบ"><i class="ti ti-trash"></i></button></div>`;
+  $('#board').insertAdjacentHTML('beforeend',html);
+  $('#board').querySelectorAll('.toolbar [data-t]').forEach(b=>b.onclick=e=>{e.stopPropagation();act(b.dataset.t)});
+  ['#pX','#pY'].forEach(s=>{const el=$(s);if(el)el.addEventListener('change',()=>{it.x=snap(+$('#pX').value);it.y=snap(+$('#pY').value);commit();render()})});
+}
+function act(t){
+  const it=st.items.find(i=>i.id===st.sel);if(!it)return;
+  if(t==='rot'){it.rot=(it.rot+90)%180;commit()}
+  else if(t==='dup'){const n=mk(it.type,it.x,it.y,it.rot);const p=findSpot(n);n.x=p[0];n.y=p[1];st.items.push(n);st.sel=n.id;commit();toast('ทำซ้ำแล้ว วางไว้ในที่ว่างที่ใกล้ที่สุด')}
+  else if(t==='seat'){it.type=it.type==='t2'?'t4':'t2';commit();toast(`เปลี่ยนเป็น${TYPES[it.type].name} (เก้าอี้ตามโต๊ะไปทั้งชุด)`)}
+  else if(t==='more'){st.popOpen=!st.popOpen}
+  else if(t==='del'){const n=chairs(it).length;st.items=st.items.filter(i=>i!==it);st.sel=null;commit();toast(n?`ลบโต๊ะพร้อมเก้าอี้ ${n} ตัวแล้ว · กด Ctrl+Z เพื่อย้อน`:'ลบแล้ว · กด Ctrl+Z เพื่อย้อน')}
+  render()}
+function findSpot(n){
+  const others=st.items.filter(i=>i!==n);
+  for(let y=.75;y<st.D;y+=.25)for(let x=.75;x<st.W;x+=.25){n.x=x;n.y=y;const b=bbox(n);
+    if(b.x1<0||b.y1<0||b.x2>st.W||b.y2>st.D||inter(b,door().zone))continue;
+    if(others.every(o=>{const B=bbox(o);return b.x2+.9<=B.x1||B.x2+.9<=b.x1||b.y2+.9<=B.y1||B.y2+.9<=b.y1}))return[x,y]}
+  return[snap(st.W/2),snap(st.D/2)]}
+function addItem(t){const n=mk(t,0,0,t==='counter'||t==='kitchen'?0:0);const p=findSpot(n);n.x=p[0];n.y=p[1];st.items.push(n);st.sel=n.id;st.popOpen=false;commit();
+  if(isMobile())st.sheetOpen=false;toast(`เพิ่ม${TYPES[t].name}แล้ว ลากไปตำแหน่งที่ต้องการได้เลย`);render()}
+
+/* ---------- interaction on board ---------- */
+let drag=null,warned3d=false;
+function svgPt(e){const svg=$('#svg'),p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const q=p.matrixTransform(svg.getScreenCTM().inverse());return[(q.x-M)/S,(q.y-M)/S]}
+function bindBoard(){
+  const svg=$('#svg');
+  svg.onpointerdown=e=>{
+    const g=e.target.closest('.item'),dg=e.target.closest('#doorG');
+    if(locked()){if(g)toast('ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข');return}
+    if(dg){st.tab='shop';st.sheetOpen=true;st.sel=null;render();return}
+    if(!g){if(st.sel){st.sel=null;st.popOpen=false;render()}return}
+    const id=g.dataset.id;if(st.sel!==id){st.sel=id;st.popOpen=false}
+    if(st.view==='3d'){if(!warned3d){toast('ใน 3D เลือกแล้วขยับด้วยปุ่มลูกศร · ลากได้ในมุมมอง 2D');warned3d=true}render();return}
+    const it=st.items.find(i=>i.id===id),[mx,my]=svgPt(e);
+    drag={it,dx:it.x-mx,dy:it.y-my,moved:false};svg.setPointerCapture(e.pointerId);render();
+  };
+  svg.onpointermove=e=>{if(!drag)return;const[mx,my]=svgPt(e);const nx=clamp(snap(mx+drag.dx),0,st.W),ny=clamp(snap(my+drag.dy),0,st.D);
+    if(nx!==drag.it.x||ny!==drag.it.y){drag.it.x=nx;drag.it.y=ny;drag.moved=true;const sel=st.sel;$('#board').innerHTML=render2D();fit();drawHeat();bindBoard();st.sel=sel;$('#svg').setPointerCapture(e.pointerId)}};
+  svg.onpointerup=()=>{if(drag&&drag.moved){commit()}drag=null;render()};
+  svg.querySelectorAll('.item').forEach(g=>g.addEventListener('focus',()=>{if(!locked()&&st.sel!==g.dataset.id&&!drag){st.sel=g.dataset.id;render();const n=$(`.item[data-id="${g.dataset.id}"]`);n&&n.focus()}}));
+  const dg=$('#doorG');if(dg)dg.onkeydown=e=>{if(e.key==='Enter'){st.tab='shop';render()}};
+}
+document.addEventListener('keydown',e=>{
+  if(e.target.matches('input,select,textarea'))return;
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();if(locked())return;
+    if(e.shiftKey){if(future.length){past.push(snapshot());restore(future.pop())}}else if(past.length){future.push(snapshot());restore(past.pop())}render();return}
+  if(e.key==='Escape'){closeMenus();if(st.sel){st.sel=null;st.popOpen=false;render()}return}
+  const it=st.items.find(i=>i.id===st.sel);if(!it||locked())return;
+  const step=e.shiftKey?1:.25,mv={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]}[e.key];
+  if(mv){e.preventDefault();it.x=clamp(it.x+mv[0],0,st.W);it.y=clamp(it.y+mv[1],0,st.D);commit();render();refocus();return}
+  if(e.key==='r'||e.key==='R'){act('rot');refocus()}
+  if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();act('del')}
+});
+function refocus(){const n=$(`.item[data-id="${st.sel}"]`);n&&n.focus({preventScroll:true})}
+function focusIssue(k){
+  const v=validate();if(!v.all.length)return;st.activeIssue=clamp(k,0,v.all.length-1);const i=v.all[st.activeIssue];
+  st.sel=i.ids[0]||null;st.popOpen=false;st.view='2d';render();
+  if(i.at&&st.zoom>1){const svg=$('#svg');svg&&svg.scrollIntoView({block:'center',inline:'center'})}
+}
+
+/* ---------- simulation (flow-field on 0.25 m grid) ---------- */
+const sim={rate:40,speed:1,paused:false,t:0,people:[],spawnAcc:0,raf:0,served:0,lost:0,walk:[],grid:null};
+const clock=t=>{const m=Math.floor(t);return`${String(11+Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`};
+function buildGrid(){
+  const c=.25,nx=Math.round(st.W/c),ny=Math.round(st.D/c),blk=new Uint8Array(nx*ny);
+  st.items.forEach(it=>{const b=body(it);for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const x=(i+.5)*c,y=(j+.5)*c;if(x>b.x1-.1&&x<b.x2+.1&&y>b.y1-.1&&y<b.y2+.1)blk[j*nx+i]=1}});
+  return{c,nx,ny,blk}}
+function cellOf(g,x,y){return[clamp(Math.floor(x/g.c),0,g.nx-1),clamp(Math.floor(y/g.c),0,g.ny-1)]}
+function bfs(g,[sx,sy]){
+  const N=g.nx*g.ny,dist=new Float32Array(N).fill(-1),par=new Int32Array(N).fill(-1),q=[sy*g.nx+sx];dist[q[0]]=0;
+  for(let h=0;h<q.length;h++){const k=q[h],x=k%g.nx,y=(k-x)/g.nx;
+    for(const[dx,dy]of[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=g.nx||Y>=g.ny)continue;const n=Y*g.nx+X;
+      if(g.blk[n]||dist[n]>=0)continue;if(dx&&dy&&(g.blk[y*g.nx+X]||g.blk[Y*g.nx+x]))continue;dist[n]=dist[k]+1;par[n]=k;q.push(n)}}
+  return{dist,par}}
+function trace(g,f,[tx,ty]){const k0=ty*g.nx+tx;if(f.dist[k0]<0)return null;const out=[];for(let k=k0;k>=0;k=f.par[k]){const x=k%g.nx;out.push([(x+.5)*g.c,((k-x)/g.nx+.5)*g.c])}return out.reverse()}
+function prepSim(){
+  const g=buildGrid(),dr=door(),mid=[(dr.a[0]+dr.b[0])/2,(dr.a[1]+dr.b[1])/2];
+  const entry=[mid[0]+dr.n[0]*.15,mid[1]+dr.n[1]*.15];const ec=cellOf(g,...entry);g.blk[ec[1]*g.nx+ec[0]]=0;
+  const fe=bfs(g,ec);let counter=null;
+  const ct=st.items.find(i=>i.type==='counter');
+  if(ct){const b=body(ct),cands=[[b.x1-.4,ct.y],[b.x2+.4,ct.y],[ct.x,b.y1-.4],[ct.x,b.y2+.4]].filter(p=>p[0]>0&&p[1]>0&&p[0]<st.W&&p[1]<st.D);
+    let best=null;cands.forEach(p=>{const c=cellOf(g,...p),d=fe.dist[c[1]*g.nx+c[0]];if(d>=0&&(!best||d<best.d))best={p,c,d}});
+    if(best)counter={p:best.p,c:best.c,f:bfs(g,best.c)}}
+  const seats=[];st.items.forEach(it=>chairs(it).forEach(c=>{const cc=cellOf(g,c.x,c.y);if(fe.dist[cc[1]*g.nx+cc[0]]>=0)seats.push({x:c.x,y:c.y,c:cc,busy:false})}));
+  sim.grid={g,entry,ec,fe,counter,seats,heat:new Float32Array(g.nx*g.ny)};
+}
+function startSim(){
+  closeMenus();st.sel=null;st.popOpen=false;st.mode='sim';st.view=st.view;
+  Object.assign(sim,{paused:false,t:0,people:[],spawnAcc:0,served:0,lost:0,walk:[]});prepSim();
+  render();cancelAnimationFrame(sim.raf);let last=performance.now(),hAcc=0;
+  const loop=now=>{const dt=clamp((now-last)/1000,0,.05);last=now;
+    if(st.mode!=='sim')return;
+    if(!sim.paused){simStep(dt*sim.speed);drawDyn();hAcc+=dt;if(hAcc>.4){hAcc=0;drawHeat()}updateStats()}
+    sim.raf=requestAnimationFrame(loop)};
+  sim.raf=requestAnimationFrame(loop)}
+function simStep(dt){
+  const G=sim.grid;sim.t+=dt;sim.spawnAcc+=dt;const every=60/sim.rate;
+  while(sim.spawnAcc>=every){sim.spawnAcc-=every;spawn()}
+  sim.people=sim.people.filter(p=>{
+    if(p.wait>0){p.wait-=dt;if(p.wait<=0)next(p);return!p.gone}
+    let d=1.2*dt;while(d>0&&p.path&&p.i<p.path.length){const[tx,ty]=p.path[p.i],dx=tx-p.x,dy=ty-p.y,L=Math.hypot(dx,dy);
+      if(L<=d){p.x=tx;p.y=ty;d-=L;p.i++}else{p.x+=dx/L*d;p.y+=dy/L*d;d=0}}
+    if(p.phase!=='seated'){p.wt+=dt;const c=cellOf(G.g,p.x,p.y);G.heat[c[1]*G.g.nx+c[0]]+=dt}
+    if(p.path&&p.i>=p.path.length)next(p);
+    return!p.gone});
+}
+function spawn(){const G=sim.grid,free=G.seats.filter(s=>!s.busy);
+  if(!free.length){sim.lost++;return}
+  const seat=free[Math.floor(Math.random()*free.length)];seat.busy=true;
+  const p={x:G.entry[0],y:G.entry[1],seat,phase:'',wait:0,wt:0,i:0};
+  if(G.counter){p.phase='toCounter';p.path=trace(G.g,G.fe,G.counter.c)}else{p.phase='toSeat';p.path=trace(G.g,G.fe,seat.c).concat([[seat.x,seat.y]])}
+  sim.people.push(p)}
+function next(p){const G=sim.grid;
+  if(p.phase==='toCounter'){p.phase='atCounter';p.wait=2;p.path=null}
+  else if(p.phase==='atCounter'){p.phase='toSeat';p.i=0;p.path=trace(G.g,G.counter.f,p.seat.c).concat([[p.seat.x,p.seat.y]])}
+  else if(p.phase==='toSeat'){p.phase='seated';sim.walk.push(p.wt);sim.served++;p.wait=10+Math.random()*10;p.path=null}
+  else if(p.phase==='seated'){p.phase='leaving';p.i=0;p.path=trace(G.g,G.fe,p.seat.c).reverse();p.seat.busy=false}
+  else if(p.phase==='leaving')p.gone=true}
+function heatStats(){const G=sim.grid;if(!G)return{hot:0};const h=G.heat,max=Math.max(...h);if(!max)return{hot:0,max};
+  const hot=new Uint8Array(h.length);h.forEach((v,k)=>{if(v>.5*max&&v>1.5)hot[k]=1});
+  let n=0;const seen=new Uint8Array(h.length);for(let k=0;k<h.length;k++){if(!hot[k]||seen[k])continue;n++;const q=[k];seen[k]=1;
+    while(q.length){const c=q.pop(),x=c%G.g.nx,y=(c-x)/G.g.nx;for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){const X=x+dx,Y=y+dy;if(X<0||Y<0||X>=G.g.nx||Y>=G.g.ny)continue;const m=Y*G.g.nx+X;if(hot[m]&&!seen[m]){seen[m]=1;q.push(m)}}}}
+  return{hot:Math.min(n,9),max}}
+function makeResult(){const hs=heatStats();const aw=sim.walk.length?sim.walk.reduce((a,b)=>a+b,0)/sim.walk.length:0;
+  return{served:sim.served,lost:sim.lost,avgWalk:Math.round(aw),hot:hs.hot}}
+function endRound(){cancelAnimationFrame(sim.raf);st.result=makeResult();st.heat={grid:sim.grid};st.mode='summary';render()}
+function backToEdit(){if(st.mode==='sim'){cancelAnimationFrame(sim.raf);st.result=makeResult();st.heat={grid:sim.grid}}
+  st.mode='edit';st.tab='add';st.sheetOpen=true;sim.people=[];render();toast('ปลดล็อกผังแล้ว · จุดหนาแน่นรอบล่าสุดยังแสดงจาง ๆ ให้ดูประกอบ')}
+function tryStart(){
+  if(st.mode!=='edit')return;const v=validate();
+  st.tab='check';st.sheetOpen=true;
+  if(v.bl.length){toast(`ยังเริ่มจำลองไม่ได้ — ต้องแก้อีก ${v.bl.length} ข้อ`);focusIssue(0);return}
+  render();toast('ตั้งค่าการจำลองทางซ้าย แล้วกดเริ่ม')}
+function updateStats(){if(st.mode!=='sim')return;const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v};
+  set('sClock',clock(sim.t));set('stClock',clock(sim.t));set('sIn',sim.people.length);set('sSeat',sim.served);set('sLost',sim.lost)}
+function proj(x,y){if(st.view==='2d')return[px(x),px(y)];return iso(x,y,0)}
+function drawDyn(){const g=$('#dyn');if(!g)return;if(st.mode!=='sim'){g.innerHTML='';return}
+  g.innerHTML=sim.people.map(p=>{const[x,y]=proj(p.x,p.y);const c=p.phase==='seated'?'#9aa8bb':p.phase==='leaving'?'#8492a5':'#1d9e75';
+    return st.view==='2d'?`<circle cx="${x}" cy="${y}" r="7" fill="${c}" stroke="#fff" stroke-width="2"/>`:`<ellipse cx="${x}" cy="${y}" rx="6" ry="3" fill="rgba(30,43,64,.15)"/><rect x="${x-4}" y="${y-26}" width="8" height="24" rx="4" fill="${c}"/><circle cx="${x}" cy="${y-30}" r="5" fill="${c}"/>`}).join('')}
+function drawHeat(){const g=$('#heat');if(!g)return;
+  const G=st.mode==='edit'?(st.heat&&st.heat.grid):sim.grid;
+  if(!G||!st.showHeat){g.innerHTML='';return}
+  const h=G.heat,max=Math.max(...h);if(!max){g.innerHTML='';return}
+  const fade=st.mode==='edit'?.55:1;let s='';
+  h.forEach((v,k)=>{const r=v/max;if(r<.12)return;const x=k%G.g.nx,y=(k-x)/G.g.nx,[cx,cy]=proj((x+.5)*G.g.c,(y+.5)*G.g.c);
+    const col=r>.6?'#e4685d':r>.3?'#e5b762':'#f2d58f';
+    s+=st.view==='2d'?`<circle cx="${cx}" cy="${cy}" r="${S*.28}" fill="${col}" fill-opacity="${(.18+.35*r)*fade}"/>`:`<ellipse cx="${cx}" cy="${cy}" rx="${K*.3}" ry="${K*.17}" fill="${col}" fill-opacity="${(.18+.35*r)*fade}"/>`});
+  g.innerHTML=s}
+
+/* ---------- menus / misc ---------- */
+function closeMenus(){['#projMenu','#expMenu'].forEach(s=>$(s).classList.remove('open'));['#projBtn','#expBtn'].forEach(s=>$(s).setAttribute('aria-expanded','false'))}
+[['#projBtn','#projMenu'],['#expBtn','#expMenu']].forEach(([b,m])=>$(b).onclick=e=>{e.stopPropagation();const o=!$(m).classList.contains('open');closeMenus();if(o){$(m).classList.add('open');$(b).setAttribute('aria-expanded','true')}});
+document.addEventListener('click',e=>{if(!e.target.closest('.menu-wrap'))closeMenus()});
+document.querySelectorAll('.menu [data-act]').forEach(b=>b.onclick=()=>{closeMenus();const a=b.dataset.act;
+  if(a==='new')return scenario('onboard');
+  if(a==='shop'){if(locked())return toast('จบรอบจำลองก่อนจึงแก้ขนาดร้านได้');st.tab='shop';st.sheetOpen=true;return render()}
+  toast({open:'(mockup) เปิดตัวเลือกไฟล์ .json',save:'(mockup) ดาวน์โหลด ร้านกาแฟของฉัน.json',png:'(mockup) ดาวน์โหลดภาพ PNG',svg:'(mockup) ดาวน์โหลดภาพ SVG',pdf:'(mockup) เปิดหน้าพิมพ์รายงาน — ผัง ผลตรวจ และผลจำลองรอบล่าสุด'}[a])});
+$('#undo').onclick=()=>{if(locked()||!past.length)return;future.push(snapshot());restore(past.pop());render()};
+$('#redo').onclick=()=>{if(locked()||!future.length)return;past.push(snapshot());restore(future.pop());render()};
+$('#v2d').onclick=()=>{st.view='2d';render()};$('#v3d').onclick=()=>{st.view='3d';render()};
+$('#zIn').onclick=()=>{st.zoom=clamp(st.zoom+.25,.5,3);renderBoard()};$('#zOut').onclick=()=>{st.zoom=clamp(st.zoom-.25,.5,3);renderBoard()};$('#zFit').onclick=()=>{st.zoom=1;renderBoard()};
+addEventListener('resize',()=>{render()});
+
+/* ---------- onboarding ---------- */
+function renderModal(){
+  const root=$('#modalRoot');if(!st.onboard){root.innerHTML='';return}
+  const side=st.door.side;
+  root.innerHTML=`<div class="modal-bg"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="obT">
+  <h3 id="obT">ร้านของคุณขนาดเท่าไร</h3><p class="sub">ใส่ค่าประมาณได้ แก้ทีหลังได้เสมอที่แท็บ "ร้าน"</p>
+  <div class="row2"><div class="field"><label for="oW">กว้าง (ม.)</label><input id="oW" type="number" step=".25" min="2" max="30" value="${st.W}"></div><div class="field"><label for="oD">ลึก (ม.)</label><input id="oD" type="number" step=".25" min="2" max="30" value="${st.D}"></div></div>
+  <div class="field"><label>ประตูทางเข้าอยู่ด้านไหน (กดที่ขอบ)</label></div>
+  <div class="door-pick"><div class="mini">${['top','bottom','left','right'].map(k=>`<button class="b-${k} ${side===k?'on':''}" data-od="${k}" aria-label="ประตูด้าน${{top:'บน',bottom:'ล่าง',left:'ซ้าย',right:'ขวา'}[k]}" aria-pressed="${side===k}"></button>`).join('')}</div>
+  <div style="font-size:13px;color:var(--sec)">ประตูอยู่ด้าน<b style="color:var(--blue)">${{top:'บน',bottom:'ล่าง',left:'ซ้าย',right:'ขวา'}[side]}</b><br><small>ตำแหน่งละเอียดลากปรับบนผังได้</small></div></div>
+  <div class="modal-actions"><button class="btn" id="obTpl"><i class="ti ti-template"></i>ใช้ผังตัวอย่างแทน</button><button class="btn pri" id="obGo">เริ่มจัดร้าน <i class="ti ti-arrow-right"></i></button></div></div></div>`;
+  root.querySelectorAll('[data-od]').forEach(b=>b.onclick=()=>{st.door.side=b.dataset.od;readOb();renderModal()});
+  const readOb=()=>{st.W=clamp(snap(+$('#oW').value||8),2,30);st.D=clamp(snap(+$('#oD').value||6),2,30);const len=['top','bottom'].includes(st.door.side)?st.W:st.D;st.door.offset=clamp(snap(len/2-st.door.width/2),0,len-st.door.width)};
+  $('#obGo').onclick=()=>{readOb();st.onboard=false;past=[];future=[];lastSnap=snapshot();render()};
+  $('#obTpl').onclick=()=>{st.W=8;st.D=6;st.door={side:'bottom',offset:3.5,width:1.2};st.items=layoutOK();st.onboard=false;past=[];future=[];lastSnap=snapshot();render()};
+  setTimeout(()=>$('#oW')&&$('#oW').focus(),0);
+}
+
+/* ---------- scenarios ---------- */
+function scenario(k){
+  cancelAnimationFrame(sim.raf);
+  Object.assign(st,{W:8,D:6,door:{side:'bottom',offset:3.5,width:1.2},items:[],sel:null,tab:'add',mode:'edit',view:'2d',zoom:1,onboard:false,result:null,heat:null,showHeat:true,activeIssue:0,sheetOpen:true,popOpen:false});
+  uid=1;
+  if(k==='onboard')st.onboard=true;
+  if(['select','sim','after','3d'].includes(k))st.items=layoutOK();
+  if(k==='select'||k==='3d')st.sel=st.items[1].id;
+  if(k==='3d')st.view='3d';
+  if(k==='issues'){st.items=layoutIssue();st.tab='check'}
+  past=[];future=[];lastSnap=snapshot();
+  if(k==='after'){Object.assign(sim,{rate:35,speed:1,t:0,people:[],spawnAcc:0,served:0,lost:0,walk:[]});prepSim();for(let i=0;i<1500;i++)simStep(.1);st.result=makeResult();st.heat={grid:sim.grid};sim.people=[]}
+  document.querySelectorAll('.mocknav button').forEach(b=>b.classList.toggle('on',b.dataset.sc===k));
+  if(k==='sim'){startSim();return}
+  render()}
+document.querySelectorAll('.mocknav [data-sc]').forEach(b=>b.onclick=()=>scenario(b.dataset.sc));
+
+function render(){
+  app.classList.toggle('sim',st.mode!=='edit');
+  renderHeader();renderRail();renderPanel();renderStatus();renderBoard();renderModal();
+}
+scenario('onboard');
+</script>
+</body>
+</html>

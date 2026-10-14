@@ -10,24 +10,26 @@
 import { useStore } from "zustand";
 import { createStore, type StoreApi } from "zustand/vanilla";
 import {
-  DEFAULT_SIZES,
-  TABLE_SET_PRESETS,
   addTableSet as coreAddTableSet,
   clampRoomDimension,
   createCounter,
   createEmptyLayout,
   createEntrance,
   createKitchen,
+  createSampleCafeLayout,
   deleteObject as coreDeleteObject,
+  findAvailableSpot,
   moveObject as coreMoveObject,
   randomId,
   resizeObject as coreResizeObject,
   rotateObject as coreRotateObject,
+  toggleTablePreset as coreToggleTablePreset,
   type IdFactory,
   type LayoutObject,
   type Meters,
   type Point,
   type StoreLayout,
+  type Table,
   type TableSetPreset,
   type ValidationResult,
   type Wall,
@@ -38,6 +40,8 @@ import { canStartSimulation, computeLayoutRevision, validateLayout } from "@/cor
 export const HISTORY_LIMIT = 40;
 export const ZOOM_MIN = 0.5;
 export const ZOOM_MAX = 3;
+
+export type PlaygroundTab = "add" | "shop" | "check";
 
 export interface EntranceInput {
   wall: Wall;
@@ -68,6 +72,10 @@ export interface LayoutStoreState {
   rotateObject: (id: string, deltaDegrees?: number) => void;
   deleteObject: (id: string) => void;
   resizeObject: (id: string, width: number, depth: number) => void;
+  /** สลับ preset โต๊ะ 2 ↔ 4 ที่นั่ง (เก้าอี้ตามทั้งชุด) */
+  toggleTableSeats: (id: string) => boolean;
+  /** ทำซ้ำวัตถุ (วางในที่ว่างใกล้สุดและเลือกวัตถุใหม่) */
+  duplicateObject: (id: string) => string | null;
   /** เริ่ม/จบการลากต่อเนื่อง — การแก้ไขระหว่างนี้รวมเป็น Undo ขั้นเดียว */
   beginInteraction: () => void;
   endInteraction: () => void;
@@ -80,6 +88,8 @@ export interface LayoutStoreState {
   selectObject: (id: string | null) => void;
   setZoom: (zoom: number) => void;
   set3DView: (is3D: boolean) => void;
+  activeTab: PlaygroundTab;
+  setActiveTab: (tab: PlaygroundTab) => void;
 
   // Validation
   runValidation: () => ValidationResult;
@@ -91,6 +101,8 @@ export interface LayoutStoreState {
   loadLayout: (layout: StoreLayout) => void;
   /** แทนผังทั้งฉบับ (เช่น นำเข้าไฟล์) เป็นการแก้ไขหนึ่งขั้น — Undo กลับผังเดิมได้ */
   replaceLayout: (layout: StoreLayout) => void;
+  /** โหลดผังตัวอย่าง "คาเฟ่ 8×6 ม." แทนผังเดิม — Undo กลับผังเดิมได้ */
+  loadSampleLayout: () => void;
   /** กู้คืนผังพร้อมประวัติ Undo/Redo (Draft) — ตัดประวัติให้ไม่เกิน HISTORY_LIMIT */
   restoreHistory: (history: StoreLayout[], historyIndex: number) => void;
   /** เริ่มผังใหม่ (ผังเริ่มต้น) และล้างประวัติ */
@@ -107,11 +119,6 @@ export interface LayoutStoreOptions {
 export function createInitialLayout(newId: IdFactory = randomId): StoreLayout {
   const layout = createEmptyLayout({ width: 8, depth: 6 }, newId);
   return { ...layout, entrance: createEntrance(layout, { wall: "south", position: 3.5 }, newId) };
-}
-
-/** ตำแหน่งวางเริ่มต้น: กึ่งกลางร้าน (Core จะ snap ให้) */
-function centered(layout: StoreLayout, size: { width: Meters; depth: Meters }): Point {
-  return { x: (layout.width - size.width) / 2, y: (layout.depth - size.depth) / 2 };
 }
 
 function selectionAfter(layout: StoreLayout, selectedId: string | null): string | null {
@@ -158,8 +165,9 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
 
     const addAreaObject = (type: "kitchen" | "counter", position?: Point) => {
       const { layout } = get();
+      const at = position ?? findAvailableSpot(layout, type);
       const create = type === "kitchen" ? createKitchen : createCounter;
-      const obj: LayoutObject = create({ position: position ?? centered(layout, DEFAULT_SIZES[type]) }, newId);
+      const obj: LayoutObject = create({ position: at }, newId);
       commit({ ...layout, objects: [...layout.objects, obj] }, obj.id);
       return obj.id;
     };
@@ -173,12 +181,13 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       historyIndex: 0,
       zoom: 1,
       is3DView: false,
+      activeTab: "add",
+      setActiveTab: (activeTab) => set({ activeTab }),
       interactionBase: null,
 
       addTableSet: (preset, position) => {
         const { layout } = get();
-        const spec = TABLE_SET_PRESETS[preset];
-        const at = position ?? centered(layout, { width: spec.tableWidth, depth: spec.tableDepth });
+        const at = position ?? findAvailableSpot(layout, preset);
         const result = coreAddTableSet(layout, preset, at, newId);
         commit(result.layout, result.tableSet.table.id);
         return result.tableSet.table.id;
@@ -190,6 +199,51 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       rotateObject: (id, deltaDegrees = 90) => commit(coreRotateObject(get().layout, id, deltaDegrees)),
       deleteObject: (id) => commit(coreDeleteObject(get().layout, id)),
       resizeObject: (id, width, depth) => commit(coreResizeObject(get().layout, id, width, depth)),
+      toggleTableSeats: (id) => {
+        const { layout } = get();
+        const obj = layout.objects.find((o) => o.id === id);
+        if (!obj) return false;
+        const targetTableId = obj.type === "table" ? obj.id : obj.type === "chair" ? obj.tableId : null;
+        if (!targetTableId) return false;
+        const res = coreToggleTablePreset(layout, targetTableId, newId);
+        if (!res) return false;
+        commit(res.layout, res.newTable.id);
+        return true;
+      },
+      duplicateObject: (id) => {
+        const { layout } = get();
+        const obj = layout.objects.find((o) => o.id === id);
+        if (!obj) return null;
+        if (obj.type === "table" || obj.type === "chair") {
+          const table =
+            obj.type === "table"
+              ? obj
+              : (layout.objects.find((o) => o.id === obj.tableId) as Table | undefined);
+          if (!table || table.type !== "table") return null;
+          const preset = table.preset ?? "table-4-seats";
+          const at = findAvailableSpot(layout, preset);
+          const res = coreAddTableSet(layout, preset, at, newId);
+          let newLayout = res.layout;
+          if (table.rotation !== 0) {
+            newLayout = coreRotateObject(newLayout, res.tableSet.table.id, table.rotation);
+          }
+          commit(newLayout, res.tableSet.table.id);
+          return res.tableSet.table.id;
+        }
+
+        if (obj.type === "counter" || obj.type === "kitchen") {
+          const at = findAvailableSpot(layout, obj.type);
+          const create = obj.type === "kitchen" ? createKitchen : createCounter;
+          const newObj = create(
+            { position: at, width: obj.width, depth: obj.depth, rotation: obj.rotation },
+            newId,
+          );
+          commit({ ...layout, objects: [...layout.objects, newObj] }, newObj.id);
+          return newObj.id;
+        }
+
+        return null;
+      },
       beginInteraction: () => set({ interactionBase: get().historyIndex }),
       endInteraction: () => set({ interactionBase: null }),
 
@@ -255,6 +309,7 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
         }),
 
       replaceLayout: (layout) => commit(layout, null),
+      loadSampleLayout: () => commit(createSampleCafeLayout(newId), null),
 
       restoreHistory: (history, historyIndex) => {
         if (history.length === 0) return;

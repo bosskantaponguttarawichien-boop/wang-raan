@@ -40,25 +40,36 @@ describe("สถานะเริ่มต้น", () => {
 });
 
 describe("Table Set Lifecycle ผ่าน Store", () => {
-  it("addTableSet สร้างโต๊ะพร้อมเก้าอี้ลูกและเลือกโต๊ะ", () => {
+  it("addTableSet สร้างโต๊ะพร้อมเก้าอี้ลูกและเลือกโต๊ะ (วางในจุดว่างที่ใกล้ที่สุด)", () => {
     const store = setup();
     const id = store.getState().addTableSet("table-2-seats");
     const { layout, selectedObjectId } = store.getState();
     expect(selectedObjectId).toBe(id);
     expect(layout.objects.filter((o) => o.type === "chair")).toHaveLength(2);
     expect(checkTableSetIntegrity(layout)).toEqual([]);
-    // วางกึ่งกลางร้าน (snap 0.25)
-    expect(selectSelectedObject(store.getState())).toMatchObject({ x: 3.5, y: 2.5 });
+    // วางในจุดว่างที่ใกล้ที่สุดบนกริด 0.25 ม.
+    expect(selectSelectedObject(store.getState())).toMatchObject({ x: 0, y: 0.5 });
   });
 
-  it("addKitchen / addCounter วางกึ่งกลางเมื่อไม่ระบุตำแหน่ง", () => {
+  it("addKitchen / addCounter หาจุดว่างอัตโนมัติเมื่อไม่ระบุตำแหน่งโดยไม่ชนกัน", () => {
     const store = setup();
     store.getState().addKitchen();
     store.getState().addCounter();
     expect(store.getState().layout.objects.map((o) => [o.type, o.x, o.y])).toEqual([
-      ["kitchen", 3, 2.25],
-      ["counter", 2.75, 2.75],
+      ["kitchen", 0, 0],
+      ["counter", 3, 0],
     ]);
+  });
+
+  it("loadSampleLayout โหลดผังตัวอย่าง Ready ทับผังเดิมและสามารถ Undo กลับได้", () => {
+    const store = setup();
+    expect(store.getState().layout.objects).toHaveLength(0);
+    store.getState().loadSampleLayout();
+    expect(store.getState().layout.objects.length).toBeGreaterThan(0);
+    expect(store.getState().runValidation().status).toBe("ready");
+    expect(selectCanUndo(store.getState())).toBe(true);
+    store.getState().undo();
+    expect(store.getState().layout.objects).toHaveLength(0);
   });
 
   it("ย้าย / หมุน โต๊ะ → เก้าอี้ตามทั้งชุด; ลบโต๊ะ → cascade และล้าง selection", () => {

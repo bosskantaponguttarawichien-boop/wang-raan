@@ -17,6 +17,7 @@ import {
   objectCenter,
   rectsIntersect,
   rotateObject,
+  toggleTablePreset,
   type Chair,
   type IdFactory,
   type StoreLayout,
@@ -339,3 +340,47 @@ describe("chairTuck", () => {
     expect(chairTuck(chair({ x: 1.6, y: 2.2, rotation: 180 }), table).fromFront).toBe(false);
   });
 });
+
+describe("toggleTablePreset — สลับ 2 ↔ 4 ที่นั่งอย่างสมบูรณ์", () => {
+  it("สลับจาก 2 ที่นั่งเป็น 4 ที่นั่ง: เก้าอี้เดิมถูกแทนที่ด้วย 4 ตัวและไม่มี orphan chair", () => {
+    const { layout, table, ids } = setup("table-2-seats", { x: 3, y: 3 });
+    const res = toggleTablePreset(layout, table.id, ids);
+    expect(res).not.toBeNull();
+    const { layout: nextLayout, newTable } = res!;
+    expect(newTable.preset).toBe("table-4-seats");
+    expect(newTable.chairIds.length).toBe(4);
+    const chairs = getChairsOfTable(nextLayout, newTable);
+    expect(chairs.length).toBe(4);
+    expect(checkTableSetIntegrity(nextLayout)).toEqual([]);
+    expectTucksWithinLimit(nextLayout, newTable.id);
+  });
+
+  it("สลับจาก 4 ที่นั่งเป็น 2 ที่นั่ง: เก้าอี้ลดเหลือ 2 ตัวและไม่มี orphan chair", () => {
+    const { layout, table, ids } = setup("table-4-seats", { x: 3, y: 3 });
+    const res = toggleTablePreset(layout, table.id, ids);
+    expect(res).not.toBeNull();
+    const { layout: nextLayout, newTable } = res!;
+    expect(newTable.preset).toBe("table-2-seats");
+    expect(newTable.chairIds.length).toBe(2);
+    const chairs = getChairsOfTable(nextLayout, newTable);
+    expect(chairs.length).toBe(2);
+    expect(checkTableSetIntegrity(nextLayout)).toEqual([]);
+    expectTucksWithinLimit(nextLayout, newTable.id);
+  });
+
+  it("โต๊ะที่หมุนอยู่ เมื่อสลับที่นั่งยังคงมุมหมุนเดิม", () => {
+    const { layout, table, ids } = setup("table-2-seats", { x: 3, y: 3 });
+    const rotated = rotateObject(layout, table.id, 90);
+    const res = toggleTablePreset(rotated, table.id, ids);
+    expect(res).not.toBeNull();
+    const { newTable } = res!;
+    expect(newTable.rotation).toBe(90);
+  });
+
+  it("ส่ง id ที่ไม่ใช่โต๊ะ → คืน null", () => {
+    const { layout, kitchen, ids } = setup("table-2-seats");
+    expect(toggleTablePreset(layout, kitchen.id, ids)).toBeNull();
+    expect(toggleTablePreset(layout, "non-existent", ids)).toBeNull();
+  });
+});
+

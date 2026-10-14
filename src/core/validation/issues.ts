@@ -18,9 +18,10 @@ export function createIssue(
   severity: IssueSeverity,
   objectIds: string[],
   message: string,
+  extra?: Partial<Omit<ValidationIssue, "id" | "category" | "severity" | "objectIds" | "message">>,
 ): ValidationIssue {
   const suffix = objectIds.length > 0 ? `/${objectIds.join("+")}` : "";
-  return { id: `${category}/${code}${suffix}`, category, severity, objectIds, message };
+  return { id: `${category}/${code}${suffix}`, category, severity, objectIds, message, ...extra };
 }
 
 /** code ของ issue (ส่วนกลางของ id) — ใช้ในเทสต์และ UI */

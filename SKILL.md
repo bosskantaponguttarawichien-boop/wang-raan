@@ -32,7 +32,7 @@ description: ใช้เมื่อทำงานกับโปรเจก�
    - **Cascade Delete:** ลบ Table จะต้องลบ Chair ลูกทั้งหมดตามไปด้วยอัตโนมัติ
    - **Group Transformation:** เมื่อย้ายตำแหน่งหรือหมุน Table เก้าอี้ลูกทั้งหมดต้องเคลื่อนที่และหมุนตามทั้งชุด
 6. **Non-blocking Canvas Placement:** ผู้ใช้สามารถลากวางวัตถุในตำแหน่งที่ชนหรือผิดกฎได้ชั่วคราวบน Canvas ห้ามเขียนโค้ดบล็อกการวางที่ Canvas แต่ให้รายงานผลผ่าน Validation Engine แทน
-7. **P2 Validation Gate:** ก่อนเริ่ม P2 Simulation หรือส่งข้อมูลข้ามไปยัง P2 ผังต้องผ่านการตรวจ Validation และสถานะต้องเป็น **Ready** หรือ **Warning** เท่านั้น **หากมีข้อผิดพลาดระดับ Blocked ปุ่มเริ่มจำลองต้องถูก Disabled**
+7. **P2 Validation Gate:** ก่อนเริ่ม P2 Simulation หรือส่งข้อมูลข้ามไปยัง P2 ผังต้องผ่านการตรวจ Validation และสถานะต้องเป็น **Ready** หรือ **Warning** เท่านั้น **หากมีข้อผิดพลาดระดับ Blocked ต้องเริ่มจำลองไม่ได้ทุกช่องทาง** — ปุ่มใช้ `aria-disabled="true"` กดแล้วพาไปข้อที่ต้องแก้ (PRD §9 ข้อ 9)
 8. **Dual-Tier Validation:** เขียนลอจิกการตรวจผังทั้ง 4 ด้านเป็น Pure TypeScript ใน `src/core/validation/` เพื่อให้สามารถรันบน Client (Instant Feedback 0ms) และรันซ้ำที่ BFF Route Handler ก่อนบันทึกลงฐานข้อมูลได้
 9. **Accessibility & Reduced Motion:** ทุกคอมโพเนนต์ต้องรองรับคีย์บอร์ด (Tab + Focus Ring), มี `aria-label` ภาษาไทย และปิดแอนิเมชันทั้งหมดเมื่อเปิด `prefers-reduced-motion` หรือสั่งพิมพ์ (`@media print`)
 
@@ -88,7 +88,7 @@ description: ใช้เมื่อทำงานกับโปรเจก�
   - ผังที่ไม่มี Entrance, Kitchen, Counter, หรือ Table Set → ขึ้นสถานะ **Blocked**
   - มีวัตถุชนกัน หรือเก้าอี้สอดโต๊ะเกิน 0.10 ม. → ขึ้นสถานะ **Blocked**
   - ทางเดินหลักแคบกว่า 1.20 ม. หรือเข้าไม่ถึงเก้าอี้/จุดบริการ → ขึ้นสถานะ **Blocked**
-  - หากสถานะเป็น **Blocked** ปุ่ม "เริ่มจำลอง (Simulation)" ต้องถูกปิดการใช้งาน
+  - หากสถานะเป็น **Blocked** กดปุ่ม "เริ่มจำลอง (Simulation)" หรือ Enter แล้วต้องไม่เริ่ม (`aria-disabled="true"`) และพาไปข้อแรกที่ต้องแก้
   - เมื่อผังเป็น **Ready** หรือ **Warning** ปุ่มจำลองจึงจะกดได้
 - [ ] **Accessibility (a11y):**
   - สามารถใช้แป้นพิมพ์ Tab เลื่อนและเห็น Focus Ring ชัดเจน (`outline: 3px solid #a4b6ff`)

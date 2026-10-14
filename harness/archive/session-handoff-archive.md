@@ -1,5 +1,27 @@
 # Session Handoff Archive — วางร้าน (Wang-Raan)
 
+## 2026-10-10 14:30 ICT — feat-036 ปิด, feat-037 เสร็จ
+
+### Core & Dev
+- package กฎผังสำหรับ Backend: `@bosskantaponguttarawichien-boop/wang-raan-core` อยู่ที่ `packages/core` (คู่มือติดตั้ง: `packages/core/README.md`)
+- โค้ดจริงยังอยู่ `src/core` — แก้ที่นั่นที่เดียว แล้ว `npm run core:smoke` ต้องผ่าน
+- ห้ามใช้ DOM API ใน `src/core` — นอกจาก boundary check แล้ว build package จะ fail ด้วย (lib ไม่มี dom)
+- แก้กฎจนผลตรวจเปลี่ยน → `packages/core/test/fixtures.test.ts` fail → ตรวจว่าตั้งใจ แล้ว `UPDATE_CORE_FIXTURES=1 npx vitest run packages/core` + ขยับเวอร์ชัน major + CHANGELOG
+- ปล่อยเวอร์ชัน: push tag `core-v<version>` (ต้องตรงกับ version ใน `packages/core/package.json`)
+
+### QA
+- unit 571, lint + contract ผ่าน, core:smoke ผ่าน
+
+### Active Blockers / Open Questions
+- ยังไม่ได้ publish package จริง — ต้อง commit + push แล้ว push tag `core-v1.0.0` (ผู้ใช้สั่ง)
+- Backend ต้องมี token `read:packages` (หรือเพิ่ม repo Backend ใน Manage Actions access ของ package)
+- ยังไม่ตัดสินใจ: คง Guest ไว้ไหม (feat-041), ชื่อโดเมน (feat-044), ช่องทางแจ้งเตือน (feat-045)
+
+### Next Steps
+1. feat-038 Backend จำลองตามสัญญา
+2. feat-035 ลองรันบน Cloudflare
+3. feat-039 ต่อ BFF กับ Backend ตามสัญญา
+
 ## 2026-10-10 13:50 ICT — feat-036 สัญญา API เสร็จ รอผู้ใช้ review
 
 ### Core & Dev

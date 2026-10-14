@@ -3,6 +3,32 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-14 17:20 ICT — เสร็จสิ้น Sprint 3: Playground UX Revamp (feat-050 → feat-060) 100%
+
+### Core & Dev
+- พัฒนา Playground UX ใหม่ครบตาม Mockup `design-html/playground-ux/index.html` และ PRD §9 ข้อ 9–15:
+  - **feat-050**: App Shell ใหม่ (Header, Rail, Panel, Stage, Status Bar)
+  - **feat-051**: แท็บ 'เพิ่ม' — แคตตาล็อกเลื่อนได้, วางโต๊ะอัตโนมัติ, ผังตัวอย่าง (คาเฟ่ 8×6 ม.), Empty state
+  - **feat-052**: แท็บ 'ร้าน' (ขนาดร้าน 2-30 ม., ประตู 4 ทิศ) + Onboarding Dialog ผังใหม่
+  - **feat-053**: Floating Selection Toolbar ลอยติดวัตถุ (หมุน, สลับที่นั่ง 4↔2, ปรับพิกัด, Cascade Delete)
+  - **feat-054**: Humanizer & Formatter ข้อความปัญหาผังเป็นภาษาคน (บอกชื่อโต๊ะ 1/2/3 และระยะ ซม.)
+  - **feat-055**: แท็บ 'จำลอง' รวมตรวจผัง + ตั้งค่าจำลองในที่เดียว, ปุ่มเริ่มใช้ `aria-disabled="true"`
+  - **feat-056**: โหมดจำลอง — ล็อกผังเข้มงวดทั้ง 2D และ 3D (ซ่อน rail, แสดง chip lock, ปิด undo/redo)
+  - **feat-057**: สรุปผลจบรอบ — การ์ดสรุปผลล่าสุด + คำแนะนำ 1 ประโยค (PRD §9 ข้อ 11) + Heatmap จางบนผัง
+  - **feat-058**: มุมมอง 3D — คลิกเลือกวัตถุ, แสดงกรอบไฮไลต์, Toolbar ลอยตัว, ขยับด้วยลูกศร snap 0.25 ม., R หมุน, Delete ลบ (Pure SVG ไม่ใช้ Three.js)
+  - **feat-059**: Playground มือถือ — Rail เป็น Bottom Tab Bar, Panel เป็น Bottom Sheet (Grip handle, auto-fold เมื่อเลือกของ), ViewSwitch ย่อ 2D/3D ต่ำกว่า 480px, รองรับ 6 breakpoints
+  - **feat-060**: รวมเทสต์ Integration และ E2E Flow ใหม่ (`playground-ux-flow.test.tsx`, `e2e/playground-ux.spec.ts`) และตรวจสอบ WCAG 2.1 AA (Axe audit) ผ่าน 100%
+
+### QA & Verification
+- Unit & Integration Tests: `make test` ผ่าน 48/48 test files (704/704 tests passed, 100%)
+- Linter & Architectural Boundaries: `make lint` ผ่าน 100% (Pure TS boundaries OK, 0 errors, 0 warnings, OpenAPI contract OK)
+- E2E Playwright Tests: `npx playwright test e2e/playground-ux.spec.ts` ผ่าน 6/6 tests (100%)
+- Accessibility: Axe WCAG 2.1 AA audit ผ่าน 100% ไม่มี violation
+
+### Status & Next Steps
+- Sprint 3 (feat-049 → feat-060) สำเร็จครบถ้วน 100%
+- งานถัดไป: ตรวจสอบ CI (`feat-043`) หรือเตรียม Backend จริงตามที่ผู้ใช้มอบหมาย
+
 ## 2026-10-12 12:40 ICT — ต่อ FE กับ `/v1/me`
 
 ### Core & Dev
@@ -77,26 +103,3 @@
 - feat-041 → feat-048 = `blocked` (ผู้ใช้สั่งพักจนกว่า Backend จริงจะขึ้น) — ห้ามเริ่มจนกว่าผู้ใช้บอก
 1. feat-035 ลองรันบน Cloudflare
 2. feat-043 CI
-
-## 2026-10-10 14:30 ICT — feat-036 ปิด, feat-037 เสร็จ
-
-### Core & Dev
-- package กฎผังสำหรับ Backend: `@bosskantaponguttarawichien-boop/wang-raan-core` อยู่ที่ `packages/core` (คู่มือติดตั้ง: `packages/core/README.md`)
-- โค้ดจริงยังอยู่ `src/core` — แก้ที่นั่นที่เดียว แล้ว `npm run core:smoke` ต้องผ่าน
-- ห้ามใช้ DOM API ใน `src/core` — นอกจาก boundary check แล้ว build package จะ fail ด้วย (lib ไม่มี dom)
-- แก้กฎจนผลตรวจเปลี่ยน → `packages/core/test/fixtures.test.ts` fail → ตรวจว่าตั้งใจ แล้ว `UPDATE_CORE_FIXTURES=1 npx vitest run packages/core` + ขยับเวอร์ชัน major + CHANGELOG
-- ปล่อยเวอร์ชัน: push tag `core-v<version>` (ต้องตรงกับ version ใน `packages/core/package.json`)
-
-### QA
-- unit 571, lint + contract ผ่าน, core:smoke ผ่าน
-
-### Active Blockers / Open Questions
-- ยังไม่ได้ publish package จริง — ต้อง commit + push แล้ว push tag `core-v1.0.0` (ผู้ใช้สั่ง)
-- Backend ต้องมี token `read:packages` (หรือเพิ่ม repo Backend ใน Manage Actions access ของ package)
-- ยังไม่ตัดสินใจ: คง Guest ไว้ไหม (feat-041), ชื่อโดเมน (feat-044), ช่องทางแจ้งเตือน (feat-045)
-
-### Next Steps
-1. feat-038 Backend จำลองตามสัญญา
-2. feat-035 ลองรันบน Cloudflare
-3. feat-039 ต่อ BFF กับ Backend ตามสัญญา
-

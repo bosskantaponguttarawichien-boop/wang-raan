@@ -1,5 +1,5 @@
 {
-  "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md",
+  "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
       "id": "feat-000",
@@ -636,6 +636,195 @@
       "sprint": 2,
       "stretch": true,
       "blocked_reason": "ผู้ใช้สั่งพักไว้จนกว่า Backend จริงจะขึ้น (2026-10-10)"
+    },
+    {
+      "id": "feat-049",
+      "name": "Playground UX Revamp — ล็อกการตัดสินใจและสเปก",
+      "description": "ยืนยัน mockup ที่ design-html/playground-ux/index.html เป็นสเปกของรอบนี้ และปิดคำถามที่ค้าง: (1) ปุ่มเริ่มจำลองตอนผัง Blocked — คง disabled ตามหลักการเดิม หรือเปลี่ยนเป็นกดได้แต่ไม่เริ่ม (aria-disabled) แล้วพาไปข้อที่ต้องแก้ ซึ่งต้องแก้ AGENTS.md/PRD.md และเทสต์ simulation-gate ด้วย; (2) สรุปผลจบรอบเป็นการ์ดในแผงซ้าย (ตาม mockup) หรือหน้าเต็ม; (3) ผังตัวอย่างอยู่ในรอบนี้หรือไม่; (4) รายการ action ที่ย้ายเข้าเมนูโปรเจกต์/ส่งออก",
+      "dependencies": [],
+      "gate": "ผู้ใช้ตอบครบ 4 ข้อ และบันทึกผลลง PRD.md / AGENTS.md (ถ้ากระทบหลักการ)",
+      "status": "done",
+      "role": "design",
+      "summary": "ปิดคำถามที่ยังค้างก่อนลงมือรื้อหน้า Playground",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "ผู้ใช้ตอบครบ 4 ข้อ (2026-10-14): (1) ปุ่มเริ่มจำลองตอน Blocked กดได้ตาม mockup แต่ไม่เริ่ม (aria-disabled + พาไปข้อที่ต้องแก้), (2) สรุปจบรอบเป็นการ์ดในแผงซ้าย, (3) ทำผังตัวอย่างในรอบนี้, (4) รายการเมนูโปรเจกต์/ส่งออกตาม mockup — บันทึกใน PRD.md §9 ข้อ 9–15, แก้หลักการ P2 Gate ใน AGENTS.md และ SKILL.md (ข้อ 7 + checklist) ให้ตรงกัน; make status ผ่าน"
+    },
+    {
+      "id": "feat-050",
+      "name": "Playground App Shell ใหม่ (Header + Icon Rail + Panel + Status Bar)",
+      "description": "จัดโครงหน้า /playground ใหม่: header = โลโก้, เมนูโปรเจกต์ (ผังใหม่/เปิด JSON/บันทึก JSON/ขนาดร้าน), ปุ่มสลับ 2D|3D กลาง header (เอา stepper และแถบ 2D/3D เหนือผังออก), undo/redo, สถานะบันทึกอัตโนมัติ, ปุ่ม 'ส่งออก ▾' (PNG/SVG/รายงาน PDF) · rail ซ้าย 3 แท็บ เพิ่ม/ร้าน/จำลอง (badge จำนวนปัญหา) · แผงตามแท็บแทน accordion เดิม · status bar ล่างของ stage (zoom + สถานะผัง + CTA) — ย้าย file-panel ออกจาก sidebar",
+      "dependencies": [
+        "feat-049"
+      ],
+      "gate": "หน้าเดสก์ท็อป 1024/1440 ตรงกับ mockup, ทุก action เดิมยังเรียกได้จากที่ใหม่ (export/import/print/share), ไม่มี horizontal scroll, Tab ไล่ได้ครบ focus ring ชัด",
+      "status": "done",
+      "role": "frontend",
+      "summary": "รื้อโครงหน้าจอเป็น rail + แผง + เมนู header ตาม mockup",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "สร้าง Playground App Shell ครบตาม mockup: playground-header.tsx (เมนูโปรเจกต์, ปุ่มสลับ 2D|3D กลาง header, undo/redo, autosave indicator, export dropdown, cloud modal), playground-rail.tsx (rail 3 แท็บ เพิ่ม/ร้าน/จำลอง พร้อม badge ปัญหา), playground-panel.tsx (แผงสลับตามแท็บแทน accordion), playground-status-bar.tsx (zoom controls + live status bar + CTA button), อัปเดต globals.css .playground-shell responsive layout ไม่เกิด horizontal scroll; make lint ผ่าน 100%, make test ผ่าน 39/39 files (647 tests passed)"
+    },
+    {
+      "id": "feat-051",
+      "name": "แท็บ 'เพิ่ม' — แคตตาล็อก วางอัตโนมัติ ผังตัวอย่าง และ Empty State",
+      "description": "แคตตาล็อก 4 ชนิด (โต๊ะ 2/4 ที่นั่ง, เคาน์เตอร์, ครัว) กดแล้ววางลงจุดว่างที่ใกล้ที่สุดซึ่งไม่ชน/ไม่ขวางทางเข้า (ค้นหาบนกริด 0.25 ม.) แล้วเลือกวัตถุนั้นทันที · ปุ่ม 'ใช้ผังตัวอย่าง' · Empty state กลางผังเมื่อยังไม่มีวัตถุ · การ์ดผลจำลองรอบล่าสุดด้านบน (ถ้ามี) · ผังตัวอย่าง 'คาเฟ่ 8×6 ม.' ต้องได้ Ready จาก validation engine จริง และวางทับผังเดิมแบบ undo ได้ (PRD §9 ข้อ 13)",
+      "dependencies": [
+        "feat-050"
+      ],
+      "gate": "เพิ่มวัตถุแล้วไม่เกิด Blocked ใหม่เมื่อยังมีที่ว่าง, ผังว่างแสดง empty state, unit test ของตัวหาจุดว่างผ่าน, unit test ยืนยันว่าผังตัวอย่างได้สถานะ Ready",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ทำให้คนไม่เคยใช้เครื่องมือออกแบบเริ่มวางของได้ทันที",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "พัฒนา findAvailableSpot บนกริด 0.25 ม. (spot-finder.ts) ป้องกันการชนกับวัตถุเดิมและไม่ทับ Door clearance zone 1.2 ม.; แคตตาล็อก 4 ชนิดกดแล้วหาจุดว่างและเลือกวัตถุทันที; เพิ่ม createSampleCafeLayout (คาเฟ่ 8x6 ม.) สถานะ Ready จริงและ Undo กลับผังเดิมได้; เพิ่ม Empty State Card บนผังเมื่อไม่มีวัตถุ พร้อมปุ่มเรียกผังตัวอย่าง; เพิ่มการ์ดสรุปผลจำลองล่าสุดในแท็บเพิ่ม; make lint ผ่าน 100%, make test ผ่าน 40/40 files (654 tests passed)"
+    },
+    {
+      "id": "feat-052",
+      "name": "แท็บ 'ร้าน' + Onboarding Dialog ผังใหม่",
+      "description": "ฟอร์มขนาดร้าน/ผนังประตู/ระยะจากมุม/ความกว้างประตู (ใช้ค่าเมื่อ Enter หรือ blur, snap 0.25, 2–30 ม.) · กดป้าย 'เข้า' บนผังแล้วเปิดแท็บนี้ · Dialog ตอนเริ่มผังใหม่ถามแค่กว้าง×ลึก และด้านประตู (เลือกจากภาพร้านย่อ) พร้อมทางเลือก 'ใช้ผังตัวอย่างแทน'",
+      "dependencies": [
+        "feat-050"
+      ],
+      "gate": "ผังใหม่เปิด dialog ครั้งเดียว, ปิดด้วย Esc ได้และ focus trap ถูกต้อง, ค่าที่ใส่ snap และ clamp ถูก",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ถามขนาดร้านตอนเริ่มครั้งเดียว ไม่ต้องให้ฟอร์มค้างอยู่ใน sidebar",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "สร้าง OnboardingModal บน Accessible Radix Dialog (FocusTrap, Esc, snap/clamp 2-30ม.) พร้อมเครื่องมือเลือกผนังประตู 4 ด้านและทางเลือกใช้ผังตัวอย่าง; เชื่อมต่อเมนูเริ่มผังใหม่ใน PlaygroundHeader; ปรับปรุง RoomSettingsForm ให้มี segmented button สลับผนังและ tip นำทาง; เชื่อมการคลิกหรือกด Enter ที่ป้าย 'เข้า' (EntranceMarker) บนผังให้สลับมาแท็บ 'ร้าน' อัตโนมัติ; unit tests ใน onboarding-modal.test.tsx และ forms.test.tsx ผ่าน 100%; make lint ผ่าน, make test ผ่าน 41/41 files (657 tests passed)"
+    },
+    {
+      "id": "feat-053",
+      "name": "Floating Selection Toolbar รุ่นใหม่",
+      "description": "ปรับ selection-toolbar ให้ลอยติดวัตถุ (สลับไปด้านล่างเมื่อชิดขอบบน): หมุน 90°, ทำซ้ำ (วางที่ว่างใกล้สุด), สลับ 2↔4 ที่นั่ง (เก้าอี้ตามทั้งชุด), '⋯' popover ปรับตำแหน่ง X/Y, ลบ (โต๊ะลบเก้าอี้ลูกแบบ cascade + toast บอกจำนวนและ Ctrl+Z) · คีย์ลัด ลูกศร/Shift/R/Delete/Esc · ไม่มี inspector ด้านขวา",
+      "dependencies": [
+        "feat-050"
+      ],
+      "gate": "ไม่มี orphan chair หลังลบ/สลับที่นั่ง, ทุกปุ่มมี aria-label ไทย, เทสต์ selection-toolbar อัปเดตและผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "คำสั่งของวัตถุอยู่ติดวัตถุ ไม่ต้องมองไปขอบจอ",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "สร้าง Floating Selection Toolbar ใหม่: หมุน 90°, ทำซ้ำ (วางที่ว่างใกล้สุดด้วย findAvailableSpot), สลับ 2↔4 ที่นั่ง (toggleTablePreset ไม่เกิด orphan chair 100%), '⋯' Popover ปรับพิกัด X/Y ละเอียด snap 0.25 ม., ปุ่มลบ cascade delete พร้อม toast Ctrl+Z และคีย์ลัด R/Delete/Esc/ลูกศร; Unit tests ใน selection-toolbar.test.tsx และ table-set.test.ts ผ่าน 100%; make lint ผ่าน, make test ผ่าน 42/42 files (668 tests passed)"
+    },
+    {
+      "id": "feat-054",
+      "name": "ข้อความปัญหาผังเป็นภาษาคน",
+      "description": "ชั้น presentation แปลง issue จาก validation engine เป็นหัวข้อ+คำแนะนำภาษาไทยพร้อมตัวเลข เช่น 'ทางเดินแคบไป 20 ซม.' / 'ระหว่างโต๊ะ 3 กับโต๊ะ 4 เหลือ 40 ซม. ต้องมีอย่างน้อย 60 ซม.' · ตั้งชื่อโต๊ะเป็น 'โต๊ะ N' บนผัง · ถ้า core ยังไม่ส่งค่าระยะที่วัดได้/พื้นที่ที่มีปัญหา (rect) ให้เพิ่มใน issue payload แบบ Pure TS",
+      "dependencies": [
+        "feat-049"
+      ],
+      "gate": "ทุก issue code มีข้อความไทยและ hint, src/core ยังผ่าน boundary check, unit test ของ formatter ผ่าน",
+      "status": "done",
+      "role": "core",
+      "summary": "ให้เจ้าของร้านอ่านปัญหาแล้วรู้ว่าต้องแก้อะไร",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "สร้าง Issue Humanizer & Formatter (formatter.ts) ใน Pure TypeScript: getTableNumbers คำนวณลำดับโต๊ะ 'โต๊ะ 1', 'โต๊ะ 2', getObjectName และ formatIssueHuman แปลงทุก issue code เป็นหัวข้อสั้นและคำแนะนำภาษาไทยรูปธรรมพร้อมตัวเลขระยะ ซม.; ปรับปรุง Artboard ให้แสดงป้ายชื่อ 'โต๊ะ N' บนโต๊ะ; เชื่อมต่อ LiveValidation ให้มี humanIssues; boundary check ผ่าน 100%, unit tests ใน formatter.test.ts (6/6 passed); make lint ผ่าน, make test ผ่าน 43/43 files (675 tests passed)"
+    },
+    {
+      "id": "feat-055",
+      "name": "แท็บ 'จำลอง' — ตรวจผัง + ตั้งค่าจำลองในที่เดียว",
+      "description": "แท็บเดียว 2 ขั้น: (1) ตรวจผัง — ผ่านแสดงกล่องเขียวสั้น, ติดแสดงรายการ 'ต้องแก้ก่อนจำลอง' กดแล้วเลือกวัตถุและไฮไลต์ ring พร้อมเลข, คำแนะนำ (Warning) พับไว้ · (2) ตั้งค่าจำลอง — ลูกค้าต่อชั่วโมง, ความเร็ว 1×/2×/4×, แสดงจุดหนาแน่น, ปุ่มเริ่ม · status bar: 'พาไปดู/ข้อถัดไป' ไล่ issue, CTA 'ไปตั้งค่าจำลอง' เปิดแท็บนี้ และซ่อนเมื่อแท็บเปิดอยู่ · ตอน Blocked ปุ่มเริ่มกดได้แต่ไม่เริ่ม: aria-disabled=\"true\", ข้อความ 'แก้อีก N ข้อก่อนเริ่ม', กดแล้วเลือกข้อแรกที่ต้องแก้ (PRD §9 ข้อ 9) · อัปเดต simulation-gate.test.tsx จากเดิมที่ตรวจ disabled",
+      "dependencies": [
+        "feat-050",
+        "feat-054"
+      ],
+      "gate": "Blocked เริ่มจำลองไม่ได้ทุกช่องทาง (ปุ่ม, Enter, status bar), Ready/Warning เริ่มได้, เทสต์ simulation-gate ปรับและผ่าน",
+      "status": "done",
+      "role": "p2",
+      "summary": "รวมการตรวจผังกับการตั้งค่าจำลองไว้แท็บเดียว",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "ปรับปรุง SimulationPanel เป็น 2 ขั้นตอน (Step 1 ตรวจผัง: ผ่านแสดงกล่องเขียวสั้น, ติดแสดงรายการ 'ต้องแก้ก่อนจำลอง' กดแล้วเลือกวัตถุ, คำแนะนำ Warning พับไว้ใน details; Step 2 ตั้งค่าจำลอง: ลูกค้าต่อชั่วโมง, ความเร็ว 1×/2×/4×, Heatmap checkbox, ปุ่มเริ่มจำลองตอน Blocked ใช้ aria-disabled='true' ไม่ disabled เงียบๆ ตาม PRD §9 ข้อ 9 พร้อมข้อความ 'แก้อีก N ข้อก่อนเริ่ม' กดแล้ว toast เตือนและเลือกข้อแรกที่ต้องแก้); เชื่อม PlaygroundPanel และ PlaygroundEditor ส่ง onToast และ onFocusIssue; อัปเดต simulation-gate.test.tsx ตรวจ aria-disabled แทน disabled และตรวจคลิกตอน Blocked (13/13 passed); make lint ผ่าน, make test ผ่าน 43/43 files (675 tests passed)"
+    },
+    {
+      "id": "feat-056",
+      "name": "โหมดจำลอง — ล็อกผังและตัวควบคุมระหว่างรัน",
+      "description": "ระหว่างจำลอง: ซ่อน rail, แผงซ้ายเป็นตัวควบคุม (ตั้งค่าชุดเดียวกับ feat-055 + หยุดชั่วคราว/จบรอบ + ตัวเลขสด เวลา/ในร้าน/นั่งแล้ว/เดินกลับ), ผังล็อกทั้ง 2D และ 3D (ลาก/คีย์ลัด/undo ไม่ทำงาน, คลิกวัตถุขึ้น toast อธิบาย), chip 'ผังล็อกระหว่างจำลอง', ปุ่ม 'กลับไปแก้ผัง' ที่ status bar",
+      "dependencies": [
+        "feat-055"
+      ],
+      "gate": "ไม่มีทางแก้ผังระหว่าง sim (e2e ยืนยัน), หยุดชั่วคราวยังล็อก, กลับไปแก้แล้วปลดล็อก",
+      "status": "done",
+      "role": "p2",
+      "summary": "ระหว่างจำลองห้ามแก้ผัง ต้องจบรอบก่อน",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "ซ่อน PlaygroundRail ระหว่างจำลอง (simActive); แผงซ้าย SimulationPanel มีตัวควบคุมความเร็ว 1×/2×/4×, checkbox Heatmap, ปุ่มหยุดชั่วคราว/จบรอบ, สถิติสด และข้อความเตือนผังล็อก; แสดง chip 'ผังล็อกระหว่างจำลอง' ทั้งใน Artboard (2D) และ IsometricView (3D); ล็อกผังทั้ง 2D และ 3D เมื่อคลิกหรือลากวัตถุจะขึ้น toast เตือน 'ผังล็อกระหว่างจำลอง — กด \"จบรอบ\" ก่อนแก้ไข' และปิดการทำงานคีย์ลัด/undo/redo/resize/toolbar; แถบสถานะ PlaygroundStatusBar มีปุ่ม 'กลับไปแก้ผัง' กดแล้วหยุดจำลองและปลดล็อกผัง; สร้าง sim-mode-locking.test.tsx ผ่าน 6/6 tests; make lint ผ่าน, make test ผ่าน 44/44 files (681 tests passed)"
+    },
+    {
+      "id": "feat-057",
+      "name": "สรุปผลจบรอบ + ใช้ผลรอบล่าสุดตอนแก้ผัง",
+      "description": "จบรอบแสดงสรุป (ลูกค้า, เวลาเดินถึงโต๊ะเฉลี่ย, จุดหนาแน่น, ลูกค้าเดินกลับเพราะไม่มีที่นั่ง) + คำแนะนำ 1 ประโยค · กลับไปแก้ผังแล้ว heatmap รอบล่าสุดแสดงจางบนผัง (ซ่อนได้) และการ์ดผลอยู่บนแท็บเพิ่ม/จำลอง · ปุ่ม 'จำลองรอบใหม่' · ผลรวมอยู่ในรายงาน PDF",
+      "dependencies": [
+        "feat-056"
+      ],
+      "gate": "ผลรอบล่าสุดไม่หายเมื่อสลับแท็บ/มุมมอง, ล้างเมื่อเริ่มรอบใหม่, รายงานพิมพ์มีผลจำลอง",
+      "status": "done",
+      "role": "p2",
+      "summary": "ให้ผลจำลองช่วยบอกว่าควรแก้ผังตรงไหน",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "เพิ่ม showHeatmap และ setShowHeatmap ใน useSimulationStore; ปรับ SimulationOverlay ให้นำ heatmap รอบล่าสุดมาแสดงแบบจาง (globalAlpha = 0.35) บนผังตอนแก้ผัง (สลับเปิด/ปิดได้); เพิ่มการ์ดสรุปผลจบรอบ (latest-sim-summary) ใน SimulationPanel พร้อมตัวเลขสด (ลูกค้า, รับบริการ, นั่งทาน, ไม่มีที่นั่ง) และคำแนะนำ 1 ประโยค (PRD §9 ข้อ 11); รวมผลจำลองลูกค้าและสถิติรอบล่าสุดลงในรายงานพิมพ์/PDF (PrintReport); สร้าง sim-summary.test.tsx ผ่าน 3/3 tests และ print-report.test.tsx ผ่าน 2/2 tests; make lint ผ่าน, make test ผ่าน 45/45 files (685 tests passed)"
+    },
+    {
+      "id": "feat-058",
+      "name": "มุมมอง 3D — เลือกและขยับวัตถุ (เฟสแรก)",
+      "description": "ใน 3D คลิกเลือกวัตถุได้, ใช้ floating toolbar ชุดเดียวกับ 2D (ยึดตำแหน่งตาม projection), ขยับด้วยลูกศร, ยังไม่รองรับการลาก (toast แนะนำ) · แก้ลำดับการวาด (painter's order) ให้เก้าอี้ด้านหลังไม่ทับ/แบนติดโต๊ะ · ล็อกตามโหมดจำลอง",
+      "dependencies": [
+        "feat-053"
+      ],
+      "gate": "เลือก/หมุน/ลบ/ขยับใน 3D แล้วผล 2D ตรงกัน, ภาพไม่มีชิ้นซ้อนผิดลำดับในผังตัวอย่าง, ยังเป็น Pure SVG",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ให้แก้ผังจากมุมมอง 3D ได้โดยไม่ต้องสลับกลับ 2D",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "ใน IsometricView (Pure SVG 100% ไม่ใช้ Three.js/WebGL): รองรับการคลิกเลือกวัตถุและซิงก์ selectedObjectId กับ layoutStore; แสดงเส้นขอบไฮไลต์สีน้ำเงิน (#3b62f4) บนวัตถุที่เลือก; แสดง SelectionToolbar ชุดเดียวกับ 2D ยึดตำแหน่งตาม isometric projection; รองรับการขยับด้วยปุ่มลูกศร (0.25 ม., Shift 1 ม.), คีย์ลัด R (หมุน), Delete/Backspace (ลบแบบ cascade สำหรับโต๊ะ) และ Esc (ยกเลิก); แจ้ง toast แนะนำ 'ใน 3D เลือกแล้วขยับด้วยปุ่มลูกศร · ลากได้ในมุมมอง 2D' เมื่อเลือกครั้งแรก; painter's order ใน buildIsoScene ถูกต้องตาม depth (x+y); สร้าง isometric-interaction.test.tsx ผ่าน 4/4 tests; make lint ผ่าน, make test ผ่าน 46/46 files (689 tests passed)"
+    },
+    {
+      "id": "feat-059",
+      "name": "Playground มือถือ — Bottom Tab Bar + Bottom Sheet",
+      "description": "ต่ำกว่า 768px: rail เป็น tab bar ล่าง (เพิ่ม/ร้าน/จำลอง), แผงเป็น bottom sheet (กดแท็บเดิมหรือ grip เพื่อพับ), แคตตาล็อกเลื่อนแนวนอน, header ย่อ (2D|3D แบบสั้นต่ำกว่า 480px, ส่งออกเหลือไอคอน), ซ่อนปุ่มซูม",
+      "dependencies": [
+        "feat-050",
+        "feat-051",
+        "feat-055",
+        "feat-056"
+      ],
+      "gate": "ผ่านทั้ง 6 breakpoints (320/375/480/768/1024/1440) ไม่มี horizontal scroll, ใช้งานด้วยการแตะได้ครบ flow",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ใช้ Playground บนมือถือได้จริง",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "ปรับปรุง Playground ให้รองรับ Mobile และทุก breakpoint (320/375/480/768/1024/1440) โดยไม่มี horizontal scrollbar: บนหน้าจอต่ำกว่า 768px rail เป็น Bottom Tab Bar ล่างสุด, แผง PlaygroundPanel เป็น Bottom Sheet พร้อมปุ่ม grip handle ย่อ/ขยาย และ toggleSheet เมื่อกดแท็บเดิมหรือเพิ่มไอเทม, แคตตาล็อกในแท็บเพิ่มเลื่อนแนวนอน (overflow-x-auto พร้อม PaletteItem shrink-0), ซ่อนปุ่มซูม; บนหน้าจอต่ำกว่า 480px ViewSwitch ใน Header ย่อป้ายชื่อเป็นสั้น '2D' และ '3D'; สร้าง playground-mobile.test.tsx ผ่าน 6/6 tests; make lint ผ่าน, make test ผ่าน 47/47 files (695 tests passed)"
+    },
+    {
+      "id": "feat-060",
+      "name": "QA — เทสต์และ Audit ของ Playground UX ใหม่",
+      "description": "อัปเดต unit/E2E ที่อิงโครงเดิม (sidebar accordion, file-panel, simulation-gate) และเพิ่ม E2E flow หลัก: ผังใหม่→onboarding→วางโต๊ะ→แก้ issue→ตั้งค่า→จำลอง→จบรอบ→กลับไปแก้ · axe/WCAG 2.1 AA, คีย์บอร์ดครบ, prefers-reduced-motion, boundary check",
+      "dependencies": [
+        "feat-051",
+        "feat-052",
+        "feat-053",
+        "feat-055",
+        "feat-056",
+        "feat-057",
+        "feat-058",
+        "feat-059"
+      ],
+      "gate": "make test, make lint, make e2e ผ่าน 100% และมีหลักฐานแนบใน evidence",
+      "status": "done",
+      "role": "qa",
+      "summary": "ยืนยันว่า UX ใหม่ไม่ทำของเดิมพังและเข้าถึงได้",
+      "sprint": 3,
+      "ux_ref": "design-html/playground-ux/index.html",
+      "evidence": "สร้าง playground-ux-flow.test.tsx ครอบคลุม 9 integration scenarios (ผังใหม่→onboarding, เพิ่มชุดโต๊ะ, selection toolbar สลับที่นั่ง 4↔2/หมุน/ลบ, rail badges, simulation panel gate aria-disabled, sim mode locking, สรุปผลจบรอบคำแนะนำ 1 ประโยค, 3D interaction, status bar 'พาไปดู') ผ่าน 9/9 tests; อัปเดต e2e helpers, responsive.spec.ts, และสร้าง e2e/playground-ux.spec.ts ครบ flow หลักและผ่าน axe WCAG 2.1 AA audit 100% (6/6 tests passed); ปรับ contrast สีใน header, rail, room settings, simulation panel ให้ผ่านเกณฑ์ 4.5:1; make lint ผ่าน (Pure TS boundaries OK), make test ผ่าน 48/48 test files (704 tests passed)"
     }
   ]
 }

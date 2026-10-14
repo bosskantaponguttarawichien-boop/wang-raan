@@ -3,6 +3,200 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-14] feat-060 QA — เทสต์และ Audit ของ Playground UX ใหม่
+
+- สร้าง Integration QA Test Suite ใหม่: `src/components/editor/playground-ux-flow.test.tsx` ผ่าน 9/9 tests ครอบคลุม:
+  1. ผังใหม่ → Onboarding Dialog → เลือกขนาดร้านและสร้างผังใหม่พร้อม Entrance
+  2. แท็บ 'เพิ่ม' → เพิ่มชุดโต๊ะ 4 ที่นั่งและ 2 ที่นั่ง → Table Set Lifecycle สมบูรณ์
+  3. Floating Selection Toolbar: สลับที่นั่ง 4↔2, หมุน 90°, ปรับพิกัด, และ Cascade Delete
+  4. สลับแท็บ 'ร้าน' และ 'จำลอง' บน PlaygroundRail + แสดง Badge ปัญหา
+  5. แท็บ 'จำลอง': ผัง Blocked ปุ่มเริ่มจำลองมี `aria-disabled="true"` ไม่เริ่มจำลอง; ผัง Ready กดเริ่มจำลองได้
+  6. โหมดจำลอง: ล็อกตัวควบคุม (Header undo/redo disabled, Rail ซ่อน, แผงแสดงปุ่มหยุดชั่วคราวและ ■ จบรอบ)
+  7. สรุปผลจบรอบจำลอง: แสดงสรุปผลรอบล่าสุดพร้อมคำแนะนำ 1 ประโยค (PRD §9 ข้อ 11) และการ์ดย่อในแท็บเพิ่ม
+  8. มุมมอง 3D: คลิกเลือกและขยับวัตถุด้วยคีย์บอร์ด (ลูกศร, R, Esc) ซิงก์กับ Store
+  9. Status Bar: แสดงจำนวนปัญหาและปุ่ม 'พาไปดู' โฟกัสปัญหาแรกและสลับไปแท็บจำลอง
+- อัปเดต E2E Helpers (`e2e/helpers.ts`) ให้รองรับทั้งโครงสร้าง PlaygroundRail ใหม่ และ Accordion เดิม
+- ปรับปรุง `e2e/responsive.spec.ts` ให้ตรวจแถบเครื่องมือทั้ง PlaygroundRail (add/shop/check) และ 6 breakpoints
+- สร้าง E2E Playwright Suite ใหม่ `e2e/playground-ux.spec.ts` (6/6 passed):
+  - Onboarding dialog และสร้างผังใหม่
+  - แผงเพิ่มและ Floating Selection Toolbar
+  - แผงร้านปรับขนาดและประตู
+  - แผงจำลอง โหมดจำลองล็อกผัง สรุปผลจบรอบ และ Heatmap
+  - มุมมอง 3D สลับด้วย ViewSwitch เลือกและขยับวัตถุ
+  - Axe Accessibility Audit (WCAG 2.1 AA) ตรวจทุกสถานะผ่าน 100% ไม่มี violation
+- แก้ไขปัญหา Color Contrast ตามมาตรฐาน WCAG 2.1 AA (≥ 4.5:1):
+  - ปรับสี DraftStatusText ใน Header เป็น `text-secondary`
+  - ปรับสีแท็บที่เลือกใน PlaygroundRail เป็น `text-[#183cbd]`
+  - ปรับสีปุ่มเลือกทิศทางประตูใน RoomSettingsForm และปุ่มความเร็วใน SimulationPanel เป็น `text-[#41536b]`
+  - ปรับสีคำแนะนำคีย์ลัดเป็น `text-secondary`
+  - ลบ container opacity-60 ใน SimulationPanel เพื่อให้อ่านข้อความชัดเจน
+- Verify: `make lint` 100% ผ่าน (Pure TS boundaries OK), `make test` 100% ผ่าน 48/48 test files (704 tests passed), `npx playwright test e2e/playground-ux.spec.ts` 100% ผ่าน 6/6 tests
+
+## [2026-10-14] feat-059 Playground มือถือ — Bottom Tab Bar + Bottom Sheet
+
+- ออกแบบและปรับปรุง UX สำหรับอุปกรณ์มือถือและหน้าจอเล็ก (< 768px และ < 480px):
+  - บนหน้าจอต่ำกว่า 768px:
+    - `PlaygroundRail` วางเป็น Bottom Tab Bar แนวนอนล่างสุด (ไอคอน เพิ่ม / ร้าน / จำลอง)
+    - `PlaygroundPanel` กลายเป็น Bottom Sheet พร้อม Grip Handle ลาก/กดพับ-กาง
+    - เมื่อกดแท็บเดิมใน Rail จะทำการสลับพับ/กาง Sheet (toggle sheetOpen)
+    - เมื่อกดแท็บใหม่ขณะที่ Sheet พับอยู่ จะสลับแท็บและกาง Sheet ขึ้นมาอัตโนมัติ
+    - เมื่อกดเพิ่มชุดโต๊ะ/ครัว/เคาน์เตอร์บนมือถือ จะพับ Sheet ลงอัตโนมัติเพื่อให้ผู้ใช้เห็นและลากจัดร้านบน Canvas ได้ทันที
+    - แคตตาล็อกในแท็บเพิ่มเลื่อนแบบแนวนอน (Horizontal Scroll / Swipe) พร้อม `PaletteItem shrink-0` ไม่กินพื้นที่แนวตั้ง
+    - ซ่อนปุ่มซูมมุมซ้ายล่างอัตโนมัติ
+  - บนหน้าจอต่ำกว่า 480px:
+    - `ViewSwitch` ใน Header ย่อป้ายชื่อเป็น "2D" และ "3D" อัตโนมัติ (ผ่าน `shortLabel`)
+    - เมนูและชื่อร้านย่อขนาดพอดี ไม่ล้นขอบจอ
+  - รองรับทั้ง 6 breakpoints หลัก (320px, 375px, 480px, 768px, 1024px, 1440px) โดยไม่มี Horizontal Scrollbar
+- เขียน Unit Tests ใน `src/components/editor/playground-mobile.test.tsx` (6/6 passed)
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (47 files, 695 tests passed)
+
+## [2026-10-14] feat-058 มุมมอง 3D — เลือกและขยับวัตถุ (Pure SVG)
+
+- ปรับปรุง `IsometricView` (`src/components/preview-3d/isometric-view.tsx`) ด้วย Pure SVG 100% ไม่ใช้ Three.js/WebGL:
+  - รองรับการคลิกเลือกวัตถุใน 3D (โต๊ะ, เก้าอี้, เคาน์เตอร์, ครัว) ซิงก์กับ `selectedObjectId` ใน store ทันที
+  - แสดงเส้นขอบไฮไลต์สีน้ำเงิน (`#3b62f4`) บนวัตถุที่เลือกใน 3D
+  - แสดง `SelectionToolbar` ลอยตัวเหนือวัตถุที่เลือกใน 3D ยึดตำแหน่งตาม Isometric Projection Math
+  - รองรับคีย์บอร์ดใน 3D: ปุ่มลูกศรเลื่อนพิกัดบนกริด 0.25 ม. (Shift = 1 ม.), R หมุน 90°, Delete/Backspace ลบวัตถุ (cascade delete โต๊ะพร้อมเก้าอี้ลูก), Esc ยกเลิกการเลือก
+  - แสดง Toast แนะนำ `"ใน 3D เลือกแล้วขยับด้วยปุ่มลูกศร · ลากได้ในมุมมอง 2D"` เมื่อคลิกเลือกวัตถุครั้งแรก
+  - คลิกพื้นหลังฉาก 3D เพื่อยกเลิกการเลือก
+  - ล็อกการแก้ไขทั้งหมดใน 3D เมื่อเข้าสู่โหมดจำลอง (`isSim`)
+- เพิ่มฟังก์ชัน `getIsoAnchor` ใน `src/core/preview/isometric.ts` (Pure TypeScript)
+- เขียน Unit Tests ใน `isometric-interaction.test.tsx` (4/4 passed) และยืนยัน Core Tests ใน `isometric.test.ts` (12/12 passed)
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (46 files, 689 tests passed)
+
+## [2026-10-14] feat-057 สรุปผลจบรอบ + ใช้ผลรอบล่าสุดตอนแก้ผัง
+
+- เพิ่ม `showHeatmap` (default: true) และ `setShowHeatmap` ใน `useSimulationStore` (`src/store/use-simulation-store.ts`)
+- ปรับปรุง `SimulationOverlay` (`src/components/simulation/simulation-overlay.tsx`):
+  - นำผล Heatmap รอบล่าสุดมาแสดงจาง ๆ บนผัง (`globalAlpha = 0.35`) เมื่ออยู่ในโหมดจัดผัง (Edit/Idle) เพื่อช่วยแนะแนวทางการจัดวางโต๊ะ
+  - ควบคุมการแสดงผลผ่าน `showHeatmap` เปิด/ปิดได้ทันที
+- ปรับปรุงแผงซ้าย `SimulationPanel` (`src/components/simulation/simulation-panel.tsx`):
+  - เพิ่มการ์ดสรุปผลจำลองรอบล่าสุด (`latest-sim-summary`) แสดงผลชัดเจน (ลูกค้าเข้ามา, รับบริการแล้ว, นั่งทาน X/Y ที่, ไม่มีที่นั่ง X คน)
+  - เพิ่มกล่องคำแนะนำ 1 ประโยค (PRD §9 ข้อ 11): แจ้งเตือนจุดคนเดินหนาแน่นบริเวณสีแดง และแนะนำเพิ่มโต๊ะหากมีลูกค้าเดินกลับ
+  - เช็กบ็อกซ์ "แสดงจุดหนาแน่นบนผัง (จาง)" สลับเปิด/ปิดได้
+  - ปุ่มเริ่มจำลองปรับข้อความเป็น "เริ่มจำลองรอบใหม่"
+- อัปเดตรายงานพิมพ์/PDF (`src/components/editor/print-report.tsx`):
+  - เพิ่มส่วน "ผลจำลองลูกค้า (รอบล่าสุด)" รวมเวลาจำลอง สถิติล่าสุด และจำนวนที่นั่งลงในเอกสาร
+- เพิ่ม Unit Tests ใน `sim-summary.test.tsx` (3/3 passed) และอัปเดต `print-report.test.tsx` (2/2 passed)
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (45 files, 685 tests passed)
+
+## [2026-10-14] feat-056 โหมดจำลอง — ล็อกผังและตัวควบคุมระหว่างรัน
+
+- ซ่อน `PlaygroundRail` ระหว่างจำลอง (`simActive`: running หรือ paused)
+- ปรับปรุงแผงซ้าย `SimulationPanel` ในโหมดจำลอง:
+  - เพิ่มตัวควบคุมความเร็วจำลอง 1× / 2× / 4× ให้ปรับได้แบบเรียลไทม์ระหว่างรัน
+  - เช็กบ็อกซ์เปิด/ปิด Heatmap ความหนาแน่นทางเดิน
+  - ปุ่มหยุดชั่วคราว / เล่นต่อ และปุ่ม "■ จบรอบ"
+  - ตารางสรุปตัวเลขสด: เวลาจำลอง, ลูกค้าในร้าน, นั่งทาน (X/Y ที่), ทานเสร็จแล้ว, ไม่มีที่นั่ง (เดินกลับ), เวลาเฉลี่ยในร้าน
+  - กล่องเตือน "ผังถูกล็อกระหว่างจำลอง ถ้าจะแก้ให้กด 'จบรอบ' หรือ 'กลับไปแก้ผัง'"
+- แสดง Chip Badge "ผังล็อกระหว่างจำลอง" (`data-testid="chip-lock"`) บน Stage ทั้งในมุมมอง 2D (`Artboard`) และมุมมอง 3D (`IsometricView`)
+- ล็อกการแก้ไขผังทั้ง 2D และ 3D อย่างเข้มงวด:
+  - เมื่อคลิกหรือลากวัตถุหรือทางเข้า จะขึ้น Toast แจ้งเตือน `ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข` และไม่เริ่ม drag หรือ select ใด ๆ
+  - ซ่อน `SelectionToolbar` และ Resize Handle ระหว่างจำลอง
+  - ปิดการทำงานของคีย์ลัดแก้ไข (ลูกศร, R, Delete, Backspace, Ctrl+Z, Ctrl+Y)
+- ในแถบสถานะ `PlaygroundStatusBar` แสดงสถานะจำลองสด และมีปุ่ม "กลับไปแก้ผัง" กดแล้วจะหยุดจำลองและปลดล็อกผังกลับสู่โหมดแก้ไข
+- สร้างเทสต์ชุดใหม่ใน `src/components/simulation/sim-mode-locking.test.tsx` (6/6 passed)
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (44 files, 681 tests passed)
+
+## [2026-10-14] feat-055 แท็บ 'จำลอง' — ตรวจผัง + ตั้งค่าจำลองในที่เดียว
+
+- ปรับปรุง `SimulationPanel` (`src/components/simulation/simulation-panel.tsx`) เป็น 2 ขั้นตอนในแท็บเดียวตาม UX mockup:
+  - **ขั้นที่ 1 ตรวจผัง**:
+    - ผังผ่าน: แสดงกล่องเขียวสั้นพร้อมติ๊กถูก "ผังผ่านการตรวจ"
+    - ผังติด: แสดงหัวข้อสีแดง "ต้องแก้ก่อนจำลอง (N)" พร้อมรายการปัญหาภาษาคน กดแต่ละข้อแล้วจะเลือกวัตถุบนผังและเลื่อนดูตำแหน่งนั้น
+    - คำแนะนำ (Warning): พับซ่อนไว้ใน `<details>` ภายใต้ชื่อ "คำแนะนำ — ไม่แก้ก็จำลองได้ (N)"
+  - **ขั้นที่ 2 ตั้งค่าการจำลอง**:
+    - สไลเดอร์ลูกค้าต่อชั่วโมง (10–80 คน/ชม.)
+    - ปุ่มเลือกความเร็วจำลอง 1× / 2× / 4×
+    - เช็กบ็อกซ์เปิด/ปิด Heatmap ความหนาแน่นทางเดิน
+    - **ปุ่มเริ่มจำลองตาม PRD §9 ข้อ 9**: ตอน Blocked ใช้ `aria-disabled="true"` (ไม่ใช้ HTML disabled เพื่อไม่ให้เงียบ) ข้อความ "แก้อีก N ข้อก่อนเริ่ม" เมื่อคลิกจะขึ้น Toast เตือนและพาไปเลือกข้อแรกที่ต้องแก้โดยอัตโนมัติ
+- เชื่อมต่อ `PlaygroundPanel` และ `PlaygroundEditor` ให้ส่ง `onFocusIssue` และ `onToast` ไปยัง `SimulationPanel`
+- ปรับปรุงแถบสถานะ `PlaygroundStatusBar` ซ่อน CTA "ไปตั้งค่าจำลอง" เมื่อเปิดแท็บ 'check' อยู่แล้ว และมีปุ่ม "พาไปดู / ข้อถัดไป" ไล่ focus issue
+- ปรับปรุงเทสต์ใน `src/components/simulation/simulation-gate.test.tsx` ให้ตรวจ `aria-disabled="true"` แทน disabled และจำลองการคลิกตอน Blocked เพื่อยืนยันว่าไม่เริ่มจำลองและมี Toast เตือน (13/13 passed)
+- Verify: `make lint` 100% ผ่าน (Boundary Pure TS OK, 0 errors, 0 warnings), `make test` 100% ผ่าน (43 files, 675 tests passed)
+
+## [2026-10-14] feat-054 ข้อความปัญหาผังเป็นภาษาคน
+
+- สร้างโมดูล Issue Humanizer & Formatter (`src/core/validation/formatter.ts`) ใน Pure TypeScript:
+  - `getTableNumbers()` ให้หมายเลขโต๊ะ 1, 2, 3... ตามลำดับโต๊ะในผัง
+  - `getObjectName()` แปลงวัตถุหรือ ID เป็นชื่อเรียกเข้าใจง่าย เช่น "โต๊ะ 1", "เก้าอี้โต๊ะ 1", "เคาน์เตอร์", "ครัว", "ทางเข้าร้าน"
+  - `formatIssueHuman()` แปลงทุก issue code เป็นหัวข้อสั้น (title) และคำแนะนำ (hint) ภาษาไทยที่ระบุชิ้นงานคู่กรณีและตัวเลขระยะ ซม. รูปธรรม
+- ปรับปรุง `artboard.tsx` ให้แสดงป้ายชื่อ "โต๊ะ N" บนโต๊ะ แทนชื่อขนาด ให้ตรงกับข้อความปัญหา
+- ขยาย `LiveValidation` ใน `src/components/validation/use-live-validation.ts` ให้แนบ `humanIssues` พร้อมหัวข้อและคำแนะนำภาษาคน
+- เขียน Unit Tests ใน `formatter.test.ts` (6 tests passed) ครอบคลุม completeness, collision, clearance และ accessibility
+- Verify: `make lint` 100% ผ่าน (Boundary Pure TS OK, 0 errors, 0 warnings), `make test` 100% ผ่าน (43 files, 675 tests passed)
+
+## [2026-10-14] feat-053 Floating Selection Toolbar รุ่นใหม่
+
+- สร้างและปรับปรุง `SelectionToolbar` (`src/components/editor-2d/selection-toolbar.tsx`) ตาม mockup `design-html/playground-ux/index.html`:
+  - ลอยติดวัตถุที่เลือก (วางด้านบน แต่สลับไปด้านล่างเมื่อชิดขอบบน)
+  - ปุ่มหมุน 90°
+  - ปุ่มทำซ้ำ (Duplicate) วางลงจุดว่างที่ใกล้ที่สุดด้วย `findAvailableSpot()` พร้อมเลือกวัตถุใหม่และแจ้ง toast
+  - ปุ่มสลับที่นั่ง 2 ↔ 4 ที่นั่ง (เฉพาะชุดโต๊ะ) เรียก `toggleTablePreset` เก้าอี้ตามทั้งชุด ไม่เกิด orphan chair 100%
+  - ปุ่ม '⋯' Popover ปรับตำแหน่ง X/Y ละเอียด (snap 0.25 ม.)
+  - ปุ่มลบ พร้อม Cascade delete เก้าอี้ลูกเมื่อลบโต๊ะ และแจ้ง toast บอกจำนวนพร้อมแนะนำ Ctrl+Z เพื่อย้อนกลับ
+  - รองรับคีย์ลัด: ลูกศร (0.25 ม.), Shift+ลูกศร (1 ม.), R (หมุน), Delete/Backspace (ลบพร้อม toast), Esc (ยกเลิกการเลือก)
+- เพิ่มฟังก์ชัน `toggleTablePreset` ใน `src/core/layout/table-set.ts` (Pure TypeScript)
+- เพิ่ม action `toggleTableSeats` และ `duplicateObject` ใน `src/store/use-layout-store.ts`
+- เพิ่ม Unit Tests ใน `selection-toolbar.test.tsx` (7 tests passed) และ `table-set.test.ts` (4 tests passed)
+- Verify: `make lint` 100% ผ่าน (0 errors, 0 warnings), `make test` 100% ผ่าน (42 files, 668 tests passed)
+
+## [2026-10-14] feat-052 แท็บ 'ร้าน' + Onboarding Dialog ผังใหม่
+
+- สร้างคอมโพเนนต์ `OnboardingModal` (`src/components/editor/onboarding-modal.tsx`) บน Accessible Radix Dialog:
+  - ถามขนาด กว้าง × ลึก (snap 0.25 ม., clamp 2–30 ม.)
+  - เครื่องมือเลือกผนังทางเข้า (บน / ล่าง / ซ้าย / ขวา) พร้อมจำลองภาพร้านย่อแบบ interactive
+  - ปุ่ม "ใช้ผังตัวอย่างแทน" โหลดผังตัวอย่าง Ready คาเฟ่ 8×6 ม.
+  - ปุ่ม "เริ่มจัดร้าน" สร้างผังตามขนาดและวางทางเข้ากลางผนัง
+  - รองรับ Esc และ Focus Trap ตามมาตรฐาน a11y
+- เชื่อมต่อ `OnboardingModal` ใน `PlaygroundHeader` ผ่านเมนูโปรเจกต์ "เริ่มผังใหม่"
+- ปรับปรุง `RoomSettingsForm` ในแท็บ 'ร้าน':
+  - เพิ่ม Segmented Buttons 4 ด้านสลับผนังทางเข้าสะดวกสบาย
+  - เพิ่มคำแนะนำ "ทางลัด: กดที่ป้าย 'เข้า' บนผังเพื่อมาหน้านี้"
+- ปรับปรุง `artboard.tsx` ให้การคลิกหรือกด Enter/Space บนป้าย 'เข้า' (EntranceMarker) สลับมาที่แท็บ 'ร้าน' อัตโนมัติ
+- เขียน unit tests ใน `onboarding-modal.test.tsx` (3/3 passed) และปรับปรุง `forms.test.tsx` (24/24 passed)
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (41 files, 657 tests passed)
+
+## [2026-10-14] feat-051 แท็บ 'เพิ่ม' — แคตตาล็อก วางอัตโนมัติ ผังตัวอย่าง และ Empty State
+
+- สร้างฟังก์ชันหาจุดว่างอัตโนมัติ `findAvailableSpot()` ใน `src/core/layout/spot-finder.ts` (Pure TypeScript):
+  - ค้นหาพิกัดบนกริด 0.25 ม. โดยคำนวณ Bounding Box ของวัตถุรวมเก้าอี้
+  - ป้องกันไม่ให้วัตถุล้นขอบร้าน และไม่ทับ Door Clearance Zone (1.2 ม. หน้าประตูทุกผนัง)
+  - ป้องกันการชนกับวัตถุเดิม โดยพยายามเว้น Clearance 0.9 ม. (ทางเดินรอง) -> 0.6 ม. (ทางเข้าเก้าอี้) -> ไม่ชน (0.05 ม.)
+  - อัปเดต `use-layout-store.ts` ให้เรียกใช้ `findAvailableSpot()` อัตโนมัติเมื่อกดเพิ่มวัตถุทั้ง 4 ชนิด และเลือกวัตถุนั้นทันที
+- สร้างผังตัวอย่าง "คาเฟ่ 8 × 6 ม." (`createSampleCafeLayout`) ผ่านการตรวจสอบได้สถานะ **Ready** 100% จาก Validation Engine จริง
+  - เพิ่ม action `loadSampleLayout` ใน store ให้วางทับผังเดิมแบบบันทึกประวัติ (Undoable) ตาม PRD §9 ข้อ 13
+- เพิ่ม Empty State กลาง Artboard เมื่อ `layout.objects.length === 0` แสดงการ์ดแนะนำพร้อมปุ่ม "หรือใช้ผังตัวอย่าง"
+- เพิ่มการ์ดสรุปผลจำลองรอบล่าสุดในแท็บ 'เพิ่ม' (เมื่อมีผลจำลองใน simulation store)
+- เพิ่ม Unit Tests ใน `spot-finder.test.ts` (4/4 passed) และอัปเดต `use-layout-store.test.ts` (27/27 passed)
+- Verify: `make lint` 100% ผ่าน (0 errors, 0 warnings), `make test` 100% ผ่าน (40 files, 654 tests passed)
+
+## [2026-10-14] feat-050 Playground App Shell ใหม่ (Header + Rail + Panel + Status Bar)
+
+- สร้างและรื้อโครงหน้า `/playground` ใหม่ทั้งหมดตาม mockup `design-html/playground-ux/index.html`:
+  - `playground-header.tsx`: ยุบ actions เดิมเข้าเมนูโปรเจกต์ (ผังใหม่, เปิด JSON, บันทึก JSON, ขนาดร้าน, บัญชีออนไลน์/CloudModal), ปุ่มสลับ 2D|3D อยู่กลาง Header, Undo/Redo, ตัวบอกสถานะบันทึกร่างอัตโนมัติ, เมนูส่งออก (PNG, SVG, รายงานพิมพ์/PDF, สร้างลิงก์แชร์)
+  - `playground-rail.tsx`: Rail ซ้าย 3 แท็บ (เพิ่ม, ร้าน, จำลอง) พร้อม Badge ตัวนับปัญหาอัตโนมัติ
+  - `playground-panel.tsx`: แผงซ้ายสลับคอนเทนต์ตามแท็บที่เลือกแทน Accordion เดิม
+  - `playground-status-bar.tsx`: แถบล่างของ Stage แสดง Zoom controls + สถานะผัง (Ready/Warning/Blocked) + รายละเอียดปัญหา + ปุ่ม CTA นำทาง
+  - `cloud-modal.tsx`: Accessible Dialog สำหรับจัดการคลาวด์ผังร้าน
+  - อัปเดต `playground-editor.tsx` และ `app/globals.css` สำหรับ layout grid `.playground-shell` รองรับ responsive desktop-first ไม่เกิด horizontal scroll
+- ติดตั้ง `pg` / `@types/pg` devDependencies แก้ typecheck ของ mock-backend, ทำความสะอาด unused imports
+- Verify: `make lint` 100% ผ่าน, `make test` 100% ผ่าน (39 files, 647 tests passed)
+
+## [2026-10-14] feat-049 ปิดการตัดสินใจ Playground UX Revamp
+
+- ผู้ใช้ตอบ: ปุ่มเริ่มจำลองตอน Blocked กดได้ตาม mockup (aria-disabled, ไม่เริ่ม, พาไปข้อที่ต้องแก้) · สรุปจบรอบเป็นการ์ด · ทำผังตัวอย่างรอบนี้ · เมนูโปรเจกต์/ส่งออกตาม mockup
+- บันทึกใน `PRD.md` §9 ข้อ 9–15; แก้หลักการ P2 Gate ใน `AGENTS.md` และ `SKILL.md` ให้ตรงกัน (กฎ "Blocked เริ่มจำลองไม่ได้" ยังเหมือนเดิม เปลี่ยนเฉพาะวิธีแสดงปุ่ม)
+- เติมรายละเอียดที่ตกลงแล้วลง feat-051 (ผังตัวอย่างต้อง Ready) และ feat-055 (พฤติกรรมปุ่ม + ต้องแก้ `simulation-gate.test.tsx`)
+- Verify: `make status` ผ่าน · เปลี่ยนเฉพาะเอกสาร ไม่ได้แตะโค้ด จึงไม่ได้รัน `make test`
+
+## [2026-10-14] วางแผน Playground UX Revamp → แตกงาน Sprint 3 (feat-049 → feat-060)
+
+- Brainstorm UX กับผู้ใช้: ผู้ใช้หลักคือเจ้าของร้านที่ไม่เคยใช้เครื่องมือออกแบบ, ห้ามแก้ผังระหว่างจำลอง (ต้องจบรอบก่อน), 3D เลือก/ขยับได้เมื่อยังไม่จำลอง
+- Mockup HTML ที่ใช้งานได้: `design-html/playground-ux/index.html` (7 สถานะ, responsive) — ผู้ใช้ขอปรับ 2 รอบ: รวม "ตรวจผัง" กับ "ตั้งค่าจำลอง" เป็นแท็บเดียว, เอา stepper ออกแล้วย้ายปุ่ม 2D|3D ขึ้น header
+- เพิ่ม feat-049 → feat-060 (sprint 3, ทุกงานมีฟิลด์ `ux_ref` ชี้ mockup) — feat-049 เป็นงานปิดคำถามที่ค้าง ต้องทำก่อน
+- Verify: `make status` ผ่าน 61 งาน ไม่มี dependency เสีย/วน · ยังไม่แตะโค้ดแอป
+
 ## [2026-10-12 20:00] ปรับ Landing Page สำหรับมือถือ (ตามที่ผู้ใช้ขอ)
 
 - เพิ่มบล็อก `@media(max-width:600px)` และ `(max-width:360px)` ใน `design-html/index.html` แล้วสร้าง `app/(marketing)/landing.css` ใหม่ด้วย `scripts/scope_landing_css.py`

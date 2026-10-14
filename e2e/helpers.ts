@@ -42,13 +42,42 @@ async function moveSelected(page: Page, dx: number, dy: number) {
   await press(dy >= 0 ? "ArrowDown" : "ArrowUp", Math.abs(dy));
 }
 
-/** เปิดหัวข้อในแถบซ้ายของ Playground (Accordion) — หัวข้อที่เปิดถูกจำไว้ใน localStorage แม้รีเฟรช */
-export async function openSection(page: Page, key: "selected" | "room" | "add" | "simulation" | "file" | "cloud") {
+/** เปิดหัวข้อหรือแท็บในแถบเครื่องมือของ Playground (รองรับทั้ง PlaygroundRail ใหม่ และ Accordion เดิม) */
+export async function openSection(page: Page, key: "selected" | "room" | "add" | "simulation" | "file" | "cloud" | "shop" | "check") {
   const toggle = page.locator(`[data-section-toggle="${key}"]`);
-  if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+  if (await toggle.count() > 0) {
+    if ((await toggle.getAttribute("aria-expanded")) !== "true") await toggle.click();
+    return;
+  }
+  // แมป key เดิมเข้ากับ tabs ใหม่ใน PlaygroundRail
+  const tabMap: Record<string, string> = {
+    add: "add",
+    room: "shop",
+    shop: "shop",
+    simulation: "check",
+    check: "check",
+  };
+  const targetTab = tabMap[key];
+  if (targetTab) {
+    const tabBtn = page.locator(`[data-tab="${targetTab}"]`);
+    if (await tabBtn.count() > 0) {
+      await tabBtn.click();
+    }
+  }
 }
 
-/** เปิดทุกหัวข้อ (ยกเว้น "ชิ้นงานที่เลือก" ที่เปิดเองเมื่อเลือกชิ้นงาน) ให้เทสต์เข้าถึงทุกแผงได้ */
+/** เปิดหัวข้อหลักให้พร้อมใช้งาน (สลับไปแท็บ "เพิ่ม" เริ่มต้น) */
 export async function openAllSections(page: Page) {
-  for (const key of ["room", "add", "simulation", "file", "cloud"] as const) await openSection(page, key);
+  const toggles = page.locator("[data-section-toggle]");
+  if (await toggles.count() > 0) {
+    for (const key of ["room", "add", "simulation", "file", "cloud"] as const) {
+      await openSection(page, key);
+    }
+  } else {
+    // โครงสร้าง UX ใหม่: เริ่มต้นที่แท็บ 'add' (เพิ่ม)
+    const addTab = page.locator('[data-tab="add"]');
+    if (await addTab.count() > 0) {
+      await addTab.click();
+    }
+  }
 }
