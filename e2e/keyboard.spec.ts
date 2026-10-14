@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe, openSection } from "./helpers";
+import { buildReadyCafe, openTab } from "./helpers";
 
 /** feat-023: ใช้งานด้วยคีย์บอร์ดล้วน + Focus Ring ชัดเจน + prefers-reduced-motion */
 
@@ -11,6 +11,15 @@ async function focusedOutline(page: Page) {
     const labelled = (el as HTMLInputElement).labels?.[0]?.textContent?.trim();
     return { tag: el.tagName, name: el.getAttribute("aria-label") ?? (labelled || el.textContent?.trim()), outline: `${cs.outlineStyle} ${cs.outlineWidth}` };
   });
+}
+
+/** กด Tab ไปจนโฟกัสถึง element ที่มี data-testid นี้ (ภายใน 60 ครั้ง) */
+async function tabTo(page: Page, testId: string) {
+  for (let i = 0; i < 60; i++) {
+    await page.keyboard.press("Tab");
+    if ((await page.evaluate(() => (document.activeElement as HTMLElement).dataset.testid)) === testId) return true;
+  }
+  return false;
 }
 
 test.describe("Landing", () => {
@@ -51,26 +60,30 @@ test.describe("Landing", () => {
 test.describe("Playground", () => {
   test("จัดผังจนพร้อม → เริ่ม/หยุดการจำลอง ด้วยคีย์บอร์ดล้วน", async ({ page }) => {
     await page.goto("/playground");
-    await openSection(page, "simulation");
-    await buildReadyCafe(page); // เพิ่มด้วยปุ่ม + ย้ายด้วยลูกศร
+    await buildReadyCafe(page); // เพิ่มด้วยปุ่ม + กรอกพิกัดในป๊อปโอเวอร์ (Enter)
     await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
-    const start = page.getByTestId("start-simulation");
-    await start.focus();
+    await openTab(page, "check");
+    expect(await tabTo(page, "start-simulation")).toBe(true);
     expect((await focusedOutline(page)).outline).toMatch(/solid 3px/);
     await page.keyboard.press("Enter");
     await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
-    await page.getByRole("button", { name: "■ หยุดจำลอง" }).focus();
+    await page.getByTestId("stop-simulation").focus();
     await page.keyboard.press("Space");
     await expect(page.getByTestId("simulation-status")).not.toContainText("กำลังจำลอง");
   });
 
-  test("ผัง Blocked: ปุ่มเริ่มจำลองกดไม่ได้และข้ามในลำดับ Tab (P2 Gate)", async ({ page }) => {
+  test("ผัง Blocked: ปุ่มเริ่มจำลอง aria-disabled แต่ Tab ถึงได้ — กดแล้วไม่เริ่ม และบอกว่าต้องแก้อีกกี่ข้อ (P2 Gate, PRD §9 ข้อ 9)", async ({ page }) => {
     await page.goto("/playground");
-    await expect(page.getByTestId("start-simulation")).toBeDisabled();
-    for (let i = 0; i < 40; i++) {
-      await page.keyboard.press("Tab");
-      expect(await page.evaluate(() => (document.activeElement as HTMLElement).dataset.testid)).not.toBe("start-simulation");
-    }
+    await openTab(page, "check");
+    const start = page.getByTestId("start-simulation");
+    await expect(start).toHaveAttribute("aria-disabled", "true");
+    // ไม่ disabled เงียบ ๆ: ผู้ใช้คีย์บอร์ดยังโฟกัสได้ และอ่านเหตุผลได้จาก aria-describedby
+    expect(await tabTo(page, "start-simulation")).toBe(true);
+    expect((await focusedOutline(page)).outline).toMatch(/solid 3px/);
+    await expect(start).toHaveAttribute("aria-describedby", /.+/);
+    await page.keyboard.press("Enter");
+    await expect(page.getByTestId("toast")).toContainText("ยังเริ่มจำลองไม่ได้");
+    await expect(page.getByTestId("simulation-status")).not.toContainText("กำลังจำลอง");
   });
 
   test("ทุกตัวควบคุมที่ Tab ถึงมี focus ring และชื่อที่อ่านได้", async ({ page }) => {

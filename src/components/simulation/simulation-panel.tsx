@@ -124,7 +124,8 @@ export function SimulationPanel({
                 ["เวลาเฉลี่ยในร้าน", metrics.avgVisitMinutes > 0 ? `${metrics.avgVisitMinutes.toFixed(1)} นาที` : "—"],
               ].map(([term, value]) => (
                 <div key={term} className="min-w-0">
-                  <dt className="text-secondary">{term}</dt>
+                  {/* secondary บน bg-surface ได้ 4.45:1 (ไม่ถึง AA) — ใช้ secondary-strong 4.77:1 */}
+                  <dt className="text-secondary-strong">{term}</dt>
                   <dd className="m-0 font-semibold tabular-nums text-ink">{value}</dd>
                 </div>
               ))}
@@ -165,7 +166,8 @@ export function SimulationPanel({
             </label>
           </div>
 
-          <div className="mt-3 rounded-[10px] bg-blue-soft p-2.5 text-[12px] text-blue">
+          {/* blue บน blue-soft ได้ 4.39:1 — ใช้ blue-hover ให้ผ่าน AA เหมือนจุดอื่น */}
+          <div className="mt-3 rounded-[10px] bg-blue-soft p-2.5 text-[12px] text-blue-hover">
             <div className="flex items-center gap-2">
               <svg viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8}>
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />

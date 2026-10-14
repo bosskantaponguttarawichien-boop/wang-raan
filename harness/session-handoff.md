@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-15 ICT — E2E กลับมาเขียวทั้งชุด (89/89)
+
+- spec ชุด UI เก่าปรับตาม Playground UX ใหม่แล้ว — ใช้ helper ใน `e2e/helpers.ts` (openTab / addItem / placeSelected / cloud) แทน selector เดิม
+- แก้บั๊กที่ E2E จับได้ 7 จุด (horizontal scroll มือถือ, พิมพ์เห็นเครื่องมือ, header 320px, ป๊อปโอเวอร์พิกัด, notes นำเข้า, contrast, ชื่อปุ่ม 3D) — ดู progress.md
+- ⚠️ แก้ `app/globals.css` แล้วต้อง `rm -rf .next` ก่อน build/E2E ในเครื่อง (cache ไม่ invalidate)
+
 ## 2026-10-15 ICT — feat-061 ทำใหม่ตามสัญญา v1.3.0 (identities)
 
 - สัญญา v1.3.0 + mock + BFF + UI เสร็จบน `feat/login-projects` — **BE รีวิวสัญญาได้แล้ว** (ข้อที่ FE ตัดสินเองอยู่ใน `harness/handoff-fe-accounts.md` §7)

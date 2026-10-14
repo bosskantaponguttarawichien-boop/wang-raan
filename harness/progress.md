@@ -3,6 +3,20 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-15] แก้ E2E ชุด UI เก่าให้ตรง Playground UX ใหม่ + บั๊กที่ E2E จับได้
+
+- **E2E**: `e2e/helpers.ts` ใหม่ (`openTab`, `addItem`, `placeSelected` ผ่านป๊อปโอเวอร์ "ปรับละเอียด", `cloud()` เปิด dialog บัญชี, `closeDialogs`) · ปรับ editor-flow / keyboard / a11y / account-share-contact ให้ใช้ Rail, เมนูโปรเจกต์/ส่งออก, toast และ P2 gate แบบ `aria-disabled` (Tab ถึงได้ กดแล้วบอกข้อที่ต้องแก้ — PRD §9 ข้อ 9)
+- **บั๊กจริงที่แก้**:
+  - มือถือ ≤ 480px เลื่อนแนวนอนได้ ~650–970px — span `sr-only` ใน `PaletteItem` หลุดจาก carousel (ปุ่มไม่มี `relative`)
+  - พิมพ์ / PDF ยังเห็น header/rail/panel — `.playground-shell` (นอก layer) ชนะ `print:hidden` → ซ่อนในบล็อก `@media print`
+  - header ที่ 320–375px: ปุ่มส่งออก/undo ทับปุ่ม 3D (กดไม่ได้), ดินสอแก้ชื่อทับเมนู → ตัวสลับมุมมองไม่หด, ชื่อผังตัดแทน, ลดระยะห่างที่ < 360px
+  - ป๊อปโอเวอร์พิกัดปิดเมื่อ Tab จาก X ไป Y → นำไปใช้เมื่อโฟกัสออกจากป๊อปโอเวอร์ทั้งก้อน (+ unit test)
+  - นำเข้าไฟล์ JSON ไม่บอกสิ่งที่ระบบแก้ให้ (เช่น ตัดเก้าอี้กำพร้า) → ต่อท้าย toast
+  - contrast ไม่ถึง AA ระหว่างจำลอง: `<dt>` ตัวเลขจำลอง (4.45:1) และกล่อง "ผังถูกล็อก" (4.39:1)
+  - ปุ่ม 2D/3D ชื่อสำหรับ screen reader เปลี่ยนตามขนาดจอ ("3D" บนมือถือ) → `aria-label` คงที่
+- **QA**: `make e2e` 89/89 สองรอบติด, `make test` 795/795, `make lint` ผ่าน
+- **ข้อสังเกต**: `.next` cache ในเครื่องไม่ invalidate เมื่อแก้ `app/globals.css` (ทั้ง dev และ `npm run build`) — แก้ CSS แล้วต้อง `rm -rf .next` ก่อน build/E2E (CI เริ่มสะอาดจึงไม่โดน)
+
 ## [2026-10-15] feat-061 rework — Identities (สัญญา v1.3.0) + แก้บั๊ก login/projects
 
 - **สัญญา** `contracts/openapi.yaml` 1.3.0 ตามข้อตกลงกับ BE (`harness/handoff-fe-accounts.md`): `resolveIdentity`, OTP คืน `{ user, created }`, `PUT /v1/me` อัปเดตอย่างเดียว, `AccountExport.identities`, `GET /v1/layouts` แบ่งหน้า — `contracts/README.md` อัปเดตตาม; contract checker ตรวจ query parameter แล้ว

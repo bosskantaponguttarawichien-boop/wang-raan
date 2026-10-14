@@ -283,6 +283,10 @@ export function SelectionToolbar({
                 setPopOpen(false);
               }
             }}
+            // นำไปใช้เมื่อโฟกัสออกจากป๊อปโอเวอร์ทั้งก้อน — Tab จากช่อง X ไป Y ต้องไม่ปิดป๊อปโอเวอร์
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) applyCoord();
+            }}
           >
             <div className="mb-2 text-[12px] font-semibold text-ink">ตำแหน่ง (ม.)</div>
             <div className="grid grid-cols-2 gap-2">
@@ -296,7 +300,6 @@ export function SelectionToolbar({
                   step="0.25"
                   value={inputX}
                   onChange={(e) => setInputX(e.target.value)}
-                  onBlur={applyCoord}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") applyCoord();
                   }}
@@ -313,7 +316,6 @@ export function SelectionToolbar({
                   step="0.25"
                   value={inputY}
                   onChange={(e) => setInputY(e.target.value)}
-                  onBlur={applyCoord}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") applyCoord();
                   }}

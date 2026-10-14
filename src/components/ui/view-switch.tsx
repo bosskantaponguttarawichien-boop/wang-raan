@@ -40,6 +40,8 @@ export function ViewSwitch<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={pressed}
+            // จอแคบแสดงแค่ shortLabel — ชื่อสำหรับ screen reader ต้องคงที่ทุกขนาดจอ (มี shortLabel อยู่ในชื่อเต็ม ตาม WCAG 2.5.3)
+            aria-label={option.shortLabel ? option.label : undefined}
             onClick={() => onValueChange(option.value)}
             className={cn(
               "min-h-7 rounded-[5px] px-3 text-[12px] leading-[1.5] text-[#637288] max-[479px]:px-2",

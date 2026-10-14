@@ -98,14 +98,15 @@ export function InlineLayoutName({ onToast, className = "" }: InlineLayoutNamePr
   }
 
   return (
-    <div className={`inline-flex items-center gap-1 min-w-0 ${className}`}>
+    // หดได้ถึงแค่ปุ่มดินสอ (จอ 320px) — ต่ำกว่านั้นดินสอจะล้นไปทับปุ่มเมนู
+    <div className={`inline-flex items-center gap-1 min-w-[30px] ${className}`}>
       <button
         type="button"
         id="inlineLayoutNameBtn"
         onClick={handleStartEdit}
         aria-label={`ชื่อผัง ${layoutName} (คลิกเพื่อแก้ไข)`}
         title="คลิกเพื่อแก้ไขชื่อผัง (Enter บันทึก, Esc ยกเลิก)"
-        className="group flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[13px] font-semibold text-[#1e2b40] hover:bg-[#f7f9fc] focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-1 transition-colors cursor-pointer max-w-[200px] sm:max-w-[260px]"
+        className="group flex items-center gap-1.5 rounded-[6px] px-1.5 py-1 text-left text-[13px] font-semibold text-[#1e2b40] hover:bg-[#f7f9fc] focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-1 transition-colors cursor-pointer min-w-[30px] max-w-[200px] sm:max-w-[260px]"
       >
         <span className="truncate">{layoutName}</span>
         <svg

@@ -307,6 +307,10 @@
   .print-avoid-break {
     break-inside: avoid;
   }
+  /* ตอนพิมพ์เหลือแค่รายงาน (print-report) — .playground-shell ด้านล่างอยู่นอก layer จึงชนะ `print:hidden` ของ Tailwind */
+  .playground-shell {
+    display: none !important;
+  }
   .reveal {
     opacity: 1 !important;
     transform: none !important;

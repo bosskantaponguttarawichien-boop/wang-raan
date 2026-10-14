@@ -164,7 +164,8 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
       return;
     }
     layoutStore.getState().replaceLayout(result.layout);
-    onToast(`นำเข้า “${file.name}” แล้ว`);
+    // notes = สิ่งที่ระบบแก้ให้ตอนนำเข้า (เช่น ตัดเก้าอี้ที่ไม่มีโต๊ะ) — ต้องบอกผู้ใช้ ไม่งั้นของหายเงียบ ๆ
+    onToast([`นำเข้า “${file.name}” แล้ว`, ...result.notes].join(" · "));
   };
 
   const handleOpenShop = () => {
@@ -181,7 +182,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
     <>
       <header
         role="banner"
-        className="[grid-area:hd] flex h-14 items-center gap-2.5 border-b border-line bg-white px-3.5 max-[767px]:h-[52px] max-[767px]:gap-1.5 max-[767px]:px-2"
+        className="[grid-area:hd] flex h-14 items-center gap-2.5 border-b border-line bg-white px-3.5 max-[767px]:h-[52px] max-[767px]:gap-1.5 max-[767px]:px-2 max-[359px]:gap-1 max-[359px]:px-1.5"
       >
         {/* Logo */}
         <Link
@@ -391,7 +392,8 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
         )}
 
         {/* Center: View Switcher */}
-        <div className="flex flex-1 items-center justify-center min-w-0">
+        {/* ตัวสลับมุมมองไม่หด (จอแคบให้ชื่อผังตัดแทน) — ไม่งั้นปุ่มด้านขวาทับปุ่ม 3D จนกดไม่ได้ */}
+        <div className="flex flex-[1_0_auto] items-center justify-center">
           <ViewSwitch
             aria-label="มุมมอง"
             value={is3D ? "3d" : "2d"}
@@ -452,7 +454,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
                 setProjOpen(false);
                 setExpOpen(!expOpen);
               }}
-              className="flex items-center gap-1.5 rounded-[10px] border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink hover:border-[#c8d2e2] hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+              className="flex items-center gap-1.5 rounded-[10px] border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink max-[359px]:px-2 hover:border-[#c8d2e2] hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
             >
               <svg viewBox="0 0 24 24" className="size-4 shrink-0 text-secondary" aria-hidden="true" {...ICON}>
                 <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -460,7 +462,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
                 <line x1="12" y1="2" x2="12" y2="15" />
               </svg>
               <span className="export-label max-[767px]:hidden">ส่งออก</span>
-              <svg viewBox="0 0 24 24" className="size-3 shrink-0 text-muted" aria-hidden="true" {...ICON}>
+              <svg viewBox="0 0 24 24" className="size-3 shrink-0 text-muted max-[359px]:hidden" aria-hidden="true" {...ICON}>
                 <path d="m6 9 6 6 6-6" />
               </svg>
             </button>

@@ -1,16 +1,26 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { buildReadyCafe, mockControl, openAllSections, sessionUserId } from "./helpers";
+import { buildReadyCafe, closeDialogs, cloud, mockControl, sessionUserId } from "./helpers";
 
-/** feat-030 / 031 / 032 / 033: เข้าสู่ระบบ → บันทึกผ่าน React Query → แชร์ลิงก์สาธารณะ, ฟอร์มติดต่อ + Rate limit */
-const cloud = (page: Page) => page.getByTestId("cloud-panel");
-
+/**
+ * feat-030 / 031 / 032 / 033: เข้าสู่ระบบ → บันทึกผ่าน React Query → แชร์ลิงก์สาธารณะ, ฟอร์มติดต่อ + Rate limit
+ * แผงบัญชีอยู่ใน dialog "บัญชีและผังออนไลน์" (เมนูโปรเจกต์) — `cloud(page)` เปิดให้เมื่อยังไม่เปิด
+ */
 async function signInAsGuest(page: Page) {
   await page.goto("/playground");
-  await openAllSections(page);
-  await cloud(page).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" }).click();
-  await expect(page.getByTestId("signed-in-as")).toContainText("ผู้ใช้ทั่วไป");
+  const guest = (await cloud(page)).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" });
+  // ล็อกอินสำเร็จแล้วโหลดหน้าใหม่ (dialog ปิด) — เปิดแผงอีกครั้งเพื่อดูสถานะ
+  await Promise.all([page.waitForEvent("load"), guest.click()]);
+  await expect((await cloud(page)).getByTestId("signed-in-as")).toContainText("ผู้ใช้ทั่วไป");
+}
+
+/** ผังใหม่ผ่านเมนูโปรเจกต์ → dialog ขนาดร้าน → เริ่มจัดร้าน */
+async function startNewLayout(page: Page) {
+  await closeDialogs(page);
+  await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
+  await page.locator('[data-act="new"]').click();
+  await page.getByTestId("onboarding-dialog").getByRole("button", { name: "เริ่มจัดร้าน" }).click();
 }
 
 test.describe("บัญชี + ผังออนไลน์ + แชร์", () => {
@@ -22,32 +32,34 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
   });
 
   test("Guest → Session Cookie HttpOnly → บันทึก/โหลด/ลบผัง → แชร์ → เปิดลิงก์แบบไม่ล็อกอิน", async ({ page, browser }) => {
+    test.slow(); // flow ยาวหลายหน้า + 2 บริบทเบราว์เซอร์ — รันขนานเต็มเครื่องเกิน 30 วินาทีได้
     await signInAsGuest(page);
     const cookie = (await page.context().cookies()).find((c) => c.name.endsWith("authjs.session-token"))!;
     expect(cookie).toBeTruthy();
     expect(cookie.httpOnly).toBe(true);
     expect(cookie.sameSite).toBe("Lax");
 
-    await expect(cloud(page).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await expect((await cloud(page)).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
     // ผัง Blocked บันทึกไม่ได้ (BFF Re-validate → 422) และรายการ optimistic ถูก rollback
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("cloud-message")).toContainText("ผังยังไม่ผ่านกฎจำเป็น");
-    await expect(cloud(page).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await expect((await cloud(page)).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
 
     await buildReadyCafe(page);
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("cloud-message")).toContainText("บันทึกแล้วเมื่อ");
     const saved = page.getByTestId("saved-layouts").getByRole("listitem");
     await expect(saved).toHaveCount(1);
     await expect(saved.first()).toContainText("ร้าน 8 × 6 ม. · 7 ชิ้น · กำลังเปิดอยู่");
-    await expect(cloud(page).getByRole("button", { name: "บันทึกทับ" })).toBeVisible();
+    await expect((await cloud(page)).getByRole("button", { name: "บันทึกทับ" })).toBeVisible();
 
     // รีโหลด: รายการมาจาก BFF (ไม่ใช่ localStorage)
     await page.reload();
+    await cloud(page);
     await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
 
     // แชร์
-    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await (await cloud(page)).getByRole("button", { name: "แชร์ลิงก์" }).click();
     const link = page.getByTestId("share-link");
     await expect(link).toBeVisible();
     const url = (await link.getAttribute("href"))!;
@@ -89,20 +101,21 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
     // ลบ (ยืนยัน) → รายการว่าง
     page.once("dialog", (d) => d.accept());
     await page.getByTestId("saved-layouts").getByRole("button", { name: /^ลบผังร้าน/ }).click();
-    await expect(cloud(page).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await expect((await cloud(page)).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
   });
 
   test("เปิดผังที่บันทึกไว้กลับมาแก้ต่อ และผู้ใช้อื่นมองไม่เห็น", async ({ page, browser }) => {
+    test.slow(); // flow ยาวหลายหน้า + 2 บริบทเบราว์เซอร์ — รันขนานเต็มเครื่องเกิน 30 วินาทีได้
     await signInAsGuest(page);
     await buildReadyCafe(page);
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
     // รอแผงลิงก์แชร์โหลดเสร็จ (ไม่งั้นปุ่มด้านล่างเลื่อนระหว่างคลิก)
-    await expect(cloud(page).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
+    await expect((await cloud(page)).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
 
-    page.once("dialog", (d) => d.accept());
-    await page.getByRole("button", { name: "เริ่มผังใหม่" }).click();
+    await startNewLayout(page);
     await expect(page.getByTestId("artboard-stage").locator('[data-type="table"]')).toHaveCount(0);
+    await cloud(page);
     await page.getByTestId("saved-layouts").getByRole("button", { name: "เปิด" }).click();
     await expect(page.getByTestId("artboard-stage").locator('[data-type="chair"]')).toHaveCount(4);
     await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
@@ -110,14 +123,15 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
     const other = await browser.newContext();
     const otherPage = await other.newPage();
     await signInAsGuest(otherPage);
-    await expect(cloud(otherPage).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await expect((await cloud(otherPage)).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
     await other.close();
   });
 
   test("ออกจากระบบ", async ({ page }) => {
     await signInAsGuest(page);
-    await cloud(page).getByRole("button", { name: "ออกจากระบบ" }).click();
-    await expect(cloud(page).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" })).toBeVisible();
+    const signOut = (await cloud(page)).getByRole("button", { name: "ออกจากระบบ" });
+    await Promise.all([page.waitForEvent("load"), signOut.click()]);
+    await expect((await cloud(page)).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" })).toBeVisible();
     expect((await page.request.get("/api/layouts")).status()).toBe(401);
   });
 });
@@ -130,13 +144,13 @@ test.describe("จัดการลิงก์แชร์ (feat-040)", () => 
     test.slow(); // flow ยาว (2 บริบท, 6 การนำทาง, axe 2 รอบ) — บน wrangler dev เกิน 30 วินาทีได้
     await signInAsGuest(page);
     await buildReadyCafe(page);
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
-    await expect(cloud(page).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
+    await expect((await cloud(page)).getByText("ยังไม่มีลิงก์แชร์")).toBeVisible();
 
     // ลิงก์ 7 วัน
-    await cloud(page).getByLabel("อายุลิงก์ใหม่").selectOption("7");
-    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await (await cloud(page)).getByLabel("อายุลิงก์ใหม่").selectOption("7");
+    await (await cloud(page)).getByRole("button", { name: "แชร์ลิงก์" }).click();
     await expect(page.getByTestId("cloud-message")).toContainText("ใช้งานได้ถึง");
     await expect(items(page)).toHaveCount(1);
     await expect(items(page).first()).toHaveAttribute("data-status", "active");
@@ -164,8 +178,8 @@ test.describe("จัดการลิงก์แชร์ (feat-040)", () => 
     expect((await api.json()).error.code).toBe("SHARE_REVOKED");
 
     // ลิงก์ใหม่ไม่หมดอายุ → Backend ทำให้หมดอายุ → หน้าแชร์แจ้ง → ต่ออายุ 30 วัน → เปิดได้
-    await cloud(page).getByLabel("อายุลิงก์ใหม่").selectOption("none");
-    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await (await cloud(page)).getByLabel("อายุลิงก์ใหม่").selectOption("none");
+    await (await cloud(page)).getByRole("button", { name: "แชร์ลิงก์" }).click();
     await expect(items(page)).toHaveCount(2);
     const secondUrl = (await page.getByTestId("share-link").getAttribute("href"))!;
     await mockControl(page.request, `shares/${secondUrl.split("/").pop()}/expire`);
@@ -174,6 +188,7 @@ test.describe("จัดการลิงก์แชร์ (feat-040)", () => 
     await expect(viewer.getByRole("heading", { level: 1 })).toHaveText("ลิงก์นี้หมดอายุแล้ว");
 
     await page.reload();
+    await cloud(page);
     const expired = items(page).filter({ has: page.locator('[data-testid="share-item-link"]', { hasText: secondUrl }) });
     await expect(expired).toHaveAttribute("data-status", "expired");
     await expect(expired.getByTestId("share-status")).toHaveText("หมดอายุแล้ว");
@@ -194,7 +209,7 @@ test.describe("Backend ล่ม (feat-039)", () => {
   test("เปิดลิงก์แชร์ตอน Backend ล่ม → หน้าแจ้งภาษาไทย (ไม่ใช่หน้า error) → กลับมาแล้วเปิดได้", async ({ page, browser }) => {
     await signInAsGuest(page);
     await buildReadyCafe(page);
-    await cloud(page).getByRole("button", { name: "แชร์ลิงก์" }).click();
+    await (await cloud(page)).getByRole("button", { name: "แชร์ลิงก์" }).click();
     const url = (await page.getByTestId("share-link").getAttribute("href"))!;
     const path = `/v1/public/shares/${url.split("/").pop()}`;
     await mockControl(page.request, "outage", { path });
@@ -217,7 +232,7 @@ test.describe("Backend ล่ม (feat-039)", () => {
     const subject = await sessionUserId(page);
     await mockControl(page.request, "outage", { subject });
 
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("cloud-message")).toContainText("ระบบจัดเก็บผังขัดข้อง ลองใหม่ภายหลัง — ผังยังอยู่ในเครื่องนี้ ไม่หาย");
     await expect(page.getByTestId("saved-layouts-error")).toContainText("โหลดรายการไม่สำเร็จ", { timeout: 15_000 });
 
@@ -228,8 +243,8 @@ test.describe("Backend ล่ม (feat-039)", () => {
     // Backend กลับมา → รายการโหลดได้ (React Query ลองซ้ำเอง หรือกด "ลองอีกครั้ง") แล้วบันทึกได้
     await mockControl(page.request, "outage", { subject, requests: 0 });
     await page.reload();
-    await expect(cloud(page).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
-    await cloud(page).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
+    await expect((await cloud(page)).getByText("ยังไม่มีผังที่บันทึกไว้")).toBeVisible();
+    await (await cloud(page)).getByRole("button", { name: "บันทึกลงบัญชี" }).click();
     await expect(page.getByTestId("saved-layouts").getByRole("listitem")).toHaveCount(1);
   });
 });

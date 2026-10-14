@@ -15,7 +15,8 @@ export const PaletteItem = React.forwardRef<HTMLButtonElement, PaletteItemProps>
       ref={ref}
       type={type}
       className={cn(
-        "flex w-full items-center gap-3 rounded-[9px] border border-[#e4e9f2] bg-white p-2 text-left",
+        // relative: ให้ span sr-only (position: absolute) อยู่ในปุ่ม — ไม่งั้นมันหลุดจาก carousel บนมือถือแล้วดันหน้าให้เลื่อนแนวนอน
+        "relative flex w-full items-center gap-3 rounded-[9px] border border-[#e4e9f2] bg-white p-2 text-left",
         "transition-colors duration-[180ms] hover:border-[#afbef2] hover:bg-[#f9faff] motion-reduce:transition-none",
         "focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
         className,

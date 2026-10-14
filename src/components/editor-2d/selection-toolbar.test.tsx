@@ -140,6 +140,25 @@ describe("SelectionToolbar Component", () => {
     expect(currentTable?.x).toBe(4.5);
   });
 
+  it("ย้ายโฟกัสจากช่อง X ไป Y ป๊อปโอเวอร์ยังเปิดอยู่ — นำไปใช้ทั้งคู่เมื่อโฟกัสออกจากป๊อปโอเวอร์", () => {
+    render(
+      <SelectionToolbar boxRef={boxRef} room={{ width: 8, depth: 6 }} objects={layout.objects} selected={table} groupRect={null} />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "ปรับละเอียด" }));
+    const inputX = screen.getByLabelText("ซ้าย-ขวา");
+    const inputY = screen.getByLabelText("บน-ล่าง");
+    fireEvent.change(inputX, { target: { value: "2" } });
+    fireEvent.blur(inputX, { relatedTarget: inputY });
+    expect(screen.getByRole("dialog", { name: "ปรับตำแหน่งละเอียด" })).toBeInTheDocument();
+    expect(layoutStore.getState().layout.objects.find((o) => o.id === table.id)?.x).toBe(table.x);
+
+    fireEvent.change(inputY, { target: { value: "3.1" } });
+    fireEvent.blur(inputY, { relatedTarget: document.body });
+    const moved = layoutStore.getState().layout.objects.find((o) => o.id === table.id);
+    expect([moved?.x, moved?.y]).toEqual([2, 3]);
+    expect(screen.queryByRole("dialog", { name: "ปรับตำแหน่งละเอียด" })).toBeNull();
+  });
+
   it("คลิกปุ่ม 'ลบ' แล้วลบโต๊ะและแจ้งเตือนจำนวนเก้าอี้พร้อม Ctrl+Z", () => {
     const onToast = vi.fn();
     render(
