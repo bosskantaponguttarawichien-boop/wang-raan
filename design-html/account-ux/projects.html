@@ -107,6 +107,13 @@ h1{font-size:24px;font-weight:600;margin:0}
 .dialog{background:#fff;border-radius:16px;padding:24px;width:min(420px,100%);box-shadow:0 20px 50px rgba(30,43,64,.2)}
 .dialog h2{font-size:17px;font-weight:600;margin:0 0 8px}
 .dialog p{color:var(--sec);margin:0 0 20px;line-height:1.6}
+.dialog .field{display:flex;flex-direction:column;gap:6px;margin-bottom:6px}
+.dialog .field label{font-size:13px;color:var(--sec);font-weight:500}
+.dialog .field input{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;width:100%}
+.dialog .field input:focus{border-color:var(--blue)}
+.dialog .field input[aria-invalid=true]{border-color:var(--danger)}
+.dialog .help{font-size:12px;color:var(--mut);margin:0 0 18px;display:flex;justify-content:space-between;gap:8px}
+.dialog .help.err{color:var(--danger-ink)}
 .dialog .acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 [hidden]{display:none!important}
 
@@ -155,6 +162,21 @@ h1{font-size:24px;font-weight:600;margin:0}
   <div id="alert"></div>
   <div id="content" aria-live="polite"></div>
 </main>
+
+<div class="overlay" id="namer" hidden>
+  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="nm-t" id="nm-form" novalidate>
+    <h2 id="nm-t">ตั้งชื่อผังใหม่</h2>
+    <div class="field">
+      <label for="nm-input">ชื่อผัง</label>
+      <input id="nm-input" maxlength="80" autocomplete="off" aria-describedby="nm-help">
+    </div>
+    <p class="help" id="nm-help"><span id="nm-msg">เช่น ชื่อร้านหรือสาขา แก้ทีหลังได้ในหน้าออกแบบ</span><span id="nm-count"></span></p>
+    <div class="acts">
+      <button class="btn" type="button" id="nm-cancel">ยกเลิก</button>
+      <button class="btn pri" type="submit"><i class="ti ti-plus" aria-hidden="true"></i>สร้างผัง</button>
+    </div>
+  </form>
+</div>
 
 <div class="overlay" id="confirm" hidden>
   <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="cf-t" aria-describedby="cf-d">
@@ -267,8 +289,31 @@ document.addEventListener('click',e=>{if(!e.target.closest('.card .menu,[data-mo
 function go(s){state=s;render();document.querySelectorAll('.mocknav [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===s))}
 function createNew(){
   if(state==='limit')return toast('ผังเต็มโควตา — ลบผังที่ไม่ใช้ก่อน');
-  toast('สร้างผังใหม่แล้ว กำลังเปิดหน้าออกแบบ… (/playground/[id])');
+  let n=data.length+1;while(data.some(p=>p.name==='ผังร้าน '+n))n++;
+  lastNewFocus=document.activeElement;
+  const i=$('#nm-input');i.value='ผังร้าน '+n;setNameError('');updateCount();
+  $('#namer').hidden=false;i.focus();i.select();
 }
+let lastNewFocus;
+const updateCount=()=>$('#nm-count').textContent=`${$('#nm-input').value.length}/80`;
+function setNameError(m){
+  $('#nm-input').setAttribute('aria-invalid',!!m);$('#nm-help').classList.toggle('err',!!m);
+  $('#nm-msg').textContent=m||'เช่น ชื่อร้านหรือสาขา แก้ทีหลังได้ในหน้าออกแบบ';
+}
+function closeNamer(){$('#namer').hidden=true;lastNewFocus&&lastNewFocus.focus()}
+$('#nm-input').addEventListener('input',()=>{updateCount();setNameError('')});
+$('#nm-cancel').onclick=closeNamer;
+$('#namer').onclick=e=>{if(e.target.id==='namer')closeNamer()};
+$('#namer').addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeNamer();
+  if(e.key==='Tab'){const f=[...$('#namer').querySelectorAll('input,button')];const i=f.indexOf(document.activeElement);
+    if(e.shiftKey&&i===0){e.preventDefault();f.at(-1).focus()}else if(!e.shiftKey&&i===f.length-1){e.preventDefault();f[0].focus()}}
+});
+$('#nm-form').addEventListener('submit',e=>{
+  e.preventDefault();const v=$('#nm-input').value.trim();
+  if(!v){setNameError('ใส่ชื่อผังอย่างน้อย 1 ตัวอักษร');$('#nm-input').focus();return}
+  $('#namer').hidden=true;toast(`สร้าง “${v}” แล้ว กำลังเปิดหน้าออกแบบ… (/playground/[id])`);
+});
 let lastFocus;
 function askDelete(id,btn){
   pending=data.find(p=>p.id===id);lastFocus=btn;

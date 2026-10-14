@@ -11,6 +11,8 @@
 - Prototype: `design-html/account-ux/login.html` (อีเมล → รหัส → สำเร็จ, รหัสใน mock = 123456) และ `design-html/account-ux/projects.html` (มีผัง / ว่าง / โหลด / error / เต็มโควตา + dialog ยืนยันลบ)
 - Verify: ทั้งสองหน้าไม่มี horizontal scroll ที่ 320px, dialog ลบโฟกัสปุ่มยกเลิกก่อนและ Esc ปิดได้; `make status` ผ่าน (65 งาน)
 
+- อัปเดต: การ์ด /projects เป็นแบบการ์ดไฟล์ใน Figma (ภาพผังย่อ + ชื่อ/ขนาด/เวลาแก้ไข + เมนู ⋯) และ dialog ตั้งชื่อตอนสร้างผังใหม่ · ข้อสรุปชื่อผัง (PRD §9 ข้อ 20): ถามชื่อตอนสร้าง/บันทึกออนไลน์ครั้งแรก + แก้ชื่อในที่บน playground · ต้องเพิ่ม `name` และ `layout` ใน LayoutSummary ของสัญญา (อยู่ใน feat-063)
+
 ## [2026-10-14] feat-060 QA — เทสต์และ Audit ของ Playground UX ใหม่
 
 - สร้าง Integration QA Test Suite ใหม่: `src/components/editor/playground-ux-flow.test.tsx` ผ่าน 9/9 tests ครอบคลุม:

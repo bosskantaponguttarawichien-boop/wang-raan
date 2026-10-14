@@ -857,11 +857,11 @@
     {
       "id": "feat-063",
       "name": "หน้ารวมโปรเจกต์ /projects",
-      "description": "หน้า /projects (ต้องล็อกอิน; ยังไม่ล็อกอิน → /login?next=/projects): การ์ดแบบไฟล์ใน Figma — ภาพผังย่อด้านบน (วาดด้วย renderPlanSvg จาก src/core/export/plan-svg.ts แบบ grid:false บนพื้น #eef2f7) + ไอคอน ชื่อผัง ขนาด และเวลาแก้ไขล่าสุดด้านล่าง · เรียงตามแก้ไขล่าสุด · การ์ด 'สร้างผังใหม่' แบบเส้นประท้ายรายการ + ปุ่มด้านบน → /playground/[id] ของผังใหม่ · เมนู ⋯ บนการ์ด (เปิดผัง / ลบผัง; เห็นเมื่อ hover/focus และเห็นตลอดบนจอสัมผัส) ลบต้องยืนยันด้วย dialog (Radix) · empty state, skeleton ตอนโหลด, error ภาษาไทย, แจ้งเมื่อเต็มโควตา (LAYOUT_LIMIT_REACHED) · header มีเมนูบัญชี (ชื่อ/อีเมล, ออกจากระบบ) · ต้องปรับสัญญา: LayoutSummary ยังไม่มีชื่อผังและ geometry สำหรับวาดภาพย่อ · V1 ไม่มีค้นหา/เปลี่ยนชื่อ/ทำสำเนา",
+      "description": "หน้า /projects (ต้องล็อกอิน; ยังไม่ล็อกอิน → /login?next=/projects): การ์ดแบบไฟล์ใน Figma — ภาพผังย่อด้านบน (วาดด้วย renderPlanSvg จาก src/core/export/plan-svg.ts แบบ grid:false บนพื้น #eef2f7) + ไอคอน ชื่อผัง ขนาด และเวลาแก้ไขล่าสุดด้านล่าง · เรียงตามแก้ไขล่าสุด · การ์ด 'สร้างผังใหม่' แบบเส้นประท้ายรายการ + ปุ่มด้านบน → /playground/[id] ของผังใหม่ · เมนู ⋯ บนการ์ด (เปิดผัง / ลบผัง; เห็นเมื่อ hover/focus และเห็นตลอดบนจอสัมผัส) ลบต้องยืนยันด้วย dialog (Radix) · empty state, skeleton ตอนโหลด, error ภาษาไทย, แจ้งเมื่อเต็มโควตา (LAYOUT_LIMIT_REACHED) · header มีเมนูบัญชี (ชื่อ/อีเมล, ออกจากระบบ) · สร้างผังใหม่ → dialog ถามชื่อผัง (ใส่ชื่ออัตโนมัติ 'ผังร้าน N' ไว้ให้, กดสร้างได้ทันทีโดยไม่ต้องแก้) · ปรับสัญญา contracts/openapi.yaml + mock-backend: เพิ่ม `name` (string 1–80 ตัวอักษร หลัง trim) ใน SaveLayoutRequest / StoredLayout / LayoutSummary และเพิ่ม `layout` (StoreLayout) ใน LayoutSummary เพื่อวาดภาพย่อฝั่ง client (เพดาน 200 ผังเดิม) — ผังเก่าที่ไม่มีชื่อ Backend ตั้ง 'ผังร้าน {width} × {depth} ม.' ให้ · V1 ไม่มีค้นหา/ทำสำเนา (เปลี่ยนชื่ออยู่ใน playground — feat-064)",
       "dependencies": [
         "feat-062"
       ],
-      "gate": "E2E: สร้าง → เห็นการ์ดพร้อมภาพย่อในรายการ → เปิดได้, ลบผ่านเมนู ⋯ + ยืนยัน → หายจากรายการและเปิดลิงก์เดิมได้ 404, เมนู ⋯ ใช้คีย์บอร์ดได้ (Enter/ลูกศร/Esc คืนโฟกัส), ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, make lint ผ่านรวม contract check",
+      "gate": "E2E: สร้าง → เห็นการ์ดพร้อมภาพย่อในรายการ → เปิดได้, ลบผ่านเมนู ⋯ + ยืนยัน → หายจากรายการและเปิดลิงก์เดิมได้ 404, เมนู ⋯ ใช้คีย์บอร์ดได้ (Enter/ลูกศร/Esc คืนโฟกัส), ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, dialog ชื่อผัง: ชื่อว่าง/ยาวเกิน 80 แสดงข้อผิดพลาดไทย, make lint ผ่านรวม contract check",
       "status": "not-started",
       "role": "frontend",
       "summary": "ที่รวมผังทั้งหมดของผู้ใช้: ดู สร้าง ลบ",
@@ -871,12 +871,12 @@
     {
       "id": "feat-064",
       "name": "/playground/[id] + บันทึกออนไลน์จาก Guest",
-      "description": "เพิ่ม route /playground/[id] เปิดผังจาก Backend (refresh แล้วยังอยู่ผังเดิม; ไม่ใช่เจ้าของ/ไม่มี → หน้า 404 ภาษาไทย) และบันทึกกลับด้วย PUT · /playground (ไม่มี id) ยังใช้แบบ Guest + draft ในเครื่องได้ทันทีโดยไม่ต้องล็อกอิน · Guest กด 'บันทึกออนไลน์' → /login?next=... หลังล็อกอินผังร่างในเครื่องถูกสร้างเป็นผังในบัญชีและพาไป /playground/[id] โดย draft ไม่หาย · header playground มีลิงก์กลับ 'ผังของฉัน' เมื่อล็อกอิน",
+      "description": "เพิ่ม route /playground/[id] เปิดผังจาก Backend (refresh แล้วยังอยู่ผังเดิม; ไม่ใช่เจ้าของ/ไม่มี → หน้า 404 ภาษาไทย) และบันทึกกลับด้วย PUT · /playground (ไม่มี id) ยังใช้แบบ Guest + draft ในเครื่องได้ทันทีโดยไม่ต้องล็อกอิน · Guest กด 'บันทึกออนไลน์' → /login?next=... หลังล็อกอินผังร่างในเครื่องถูกสร้างเป็นผังในบัญชีและพาไป /playground/[id] โดย draft ไม่หาย · header playground มีลิงก์กลับ 'ผังของฉัน' เมื่อล็อกอิน · ชื่อผัง: ชื่อผังมุมซ้ายบนของ playground กดแก้ได้ในที่ (inline edit: Enter/blur บันทึก, Esc ยกเลิก, ว่าง = คืนชื่อเดิม) บันทึกผ่าน PUT — Guest แก้ชื่อได้และเก็บใน draft ในเครื่อง · บันทึกออนไลน์ครั้งแรกจาก Guest ถามชื่อก่อน (ใส่ชื่อปัจจุบันไว้ให้, กดข้ามได้)",
       "dependencies": [
         "feat-062",
         "feat-063"
       ],
-      "gate": "E2E: Guest วาดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → อยู่ที่ /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังเหมือนเดิม, ผัง Blocked ยังบันทึกได้แต่เริ่มจำลองไม่ได้, unit + e2e ผ่าน",
+      "gate": "E2E: Guest วาดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → อยู่ที่ /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังเหมือนเดิม, ผัง Blocked ยังบันทึกได้แต่เริ่มจำลองไม่ได้, unit + e2e ผ่าน, แก้ชื่อใน playground แล้วชื่อใน /projects ตรงกันหลัง refresh, แก้ชื่อใช้คีย์บอร์ดได้และมี aria-label ไทย",
       "status": "not-started",
       "role": "frontend",
       "summary": "ผังแต่ละอันมี URL ของตัวเอง และ Guest บันทึกเข้าบัญชีได้ไม่หาย",
