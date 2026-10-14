@@ -103,7 +103,7 @@ h1{font-size:24px;font-weight:600;margin:0}
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(30,43,64,.2);max-width:calc(100vw - 32px);z-index:60}
 
-.overlay{position:fixed;inset:0;background:rgba(30,43,64,.4);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;z-index:50}
+.overlay{position:fixed;inset:0;grid-template-columns:minmax(0,1fr);background:rgba(30,43,64,.4);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;z-index:50}
 .dialog{background:#fff;border-radius:16px;padding:24px;width:min(420px,100%);box-shadow:0 20px 50px rgba(30,43,64,.2)}
 .dialog h2{font-size:17px;font-weight:600;margin:0 0 8px}
 .dialog p{color:var(--sec);margin:0 0 20px;line-height:1.6}
@@ -114,6 +114,25 @@ h1{font-size:24px;font-weight:600;margin:0}
 .dialog .field input[aria-invalid=true]{border-color:var(--danger)}
 .dialog .help{font-size:12px;color:var(--mut);margin:0 0 18px;display:flex;justify-content:space-between;gap:8px}
 .dialog .help.err{color:var(--danger-ink)}
+.dialog.wide{width:min(460px,100%)}
+.dialog .desc{margin:-4px 0 18px;font-size:13px}
+.dialog fieldset{border:0;padding:0;margin:0 0 16px;min-width:0}
+.dialog legend{font-size:13px;color:var(--sec);font-weight:500;padding:0;margin-bottom:6px}
+.dialog legend span{color:var(--mut);font-weight:400}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.size-row{display:flex;align-items:center;gap:8px}
+.unit{flex:1;min-width:0;display:flex;align-items:center;gap:6px;height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;color:var(--sec);font-size:13px}
+.unit:focus-within{border-color:var(--blue);outline:3px solid var(--focus);outline-offset:1px}
+.unit input{flex:1;min-width:0;border:0;outline:0;height:100%;font-size:15px;font-weight:500;color:var(--ink);text-align:right;padding:0;background:transparent}
+.unit.bad{border-color:var(--danger)}
+.x{color:var(--mut)}
+.size .help{margin:6px 0 0}
+.seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{flex:1;border:0;background:#fff;height:40px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-checked=true]{background:var(--blue-soft);color:#183cbd;font-weight:600}
+.acts.split{justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding-top:16px;margin-top:4px}
+@media (max-width:480px){.acts.split{flex-direction:column-reverse;align-items:stretch}.acts.split .btn{width:100%}.acts.split>.acts{display:grid;grid-template-columns:1fr 1fr}}
 .dialog .acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
 [hidden]{display:none!important}
 
@@ -164,16 +183,38 @@ h1{font-size:24px;font-weight:600;margin:0}
 </main>
 
 <div class="overlay" id="namer" hidden>
-  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="nm-t" id="nm-form" novalidate>
-    <h2 id="nm-t">ตั้งชื่อผังใหม่</h2>
+  <form class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="nm-t" aria-describedby="nm-d" id="nm-form" novalidate>
+    <h2 id="nm-t">สร้างผังใหม่</h2>
+    <p id="nm-d" class="desc">ใส่ค่าประมาณได้ แก้ทีหลังได้เสมอที่แท็บ “ร้าน”</p>
     <div class="field">
       <label for="nm-input">ชื่อผัง</label>
       <input id="nm-input" maxlength="80" autocomplete="off" aria-describedby="nm-help">
     </div>
-    <p class="help" id="nm-help"><span id="nm-msg">เช่น ชื่อร้านหรือสาขา แก้ทีหลังได้ในหน้าออกแบบ</span><span id="nm-count"></span></p>
-    <div class="acts">
-      <button class="btn" type="button" id="nm-cancel">ยกเลิก</button>
-      <button class="btn pri" type="submit"><i class="ti ti-plus" aria-hidden="true"></i>สร้างผัง</button>
+    <p class="help" id="nm-help"><span id="nm-msg">เช่น ชื่อร้านหรือสาขา</span><span id="nm-count"></span></p>
+    <fieldset class="size">
+      <legend>ขนาดร้าน <span>(2–30 ม.)</span></legend>
+      <div class="size-row">
+        <div class="unit"><label for="nm-w" class="sr">ความกว้าง (เมตร)</label><span aria-hidden="true">กว้าง</span><input id="nm-w" type="number" inputmode="decimal" min="2" max="30" step="0.25" value="8"><span aria-hidden="true">ม.</span></div>
+        <span class="x" aria-hidden="true">×</span>
+        <div class="unit"><label for="nm-dp" class="sr">ความลึก (เมตร)</label><span aria-hidden="true">ลึก</span><input id="nm-dp" type="number" inputmode="decimal" min="2" max="30" step="0.25" value="6"><span aria-hidden="true">ม.</span></div>
+      </div>
+      <p class="help err" id="size-err" hidden></p>
+    </fieldset>
+    <fieldset class="door">
+      <legend>ประตูอยู่ด้าน</legend>
+      <div class="seg" role="radiogroup" aria-label="เลือกผนังทางเข้า">
+        <button type="button" role="radio" aria-checked="false" data-wall="top">บน</button>
+        <button type="button" role="radio" aria-checked="true" data-wall="bottom">ล่าง</button>
+        <button type="button" role="radio" aria-checked="false" data-wall="left">ซ้าย</button>
+        <button type="button" role="radio" aria-checked="false" data-wall="right">ขวา</button>
+      </div>
+    </fieldset>
+    <div class="acts split">
+      <button class="btn" type="button" id="nm-tpl"><i class="ti ti-layout-board" aria-hidden="true" style="color:var(--blue)"></i>ใช้ผังตัวอย่างแทน</button>
+      <div class="acts">
+        <button class="btn" type="button" id="nm-cancel">ยกเลิก</button>
+        <button class="btn pri" type="submit">สร้างผัง<i class="ti ti-arrow-right" aria-hidden="true"></i></button>
+      </div>
     </div>
   </form>
 </div>
@@ -291,14 +332,14 @@ function createNew(){
   if(state==='limit')return toast('ผังเต็มโควตา — ลบผังที่ไม่ใช้ก่อน');
   let n=data.length+1;while(data.some(p=>p.name==='ผังร้าน '+n))n++;
   lastNewFocus=document.activeElement;
-  const i=$('#nm-input');i.value='ผังร้าน '+n;setNameError('');updateCount();
+  const i=$('#nm-input');i.value='ผังร้าน '+n;setNameError('');updateCount();$('#nm-w').value=8;$('#nm-dp').value=6;setSizeError('');setWall('bottom');
   $('#namer').hidden=false;i.focus();i.select();
 }
 let lastNewFocus;
 const updateCount=()=>$('#nm-count').textContent=`${$('#nm-input').value.length}/80`;
 function setNameError(m){
   $('#nm-input').setAttribute('aria-invalid',!!m);$('#nm-help').classList.toggle('err',!!m);
-  $('#nm-msg').textContent=m||'เช่น ชื่อร้านหรือสาขา แก้ทีหลังได้ในหน้าออกแบบ';
+  $('#nm-msg').textContent=m||'เช่น ชื่อร้านหรือสาขา';
 }
 function closeNamer(){$('#namer').hidden=true;lastNewFocus&&lastNewFocus.focus()}
 $('#nm-input').addEventListener('input',()=>{updateCount();setNameError('')});
@@ -306,14 +347,30 @@ $('#nm-cancel').onclick=closeNamer;
 $('#namer').onclick=e=>{if(e.target.id==='namer')closeNamer()};
 $('#namer').addEventListener('keydown',e=>{
   if(e.key==='Escape')closeNamer();
-  if(e.key==='Tab'){const f=[...$('#namer').querySelectorAll('input,button')];const i=f.indexOf(document.activeElement);
+  if(e.key==='Tab'){const f=[...$('#namer').querySelectorAll('input,button')].filter(x=>x.tabIndex>=0);const i=f.indexOf(document.activeElement);
     if(e.shiftKey&&i===0){e.preventDefault();f.at(-1).focus()}else if(!e.shiftKey&&i===f.length-1){e.preventDefault();f[0].focus()}}
 });
 $('#nm-form').addEventListener('submit',e=>{
   e.preventDefault();const v=$('#nm-input').value.trim();
   if(!v){setNameError('ใส่ชื่อผังอย่างน้อย 1 ตัวอักษร');$('#nm-input').focus();return}
-  $('#namer').hidden=true;toast(`สร้าง “${v}” แล้ว กำลังเปิดหน้าออกแบบ… (/playground/[id])`);
+  const w=+$('#nm-w').value,dp=+$('#nm-dp').value,ok=x=>x>=2&&x<=30;
+  if(!ok(w)||!ok(dp)){setSizeError('ขนาดร้านต้องอยู่ระหว่าง 2–30 เมตร',!ok(w),!ok(dp));(!ok(w)?$('#nm-w'):$('#nm-dp')).focus();return}
+  const snap=x=>Math.round(x*4)/4;
+  $('#namer').hidden=true;toast(`สร้าง “${v}” ${fmt(snap(w))} × ${fmt(snap(dp))} ม. ประตูด้าน${WALLS[wall]} → เปิดหน้าออกแบบ (ไม่ขึ้น onboarding ซ้ำ)`);
 });
+const WALLS={top:'บน',bottom:'ล่าง',left:'ซ้าย',right:'ขวา'};let wall='bottom';
+const wallBtns=[...document.querySelectorAll('[data-wall]')];
+function setWall(w,focus){wall=w;wallBtns.forEach(b=>{const on=b.dataset.wall===w;b.setAttribute('aria-checked',on);b.tabIndex=on?0:-1;if(on&&focus)b.focus()})}
+wallBtns.forEach((b,i)=>{b.onclick=()=>setWall(b.dataset.wall);b.onkeydown=e=>{
+  const d=e.key==='ArrowRight'||e.key==='ArrowDown'?1:e.key==='ArrowLeft'||e.key==='ArrowUp'?-1:0;
+  if(d){e.preventDefault();setWall(wallBtns[(i+d+4)%4].dataset.wall,true)}}});
+function setSizeError(m,badW=false,badD=false){
+  const e=$('#size-err');e.hidden=!m;e.textContent=m;
+  $('#nm-w').closest('.unit').classList.toggle('bad',badW);$('#nm-dp').closest('.unit').classList.toggle('bad',badD);
+  $('#nm-w').setAttribute('aria-invalid',badW);$('#nm-dp').setAttribute('aria-invalid',badD);
+}
+['#nm-w','#nm-dp'].forEach(id=>$(id).addEventListener('input',()=>setSizeError('')));
+$('#nm-tpl').onclick=()=>{const v=$('#nm-input').value.trim()||'คาเฟ่ 8×6 ม.';$('#namer').hidden=true;toast(`สร้าง “${v}” จากผังตัวอย่างคาเฟ่ 8×6 ม. → เปิดหน้าออกแบบ`)};
 let lastFocus;
 function askDelete(id,btn){
   pending=data.find(p=>p.id===id);lastFocus=btn;
