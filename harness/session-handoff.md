@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-14 21:55 ICT — FE handoff: Identities + Email OTP
+
+- ข้อตกลงกับ BE และลำดับงาน FE ทั้งหมดอยู่ที่ `harness/handoff-fe-accounts.md` — อ่านก่อนแตะ feat-061–064
+- งาน OTP / `/login` ใน working tree ยังไม่ commit และยังใช้แบบเดิม (BFF สร้าง user id เอง) — ต้องแก้ตาม handoff และคืน feat-061 เป็น `in-progress`
+- BE รอสัญญา v1.3.0 ที่ merge แล้วจึงเริ่ม endpoint
+
 ## 2026-10-14 21:10 ICT — วางแผนบัญชีผู้ใช้ + หน้ารวมโปรเจกต์
 
 ### Core & Dev
