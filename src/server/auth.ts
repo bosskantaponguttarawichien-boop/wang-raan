@@ -17,6 +17,7 @@ import { headers } from "next/headers";
 import { accountRepository } from "./account-repository";
 import { syncSignIn } from "./account-sync";
 import { SESSION_MAX_AGE, authSecret, subjectFor } from "./auth-config";
+import { backendClient, readBody, send } from "./backend";
 
 declare module "next-auth" {
   interface Session {
@@ -30,6 +31,45 @@ const providers: Provider[] = [
     name: "ผู้ใช้ทั่วไป",
     credentials: {},
     authorize: async () => ({ id: `guest-${globalThis.crypto.randomUUID()}`, name: "ผู้ใช้ทั่วไป" }),
+  }),
+  Credentials({
+    id: "email-otp",
+    name: "อีเมล",
+    credentials: {
+      email: { label: "อีเมล", type: "email" },
+      code: { label: "รหัส OTP", type: "text" },
+    },
+    authorize: async (credentials) => {
+      if (!credentials?.email || !credentials?.code) return null;
+      const email = String(credentials.email).trim().toLowerCase();
+      const code = String(credentials.code).trim();
+      if (!/^[0-9]{6}$/.test(code)) return null;
+      try {
+        const res = await send(
+          backendClient,
+          "anonymous",
+          "/v1/auth/otp/verify",
+          {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ email, code }),
+          },
+          [400, 401, 429],
+        );
+        if (!res.ok) {
+          const body = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+          const errCode = body?.error?.code ?? "INVALID_OTP";
+          throw new Error(errCode);
+        }
+        const data = await readBody<{ user: { id: string; name?: string | null; email?: string | null; image?: string | null } }>(res);
+        return data.user;
+      } catch (error) {
+        if (error instanceof Error && (error.message.startsWith("OTP_") || error.message === "RATE_LIMITED")) {
+          throw error;
+        }
+        return null;
+      }
+    },
   }),
 ];
 if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET) providers.push(GitHub);

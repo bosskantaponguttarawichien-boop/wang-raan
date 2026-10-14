@@ -120,6 +120,7 @@ describe("syncSignIn", () => {
 
   it("ย้ายเฉพาะ Guest → บัญชีจริงที่ต่างกัน", () => {
     expect(guestToMerge(GITHUB, GUEST)).toBe(GUEST);
+    expect(guestToMerge("email-0f8fad5b-d9cb-469f-a165-70867728950e", GUEST)).toBe(GUEST);
     expect(guestToMerge(GITHUB, null)).toBeNull();
     expect(guestToMerge(GITHUB, GITHUB)).toBeNull();
     expect(guestToMerge(GUEST, GUEST.replace("0f8f", "1f8f"))).toBeNull();
@@ -130,5 +131,11 @@ describe("syncSignIn", () => {
   it("profileInput: id ที่ไม่รู้จัก provider → null", () => {
     expect(profileInput("alice", {})).toBeNull();
     expect(profileInput(GUEST, {})).toEqual({ provider: "guest", name: null, email: null, image: null });
+    expect(profileInput("email-0f8fad5b-d9cb-469f-a165-70867728950e", { email: "a@b.com" })).toEqual({
+      provider: "email",
+      name: null,
+      email: "a@b.com",
+      image: null,
+    });
   });
 });

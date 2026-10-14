@@ -835,10 +835,11 @@
         "feat-039"
       ],
       "gate": "make lint ผ่านรวม contract check, unit ครอบคลุม: ขอรหัส, รหัสถูก/ผิด/หมดอายุ/ผิดเกิน 5 ครั้ง, อีเมลใหม่สร้างบัญชี, Guest → OTP ย้ายผังครบ",
-      "status": "not-started",
+      "status": "done",
       "role": "bff",
       "summary": "ล็อกอินด้วยอีเมล + รหัส OTP โดยไม่ต้องสมัครและไม่มีรหัสผ่าน",
-      "sprint": 4
+      "sprint": 4,
+      "evidence": "สัญญา API contracts/openapi.yaml เพิ่ม POST /v1/auth/otp/request และ POST /v1/auth/otp/verify (x-allow-anonymous: true, schemas, responses 200/400/401/429/5XX) และเพิ่ม provider 'email' ใน AuthProvider; mock-backend/handler.ts รองรับ OTP store ในหน่วยความจำ, rate limit cooldown 60 วิ (429 + Retry-After), รหัส 6 หลักหมดอายุ 10 นาที, ลองผิดได้ 5 ครั้ง (400 OTP_INVALID พร้อม attemptsLeft, ผิดเกิน 400 OTP_ATTEMPTS_EXCEEDED), สร้างบัญชี user ใหม่อัตโนมัติเมื่ออีเมลยังไม่มีในระบบ; Auth.js เพิ่ม credentials provider 'email-otp' และ BFF เพิ่ม POST /api/auth/otp/request; account-sync รองรับการย้ายผัง Guest → Email OTP สมบูรณ์; Unit tests ครอบคลุมใน contracts/openapi.test.ts, mock-backend/handler.test.ts, src/server/otp-handlers.test.ts, src/server/account-handlers.test.ts ผ่าน 100% (722 tests); make contract ผ่าน, make lint ผ่าน (0 errors, 0 warnings)"
     },
     {
       "id": "feat-062",
@@ -848,11 +849,12 @@
         "feat-061"
       ],
       "gate": "E2E (mock OTP): อีเมล → รหัส → ถึง /projects และ ?next= พากลับถูก, open redirect ถูกกัน, ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, ใช้คีย์บอร์ดได้ทั้ง flow",
-      "status": "not-started",
+      "status": "done",
       "role": "frontend",
       "summary": "หน้าเข้าสู่ระบบด้วย Google หรืออีเมล OTP",
       "sprint": 4,
-      "ux_ref": "design-html/account-ux/login.html"
+      "ux_ref": "design-html/account-ux/login.html",
+      "evidence": "สร้าง src/lib/safe-redirect.ts ป้องกัน Open Redirect (3/3 unit tests passed); สร้าง src/components/auth/login-form.tsx รองรับ Step 1 กรอกอีเมล/Google sign-in, Step 2 กรอก OTP 6 หลัก ช่องเดียว inputmode=numeric autocomplete=one-time-code, นับถอยหลัง 60 วิ, เปลี่ยนอีเมล, ตรวจสอบ session ปัจจุบัน (Guest เข้าได้ / ผู้ใช้ล็อกอินแล้ว redirect อัตโนมัติ); สร้าง app/login/page.tsx ครอบด้วย AppProviders และ Suspense; เพิ่มลิงก์เข้าสู่ระบบใน Header ของ app/(marketing)/page.tsx; เขียน Unit tests ใน src/components/auth/login-form.test.tsx ครอบคลุมทุก flow (8/8 tests passed); เขียน Playwright E2E tests ใน e2e/login-otp.spec.ts ครบ 10 tests (โฟลว์ OTP, ?next= redirect, open redirect check, คีย์บอร์ดนำทาง, axe WCAG 2.1 AA audit 0 violations, และ 6 breakpoints ไม่มี horizontal scrollbar); make lint และ make contract ผ่าน 100%, npm test ผ่าน 51 files (733 tests passed)"
     },
     {
       "id": "feat-063",
@@ -862,11 +864,12 @@
         "feat-062"
       ],
       "gate": "E2E: สร้าง → เห็นการ์ดพร้อมภาพย่อในรายการ → เปิดได้, ลบผ่านเมนู ⋯ + ยืนยัน → หายจากรายการและเปิดลิงก์เดิมได้ 404, เมนู ⋯ ใช้คีย์บอร์ดได้ (Enter/ลูกศร/Esc คืนโฟกัส), ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, dialog สร้างผัง: ชื่อว่าง/ยาวเกิน 80 และขนาดนอก 2–30 ม. แสดงข้อผิดพลาดไทยและโฟกัสช่องที่ผิด, ผังที่สร้างได้ขนาด/ประตูตรงที่เลือก และไม่ขึ้น onboarding ใน playground, make lint ผ่านรวม contract check",
-      "status": "not-started",
+      "status": "done",
       "role": "frontend",
       "summary": "ที่รวมผังทั้งหมดของผู้ใช้: ดู สร้าง ลบ",
       "sprint": 4,
-      "ux_ref": "design-html/account-ux/projects.html"
+      "ux_ref": "design-html/account-ux/projects.html",
+      "evidence": "1. ปรับสัญญา API contracts/openapi.yaml เพิ่ม name (1-80 chars) ใน SaveLayoutRequest, StoredLayout, LayoutSummary และ layout ใน LayoutSummary (make contract ผ่าน 100%)\n2. อัปเดต mock-backend/handler.ts ให้รองรับ name, layout และ fallback สำหรับผังเดิม (unit tests 35/35 passed)\n3. อัปเดต Layout Schemas, Repository, Handlers, ApiClient, LayoutQueries ให้ส่งและรับ name/layout\n4. เพิ่ม createStarterLayout ใน src/core/layout/sample-layout.ts จัดวาง Kitchen, Counter, Table 2 ที่นั่ง และ ประตู ไม่ทับและไม่ชน ผ่าน Ready/Warning บันทึกลง BFF ได้โดยไม่ติดสถานะ Blocked (unit tests 2/2 passed)\n5. สร้าง UI Components: DeleteConfirmDialog (Radix, โฟกัสเริ่มต้นที่ปุ่มยกเลิก), CreateProjectDialog (ตรวจสอบชื่อ 1-80 ตัวอักษร, ขนาด 2-30 ม., ประตู 4 ด้าน, ปุ่มใช้ผังตัวอย่าง), ProjectCardMenu (ปุ่ม ⋯, เมนูเปิด/ลบ, Esc คืนโฟกัสที่ปุ่ม ⋯), ProjectCard (ภาพย่อ SVG ผ่าน renderPlanSvg grid:false, วันที่ภาษาไทย, hover/focus/touch friendly), ProjectsHeader (โลโก้, เมนูบัญชี, responsive label), ProjectsList (Empty state, โควตา 20 ผัง, Skeleton โหลด, จัดการ CRUD ครบถ้วน)\n6. สร้าง Route app/(app)/projects/page.tsx และ app/(app)/playground/[id]/page.tsx + playground-with-id-client.tsx\n7. เขียน Vitest unit tests สำหรับทุกคอมโพเนนต์ (748/748 tests passed)\n8. เขียน Playwright E2E tests ใน e2e/projects.spec.ts ผ่านครบ 10/10 tests (สร้างผัง, แสดงการ์ดภาพย่อ, เปิดผัง, ลบผัง, คีย์บอร์ดนำทาง Esc คืนโฟกัส, Axe WCAG 2.1 AA audit 0 violations, 6 Breakpoints 320-1440px ไม่มี horizontal scrollbar)\n9. make lint, make test, make contract ผ่าน 100%"
     },
     {
       "id": "feat-064",
@@ -877,10 +880,11 @@
         "feat-063"
       ],
       "gate": "E2E: Guest วาดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → อยู่ที่ /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังเหมือนเดิม, ผัง Blocked ยังบันทึกได้แต่เริ่มจำลองไม่ได้, unit + e2e ผ่าน, แก้ชื่อใน playground แล้วชื่อใน /projects ตรงกันหลัง refresh, แก้ชื่อใช้คีย์บอร์ดได้และมี aria-label ไทย",
-      "status": "not-started",
+      "status": "done",
       "role": "frontend",
       "summary": "ผังแต่ละอันมี URL ของตัวเอง และ Guest บันทึกเข้าบัญชีได้ไม่หาย",
-      "sprint": 4
+      "sprint": 4,
+      "evidence": "1. zustand store: เพิ่ม layoutName, layoutId, loadLayout(layout, name?, id?), resetLayout, restoreHistory (unit tests 27/27 passed)\n2. draft storage & autosave: รองรับ name ใน Draft schema และข้ามบันทึก local draft เมื่อเป็นผังออนไลน์ (unit tests 12/12 passed)\n3. สร้าง InlineLayoutName (src/components/editor/inline-layout-name.tsx): แก้ไขชื่อ inline, Enter/blur บันทึก, Esc ยกเลิก, ค่าว่างคืนชื่อเดิม, ยิง PUT เมื่อเป็นผังออนไลน์ (unit tests 5/5 passed)\n4. สร้าง SaveOnlineDialog (src/components/editor/save-online-dialog.tsx): Radix Dialog ถามชื่อผังก่อนนำทางไป /login?next=/playground?sync=1 (unit tests 1/1 passed)\n5. สร้าง useOnlineAutosave (src/lib/online-autosave.ts): debounce save ผังออนไลน์เมื่อมีการแก้ไข โดยตรวจสอบ validation ก่อน (unit tests 2/2 passed)\n6. สร้าง useGuestSync (src/lib/guest-sync.ts): เมื่อล็อกอินเสร็จกลับมาที่ ?sync=1 จะ sync ผังและชื่อเข้า backend พร้อมสุ่ม ID เฉพาะของผู้ใช้ แล้ว redirect ไป /playground/[id] (unit tests 4/4 passed)\n7. อัปเดต PlaygroundHeader: แสดง InlineLayoutName, เมนูโปรเจกต์, ปุ่มลิงก์ 'ผังของฉัน' เมื่อล็อกอินแล้ว, ปุ่ม 'บันทึกออนไลน์' (contrast WCAG 2.1 AA ผ่าน) เมื่อเป็น Guest\n8. สร้าง route /playground/[id] และหน้า 404 ภาษาไทย app/(app)/playground/[id]/not-found.tsx พร้อมปุ่มนำทางกลับ\n9. Playwright E2E: e2e/playground-id-online.spec.ts ผ่านครบ 10/10 tests (Guest จัดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังอยู่, inline name edit, 404 ไม่ใช่เจ้าของ, blocked gate, Axe 0 violations, responsive 6 breakpoints 320-1440px)\n10. make lint, make contract, make test (59 test files, 760 tests) ผ่าน 100%"
     }
   ]
 }

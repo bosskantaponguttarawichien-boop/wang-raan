@@ -95,16 +95,24 @@ export interface LayoutStoreState {
   runValidation: () => ValidationResult;
   invalidateValidation: () => void;
 
+  // Metadata
+  /** ชื่อผังร้าน (1–80 ตัวอักษร) */
+  layoutName: string;
+  setLayoutName: (name: string) => void;
+  /** รหัสผังออนไลน์ (null = ร่างในเครื่อง / Guest) */
+  layoutId: string | null;
+  setLayoutId: (id: string | null) => void;
+
   // History & Persistence
   undo: () => void;
   redo: () => void;
-  loadLayout: (layout: StoreLayout) => void;
+  loadLayout: (layout: StoreLayout, name?: string, id?: string | null) => void;
   /** แทนผังทั้งฉบับ (เช่น นำเข้าไฟล์) เป็นการแก้ไขหนึ่งขั้น — Undo กลับผังเดิมได้ */
   replaceLayout: (layout: StoreLayout) => void;
   /** โหลดผังตัวอย่าง "คาเฟ่ 8×6 ม." แทนผังเดิม — Undo กลับผังเดิมได้ */
   loadSampleLayout: () => void;
   /** กู้คืนผังพร้อมประวัติ Undo/Redo (Draft) — ตัดประวัติให้ไม่เกิน HISTORY_LIMIT */
-  restoreHistory: (history: StoreLayout[], historyIndex: number) => void;
+  restoreHistory: (history: StoreLayout[], historyIndex: number, name?: string) => void;
   /** เริ่มผังใหม่ (ผังเริ่มต้น) และล้างประวัติ */
   resetLayout: () => void;
 }
@@ -291,44 +299,55 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       },
       invalidateValidation: () => set({ validation: null }),
 
+      layoutName: "ร้านกาแฟของฉัน",
+      setLayoutName: (name: string) => set({ layoutName: name }),
+      layoutId: null,
+      setLayoutId: (id: string | null) => set({ layoutId: id }),
+
       undo: () => {
         set({ interactionBase: null });
         travel(get().historyIndex - 1);
       },
       redo: () => travel(get().historyIndex + 1),
 
-      loadLayout: (layout) =>
-        set({
+      loadLayout: (layout, name, id) =>
+        set((prev) => ({
           layout,
+          layoutName: name ?? prev.layoutName,
+          layoutId: id !== undefined ? id : prev.layoutId,
           layoutRevision: computeLayoutRevision(layout),
           validation: null,
           selectedObjectId: null,
           history: [layout],
           historyIndex: 0,
           interactionBase: null,
-        }),
+        })),
 
       replaceLayout: (layout) => commit(layout, null),
       loadSampleLayout: () => commit(createSampleCafeLayout(newId), null),
 
-      restoreHistory: (history, historyIndex) => {
+      restoreHistory: (history, historyIndex, name) => {
         if (history.length === 0) return;
         const start = Math.max(0, history.length - (HISTORY_LIMIT + 1));
         const kept = history.slice(start);
         const index = Math.min(kept.length - 1, Math.max(0, historyIndex - start));
         const layout = kept[index]!;
-        set({
+        set((prev) => ({
           layout,
+          layoutName: name ?? prev.layoutName,
           layoutRevision: computeLayoutRevision(layout),
           validation: null,
           selectedObjectId: null,
           history: kept,
           historyIndex: index,
           interactionBase: null,
-        });
+        }));
       },
 
-      resetLayout: () => get().loadLayout(createInitialLayout(newId)),
+      resetLayout: () => {
+        set({ layoutId: null, layoutName: "ร้านกาแฟของฉัน" });
+        get().loadLayout(createInitialLayout(newId));
+      },
     };
   });
 }

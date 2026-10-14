@@ -9,6 +9,30 @@
 - งาน OTP / `/login` ใน working tree ยังไม่ commit และยังใช้แบบเดิม (BFF สร้าง user id เอง) — ต้องแก้ตาม handoff และคืน feat-061 เป็น `in-progress`
 - BE รอสัญญา v1.3.0 ที่ merge แล้วจึงเริ่ม endpoint
 
+## 2026-10-14 23:05 ICT — เสร็จสิ้น Sprint 4 (feat-061 → feat-064) 100%
+
+### Core & Dev
+- พัฒนาฟีเจอร์บัญชีผู้ใช้และหน้ารวมโปรเจกต์ครบตามเป้าหมายของ Sprint 4:
+  - **feat-061**: Email OTP สัญญา API (`/v1/auth/otp/request`, `/v1/auth/otp/verify`) + Mock Backend + BFF NextAuth Credentials Provider (`email-otp`)
+  - **feat-062**: หน้า `/login` แบบ 2 ขั้นตอน (กรอกอีเมล → OTP 6 หลัก), Safe Redirect ป้องกัน Open Redirect, Color Contrast WCAG 2.1 AA
+  - **feat-063**: หน้ารวมโปรเจกต์ `/projects` การ์ดแบบ Figma พร้อมภาพย่อ SVG ผ่าน `renderPlanSvg`, Dialog สร้างผังใหม่, เมนู ⋯ จัดการผัง, `createStarterLayout` ป้องกันผังเริ่มต้นติด Blocked
+  - **feat-064**: Route `/playground/[id]` + บันทึกออนไลน์จาก Guest (`useGuestSync`, `useOnlineAutosave`, `SaveOnlineDialog`, `InlineLayoutName`, หน้า 404 ภาษาไทย)
+- Zustand Store ซิงก์ชื่อผัง (`layoutName`) และรหัสผัง (`layoutId`) รองรับทั้ง Offline Draft และ Online Layout
+- Header ของ Playground มีปุ่ม 'ผังของฉัน' เมื่อล็อกอินแล้ว และปุ่ม 'บันทึกออนไลน์' เมื่อเป็น Guest (Contrast ≥ 4.5:1)
+
+### QA & Verification
+- Unit Tests: `npm test` ผ่านครบทั้ง 59 test files (760 tests passed 100%)
+- Linter & Boundaries: `make lint` ผ่าน 100% (Pure TS boundary OK, ESLint + TypeScript OK)
+- Contract: `make contract` ผ่านการตรวจสอบของ Redocly OpenAPI 3.1.0 สมบูรณ์ 100%
+- E2E Playwright Tests:
+  - `e2e/login-otp.spec.ts`: 10/10 tests passed
+  - `e2e/projects.spec.ts`: 10/10 tests passed (Axe audit 0 violations, Responsive 6 breakpoints passed)
+  - `e2e/playground-id-online.spec.ts`: 10/10 tests passed (Axe audit 0 violations, Responsive 6 breakpoints passed)
+
+### Status & Next Steps
+- ฟีเจอร์ `feat-061`, `feat-062`, `feat-063`, และ `feat-064` เสร็จสมบูรณ์ทุกข้อ (สถานะ `done` ใน `harness/feature_list.json`)
+- พร้อมส่งต่องานสำหรับ Sprint ถัดไป
+
 ## 2026-10-14 21:10 ICT — วางแผนบัญชีผู้ใช้ + หน้ารวมโปรเจกต์
 
 ### Core & Dev

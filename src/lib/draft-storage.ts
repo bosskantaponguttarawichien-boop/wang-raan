@@ -13,6 +13,7 @@ export const DRAFT_KEY = "wang-raan:draft:v1";
 
 export interface Draft {
   savedAt: string;
+  name?: string;
   history: StoreLayout[];
   historyIndex: number;
 }
@@ -21,6 +22,7 @@ const DraftSchema = z
   .object({
     schema: z.literal(1),
     savedAt: z.string().datetime(),
+    name: z.string().max(80).optional(),
     history: z.array(StoreLayoutSchema).min(1).max(41),
     historyIndex: z.number().int().min(0),
   })
@@ -47,8 +49,8 @@ export function loadDraft(storage: Storage | null): Draft | null {
   try {
     const parsed = DraftSchema.safeParse(JSON.parse(raw));
     if (parsed.success) {
-      const { savedAt, history, historyIndex } = parsed.data;
-      return { savedAt, history: history as StoreLayout[], historyIndex };
+      const { savedAt, name, history, historyIndex } = parsed.data;
+      return { savedAt, name, history: history as StoreLayout[], historyIndex };
     }
   } catch {
     // JSON เสีย → ทิ้งด้านล่าง
@@ -61,10 +63,14 @@ export type SaveResult = { ok: true; keptHistory: number } | { ok: false; reason
 
 export function saveDraft(storage: Storage | null, draft: Draft): SaveResult {
   if (!storage) return { ok: false, reason: "unavailable" };
+  const { name } = draft;
   let { history, historyIndex } = draft;
   for (;;) {
     try {
-      storage.setItem(DRAFT_KEY, JSON.stringify({ schema: 1, savedAt: draft.savedAt, history, historyIndex }));
+      storage.setItem(
+        DRAFT_KEY,
+        JSON.stringify({ schema: 1, savedAt: draft.savedAt, ...(name ? { name } : {}), history, historyIndex }),
+      );
       return { ok: true, keptHistory: history.length };
     } catch (error) {
       if (!isQuotaError(error)) return { ok: false, reason: "error" };

@@ -24,6 +24,7 @@ async function parseAndValidate(request: Request) {
     };
   }
   const layout = parsed.data.layout;
+  const name = parsed.data.name;
   const validation = validateLayout(layout);
   if (validation.status === "blocked") {
     return {
@@ -34,7 +35,7 @@ async function parseAndValidate(request: Request) {
       }),
     };
   }
-  return { ok: true as const, layout, validation };
+  return { ok: true as const, layout, validation, name };
 }
 
 export function createLayoutHandlers(repo: LayoutRepository, resolveUser: ResolveUser) {
@@ -45,7 +46,7 @@ export function createLayoutHandlers(repo: LayoutRepository, resolveUser: Resolv
     create: withUser(resolveUser, async (user, request) => {
       const result = await parseAndValidate(request);
       if (!result.ok) return result.response;
-      const stored = await repo.create(user.id, result.layout);
+      const stored = await repo.create(user.id, result.layout, result.name);
       if (stored === "conflict") return problem(409, "LAYOUT_EXISTS", "มีผังรหัสนี้อยู่แล้ว ใช้ PUT เพื่ออัปเดต");
       return json(stored, 201);
     }),
@@ -59,7 +60,7 @@ export function createLayoutHandlers(repo: LayoutRepository, resolveUser: Resolv
       const result = await parseAndValidate(request);
       if (!result.ok) return result.response;
       if (result.layout.id !== id) return problem(400, "ID_MISMATCH", "รหัสผังใน URL ไม่ตรงกับข้อมูล");
-      const stored = await repo.update(user.id, result.layout);
+      const stored = await repo.update(user.id, result.layout, result.name);
       return stored === "not-found" ? notFound() : json(stored);
     }),
 

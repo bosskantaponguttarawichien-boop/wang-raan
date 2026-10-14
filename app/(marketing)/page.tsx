@@ -148,6 +148,7 @@ export default function HomePage() {
           <a href="#how-it-works">วิธีใช้งาน</a>
           <a href="#faq">คำถามที่พบบ่อย</a>
           <a href="#contact">ติดต่อเรา</a>
+          <Link href="/login">เข้าสู่ระบบ</Link>
         </nav>
         <Link className="cta header-cta" href="/playground">
           เริ่มจัดร้าน

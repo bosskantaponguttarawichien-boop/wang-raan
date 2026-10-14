@@ -36,15 +36,17 @@ export function useLayoutsQuery(enabled: boolean, client: ApiClient = api) {
   return useQuery({ queryKey: layoutKeys.list(), queryFn: client.listLayouts, enabled });
 }
 
-function summaryOf(layout: StoreLayout, updatedAt: string): LayoutSummaryDto {
+function summaryOf(layout: StoreLayout, updatedAt: string, name?: string): LayoutSummaryDto {
   return {
     id: layout.id,
+    name: name || `ผังร้าน ${layout.width} × ${layout.depth} ม.`,
     width: layout.width,
     depth: layout.depth,
     objectCount: layout.objects.length,
     // ผลตรวจฝั่ง Client สำหรับแสดงชั่วคราว — ค่าจริงมาจาก BFF หลังบันทึก
     status: validateLayout(layout).status,
     updatedAt,
+    layout,
   };
 }
 

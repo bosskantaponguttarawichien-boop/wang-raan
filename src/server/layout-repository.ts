@@ -11,6 +11,7 @@ import type { BackendClient } from "./token-relay";
 export { BackendError } from "./backend";
 
 export interface StoredLayout {
+  name: string;
   layout: StoreLayout;
   validation: ValidationResult;
   createdAt: string;
@@ -19,18 +20,20 @@ export interface StoredLayout {
 
 export interface LayoutSummary {
   id: string;
+  name: string;
   width: number;
   depth: number;
   objectCount: number;
   status: ValidationResult["status"];
   updatedAt: string;
+  layout: StoreLayout;
 }
 
 export interface LayoutRepository {
   list(ownerId: string): Promise<LayoutSummary[]>;
   get(ownerId: string, id: string): Promise<StoredLayout | null>;
-  create(ownerId: string, layout: StoreLayout): Promise<StoredLayout | "conflict">;
-  update(ownerId: string, layout: StoreLayout): Promise<StoredLayout | "not-found">;
+  create(ownerId: string, layout: StoreLayout, name?: string): Promise<StoredLayout | "conflict">;
+  update(ownerId: string, layout: StoreLayout, name?: string): Promise<StoredLayout | "not-found">;
   remove(ownerId: string, id: string): Promise<boolean>;
 }
 
@@ -47,16 +50,28 @@ export function createRemoteLayoutRepository(client: BackendClient = backendClie
       const res = await send(client, ownerId, item(id), {}, [404]);
       return res.status === 404 ? null : readBody<StoredLayout>(res);
     },
-    async create(ownerId, layout) {
-      const res = await send(client, ownerId, "/v1/layouts", { method: "POST", body: JSON.stringify({ layout }) }, [409]);
+    async create(ownerId, layout, name) {
+      const res = await send(
+        client,
+        ownerId,
+        "/v1/layouts",
+        { method: "POST", body: JSON.stringify({ layout, ...(name ? { name } : {}) }) },
+        [409],
+      );
       if (res.status !== 409) return readBody<StoredLayout>(res);
       // 409 มีสองแบบ: id ซ้ำ (ให้ผู้เรียกสลับไป PUT) หรือโควตาเต็ม (ส่งต่อให้ผู้ใช้)
       const error = ((await res.json().catch(() => null)) as { error?: Record<string, unknown> } | null)?.error ?? {};
       if (error.code === "LAYOUT_EXISTS") return "conflict";
       throw new BackendError(409, typeof error.code === "string" ? error.code : null, error);
     },
-    async update(ownerId, layout) {
-      const res = await send(client, ownerId, item(layout.id), { method: "PUT", body: JSON.stringify({ layout }) }, [404]);
+    async update(ownerId, layout, name) {
+      const res = await send(
+        client,
+        ownerId,
+        item(layout.id),
+        { method: "PUT", body: JSON.stringify({ layout, ...(name ? { name } : {}) }) },
+        [404],
+      );
       return res.status === 404 ? "not-found" : readBody<StoredLayout>(res);
     },
     async remove(ownerId, id) {

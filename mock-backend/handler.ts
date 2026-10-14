@@ -21,7 +21,15 @@ export { LAYOUT_LIMIT, SHARE_LIMIT, SHARE_MAX_DAYS };
 const DAY_MS = 24 * 60 * 60 * 1000;
 const KB = 1024;
 
-type Provider = "guest" | "google" | "line" | "github";
+type Provider = "guest" | "google" | "line" | "github" | "email";
+
+interface OtpRecord {
+  email: string;
+  code: string;
+  expiresAt: number;
+  attemptsLeft: number;
+  lastRequestedAt: number;
+}
 
 interface UserRecord {
   id: string;
@@ -33,6 +41,7 @@ interface UserRecord {
   updatedAt: string;
 }
 interface LayoutRecord {
+  name: string;
   layout: StoreLayout;
   validation: ValidationResult;
   createdAt: string;
@@ -62,6 +71,7 @@ export interface MockBackendOptions {
   secret: string;
   now?: () => Date;
   newShareKey?: () => string;
+  newOtpCode?: (email: string) => string;
 }
 
 class HttpProblem extends Error {
@@ -85,9 +95,13 @@ const ExpiresAtSchema = z.string().datetime({ offset: true }).nullable();
 const CreateShareSchema = z.object({ expiresAt: ExpiresAtSchema.optional() }).strict();
 const UpdateShareSchema = z.object({ expiresAt: ExpiresAtSchema }).strict();
 const ContactMessageSchema = ContactSchema.omit({ website: true });
+const RequestOtpSchema = z.object({ email: z.string().email().max(254) }).strict();
+const VerifyOtpSchema = z
+  .object({ email: z.string().email().max(254), code: z.string().regex(/^[0-9]{6}$/) })
+  .strict();
 const ProfileSchema = z
   .object({
-    provider: z.enum(["guest", "google", "line", "github"]),
+    provider: z.enum(["guest", "google", "line", "github", "email"]),
     name: z.string().max(200).nullable().optional(),
     email: z.string().email().max(254).nullable().optional(),
     image: z.string().url().max(2048).nullable().optional(),
@@ -99,18 +113,20 @@ const MergeGuestSchema = z
 
 function providerOf(userId: string): Provider {
   const prefix = userId.split("-")[0];
-  return prefix === "google" || prefix === "line" || prefix === "github" ? prefix : "guest";
+  return prefix === "google" || prefix === "line" || prefix === "github" || prefix === "email" ? (prefix as Provider) : "guest";
 }
 
 export function createMockBackend(options: MockBackendOptions) {
   const now = options.now ?? (() => new Date());
   const newShareKey = options.newShareKey ?? createShareKey;
+  const newOtpCode = options.newOtpCode ?? (() => "123456");
   const iso = () => now().toISOString();
 
   let users = new Map<string, UserRecord>();
   let layouts = new Map<string, Map<string, LayoutRecord>>();
   let shares = new Map<string, ShareRecord>();
   let contacts: ContactRecord[] = [];
+  let otps = new Map<string, OtpRecord>();
   const minute10 = 10 * 60 * 1000;
   const clock = () => now().getTime();
   let limiters = {
@@ -128,6 +144,7 @@ export function createMockBackend(options: MockBackendOptions) {
     layouts = new Map();
     shares = new Map();
     contacts = [];
+    otps = new Map();
     limiters = {
       ip: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
       user: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
@@ -154,13 +171,15 @@ export function createMockBackend(options: MockBackendOptions) {
     expiresAt: s.expiresAt,
     revokedAt: s.revokedAt,
   });
-  const summary = ({ layout, validation, updatedAt }: LayoutRecord) => ({
+  const summary = ({ name, layout, validation, updatedAt }: LayoutRecord) => ({
     id: layout.id,
+    name: name || `ผังร้าน ${layout.width} × ${layout.depth} ม.`,
     width: layout.width,
     depth: layout.depth,
     objectCount: layout.objects.length,
     status: validation.status,
     updatedAt,
+    layout,
   });
 
   // ── อ่าน request ─────────────────────────────────────────────────────────
@@ -191,7 +210,7 @@ export function createMockBackend(options: MockBackendOptions) {
   }
 
   function parseLayout(body: unknown) {
-    const { layout } = parse(SaveLayoutRequestSchema, body, "INVALID_LAYOUT_SCHEMA");
+    const { layout, name } = parse(SaveLayoutRequestSchema, body, "INVALID_LAYOUT_SCHEMA");
     const validation = validateLayout(layout, { now });
     if (validation.status === "blocked") {
       throw new HttpProblem(422, "LAYOUT_BLOCKED", "layout has blocking issues", {
@@ -199,7 +218,7 @@ export function createMockBackend(options: MockBackendOptions) {
         issues: validation.issues.filter((i) => i.severity === "blocked"),
       });
     }
-    return { layout, validation };
+    return { layout, validation, name: name?.trim() };
   }
 
   function expiresAtFrom(value: string | null | undefined): string | null {
@@ -244,12 +263,18 @@ export function createMockBackend(options: MockBackendOptions) {
       method: "POST",
       pattern: /^\/v1\/layouts$/,
       handle: async ({ request, user }) => {
-        const { layout, validation } = parseLayout(await readBody(request, 512 * KB));
+        const { layout, validation, name } = parseLayout(await readBody(request, 512 * KB));
         const items = layoutsOf(user);
         if (items.has(layout.id)) throw new HttpProblem(409, "LAYOUT_EXISTS", "layout id already exists");
         if (items.size >= LAYOUT_LIMIT) throw new HttpProblem(409, "LAYOUT_LIMIT_REACHED", `limit ${LAYOUT_LIMIT} layouts`);
         const at = iso();
-        const record = { layout, validation, createdAt: at, updatedAt: at };
+        const record: LayoutRecord = {
+          name: name || `ผังร้าน ${layout.width} × ${layout.depth} ม.`,
+          layout,
+          validation,
+          createdAt: at,
+          updatedAt: at,
+        };
         items.set(layout.id, record);
         return json(record, 201);
       },
@@ -267,11 +292,12 @@ export function createMockBackend(options: MockBackendOptions) {
       method: "PUT",
       pattern: /^\/v1\/layouts\/([^/]+)$/,
       handle: async ({ request, user, params: [id] }) => {
-        const { layout, validation } = parseLayout(await readBody(request, 512 * KB));
+        const { layout, validation, name } = parseLayout(await readBody(request, 512 * KB));
         if (layout.id !== id) throw new HttpProblem(400, "ID_MISMATCH", "layout.id does not match path");
         const existing = layouts.get(user)?.get(id);
         if (!existing) throw new HttpProblem(404, "NOT_FOUND", "layout not found");
-        const record = { ...existing, layout, validation, updatedAt: iso() };
+        const finalName = name ?? existing.name ?? `ผังร้าน ${layout.width} × ${layout.depth} ม.`;
+        const record: LayoutRecord = { ...existing, name: finalName, layout, validation, updatedAt: iso() };
         layoutsOf(user).set(id, record);
         return json(record);
       },
@@ -467,6 +493,72 @@ export function createMockBackend(options: MockBackendOptions) {
         return json({ movedLayouts: moving.size, movedShares, renamed });
       },
     },
+    {
+      method: "POST",
+      pattern: /^\/v1\/auth\/otp\/request$/,
+      anonymous: true,
+      handle: async ({ request }) => {
+        const body = parse(RequestOtpSchema, await readBody(request, KB));
+        const email = body.email.trim().toLowerCase();
+        const existing = otps.get(email);
+        const currentTime = clock();
+        if (existing && currentTime - existing.lastRequestedAt < 60_000) {
+          const retryAfter = Math.max(1, Math.ceil((60_000 - (currentTime - existing.lastRequestedAt)) / 1000));
+          throw new HttpProblem(429, "RATE_LIMITED", "please wait before requesting a new code", { retryAfter });
+        }
+        const code = newOtpCode(email);
+        otps.set(email, {
+          email,
+          code,
+          expiresAt: currentTime + 10 * 60 * 1000,
+          attemptsLeft: 5,
+          lastRequestedAt: currentTime,
+        });
+        return json({ sent: true, expiresIn: 600 });
+      },
+    },
+    {
+      method: "POST",
+      pattern: /^\/v1\/auth\/otp\/verify$/,
+      anonymous: true,
+      handle: async ({ request }) => {
+        const body = parse(VerifyOtpSchema, await readBody(request, KB));
+        const email = body.email.trim().toLowerCase();
+        const record = otps.get(email);
+        const currentTime = clock();
+        if (!record || record.expiresAt <= currentTime) {
+          throw new HttpProblem(400, "OTP_EXPIRED", "รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่");
+        }
+        if (record.attemptsLeft <= 0) {
+          throw new HttpProblem(400, "OTP_ATTEMPTS_EXCEEDED", "กรอกรหัสผิดเกินจำนวนที่กำหนด กรุณาขอรหัสใหม่");
+        }
+        if (record.code !== body.code) {
+          record.attemptsLeft--;
+          if (record.attemptsLeft <= 0) {
+            throw new HttpProblem(400, "OTP_ATTEMPTS_EXCEEDED", "กรอกรหัสผิดเกินจำนวนที่กำหนด กรุณาขอรหัสใหม่");
+          }
+          throw new HttpProblem(400, "OTP_INVALID", "รหัสไม่ถูกต้อง", { attemptsLeft: record.attemptsLeft });
+        }
+        otps.delete(email);
+        let user = [...users.values()].find((u) => u.email?.toLowerCase() === email);
+        if (!user) {
+          const at = iso();
+          const id = `email-${globalThis.crypto.randomUUID()}`;
+          const name = email.split("@")[0] ?? "ผู้ใช้";
+          user = {
+            id,
+            provider: "email",
+            name,
+            email,
+            image: null,
+            createdAt: at,
+            updatedAt: at,
+          };
+          users.set(id, user);
+        }
+        return json({ user });
+      },
+    },
   ];
 
   function deleteUser(user: string) {
@@ -537,7 +629,7 @@ export function createMockBackend(options: MockBackendOptions) {
     fetch: handle,
     reset,
     /** สำหรับเทสต์ตรวจสถานะภายใน (เช่น ลบบัญชีแล้วไม่เหลือข้อมูล) */
-    inspect: () => ({ users, layouts, shares, contacts }),
+    inspect: () => ({ users, layouts, shares, contacts, otps }),
   };
 }
 

@@ -5,7 +5,7 @@ import { validateLayout } from "@/core/validation";
 import { contractFetch } from "./contract-checker";
 
 const layout = cafeLayout();
-const stored = { layout, validation: validateLayout(layout), createdAt: "2026-10-10T06:00:00.000Z", updatedAt: "2026-10-10T06:00:00.000Z" };
+const stored = { name: "ร้านกาแฟสาขาสยาม", layout, validation: validateLayout(layout), createdAt: "2026-10-10T06:00:00.000Z", updatedAt: "2026-10-10T06:00:00.000Z" };
 const headers = { authorization: "Bearer t", "x-request-id": "0f8fad5b-d9cb-469f-a165-70867728950e" };
 const json = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...extra } });

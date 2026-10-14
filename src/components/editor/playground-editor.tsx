@@ -14,6 +14,8 @@ import { layoutActions as actions, layoutStore, useLayoutStore } from "@/store/u
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getDraftStorage } from "@/lib/draft-storage";
 import { restoreDraft, startAutosave } from "@/lib/draft-autosave";
+import { useOnlineAutosave } from "@/lib/online-autosave";
+import { useGuestSync } from "@/lib/guest-sync";
 import { ZoomControls } from "./canvas-controls";
 import { PlaygroundHeader } from "./playground-header";
 import { PlaygroundRail } from "./playground-rail";
@@ -71,6 +73,7 @@ function useHistoryShortcuts() {
 export function PlaygroundEditor() {
   useHistoryShortcuts();
   useDraftAutosave();
+  useOnlineAutosave();
   const live = useLiveValidation();
   const is3D = useLayoutStore((s) => s.is3DView);
   const simStatus = useSimulationStore((s) => s.status);
@@ -87,6 +90,7 @@ export function PlaygroundEditor() {
       setToastMsg(null);
     }, 2400);
   };
+  useGuestSync({ onToast: showToast });
 
   const focusIssue = (index: number) => {
     const issue = live.result.issues[index];

@@ -7,7 +7,7 @@ import type { ShareDto, StoredLayoutDto } from "@/lib/api-client";
 import { backendClient, readBody, send } from "./backend";
 import type { BackendClient } from "./token-relay";
 
-export type AuthProvider = "guest" | "google" | "line" | "github";
+export type AuthProvider = "guest" | "google" | "line" | "github" | "email";
 
 export interface UserProfile {
   id: string;
@@ -48,7 +48,7 @@ export interface AccountRepository {
   mergeGuest(userId: string, guestId: string): Promise<MergeGuestResult>;
 }
 
-const PROVIDERS: readonly AuthProvider[] = ["guest", "google", "line", "github"];
+const PROVIDERS: readonly AuthProvider[] = ["guest", "google", "line", "github", "email"];
 
 /** provider จาก id ผู้ใช้ (`<provider>-<...>` ตาม auth-config.subjectFor) — รูปแบบอื่นคืน null */
 export function providerOf(userId: string): AuthProvider | null {

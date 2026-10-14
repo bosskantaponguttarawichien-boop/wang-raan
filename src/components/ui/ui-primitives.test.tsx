@@ -108,7 +108,7 @@ describe("ARIA ภาษาไทย", () => {
       <>
         <Button>บันทึก</Button>
         <Button asChild>
-          <a href="/playground">เริ่มจัดผังร้าน</a>
+          <a href="#test">เริ่มจัดผังร้าน</a>
         </Button>
       </>,
     );

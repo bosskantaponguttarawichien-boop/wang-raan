@@ -17,9 +17,12 @@ import {
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { summarizeIssues } from "@/components/validation/use-live-validation";
 import { createEmptyLayout, createEntrance, randomId, type Wall } from "@/core/layout";
+import { useSession } from "next-auth/react";
 import { DraftStatusText } from "./header-actions";
 import { CloudModal } from "./cloud-modal";
 import { OnboardingModal } from "./onboarding-modal";
+import { InlineLayoutName } from "./inline-layout-name";
+import { SaveOnlineDialog } from "./save-online-dialog";
 
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 const ICON_BTN =
@@ -30,6 +33,8 @@ export interface PlaygroundHeaderProps {
 }
 
 export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) {
+  const { data: session } = useSession();
+  const isLoggedIn = Boolean(session?.user?.id && !session.user.id.startsWith("guest-"));
   const is3D = useLayoutStore((s) => s.is3DView);
   const canUndo = useLayoutStore(selectCanUndo);
   const canRedo = useLayoutStore(selectCanRedo);
@@ -40,6 +45,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
   const [expOpen, setExpOpen] = React.useState(false);
   const [cloudOpen, setCloudOpen] = React.useState(false);
   const [onboardingOpen, setOnboardingOpen] = React.useState(false);
+  const [saveOnlineOpen, setSaveOnlineOpen] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -195,6 +201,9 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
           <span className="max-[767px]:hidden">วางร้าน</span>
         </Link>
 
+        {/* Project Name (Inline Editable) */}
+        <InlineLayoutName onToast={onToast} />
+
         {/* Project Menu */}
         <div className="relative" data-menu-wrap>
           <button
@@ -203,7 +212,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
             id="projBtn"
             aria-haspopup="menu"
             aria-expanded={projOpen}
-            aria-label="เมนูโปรเจกต์ ร้านกาแฟของฉัน"
+            aria-label="เมนูโปรเจกต์"
             onClick={() => {
               setExpOpen(false);
               setProjOpen(!projOpen);
@@ -213,7 +222,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
             <svg viewBox="0 0 24 24" className="size-4 shrink-0" aria-hidden="true" {...ICON}>
               <path d="M4 6h16M4 12h16M4 18h16" />
             </svg>
-            <span className="max-w-[160px] truncate max-[1023px]:hidden">ร้านกาแฟของฉัน</span>
+            <span className="max-w-[160px] truncate max-[1023px]:hidden">เมนู</span>
             <svg viewBox="0 0 24 24" className="size-3.5 shrink-0 text-muted" aria-hidden="true" {...ICON}>
               <path d="m6 9 6 6 6-6" />
             </svg>
@@ -226,6 +235,45 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
               aria-label="เมนูโปรเจกต์"
               className="absolute left-0 top-[calc(100%+6px)] z-40 min-w-[220px] rounded-[12px] border border-line bg-white p-1.5 shadow-[0_10px_30px_rgba(30,43,64,0.12)]"
             >
+              {isLoggedIn ? (
+                <Link
+                  href="/projects"
+                  role="menuitem"
+                  data-act="projects"
+                  onClick={closeMenus}
+                  className="flex w-full items-start gap-2.5 rounded-[8px] p-2 text-left text-[13px] text-ink hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus no-underline"
+                >
+                  <svg viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden="true" {...ICON}>
+                    <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z" />
+                  </svg>
+                  <div>
+                    <span className="block font-medium">ผังของฉัน</span>
+                    <small className="block text-[11px] text-muted">กลับไปหน้ารวมโปรเจกต์</small>
+                  </div>
+                </Link>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-act="save-online"
+                  onClick={() => {
+                    closeMenus();
+                    setSaveOnlineOpen(true);
+                  }}
+                  className="flex w-full items-start gap-2.5 rounded-[8px] p-2 text-left text-[13px] text-ink hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+                >
+                  <svg viewBox="0 0 24 24" className="mt-0.5 size-4 shrink-0 text-blue" aria-hidden="true" {...ICON}>
+                    <path d="M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6L16 6a5 5 0 0 1 1 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <div>
+                    <span className="block font-medium text-blue">บันทึกออนไลน์</span>
+                    <small className="block text-[11px] text-muted">บันทึกเข้าบัญชีของคุณ</small>
+                  </div>
+                </button>
+              )}
+
+              <hr className="my-1 border-t border-line" />
+
               <button
                 type="button"
                 role="menuitem"
@@ -310,6 +358,37 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
             </div>
           )}
         </div>
+
+        {/* My Projects / Save Online quick button */}
+        {isLoggedIn ? (
+          <Link
+            href="/projects"
+            id="myProjectsLink"
+            aria-label="ไปยังหน้ารวมผังของฉัน"
+            className="flex items-center gap-1.5 rounded-[8px] px-2 py-1.5 text-[13px] font-medium text-secondary hover:bg-surface hover:text-ink focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus no-underline max-[767px]:hidden"
+          >
+            <svg viewBox="0 0 24 24" className="size-4 shrink-0 text-secondary" aria-hidden="true" {...ICON}>
+              <path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z" />
+            </svg>
+            <span>ผังของฉัน</span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            id="saveOnlineBtn"
+            aria-label="บันทึกผังออนไลน์"
+            onClick={() => {
+              closeMenus();
+              setSaveOnlineOpen(true);
+            }}
+            className="flex items-center gap-1.5 rounded-[8px] bg-[#edf1ff] px-2.5 py-1.5 text-[13px] font-semibold text-[#1d4ed8] hover:bg-[#dce5ff] focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus transition-colors cursor-pointer max-[767px]:hidden"
+          >
+            <svg viewBox="0 0 24 24" className="size-4 shrink-0 text-[#1d4ed8]" aria-hidden="true" {...ICON}>
+              <path d="M7 16a4 4 0 0 1-.88-7.903A5 5 0 1 1 15.9 6L16 6a5 5 0 0 1 1 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            <span>บันทึกออนไลน์</span>
+          </button>
+        )}
 
         {/* Center: View Switcher */}
         <div className="flex flex-1 items-center justify-center min-w-0">
@@ -491,6 +570,9 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
 
       {/* Cloud & Share Modal */}
       <CloudModal open={cloudOpen} onOpenChange={setCloudOpen} />
+
+      {/* Save Online Modal */}
+      <SaveOnlineDialog open={saveOnlineOpen} onOpenChange={setSaveOnlineOpen} />
 
       {/* Onboarding / New Layout Modal */}
       <OnboardingModal

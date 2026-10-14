@@ -52,8 +52,11 @@ describe("Zod schemas — type-safe ตรงกับ Core types", () => {
     expect(result.error!.issues[0]!.path).toEqual(["objects", l.objects.length, "id"]);
   });
 
-  it("SaveLayoutRequest ต้องมี { layout } เท่านั้น", () => {
+  it("SaveLayoutRequest รับ { layout } หรือ { layout, name } เท่านั้น", () => {
     expect(SaveLayoutRequestSchema.safeParse({ layout: cafeLayout() }).success).toBe(true);
+    expect(SaveLayoutRequestSchema.safeParse({ layout: cafeLayout(), name: "ร้านกาแฟสาขาสยาม" }).success).toBe(true);
+    expect(SaveLayoutRequestSchema.safeParse({ layout: cafeLayout(), name: "" }).success).toBe(false);
+    expect(SaveLayoutRequestSchema.safeParse({ layout: cafeLayout(), name: "a".repeat(81) }).success).toBe(false);
     expect(SaveLayoutRequestSchema.safeParse(cafeLayout()).success).toBe(false);
   });
 

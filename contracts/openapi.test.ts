@@ -70,10 +70,12 @@ describe("โครงสร้างสัญญา", () => {
         "listLayouts",
         "listShares",
         "mergeGuest",
+        "requestOtp",
         "revokeShare",
         "updateLayout",
         "updateShare",
         "upsertMe",
+        "verifyOtp",
       ].sort(),
     );
   });
@@ -89,11 +91,13 @@ describe("โครงสร้างสัญญา", () => {
     }
   });
 
-  it("anonymous ใช้ได้เฉพาะเปิดลิงก์แชร์และส่งฟอร์มติดต่อ", () => {
+  it("anonymous ใช้ได้เฉพาะเปิดลิงก์แชร์, ส่งฟอร์มติดต่อ และขอ/ตรวจ OTP", () => {
     expect(operations.filter((o) => o.op["x-allow-anonymous"]).map((o) => o.op.operationId).sort()).toEqual([
       "createContactMessage",
       "getPublicShare",
-    ]);
+      "requestOtp",
+      "verifyOtp",
+    ].sort());
   });
 
   it("ตัวเลขโควตาในสัญญาตรงกับ src/server/limits.ts (ข้อความไทยของ BFF และ Backend จำลองใช้ค่าเดียวกัน)", () => {
@@ -183,17 +187,20 @@ describe("ผลตรวจและ response ของผัง", () => {
   });
 
   it("StoredLayout / LayoutSummary / PublicShare", () => {
-    expect(schema("StoredLayout")({ layout, validation, createdAt: at, updatedAt: at })).toBe(true);
+    expect(schema("StoredLayout")({ name: "ร้านกาแฟสาขาสยาม", layout, validation, createdAt: at, updatedAt: at })).toBe(true);
     expect(
-      schema("LayoutSummary")({ id: layout.id, width: layout.width, depth: layout.depth, objectCount: layout.objects.length, status: validation.status, updatedAt: at }),
+      schema("LayoutSummary")({ id: layout.id, name: "ร้านกาแฟสาขาสยาม", width: layout.width, depth: layout.depth, objectCount: layout.objects.length, status: validation.status, updatedAt: at, layout }),
     ).toBe(true);
     expect(schema("PublicShare")({ layout, validation, createdAt: at, expiresAt: null })).toBe(true);
     // PublicShare ห้ามเปิดเผยเจ้าของ
     expect(schema("PublicShare")({ layout, validation, createdAt: at, expiresAt: null, ownerId: "guest-1" })).toBe(false);
   });
 
-  it("SaveLayoutRequest รับแค่ { layout } — ผลตรวจ Backend คำนวณเอง", () => {
+  it("SaveLayoutRequest รับ { layout } และ { layout, name } (1–80 ตัวอักษร) — ผลตรวจ Backend คำนวณเอง", () => {
     expect(schema("SaveLayoutRequest")({ layout })).toBe(true);
+    expect(schema("SaveLayoutRequest")({ layout, name: "ร้านกาแฟสาขาสยาม" })).toBe(true);
+    expect(schema("SaveLayoutRequest")({ layout, name: "" })).toBe(false);
+    expect(schema("SaveLayoutRequest")({ layout, name: "a".repeat(81) })).toBe(false);
     expect(schema("SaveLayoutRequest")({ layout, validation })).toBe(false);
   });
 
@@ -262,6 +269,40 @@ describe("บัญชีผู้ใช้", () => {
     const at = "2026-10-10T06:00:00.000Z";
     expect(
       schema("User")({ id: "guest-1", provider: "guest", name: null, email: null, image: null, createdAt: at, updatedAt: at }),
+    ).toBe(true);
+  });
+
+  it("AuthProvider รองรับ email", () => {
+    expect(schema("AuthProvider")("email")).toBe(true);
+    expect(schema("AuthProvider")("facebook")).toBe(false);
+  });
+});
+
+describe("Email OTP", () => {
+  it("RequestOtpRequest ตรวจสอบความถูกต้องของอีเมล", () => {
+    expect(schema("RequestOtpRequest")({ email: "user@example.com" })).toBe(true);
+    expect(schema("RequestOtpRequest")({ email: "invalid-email" })).toBe(false);
+    expect(schema("RequestOtpRequest")({})).toBe(false);
+    expect(schema("RequestOtpRequest")({ email: "user@example.com", extra: 123 })).toBe(false);
+  });
+
+  it("RequestOtpResponse ต้องมี sent และ expiresIn", () => {
+    expect(schema("RequestOtpResponse")({ sent: true, expiresIn: 600 })).toBe(true);
+    expect(schema("RequestOtpResponse")({ sent: true })).toBe(false);
+  });
+
+  it("VerifyOtpRequest ตรวจสอบอีเมลและรหัส 6 หลัก", () => {
+    expect(schema("VerifyOtpRequest")({ email: "user@example.com", code: "123456" })).toBe(true);
+    expect(schema("VerifyOtpRequest")({ email: "user@example.com", code: "12345" })).toBe(false);
+    expect(schema("VerifyOtpRequest")({ email: "user@example.com", code: "abcdef" })).toBe(false);
+  });
+
+  it("VerifyOtpResponse คืน user ที่ถูกต้อง", () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    expect(
+      schema("VerifyOtpResponse")({
+        user: { id: "email-1", provider: "email", name: "Somchai", email: "user@example.com", image: null, createdAt: at, updatedAt: at },
+      }),
     ).toBe(true);
   });
 });

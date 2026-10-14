@@ -75,7 +75,7 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     render(<PlaygroundHeader onToast={toastFn} />);
 
     // กดปุ่มโปรเจกต์
-    const projBtn = screen.getByRole("button", { name: /ร้านกาแฟของฉัน/ });
+    const projBtn = screen.getByRole("button", { name: "เมนูโปรเจกต์" });
     await user.click(projBtn);
 
     // เมนูโปรเจกต์เปิดขึ้น

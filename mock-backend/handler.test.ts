@@ -68,15 +68,24 @@ describe("ผังร้าน", () => {
     expect(created.status).toBe(201);
     expect(created.body.validation.status).toBe("ready");
     expect(created.body.createdAt).toBe(new Date(T0).toISOString());
+    expect(created.body.name).toBe(`ผังร้าน ${layout.width} × ${layout.depth} ม.`);
 
-    expect((await call("GET", "/v1/layouts")).body.layouts).toEqual([
-      expect.objectContaining({ id: layout.id, objectCount: layout.objects.length, status: "ready" }),
+    const listRes = await call("GET", "/v1/layouts");
+    expect(listRes.body.layouts).toEqual([
+      expect.objectContaining({
+        id: layout.id,
+        name: `ผังร้าน ${layout.width} × ${layout.depth} ม.`,
+        objectCount: layout.objects.length,
+        status: "ready",
+        layout: expect.objectContaining({ id: layout.id }),
+      }),
     ]);
     expect((await call("GET", `/v1/layouts/${layout.id}`)).body.layout).toEqual(layout);
 
     clock += 60_000;
-    const updated = await call("PUT", `/v1/layouts/${layout.id}`, { body: { layout: { ...layout, width: 9 } } });
+    const updated = await call("PUT", `/v1/layouts/${layout.id}`, { body: { layout: { ...layout, width: 9 }, name: "ร้านกาแฟสาขาสยาม" } });
     expect(updated.status).toBe(200);
+    expect(updated.body.name).toBe("ร้านกาแฟสาขาสยาม");
     expect(updated.body.createdAt).toBe(created.body.createdAt);
     expect(updated.body.updatedAt).not.toBe(created.body.updatedAt);
 
@@ -371,5 +380,129 @@ describe("คำสั่งควบคุมสำหรับเทสต์ 
     );
     await control("reset");
     expect((await call("GET", "/v1/layouts")).body.layouts).toEqual([]);
+  });
+});
+
+describe("Email OTP", () => {
+  it("ขอรหัสสำเร็จ → ได้ { sent: true, expiresIn: 600 }", async () => {
+    const res = await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ sent: true, expiresIn: 600 });
+  });
+
+  it("ขอรหัสซ้ำก่อน 60 วินาที → 429 RATE_LIMITED พร้อม Retry-After", async () => {
+    await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    // ผ่านไป 20 วินาที
+    clock += 20 * 1000;
+    const res = await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    expect(res.status).toBe(429);
+    expect(res.body.error.code).toBe("RATE_LIMITED");
+    expect(res.headers.get("retry-after")).toBe("40");
+
+    // ผ่านไปอีก 40 วินาที (ครบ 60 วินาที) ขอใหม่ได้
+    clock += 40 * 1000;
+    const res2 = await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    expect(res2.status).toBe(200);
+  });
+
+  it("ตรวจรหัสถูกครั้งแรก → คืน user ใหม่ที่สร้างอัตโนมัติ (provider: email)", async () => {
+    const res = await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "newuser@example.com" },
+    });
+    expect(res.status).toBe(200);
+
+    const verifyRes = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "newuser@example.com", code: "123456" },
+    });
+    expect(verifyRes.status).toBe(200);
+    expect(verifyRes.body.user.email).toBe("newuser@example.com");
+    expect(verifyRes.body.user.provider).toBe("email");
+    expect(verifyRes.body.user.id).toMatch(/^email-/);
+    expect(verifyRes.body.user.name).toBe("newuser");
+
+    // ล็อกอินซ้ำ คืน user เดิม ไม่สร้าง id ใหม่
+    clock += 100 * 1000;
+    await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "newuser@example.com" },
+    });
+    const verifyRes2 = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "newuser@example.com", code: "123456" },
+    });
+    expect(verifyRes2.status).toBe(200);
+    expect(verifyRes2.body.user.id).toBe(verifyRes.body.user.id);
+  });
+
+  it("ตรวจรหัสผิด → 400 OTP_INVALID และลด attemptsLeft", async () => {
+    await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    const res = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "user@example.com", code: "999999" },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("OTP_INVALID");
+    expect(res.body.error.attemptsLeft).toBe(4);
+  });
+
+  it("ตรวจรหัสผิดเกิน 5 ครั้ง → 400 OTP_ATTEMPTS_EXCEEDED", async () => {
+    await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    for (let i = 0; i < 4; i++) {
+      const res = await call("POST", "/v1/auth/otp/verify", {
+        user: "anonymous",
+        body: { email: "user@example.com", code: "000000" },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe("OTP_INVALID");
+    }
+    const finalRes = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "user@example.com", code: "000000" },
+    });
+    expect(finalRes.status).toBe(400);
+    expect(finalRes.body.error.code).toBe("OTP_ATTEMPTS_EXCEEDED");
+
+    // ใส่รหัสถูกหลังจากนั้นก็ไม่ได้แล้ว
+    const afterRes = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "user@example.com", code: "123456" },
+    });
+    expect(afterRes.status).toBe(400);
+    expect(afterRes.body.error.code).toBe("OTP_ATTEMPTS_EXCEEDED");
+  });
+
+  it("รหัสหมดอายุ (หลัง 10 นาที) → 400 OTP_EXPIRED", async () => {
+    await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+    });
+    // ก้าวเวลาไป 10 นาที + 1 วินาที
+    clock += (10 * 60 + 1) * 1000;
+    const res = await call("POST", "/v1/auth/otp/verify", {
+      user: "anonymous",
+      body: { email: "user@example.com", code: "123456" },
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("OTP_EXPIRED");
   });
 });

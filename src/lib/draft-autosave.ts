@@ -26,7 +26,7 @@ export function useDraftStatus<T>(selector: (s: DraftStatusState) => T): T {
 export function restoreDraft(store: StoreApi<LayoutStoreState>, storage: Storage | null, status = draftStatusStore): Draft | null {
   const draft = loadDraft(storage);
   if (!draft) return null;
-  store.getState().restoreHistory(draft.history, draft.historyIndex);
+  store.getState().restoreHistory(draft.history, draft.historyIndex, draft.name);
   status.setState({ restoredAt: draft.savedAt, status: "saved", lastSavedAt: draft.savedAt });
   return draft;
 }
@@ -47,16 +47,26 @@ export function startAutosave(store: StoreApi<LayoutStoreState>, storage: Storag
   const flush = () => {
     if (timer) clearTimeout(timer);
     timer = null;
-    const { history, historyIndex } = store.getState();
+    const { history, historyIndex, layoutName, layoutId } = store.getState();
+    // ผังออนไลน์ไม่บันทึกทับ local draft ของ Guest
+    if (layoutId !== null) return;
     const savedAt = now().toISOString();
-    const result = saveDraft(storage, { savedAt, history, historyIndex });
+    const result = saveDraft(storage, { savedAt, name: layoutName, history, historyIndex });
     status.setState(result.ok ? { status: "saved", lastSavedAt: savedAt } : { status: "error" });
   };
 
   const unsubscribe = store.subscribe((state, prev) => {
-    // บันทึกเฉพาะเมื่อผังหรือประวัติเปลี่ยน (ไม่ใช่ selection / zoom / ผลตรวจ)
-    if (state.history === prev.history && state.historyIndex === prev.historyIndex) return;
-    if (state.history.length === 1) {
+    // ถ้าเป็นผังออนไลน์ ไม่บันทึกลง localStorage draft
+    if (state.layoutId !== null) return;
+    // บันทึกเฉพาะเมื่อผัง ประวัติ หรือชื่อผังเปลี่ยน (ไม่ใช่ selection / zoom / ผลตรวจ)
+    if (
+      state.history === prev.history &&
+      state.historyIndex === prev.historyIndex &&
+      state.layoutName === prev.layoutName
+    ) {
+      return;
+    }
+    if (state.history.length === 1 && (!state.layoutName || state.layoutName === "ร้านกาแฟของฉัน")) {
       // ผังเริ่มต้นใหม่ที่ยังไม่มีการแก้ไข (เริ่มผังใหม่) → ไม่มีอะไรต้องกู้คืน
       if (timer) clearTimeout(timer);
       timer = null;

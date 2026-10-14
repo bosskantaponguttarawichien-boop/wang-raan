@@ -3,6 +3,84 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-14] feat-064 /playground/[id] + บันทึกออนไลน์จาก Guest
+
+- **State Management & Draft Storage**:
+  - `src/store/use-layout-store.ts`: เพิ่ม `layoutName: string` (ค่าเริ่มต้น 'ร้านกาแฟของฉัน'), `layoutId: string | null`, `setLayoutName()`, `setLayoutId()`, อัปเดต `loadLayout(layout, name?, id?)`, `resetLayout()`, `restoreHistory()` (unit tests 27/27 ผ่าน)
+  - `src/lib/draft-storage.ts`: เพิ่มฟิลด์ `name?: string` (1-80 chars) ใน `DraftSchema` และ `saveDraft` / `loadDraft` (unit tests 12/12 ผ่าน)
+  - `src/lib/draft-autosave.ts`: ซิงก์ชื่อผังเข้ากับ draft และข้ามการบันทึกลง local storage เมื่อเป็นผังออนไลน์ (`layoutId !== null`)
+- **UI Components & Modals**:
+  - `src/components/editor/inline-layout-name.tsx`: คอมโพเนนต์แก้ไขชื่อผังแบบ Inline มุมซ้ายบน: คลิกเพื่อแก้ไข, Esc ยกเลิก, Enter หรือ blur เพื่อบันทึก, หากกรอกว่างจะคืนชื่อเดิม, รองรับ PUT `/api/layouts/[id]` เมื่อเป็นผังออนไลน์ (unit tests 5/5 ผ่าน)
+  - `src/components/editor/save-online-dialog.tsx`: Radix Accessible Dialog สำหรับ Guest ถามชื่อผังก่อนนำทางไปล็อกอิน (ค่าเริ่มต้นจากชื่อปัจจุบัน, จำกัด 80 ตัวอักษร, โฟกัสอัตโนมัติที่ input) พร้อมบันทึก draft ลง storage และนำทางไป `/login?next=/playground?sync=1` (unit tests 1/1 ผ่าน)
+  - `src/components/editor/playground-header.tsx`: ปรับปรุง Header ให้มี `InlineLayoutName`, ปุ่มเมนูโปรเจกต์ `#projBtn`, ปุ่มลิงก์ 'ผังของฉัน' (`/projects`) เมื่อเข้าสู่ระบบแล้ว, ปุ่ม 'บันทึกออนไลน์' (`#saveOnlineBtn`) มี Color Contrast ≥ 4.5:1 ตามเกณฑ์ WCAG 2.1 AA เมื่อเป็น Guest, และเพิ่ม `SaveOnlineDialog`
+- **Online Autosave & Guest Sync**:
+  - `src/lib/online-autosave.ts`: Hook `useOnlineAutosave` สำหรับ debounce 800ms บันทึกผังออนไลน์ผ่าน `api.updateLayout` เมื่อมีการแก้ไข พร้อมตรวจสอบ Inviolable Dual-Tier Validation (ถ้าผังติดสถานะ Blocked จะไม่ส่งขึ้น Backend) (unit tests 2/2 ผ่าน)
+  - `src/lib/guest-sync.ts`: Hook `useGuestSync` ตรวจจับ `?sync=1` หลังผู้ใช้ล็อกอิน OTP สำเร็จ ดึงผังร่างและชื่อจาก local storage หรือ store แล้วสร้างผังใหม่บน Backend ด้วย ID เฉพาะของผู้ใช้ จากนั้นเคลียร์ร่างและนำทางไป `/playground/[newLayout.id]` (unit tests 4/4 ผ่าน)
+- **Route /playground/[id] & 404 Handler**:
+  - `app/(app)/playground/[id]/page.tsx` & `playground-with-id-client.tsx`: ตรวจสอบ session และสิทธิ์ความเป็นเจ้าของผัง หากไม่พบหรือไม่มีสิทธิ์ให้เรียก `notFound()`
+  - `app/(app)/playground/[id]/not-found.tsx`: หน้า 404 ภาษาไทย 'ไม่พบผังร้านนี้' พร้อมคำอธิบายและปุ่มลิงก์กลับ 'ไปยังหน้ารวมผังร้าน' และ 'สร้างผังใหม่'
+- **Verification & Quality Gate**:
+  - Unit tests: `src/lib/guest-sync.test.ts` (4/4 passed), `src/lib/online-autosave.test.ts` (2/2 passed), `src/components/editor/inline-layout-name.test.tsx` (5/5 passed), `src/components/editor/save-online-dialog.test.tsx` (1/1 passed)
+  - Playwright E2E: `e2e/playground-id-online.spec.ts` ผ่านครบ 10/10 tests (Guest จัดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังอยู่, inline name edit, 404 ภาษาไทยเมื่อไม่มีผัง/ไม่ใช่เจ้าของ, blocked gate, Axe 0 violations, responsive 6 breakpoints 320–1440px)
+  - Full suite check: `make lint` ผ่าน 100% (Pure TS boundary OK, ESLint + TypeScript OK), `make contract` ผ่าน 100%, `npm test` ผ่านครบทั้ง 59 test files (760 tests passed)
+
+## [2026-10-14] feat-063 หน้ารวมโปรเจกต์ /projects
+
+- **OpenAPI Contract & Mock Backend**:
+  - ปรับสัญญา `contracts/openapi.yaml` เพิ่มฟิลด์ `name` (string 1–80 chars) ใน `SaveLayoutRequest`, `StoredLayout`, `LayoutSummary` และเพิ่ม `layout: StoreLayout` ใน `LayoutSummary` สำหรับวาดภาพย่อ SVG
+  - อัปเดต `mock-backend/handler.ts` ให้บันทึกและตอบกลับ `name` และ `layout` พร้อม fallback เป็น `ผังร้าน {width} × {depth} ม.` สำหรับผังเดิมที่ไม่มีชื่อ (unit tests 35/35 ผ่าน)
+  - `make contract` ผ่านการตรวจสอบของ Redocly 100%
+- **BFF & Client Data Layer**:
+  - อัปเดต Schema ใน `src/core/validation/layout.schema.ts` (`SaveLayoutRequestSchema`, `StoredLayoutSchema`, `LayoutSummarySchema`)
+  - อัปเดต `src/server/layout-repository.ts`, `src/server/layout-handlers.ts`, `src/lib/api-client.ts`, `src/lib/layout-queries.ts` ให้ส่งและรับ `name` และ `layout`
+- **Starter Layout Generator (`createStarterLayout`)**:
+  - เพิ่มฟังก์ชัน `createStarterLayout` ใน `src/core/layout/sample-layout.ts` สำหรับสร้างผังเริ่มต้นตามขนาดร้านและผนังทางเข้าที่เลือก
+  - จัดวาง Kitchen, Counter และ Table 2 ที่นั่งในตำแหน่งที่มี clearance และ accessibility ผ่านเกณฑ์ เพื่อไม่ให้ผังติดสถานะ Blocked เมื่อสร้างใหม่ (ผ่าน Inviolable Dual-Tier Validation)
+- **UI Components & Pages**:
+  - `src/components/projects/delete-confirm-dialog.tsx`: Dialog ยืนยันลบผังด้วย Radix Dialog พร้อมตั้งโฟกัสเริ่มต้นที่ปุ่ม 'ยกเลิก' เพื่อความปลอดภัย (WCAG 2.1 AA)
+  - `src/components/projects/create-project-dialog.tsx`: Dialog สร้างผังใหม่ ตรวจสอบชื่อ (1–80 ตัวอักษร), ขนาดร้าน (2–30 ม. snap 0.25), ผนังประตู 4 ด้าน (radio group) และปุ่ม 'ใช้ผังตัวอย่างแทน'
+  - `src/components/projects/project-card-menu.tsx`: เมนูปุ่ม ⋯ (เปิดผัง / ลบผัง) รองรับ hover/focus และกด Esc เพื่อคืนโฟกัสที่ปุ่ม ⋯
+  - `src/components/projects/project-card.tsx`: การ์ดผังร้านแบบ Figma วาดภาพย่อด้วย `renderPlanSvg` (grid:false บนพื้น `#eef2f7`), แสดงชื่อ ขนาด และเวลาแก้ไขภาษาไทย
+  - `src/components/projects/projects-header.tsx`: Header สำหรับหน้ารวมโปรเจกต์ โลโก้, ข้อมูลบัญชีผู้ใช้ และเมนูออกจากระบบ
+  - `src/components/projects/projects-list.tsx`: จัดการสถานะ empty, loading skeleton, error, โควตา 20 ผัง, dialogs และ toast แจ้งผลการดำเนินงาน
+  - `app/(app)/projects/page.tsx`: Route สำหรับหน้ารวมโปรเจกต์
+  - `app/(app)/playground/[id]/page.tsx` & `playground-with-id-client.tsx`: Route สำหรับเปิดผังตาม id
+- **Verify & Quality Gate**:
+  - Vitest Unit Tests: 55/55 test files ผ่าน 100% (748 tests)
+  - Playwright E2E: `e2e/projects.spec.ts` ผ่านครบ 10/10 tests (CRUD flow, คีย์บอร์ดนำทาง Esc คืนโฟกัส, Axe WCAG 2.1 AA audit 0 violations, และ Responsive 6 breakpoints 320–1440px ไม่มี horizontal scrollbar)
+  - `make lint`: 0 errors, 0 warnings (Pure TS boundary OK, ESLint + TypeScript OK, Redocly contract OK)
+
+## [2026-10-14] feat-062 หน้าเข้าสู่ระบบ /login
+
+- **Safe Redirect**: สร้าง `src/lib/safe-redirect.ts` (`getSafeNextPath`) ป้องกัน Open Redirect โดยอนุญาตเฉพาะ relative path ภายในที่ขึ้นต้นด้วย `/` (ไม่รวม `//` หรือ protocol scheme) พร้อม unit tests 3/3 ผ่าน
+- **Login Component (`LoginForm`)**:
+  - สร้าง `src/components/auth/login-form.tsx` รองรับ 2 ขั้นตอน: ขั้นตอนที่ 1 ป้อนอีเมล (มีปุ่ม Google sign-in ถ้าเปิด provider) → ขั้นตอนที่ 2 ป้อนรหัส OTP 6 หลัก
+  - ช่องกรอกรหัสเดียว `inputMode="numeric"`, `autoComplete="one-time-code"`, รองรับการ paste รหัส 6 หลักอัตโนมัติ
+  - รองรับนับเวลาถอยหลัง 60 วินาที พร้อมปุ่ม 'ส่งรหัสใหม่' และปุ่ม 'เปลี่ยนอีเมล' เพื่อกลับขั้นตอนแรก
+  - ข้อความแจ้งเตือนภาษาไทยครบถ้วน ('ยังไม่มีบัญชี? ใช้อีเมลนี้ได้เลย ระบบจะสร้างให้', แจ้งรหัสผิด/หมดอายุ/ผิดเกินจำนวน)
+  - ตรวจจับ Session ปัจจุบัน: ถ้าเป็นผู้ใช้ที่มีบัญชีจริงแล้ว redirect ไป `/projects` ทันที แต่ถ้าเป็น Guest ยังเปิดให้เข้าสู่ระบบเพื่อเชื่อมโยงบัญชีได้
+- **Page & Routing**:
+  - สร้าง `app/login/page.tsx` ห่อหุ้มด้วย `AppProviders` (SessionProvider) และ `Suspense`
+  - เพิ่มลิงก์ 'เข้าสู่ระบบ' ใน Header ของ `app/(marketing)/page.tsx`
+- **Design & Accessibility (WCAG 2.1 AA)**:
+  - จัดการ Color Contrast ให้ผ่านเกณฑ์ WCAG 2.1 AA (≥ 4.5:1) สำหรับทุกองค์ประกอบ (ใช้ `#4e627c` บนพื้นขาว และ `#384b66` บนพื้น `#edf1ff`)
+  - โฟกัสริงชัดเจน `outline: 3px solid #a4b6ff` พร้อม `aria-invalid` และ `aria-describedby`
+- **Verify**:
+  - Unit tests: `src/components/auth/login-form.test.tsx` (8/8 tests passed), `src/lib/safe-redirect.test.ts` (3/3 tests passed)
+  - E2E Playwright: `e2e/login-otp.spec.ts` (10/10 tests passed รวม Axe WCAG 2.1 AA audit 0 violations, คีย์บอร์ดนำทาง, safe redirect, และ 6 breakpoints ไม่มี horizontal scrollbar)
+  - Gate: `npm test` ผ่าน 51/51 test files (733 tests), `make lint` ผ่าน, `make contract` ผ่าน 100%
+
+## [2026-10-14] feat-061 Email OTP — สัญญา API + BFF + Mock
+
+- **สัญญา API**: เพิ่ม `POST /v1/auth/otp/request` และ `POST /v1/auth/otp/verify` ใน `contracts/openapi.yaml` (มี `x-allow-anonymous: true`, RequestId header, schemas: `RequestOtpRequest`, `RequestOtpResponse`, `VerifyOtpRequest`, `VerifyOtpResponse`) และเพิ่ม `email` ใน `AuthProvider`
+- **Backend จำลอง (mock-backend)**: รองรับ OTP memory store, รหัส 6 หลักหมดอายุ 10 นาที (600 วินาที), cooldown ขอรหัสใหม่ 60 วินาที (ตอบ 429 RATE_LIMITED พร้อม Retry-After), กรอกรหัสผิดได้ 5 ครั้ง (400 OTP_INVALID พร้อม attemptsLeft, ผิดเกิน 400 OTP_ATTEMPTS_EXCEEDED), ตรวจถูกคืน User (สร้างใหม่อัตโนมัติด้วย provider: email เมื่อเป็นอีเมลใหม่)
+- **BFF & Auth.js**:
+  - `src/server/auth.ts`: เพิ่ม Credentials Provider `email-otp` ตรวจรหัสผ่าน Backend `/v1/auth/otp/verify`
+  - `src/server/otp-handlers.ts`: Handler สำหรับ `POST /api/auth/otp/request` ตรวจ Zod schema และส่งต่อ Backend
+  - `app/api/auth/otp/request/route.ts` และ `app/api/auth/otp/route.ts`: BFF Route Handler
+  - `src/server/account-repository.ts` & `src/server/account-sync.ts`: รองรับ provider `email` และย้ายผัง Guest เข้าบัญชี email สำเร็จ
+- **Verify**: `make contract` ผ่าน, `npm run lint` ผ่าน (0 errors, 0 warnings), `make test` ผ่าน 49/49 files (722 tests passed) รวม unit tests ใน `contracts/openapi.test.ts`, `mock-backend/handler.test.ts`, `src/server/otp-handlers.test.ts`, `src/server/account-handlers.test.ts`
+
 ## [2026-10-14] Planning — บัญชีผู้ใช้และหน้ารวมโปรเจกต์ (feat-061–064)
 
 - ข้อสรุปกับผู้ใช้ (บันทึกใน PRD §9 ข้อ 16–19): ไม่บังคับล็อกอินก่อนใช้ playground, เข้าสู่ระบบด้วย Google + อีเมล OTP 6 หลัก (ไม่มี register / รหัสผ่าน, ยกเลิก LINE), `/projects` V1 = รายการ + สร้างใหม่ + ลบ, ผังมี URL `/playground/[id]`

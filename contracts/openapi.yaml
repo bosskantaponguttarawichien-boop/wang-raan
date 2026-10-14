@@ -42,6 +42,8 @@ tags:
     description: ข้อความจากฟอร์มติดต่อ
   - name: account
     description: บัญชีผู้ใช้และ PDPA
+  - name: auth
+    description: ยืนยันตัวตนด้วย Email OTP
 
 paths:
   /health:
@@ -425,6 +427,64 @@ paths:
         "400": { $ref: "#/components/responses/BadRequest" }
         "401": { $ref: "#/components/responses/Unauthorized" }
 
+  /v1/auth/otp/request:
+    post:
+      tags: [auth]
+      operationId: requestOtp
+      summary: ขอรหัส OTP 6 หลักส่งไปที่อีเมล
+      description: |
+        Backend ส่งรหัส OTP 6 หลักไปยังอีเมลที่ระบุ รหัสมีอายุ 10 นาที (600 วินาที)
+        ไม่เปิดเผยว่าอีเมลนี้มีบัญชีในระบบอยู่แล้วหรือไม่ (ป้องกัน user enumeration)
+        มี cooldown ขอใหม่ได้ทุก 60 วินาที (หากขอก่อนตอบ 429 พร้อม Retry-After)
+      x-allow-anonymous: true
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RequestOtpRequest" }
+      responses:
+        "5XX": { $ref: "#/components/responses/ServerError" }
+        "200":
+          description: ส่งรหัสแล้ว
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RequestOtpResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /v1/auth/otp/verify:
+    post:
+      tags: [auth]
+      operationId: verifyOtp
+      summary: ตรวจสอบรหัส OTP และคืนข้อมูลผู้ใช้
+      description: |
+        ตรวจรหัส OTP 6 หลักที่ส่งไปทางอีเมล
+        - กรอกผิดได้ไม่เกิน 5 ครั้ง (ผิดเกินตอบ 400 OTP_ATTEMPTS_EXCEEDED)
+        - รหัสหมดอายุหลัง 10 นาที (ตอบ 400 OTP_EXPIRED)
+        - รหัสไม่ถูกต้อง (ตอบ 400 OTP_INVALID)
+        - หากตรวจผ่านและเป็นอีเมลใหม่ Backend สร้างบัญชีให้อัตโนมัติ (provider: email)
+      x-allow-anonymous: true
+      parameters:
+        - $ref: "#/components/parameters/RequestId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VerifyOtpRequest" }
+      responses:
+        "5XX": { $ref: "#/components/responses/ServerError" }
+        "200":
+          description: รหัสถูกต้อง คืนข้อมูลผู้ใช้
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VerifyOtpResponse" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
 components:
   securitySchemes:
     internalToken:
@@ -683,12 +743,21 @@ components:
       additionalProperties: false
       required: [layout]
       properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: ชื่อผังร้าน (1–80 ตัวอักษรหลังตัดช่องว่างหัวท้าย)
         layout: { $ref: "#/components/schemas/StoreLayout" }
     StoredLayout:
       type: object
       additionalProperties: false
-      required: [layout, validation, createdAt, updatedAt]
+      required: [name, layout, validation, createdAt, updatedAt]
       properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
         layout: { $ref: "#/components/schemas/StoreLayout" }
         validation: { $ref: "#/components/schemas/ValidationResult" }
         createdAt: { $ref: "#/components/schemas/DateTime" }
@@ -696,14 +765,19 @@ components:
     LayoutSummary:
       type: object
       additionalProperties: false
-      required: [id, width, depth, objectCount, status, updatedAt]
+      required: [id, name, width, depth, objectCount, status, updatedAt, layout]
       properties:
         id: { $ref: "#/components/schemas/Id" }
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
         width: { type: number }
         depth: { type: number }
         objectCount: { type: integer, minimum: 0 }
         status: { type: string, enum: [ready, warning, blocked] }
         updatedAt: { $ref: "#/components/schemas/DateTime" }
+        layout: { $ref: "#/components/schemas/StoreLayout" }
 
     # ── ลิงก์แชร์ ──
     ShareLink:
@@ -772,7 +846,7 @@ components:
     # ── บัญชีผู้ใช้ ──
     AuthProvider:
       type: string
-      enum: [guest, google, line, github]
+      enum: [guest, google, line, github, email]
     User:
       type: object
       additionalProperties: false
@@ -863,7 +937,38 @@ components:
         - SHARE_REVOKED
         - SHARE_EXPIRED
         - RATE_LIMITED
+        - OTP_INVALID
+        - OTP_EXPIRED
+        - OTP_ATTEMPTS_EXCEEDED
         - INTERNAL_ERROR
+
+    # ── ยืนยันตัวตน Email OTP ──
+    RequestOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email: { type: string, format: email, minLength: 1, maxLength: 254 }
+    RequestOtpResponse:
+      type: object
+      additionalProperties: false
+      required: [sent, expiresIn]
+      properties:
+        sent: { type: boolean }
+        expiresIn: { type: integer, description: "อายุของรหัส (วินาที) ค่าปกติ 600" }
+    VerifyOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email, code]
+      properties:
+        email: { type: string, format: email, minLength: 1, maxLength: 254 }
+        code: { type: string, pattern: "^[0-9]{6}$", minLength: 6, maxLength: 6 }
+    VerifyOtpResponse:
+      type: object
+      additionalProperties: false
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/User" }
     Error:
       type: object
       additionalProperties: false
@@ -892,6 +997,10 @@ components:
               description: วินาที (คู่กับ RATE_LIMITED)
               type: integer
               minimum: 1
+            attemptsLeft:
+              description: จำนวนครั้งที่เหลือที่ลองกรอกรหัสได้ (คู่กับ OTP_INVALID)
+              type: integer
+              minimum: 0
             validation: { $ref: "#/components/schemas/ValidationResult" }
             issues:
               type: array
