@@ -4,11 +4,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AppProviders } from "@/components/providers/app-providers";
 import { LoginForm } from "@/components/auth/login-form";
+import { googleLoginEnabled } from "@/server/auth-config";
 
 export const metadata: Metadata = {
   title: "เข้าสู่ระบบ — วางร้าน",
   description: "เข้าสู่ระบบวางร้านด้วย Google หรืออีเมล OTP บันทึกผังร้านไว้ในบัญชี เปิดต่อได้จากทุกเครื่อง",
 };
+
+// ปุ่ม Google ขึ้นกับ env ตอนรัน ไม่ใช่ตอน build
+export const dynamic = "force-dynamic";
 
 export default function LoginPage() {
   return (
@@ -36,7 +40,7 @@ export default function LoginPage() {
             <div className="w-full max-w-[400px] h-[320px] bg-white border border-[#e2e8f1] rounded-[16px] animate-pulse" />
           }
         >
-          <LoginForm />
+          <LoginForm hasGoogleProvider={googleLoginEnabled()} />
         </React.Suspense>
       </main>
     </div>

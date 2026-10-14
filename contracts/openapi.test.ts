@@ -11,7 +11,7 @@ import { parse } from "yaml";
 import type { StoreLayout } from "@/core/layout";
 import { StoreLayoutSchema, validateLayout } from "@/core/validation";
 import { ContactSchema } from "@/lib/contact-schema";
-import { LAYOUT_LIMIT, SHARE_LIMIT, SHARE_MAX_DAYS } from "@/server/limits";
+import { LAYOUT_LIMIT, LAYOUT_PAGE_DEFAULT, LAYOUT_PAGE_MAX, SHARE_LIMIT, SHARE_MAX_DAYS } from "@/server/limits";
 import { cafeLayout } from "@/test/fixtures/layouts";
 
 type Operation = {
@@ -71,6 +71,7 @@ describe("โครงสร้างสัญญา", () => {
         "listShares",
         "mergeGuest",
         "requestOtp",
+        "resolveIdentity",
         "revokeShare",
         "updateLayout",
         "updateShare",
@@ -91,11 +92,12 @@ describe("โครงสร้างสัญญา", () => {
     }
   });
 
-  it("anonymous ใช้ได้เฉพาะเปิดลิงก์แชร์, ส่งฟอร์มติดต่อ และขอ/ตรวจ OTP", () => {
+  it("anonymous ใช้ได้เฉพาะเปิดลิงก์แชร์, ส่งฟอร์มติดต่อ, ล็อกอิน (resolve) และขอ/ตรวจ OTP", () => {
     expect(operations.filter((o) => o.op["x-allow-anonymous"]).map((o) => o.op.operationId).sort()).toEqual([
       "createContactMessage",
       "getPublicShare",
       "requestOtp",
+      "resolveIdentity",
       "verifyOtp",
     ].sort());
   });
@@ -103,7 +105,7 @@ describe("โครงสร้างสัญญา", () => {
   it("ตัวเลขโควตาในสัญญาตรงกับ src/server/limits.ts (ข้อความไทยของ BFF และ Backend จำลองใช้ค่าเดียวกัน)", () => {
     const text = readFileSync(resolve(__dirname, "openapi.yaml"), "utf8");
     const list = spec.paths["/v1/layouts"]!.get as unknown as { responses: { "200": { content: { "application/json": { schema: { properties: { layouts: { maxItems: number } } } } } } } };
-    expect(list.responses["200"].content["application/json"].schema.properties.layouts.maxItems).toBe(LAYOUT_LIMIT);
+    expect(list.responses["200"].content["application/json"].schema.properties.layouts.maxItems).toBe(LAYOUT_PAGE_MAX);
     expect(text).toContain(`ผู้ใช้มีผังครบ ${LAYOUT_LIMIT} ผังแล้ว`);
     expect(text).toContain(`ลิงก์ที่ยังใช้งานได้ต่อผังสูงสุด ${SHARE_LIMIT} ลิงก์`);
     expect(text).toContain(`ไม่เกิน ${SHARE_MAX_DAYS} วันจากตอนนี้`);
@@ -297,12 +299,69 @@ describe("Email OTP", () => {
     expect(schema("VerifyOtpRequest")({ email: "user@example.com", code: "abcdef" })).toBe(false);
   });
 
-  it("VerifyOtpResponse คืน user ที่ถูกต้อง", () => {
+  it("RequestOtpResponse.sent เป็น true เสมอ (กันการเดาอีเมล)", () => {
+    expect(schema("RequestOtpResponse")({ sent: false, expiresIn: 600 })).toBe(false);
+  });
+
+  it("verifyOtp คืน { user, created } แบบเดียวกับ resolve", () => {
     const at = "2026-10-14T10:00:00.000Z";
-    expect(
-      schema("VerifyOtpResponse")({
-        user: { id: "email-1", provider: "email", name: "Somchai", email: "user@example.com", image: null, createdAt: at, updatedAt: at },
-      }),
-    ).toBe(true);
+    const user = { id: `usr-${globalThis.crypto.randomUUID()}`, provider: "email", name: null, email: "user@example.com", image: null, createdAt: at, updatedAt: at };
+    expect(schema("ResolvedUser")({ user, created: true })).toBe(true);
+    expect(schema("ResolvedUser")({ user })).toBe(false);
+  });
+
+  it("request / verify / resolve ต้องส่ง X-Client-IP", () => {
+    for (const id of ["requestOtp", "verifyOtp", "resolveIdentity"]) {
+      const op = operations.find((o) => o.op.operationId === id)!;
+      expect(op.op.parameters?.map((p) => p.$ref), id).toContain("#/components/parameters/ClientIp");
+    }
+  });
+});
+
+describe("Identities (v1.3.0)", () => {
+  const oauth = { provider: "google", providerAccountId: "1234567890", email: "a@example.com", emailVerified: true };
+
+  it("ResolveIdentityRequest: Guest ส่งแค่ provider", () => {
+    expect(schema("ResolveIdentityRequest")({ provider: "guest" })).toBe(true);
+    expect(schema("ResolveIdentityRequest")({ provider: "guest", providerAccountId: "x" })).toBe(false);
+  });
+
+  it("ResolveIdentityRequest: OAuth ต้องมี providerAccountId, email (null ได้) และ emailVerified", () => {
+    expect(schema("ResolveIdentityRequest")(oauth)).toBe(true);
+    expect(schema("ResolveIdentityRequest")({ ...oauth, provider: "github", email: null, emailVerified: false, name: "A", image: null })).toBe(true);
+    expect(schema("ResolveIdentityRequest")({ ...oauth, providerAccountId: "" })).toBe(false);
+    expect(schema("ResolveIdentityRequest")({ ...oauth, providerAccountId: "x".repeat(256) })).toBe(false);
+    expect(schema("ResolveIdentityRequest")({ provider: oauth.provider, providerAccountId: oauth.providerAccountId, email: oauth.email })).toBe(false);
+  });
+
+  it("ResolveIdentityRequest: provider email ต้องไปทาง verifyOtp", () => {
+    expect(schema("ResolveIdentityRequest")({ ...oauth, provider: "email" })).toBe(false);
+  });
+
+  it("UpsertProfileRequest ไม่รับ provider และต้องมีอย่างน้อย 1 ช่อง", () => {
+    expect(schema("UpsertProfileRequest")({ name: "สมชาย" })).toBe(true);
+    expect(schema("UpsertProfileRequest")({ provider: "google", name: "สมชาย" })).toBe(false);
+    expect(schema("UpsertProfileRequest")({})).toBe(false);
+  });
+
+  it("AccountExport มี identities", () => {
+    const at = "2026-10-14T10:00:00.000Z";
+    const user = { id: "usr-1", provider: "google", name: null, email: null, image: null, createdAt: at, updatedAt: at };
+    const identity = { provider: "google", providerAccountId: "1", email: null, emailVerified: false, createdAt: at, lastLoginAt: at };
+    const base = { exportedAt: at, user, layouts: [], shares: [], contactMessages: [] };
+    expect(schema("AccountExport")({ ...base, identities: [identity] })).toBe(true);
+    expect(schema("AccountExport")(base)).toBe(false);
+  });
+
+  it("PUT /v1/me ตอบ 404 เมื่อไม่มีผู้ใช้ (ไม่สร้างบัญชีแล้ว)", () => {
+    const op = operations.find((o) => o.op.operationId === "upsertMe")!;
+    expect(Object.keys(op.op.responses)).toContain("404");
+  });
+
+  it("GET /v1/layouts แบ่งหน้าด้วย limit (1–50, ค่าเริ่มต้น 24) + cursor", () => {
+    const op = operations.find((o) => o.op.operationId === "listLayouts")!;
+    const params = (op.op.parameters ?? []) as Array<{ name?: string; schema?: Record<string, unknown> }>;
+    expect(params.find((p) => p.name === "limit")?.schema).toMatchObject({ minimum: 1, maximum: LAYOUT_PAGE_MAX, default: LAYOUT_PAGE_DEFAULT });
+    expect(params.find((p) => p.name === "cursor")).toBeDefined();
   });
 });

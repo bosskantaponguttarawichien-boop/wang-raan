@@ -3,6 +3,13 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-15 ICT — feat-061 ทำใหม่ตามสัญญา v1.3.0 (identities)
+
+- สัญญา v1.3.0 + mock + BFF + UI เสร็จบน `feat/login-projects` — **BE รีวิวสัญญาได้แล้ว** (ข้อที่ FE ตัดสินเองอยู่ใน `harness/handoff-fe-accounts.md` §7)
+- BFF ไม่สร้าง user id เองแล้ว; Google เปิดเมื่อตั้ง `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET`
+- E2E ชุด UI เก่า 28 เคสล้มมาตั้งแต่ก่อนงานนี้ (selector ของ playground เดิม) — ควรแยกงานแก้ spec เหล่านี้
+- ยังเปิด: โดเมน/บริการส่งเมล (Resend หรือ SES), feat-041 รอ Backend จริงบน staging
+
 ## 2026-10-14 21:55 ICT — FE handoff: Identities + Email OTP
 
 - ข้อตกลงกับ BE และลำดับงาน FE ทั้งหมดอยู่ที่ `harness/handoff-fe-accounts.md` — อ่านก่อนแตะ feat-061–064

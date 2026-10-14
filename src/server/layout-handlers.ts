@@ -5,12 +5,21 @@ import "server-only";
  * ผลตรวจจาก Client ไม่ถูกเชื่อถือ: server คำนวณ ValidationResult ใหม่ทุกครั้ง (Dual-Tier Validation)
  * ทุก endpoint ต้องมี Session (401) และเห็นเฉพาะผังของตนเอง (ผังของคนอื่นตอบ 404)
  */
+import { z } from "zod";
 import { SaveLayoutRequestSchema, validateLayout } from "@/core/validation";
 import { json, problem, readJson, withUser, zodDetails } from "./http";
 import type { LayoutRepository } from "./layout-repository";
+import { LAYOUT_PAGE_MAX } from "./limits";
 import type { ResolveUser } from "./session";
 
 export { MAX_BODY_BYTES } from "./http";
+
+const ListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(LAYOUT_PAGE_MAX).optional(),
+    cursor: z.string().min(1).max(512).optional(),
+  })
+  .strict();
 
 /** parse + re-validate; คืน layout/validation ที่ผ่านแล้ว หรือ Response ข้อผิดพลาด */
 async function parseAndValidate(request: Request) {
@@ -41,7 +50,14 @@ async function parseAndValidate(request: Request) {
 export function createLayoutHandlers(repo: LayoutRepository, resolveUser: ResolveUser) {
   const notFound = () => problem(404, "NOT_FOUND", "ไม่พบผังร้านนี้");
   return {
-    list: withUser(resolveUser, async (user) => json({ layouts: await repo.list(user.id) })),
+    /** `?limit=1–50&cursor=<nextCursor>` ส่งต่อ Backend — ไม่ส่ง = หน้าแรก 24 ผัง */
+    list: withUser(resolveUser, async (user, request) => {
+      const query = ListQuerySchema.safeParse(Object.fromEntries(new URL(request.url).searchParams));
+      if (!query.success) return problem(400, "INVALID_REQUEST", "พารามิเตอร์รายการผังไม่ถูกต้อง", { details: zodDetails(query.error) });
+      const page = await repo.list(user.id, query.data);
+      if (page === "invalid-cursor") return problem(400, "INVALID_REQUEST", "ลิงก์หน้าถัดไปหมดอายุ โหลดรายการใหม่อีกครั้ง");
+      return json(page);
+    }),
 
     create: withUser(resolveUser, async (user, request) => {
       const result = await parseAndValidate(request);

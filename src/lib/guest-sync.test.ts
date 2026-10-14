@@ -5,7 +5,7 @@ import * as nextAuthReact from "next-auth/react";
 import * as nextNavigation from "next/navigation";
 import { api } from "@/lib/api-client";
 import { layoutStore } from "@/store/use-layout-store";
-import { useGuestSync } from "./guest-sync";
+import { PENDING_SYNC_KEY, useGuestSync } from "./guest-sync";
 
 vi.mock("next-auth/react", () => ({
   useSession: vi.fn(),
@@ -63,7 +63,22 @@ describe("useGuestSync (feat-064)", () => {
     expect(api.createLayout).not.toHaveBeenCalled();
   });
 
-  it("sync ผังและ redirect ไป /playground/[id] เมื่อ sync=1 และเป็น user", async () => {
+  it("ไม่มี marker pending-sync (เช่น โหลด ?sync=1 ซ้ำ) → ไม่สร้างผัง กลับ /playground", async () => {
+    searchParamsGet.mockReturnValue("1");
+    vi.mocked(nextAuthReact.useSession).mockReturnValue({
+      data: { user: { id: "usr_test" } },
+      status: "authenticated",
+    } as unknown as ReturnType<typeof nextAuthReact.useSession>);
+
+    renderHook(() => useGuestSync({ onToast: toastMock }));
+
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith("/playground"));
+    expect(api.createLayout).not.toHaveBeenCalled();
+  });
+
+  it("sync ผังและ redirect ไป /playground/[id] เมื่อ sync=1 และเป็น user — ล้างแค่ร่าง ไม่ล้างค่าอื่นใน localStorage", async () => {
+    localStorage.setItem(PENDING_SYNC_KEY, JSON.stringify({ name: "คาเฟ่ทดสอบ" }));
+    localStorage.setItem("wang-raan:other-pref", "keep");
     searchParamsGet.mockReturnValue("1");
     vi.mocked(nextAuthReact.useSession).mockReturnValue({
       data: { user: { id: "usr_test", email: "test@example.com" } },
@@ -90,9 +105,13 @@ describe("useGuestSync (feat-064)", () => {
       expect(replaceMock).toHaveBeenCalledWith("/playground/lay_new_123");
       expect(toastMock).toHaveBeenCalledWith("บันทึกผังในบัญชีของคุณเรียบร้อยแล้ว");
     });
+    expect(vi.mocked(api.createLayout).mock.calls[0]![1]).toBe("คาเฟ่ทดสอบ");
+    expect(localStorage.getItem(PENDING_SYNC_KEY)).toBeNull();
+    expect(localStorage.getItem("wang-raan:other-pref")).toBe("keep");
   });
 
   it("จัดการ error เมื่อสร้างผังไม่สำเร็จ", async () => {
+    localStorage.setItem(PENDING_SYNC_KEY, "{}");
     searchParamsGet.mockReturnValue("1");
     vi.mocked(nextAuthReact.useSession).mockReturnValue({
       data: { user: { id: "usr_test" } },

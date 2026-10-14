@@ -5,3 +5,6 @@
 export const LAYOUT_LIMIT = 200;
 export const SHARE_LIMIT = 20;
 export const SHARE_MAX_DAYS = 365;
+/** GET /v1/layouts แบ่งหน้า — ค่าเริ่มต้น / สูงสุดต่อหน้า */
+export const LAYOUT_PAGE_DEFAULT = 24;
+export const LAYOUT_PAGE_MAX = 50;

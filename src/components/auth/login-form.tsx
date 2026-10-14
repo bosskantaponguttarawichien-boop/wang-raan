@@ -33,9 +33,12 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
   const emailInputRef = React.useRef<HTMLInputElement>(null);
   const codeInputRef = React.useRef<HTMLInputElement>(null);
   const timerRef = React.useRef<NodeJS.Timeout | null>(null);
+  /** ล็อกอินสำเร็จในหน้านี้แล้ว — ไปหน้าถัดไปด้วยการโหลดเต็มหน้าทางเดียว (กัน redirect ซ้อนจาก effect ด้านล่าง) */
+  const redirectingRef = React.useRef(false);
 
   // ถ้าล็อกอินเป็นผู้ใช้จริงอยู่แล้ว (ไม่ใช่ guest) -> redirect ไป nextUrl
   React.useEffect(() => {
+    if (redirectingRef.current) return;
     if (status === "authenticated" && session?.user?.id && !session.user.id.startsWith("guest-")) {
       router.replace(nextUrl);
     }
@@ -126,6 +129,8 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
     setCodeError(null);
     setLoading(true);
 
+    // session อัปเดตได้ก่อน signIn คืนค่า → ตั้งไว้ก่อนเรียก แล้วปลดเมื่อไม่สำเร็จ
+    redirectingRef.current = true;
     try {
       const result = await signIn("email-otp", {
         email: email.trim().toLowerCase(),
@@ -134,13 +139,19 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
       });
 
       if (result?.error) {
-        const err = result.error;
-        if (err.includes("OTP_ATTEMPTS_EXCEEDED")) {
+        redirectingRef.current = false;
+        // code มาจาก CredentialsSignin ใน server/auth.ts
+        const err = result.code ?? "";
+        if (err === "OTP_ATTEMPTS_EXCEEDED") {
           setCodeError("กรอกรหัสผิดเกินจำนวนที่กำหนด กรุณาขอรหัสใหม่");
-        } else if (err.includes("OTP_EXPIRED")) {
+        } else if (err === "OTP_EXPIRED") {
           setCodeError("รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่");
-        } else {
+        } else if (err === "RATE_LIMITED") {
+          setCodeError("ลองถี่เกินไป กรุณารอสักครู่แล้วลองใหม่");
+        } else if (err === "OTP_INVALID" || err === "credentials") {
           setCodeError("รหัสไม่ถูกต้อง กรุณาตรวจอีกครั้ง");
+        } else {
+          setCodeError("ระบบขัดข้องชั่วคราว ลองใหม่อีกครั้ง");
         }
         setLoading(false);
         return;
@@ -151,6 +162,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
         window.location.href = nextUrl;
       }, 1200);
     } catch {
+      redirectingRef.current = false;
       setCodeError("เกิดข้อผิดพลาดในการตรวจสอบรหัส ลองใหม่อีกครั้ง");
       setLoading(false);
     }

@@ -7,6 +7,7 @@ import "server-only";
 import { z } from "zod";
 import { BackendConfigError, BackendError, backendClient, send, readBody } from "./backend";
 import { json, problem, readJson, tooManyRequests, zodDetails } from "./http";
+import { clientIp } from "./rate-limit";
 import type { BackendClient } from "./token-relay";
 
 export const OTP_REQUEST_MAX_BYTES = 1024;
@@ -35,12 +36,12 @@ export function createRequestOtpHandler(deps: OtpHandlerDeps = {}) {
     try {
       const res = await send(
         client,
-        "anonymous",
+        null,
         "/v1/auth/otp/request",
         {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(parsed.data),
+          headers: { "content-type": "application/json", "x-client-ip": clientIp(request) },
+          body: JSON.stringify({ email: parsed.data.email.trim().toLowerCase() }),
         },
         [400, 429],
       );
@@ -55,7 +56,7 @@ export function createRequestOtpHandler(deps: OtpHandlerDeps = {}) {
         return problem(400, "INVALID_REQUEST", "ไม่สามารถส่งรหัสได้ กรุณาตรวจสอบอีเมล");
       }
 
-      const data = await readBody<{ sent: boolean; expiresIn: number }>(res);
+      const data = await readBody<{ sent: true; expiresIn: number }>(res);
       return json(data);
     } catch (error) {
       if (error instanceof BackendError && error.code === "RATE_LIMITED") {

@@ -4,6 +4,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { saveDraft, getDraftStorage } from "@/lib/draft-storage";
+import { PENDING_SYNC_KEY } from "@/lib/guest-sync";
 import { useLayoutStore } from "@/store/use-layout-store";
 
 export interface SaveOnlineDialogProps {
@@ -44,7 +45,7 @@ export function SaveOnlineDialog({ open, onOpenChange }: SaveOnlineDialogProps) 
         historyIndex,
       });
       try {
-        storage.setItem("wang-raan:pending-sync", JSON.stringify({ name: limitedName }));
+        storage.setItem(PENDING_SYNC_KEY, JSON.stringify({ name: limitedName }));
       } catch {
         // ignore storage error
       }

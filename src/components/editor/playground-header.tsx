@@ -5,7 +5,7 @@ import * as React from "react";
 import { ViewSwitch } from "@/components/ui";
 import { renderPlanSvg } from "@/core/export";
 import { createLayoutFile, importLayoutFile, layoutFileName, serializeLayoutFile } from "@/core/io";
-import { getDraftStorage } from "@/lib/draft-storage";
+import { clearDraft, getDraftStorage } from "@/lib/draft-storage";
 import { downloadBlob, downloadText, svgToPngBlob } from "@/lib/export-client";
 import {
   layoutActions as actions,
@@ -96,7 +96,7 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
       entrance: createEntrance(newLayout, { wall, position: doorPos, width: doorWidth }, randomId),
     };
     store.loadLayout(withDoor);
-    getDraftStorage()?.clear();
+    clearDraft(getDraftStorage());
     onToast("เริ่มผังใหม่แล้ว");
   };
 

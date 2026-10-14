@@ -32,7 +32,11 @@ async function call(
   path: string,
   opts: { user?: string | null; body?: unknown; headers?: Record<string, string>; invalid?: boolean } = {},
 ) {
-  const headers: Record<string, string> = { "x-request-id": globalThis.crypto.randomUUID(), ...opts.headers };
+  const headers: Record<string, string> = {
+    "x-request-id": globalThis.crypto.randomUUID(),
+    ...(path.startsWith("/v1/auth/") ? { "x-client-ip": "203.0.113.7" } : {}),
+    ...opts.headers,
+  };
   const user = opts.user === undefined ? "google-alice" : opts.user;
   if (user) headers.authorization = `Bearer ${await createInternalToken(user, SECRET)}`;
   if (opts.body !== undefined) headers["content-type"] = "application/json";
@@ -46,6 +50,17 @@ async function call(
 }
 
 const save = (layout = cafeLayout(), user?: string) => call("POST", "/v1/layouts", { body: { layout }, user });
+
+/** ล็อกอินแบบ OAuth ผ่าน resolve (token anonymous ตามสัญญา) */
+const resolve = (body: Record<string, unknown>) => call("POST", "/v1/auth/identities/resolve", { user: "anonymous", body });
+const google = (id: string, email: string | null, emailVerified = true) =>
+  resolve({ provider: "google", providerAccountId: id, email, emailVerified, name: "Alice", image: null });
+/** ล็อกอินด้วย OTP (mock ใช้รหัส 123456) */
+async function otpLogin(email: string) {
+  await call("POST", "/v1/auth/otp/request", { user: "anonymous", body: { email } });
+  clock += 61_000; // พ้น cooldown สำหรับครั้งถัดไป
+  return call("POST", "/v1/auth/otp/verify", { user: "anonymous", body: { email, code: "123456" } });
+}
 
 describe("ระบบ", () => {
   it("/health ไม่ต้องใช้ token", async () => {
@@ -281,34 +296,48 @@ describe("ฟอร์มติดต่อ", () => {
 });
 
 describe("บัญชีผู้ใช้", () => {
-  it("โปรไฟล์: ยังไม่มี → 404, PUT สร้าง → GET ได้, PUT ซ้ำ createdAt คงเดิม", async () => {
+  it("PUT /v1/me อัปเดตอย่างเดียว: ไม่มีบัญชี → 404, มีแล้ว → แก้เฉพาะช่องที่ส่ง createdAt คงเดิม", async () => {
     expect((await call("GET", "/v1/me")).status).toBe(404);
-    const created = await call("PUT", "/v1/me", { body: { provider: "google", name: "Alice", email: "alice@example.com", image: null } });
-    expect(created.body).toMatchObject({ id: "google-alice", provider: "google", name: "Alice" });
+    expect((await call("PUT", "/v1/me", { body: { name: "Alice" } })).status).toBe(404);
+    const { user } = (await google("g-1", "alice@example.com")).body;
     clock += 1000;
-    const again = await call("PUT", "/v1/me", { body: { provider: "google", name: "Alice B." } });
-    expect(again.body.createdAt).toBe(created.body.createdAt);
-    expect((await call("GET", "/v1/me")).body.name).toBe("Alice B.");
+    const updated = await call("PUT", "/v1/me", { user: user.id, body: { name: "Alice B." } });
+    expect(updated.body).toMatchObject({ id: user.id, provider: "google", name: "Alice B.", email: "alice@example.com" });
+    expect(updated.body.createdAt).toBe(user.createdAt);
+    expect((await call("PUT", "/v1/me", { user: user.id, body: { provider: "google" }, invalid: true })).status).toBe(400);
   });
 
-  it("ส่งออกข้อมูลครบ แล้วลบบัญชี → ไม่เหลือข้อมูลของผู้ใช้ (ลบซ้ำได้)", async () => {
+  it("ส่งออกข้อมูลครบ (รวม identities) แล้วลบบัญชี → ไม่เหลือข้อมูลของผู้ใช้ (ลบซ้ำได้)", async () => {
+    const { user } = (await google("g-1", "alice@example.com")).body;
+    await otpLogin("alice@example.com"); // ผูก identity email เข้าบัญชีเดียวกัน
+    await call("POST", "/v1/auth/otp/request", { user: "anonymous", body: { email: "alice@example.com" } }); // รหัสค้าง
     const layout = cafeLayout();
-    await call("PUT", "/v1/me", { body: { provider: "google", name: "Alice" } });
-    await save(layout);
-    await call("POST", `/v1/layouts/${layout.id}/shares`, { body: {} });
-    await call("POST", "/v1/contact-messages", { body: { name: "Alice", email: "a@example.com", message: "ขอใบเสนอราคาหน่อย" }, headers: { "x-client-ip": "1.1.1.1" } });
-    const exported = await call("GET", "/v1/me/export");
+    await save(layout, user.id);
+    await call("POST", `/v1/layouts/${layout.id}/shares`, { user: user.id, body: {} });
+    await call("POST", "/v1/contact-messages", { user: user.id, body: { name: "Alice", email: "a@example.com", message: "ขอใบเสนอราคาหน่อย" }, headers: { "x-client-ip": "1.1.1.1" } });
+    const exported = await call("GET", "/v1/me/export", { user: user.id });
+    expect(exported.body.identities.map((i: { provider: string }) => i.provider).sort()).toEqual(["email", "google"]);
+    expect(exported.body.identities.find((i: { provider: string }) => i.provider === "email")).toMatchObject({
+      providerAccountId: "alice@example.com",
+      emailVerified: true,
+    });
     expect(exported.body.layouts).toHaveLength(1);
     expect(exported.body.shares).toHaveLength(1);
     expect(exported.body.contactMessages).toHaveLength(1);
 
-    expect((await call("DELETE", "/v1/me")).status).toBe(204);
-    expect((await call("DELETE", "/v1/me")).status).toBe(204);
-    const { users, layouts, shares, contacts } = mock.inspect();
-    expect(users.has("google-alice")).toBe(false);
-    expect(layouts.has("google-alice")).toBe(false);
-    expect([...shares.values()].some((s) => s.ownerId === "google-alice")).toBe(false);
-    expect(contacts.some((c) => c.userId === "google-alice")).toBe(false);
+    expect((await call("DELETE", "/v1/me", { user: user.id })).status).toBe(204);
+    expect((await call("DELETE", "/v1/me", { user: user.id })).status).toBe(204);
+    const { users, identities, layouts, shares, contacts, otps } = mock.inspect();
+    expect(users.has(user.id)).toBe(false);
+    expect([...identities.values()].some((i) => i.userId === user.id)).toBe(false);
+    expect(otps.has("alice@example.com")).toBe(false);
+    expect(layouts.has(user.id)).toBe(false);
+    expect([...shares.values()].some((s) => s.ownerId === user.id)).toBe(false);
+    expect(contacts.some((c) => c.userId === user.id)).toBe(false);
+    // ล็อกอินใหม่หลังลบ = บัญชีใหม่
+    const again = (await google("g-1", "alice@example.com")).body;
+    expect(again.created).toBe(true);
+    expect(again.user.id).not.toBe(user.id);
   });
 
   it("ย้ายผัง Guest เข้าบัญชี: id ชนได้ id ใหม่, ลิงก์ย้ายตาม, เรียกซ้ำได้ 0", async () => {
@@ -417,6 +446,16 @@ describe("Email OTP", () => {
     expect(res2.status).toBe(200);
   });
 
+  it("ต้องส่ง X-Client-IP", async () => {
+    const res = await call("POST", "/v1/auth/otp/request", {
+      user: "anonymous",
+      body: { email: "user@example.com" },
+      headers: { "x-client-ip": "" },
+      invalid: true,
+    });
+    expect(res.status).toBe(400);
+  });
+
   it("ตรวจรหัสถูกครั้งแรก → คืน user ใหม่ที่สร้างอัตโนมัติ (provider: email)", async () => {
     const res = await call("POST", "/v1/auth/otp/request", {
       user: "anonymous",
@@ -431,8 +470,9 @@ describe("Email OTP", () => {
     expect(verifyRes.status).toBe(200);
     expect(verifyRes.body.user.email).toBe("newuser@example.com");
     expect(verifyRes.body.user.provider).toBe("email");
-    expect(verifyRes.body.user.id).toMatch(/^email-/);
+    expect(verifyRes.body.user.id).toMatch(/^usr-[0-9a-f-]{36}$/);
     expect(verifyRes.body.user.name).toBe("newuser");
+    expect(verifyRes.body.created).toBe(true);
 
     // ล็อกอินซ้ำ คืน user เดิม ไม่สร้าง id ใหม่
     clock += 100 * 1000;
@@ -446,6 +486,13 @@ describe("Email OTP", () => {
     });
     expect(verifyRes2.status).toBe(200);
     expect(verifyRes2.body.user.id).toBe(verifyRes.body.user.id);
+    expect(verifyRes2.body.created).toBe(false);
+  });
+
+  it("อีเมลตัวพิมพ์ใหญ่/ช่องว่าง = บัญชีเดียวกัน", async () => {
+    const a = (await otpLogin("Bob@Example.com")).body;
+    const b = (await otpLogin("bob@example.com")).body;
+    expect(b.user.id).toBe(a.user.id);
   });
 
   it("ตรวจรหัสผิด → 400 OTP_INVALID และลด attemptsLeft", async () => {
@@ -504,5 +551,126 @@ describe("Email OTP", () => {
     });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe("OTP_EXPIRED");
+  });
+});
+
+describe("Identities: resolve + กติกาผูกบัญชี", () => {
+  it("Guest: ได้ guest-<uuid> ใหม่ทุกครั้ง ไม่มี identity", async () => {
+    const a = await resolve({ provider: "guest" });
+    const b = await resolve({ provider: "guest" });
+    expect(a.body).toMatchObject({ created: true, user: { provider: "guest", email: null } });
+    expect(a.body.user.id).toMatch(/^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(b.body.user.id).not.toBe(a.body.user.id);
+    expect(mock.inspect().identities.size).toBe(0);
+  });
+
+  it("Guest เกินโควตาต่อ IP → 429", async () => {
+    mock = createMockBackend({ secret: SECRET, now: () => new Date(clock), guestLimitPerIp: 2 });
+    checked = contractFetch(mock.fetch);
+    lenient = contractFetch(mock.fetch, { requests: false });
+    await resolve({ provider: "guest" });
+    await resolve({ provider: "guest" });
+    const res = await resolve({ provider: "guest" });
+    expect(res.status).toBe(429);
+    expect(res.headers.get("retry-after")).toBeTruthy();
+  });
+
+  it("ครั้งแรกสร้าง usr-<uuid>, ครั้งต่อไปได้บัญชีเดิม", async () => {
+    const first = (await google("g-1", "alice@example.com")).body;
+    expect(first.created).toBe(true);
+    expect(first.user.id).toMatch(/^usr-/);
+    clock += 1000;
+    const second = (await google("g-1", "alice@example.com")).body;
+    expect(second).toMatchObject({ created: false, user: { id: first.user.id } });
+  });
+
+  it("Google ที่ยืนยันอีเมลแล้ว ผูกกับบัญชี OTP เดิมที่อีเมลเดียวกัน (provider = ล็อกอินล่าสุด)", async () => {
+    const otp = (await otpLogin("alice@example.com")).body;
+    const g = (await google("g-1", "ALICE@Example.com")).body;
+    expect(g).toMatchObject({ created: false, user: { id: otp.user.id, provider: "google" } });
+    // กลับมาใช้ OTP ก็ยังบัญชีเดิม
+    expect((await otpLogin("alice@example.com")).body.user).toMatchObject({ id: otp.user.id, provider: "email" });
+  });
+
+  it("OTP ผูกกับบัญชี Google ที่ยืนยันอีเมลแล้ว", async () => {
+    const g = (await google("g-1", "alice@example.com")).body;
+    expect((await otpLogin("alice@example.com")).body).toMatchObject({ created: false, user: { id: g.user.id } });
+  });
+
+  it("Google ที่ยังไม่ยืนยันอีเมล ไม่ผูก → บัญชีใหม่", async () => {
+    const otp = (await otpLogin("alice@example.com")).body;
+    const g = (await google("g-1", "alice@example.com", false)).body;
+    expect(g.created).toBe(true);
+    expect(g.user.id).not.toBe(otp.user.id);
+  });
+
+  it("GitHub ไม่ผูกด้วยอีเมลเสมอ — และบัญชี GitHub ที่อีเมลไม่ยืนยันก็ไม่ถูก OTP ผูกเข้าไป", async () => {
+    const otp = (await otpLogin("alice@example.com")).body;
+    const gh = (await resolve({ provider: "github", providerAccountId: "42", email: "alice@example.com", emailVerified: true })).body;
+    expect(gh.user.id).not.toBe(otp.user.id);
+
+    const squatter = (await resolve({ provider: "github", providerAccountId: "43", email: "carol@example.com", emailVerified: false })).body;
+    expect((await otpLogin("carol@example.com")).body.user.id).not.toBe(squatter.user.id);
+  });
+
+  it("เปลี่ยนอีเมลที่ Google ทีหลัง → ยังได้บัญชีเดิม (หาจาก providerAccountId ก่อน)", async () => {
+    const before = (await google("g-1", "alice@example.com")).body;
+    const after = (await google("g-1", "alice.new@example.com")).body;
+    expect(after).toMatchObject({ created: false, user: { id: before.user.id } });
+  });
+
+  it("provider email ห้ามผ่าน resolve → 400", async () => {
+    const res = await call("POST", "/v1/auth/identities/resolve", {
+      user: "anonymous",
+      body: { provider: "email", providerAccountId: "a@example.com", email: "a@example.com", emailVerified: true },
+      invalid: true,
+    });
+    expect(res.status).toBe(400);
+  });
+
+  it("Guest → ล็อกอิน OTP → merge-guest ย้ายผังครบ", async () => {
+    const guest = (await resolve({ provider: "guest" })).body.user.id;
+    await save(cafeLayout(), guest);
+    await save({ ...cafeLayout(), id: "second" }, guest);
+    const user = (await otpLogin("dave@example.com")).body.user.id;
+    const merged = await call("POST", "/v1/me/merge-guest", { user, body: { guestId: guest } });
+    expect(merged.body.movedLayouts).toBe(2);
+    expect((await call("GET", "/v1/layouts", { user })).body.layouts).toHaveLength(2);
+  });
+});
+
+describe("รายการผังแบบแบ่งหน้า", () => {
+  async function seed(count: number) {
+    for (let i = 0; i < count; i++) {
+      clock += 1000;
+      await save({ ...cafeLayout(), id: `l-${String(i).padStart(2, "0")}` });
+    }
+  }
+
+  it("ค่าเริ่มต้น 24 ต่อหน้า ใหม่สุดก่อน ไล่ cursor จนครบไม่ซ้ำ", async () => {
+    await seed(30);
+    const first = await call("GET", "/v1/layouts");
+    expect(first.body.layouts).toHaveLength(24);
+    expect(first.body.layouts[0].id).toBe("l-29");
+    expect(first.body.nextCursor).toEqual(expect.any(String));
+    const second = await call("GET", `/v1/layouts?cursor=${encodeURIComponent(first.body.nextCursor)}`);
+    expect(second.body.layouts).toHaveLength(6);
+    expect(second.body.nextCursor).toBeNull();
+    const ids = [...first.body.layouts, ...second.body.layouts].map((l: { id: string }) => l.id);
+    expect(new Set(ids).size).toBe(30);
+  });
+
+  it("limit กำหนดได้ 1–50 (นอกช่วง → 400), ไม่มีผัง → [] + null", async () => {
+    expect((await call("GET", "/v1/layouts")).body).toEqual({ layouts: [], nextCursor: null });
+    await seed(3);
+    const page = await call("GET", "/v1/layouts?limit=2");
+    expect(page.body.layouts).toHaveLength(2);
+    expect(page.body.nextCursor).not.toBeNull();
+    expect((await call("GET", "/v1/layouts?limit=51", { invalid: true })).status).toBe(400);
+    expect((await call("GET", "/v1/layouts?limit=0", { invalid: true })).status).toBe(400);
+  });
+
+  it("cursor ปลอม → 400", async () => {
+    expect((await call("GET", "/v1/layouts?cursor=not-a-cursor")).status).toBe(400);
   });
 });

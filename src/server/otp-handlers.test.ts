@@ -3,7 +3,6 @@ import { testBackend } from "@/test/backend";
 import { cafeLayout } from "@/test/fixtures/layouts";
 import { createRequestOtpHandler } from "./otp-handlers";
 import { guestToMerge, syncSignIn } from "./account-sync";
-import { readBody, send } from "./backend";
 
 let backend: ReturnType<typeof testBackend>;
 let handler: ReturnType<typeof createRequestOtpHandler>;
@@ -59,68 +58,34 @@ describe("POST /api/auth/otp/request", () => {
   });
 });
 
-describe("Email OTP Verify via Backend & Guest Migration", () => {
-  it("ขอรหัส → verify รหัสถูก → คืน user ใหม่", async () => {
-    await handler(req({ email: "somchai@example.com" }));
+describe("verifyOtp ผ่าน account repository", () => {
+  const IP = "203.0.113.7";
 
-    // verify รหัสตรงกับ backend
-    const res = await send(
-      backend.client,
-      "anonymous",
-      "/v1/auth/otp/verify",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "somchai@example.com", code: "123456" }),
-      },
-      [400, 429],
-    );
-    expect(res.status).toBe(200);
-    const data = await readBody<{ user: { id: string; email: string; provider: string } }>(res);
-    expect(data.user.email).toBe("somchai@example.com");
-    expect(data.user.provider).toBe("email");
-    expect(data.user.id).toMatch(/^email-/);
+  it("ขอรหัส → verify รหัสถูก → บัญชีใหม่ usr-<uuid> (created)", async () => {
+    await handler(req({ email: "somchai@example.com" }));
+    const { user, created } = await backend.accounts.verifyOtp("somchai@example.com", "123456", IP);
+    expect(created).toBe(true);
+    expect(user).toMatchObject({ email: "somchai@example.com", provider: "email" });
+    expect(user.id).toMatch(/^usr-[0-9a-f-]{36}$/);
   });
 
-  it("verify รหัสผิด → 400 OTP_INVALID", async () => {
+  it("รหัสผิด / ไม่มีรหัส → OtpError พร้อม code ตามสัญญา", async () => {
     await handler(req({ email: "somchai@example.com" }));
-    const res = await send(
-      backend.client,
-      "anonymous",
-      "/v1/auth/otp/verify",
-      {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email: "somchai@example.com", code: "999999" }),
-      },
-      [400, 429],
-    );
-    expect(res.status).toBe(400);
-    const err = await res.json();
-    expect(err.error.code).toBe("OTP_INVALID");
-    expect(err.error.attemptsLeft).toBe(4);
+    await expect(backend.accounts.verifyOtp("somchai@example.com", "999999", IP)).rejects.toMatchObject({ code: "OTP_INVALID" });
+    await expect(backend.accounts.verifyOtp("nobody@example.com", "123456", IP)).rejects.toMatchObject({ code: "OTP_EXPIRED" });
   });
 
-  it("Guest → Email OTP: ย้ายผังจาก Guest เข้าบัญชี email สำเร็จ", async () => {
-    const GUEST_ID = `guest-${globalThis.crypto.randomUUID()}`;
-    const EMAIL_USER_ID = `email-${globalThis.crypto.randomUUID()}`;
-
-    // Guest มีผังในระบบ
+  it("Guest → Email OTP: ผังย้ายเข้าบัญชีครบ", async () => {
+    const guest = (await backend.accounts.resolve({ provider: "guest" }, IP)).user.id;
     const layout = cafeLayout();
-    await backend.layouts.create(GUEST_ID, layout);
-    expect((await backend.layouts.list(GUEST_ID)).length).toBe(1);
+    await backend.layouts.create(guest, layout);
+    await backend.layouts.create(guest, { ...layout, id: "second" });
 
-    // ย้ายผัง
-    expect(guestToMerge(EMAIL_USER_ID, GUEST_ID)).toBe(GUEST_ID);
-    const mergeResult = await syncSignIn(backend.accounts, {
-      userId: EMAIL_USER_ID,
-      profile: { email: "somchai@example.com", name: "Somchai" },
-      previousUserId: GUEST_ID,
-    });
-    expect(mergeResult).toEqual({ movedLayouts: 1, movedShares: 0, renamed: [] });
-
-    // ผังย้ายไปอยู่ใต้ EMAIL_USER_ID
-    expect((await backend.layouts.list(EMAIL_USER_ID)).map((l) => l.id)).toEqual([layout.id]);
-    expect(await backend.layouts.list(GUEST_ID)).toEqual([]);
+    await handler(req({ email: "somchai@example.com" }));
+    const { user } = await backend.accounts.verifyOtp("somchai@example.com", "123456", IP);
+    expect(guestToMerge(user.id, guest)).toBe(guest);
+    expect(await syncSignIn(backend.accounts, { userId: user.id, previousUserId: guest })).toEqual({ movedLayouts: 2, movedShares: 0, renamed: [] });
+    expect((await backend.layoutIds(user.id)).sort()).toEqual([layout.id, "second"].sort());
+    expect(await backend.layoutIds(guest)).toEqual([]);
   });
 });

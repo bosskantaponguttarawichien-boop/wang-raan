@@ -1,15 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cafeLayout } from "@/test/fixtures/layouts";
 import { testBackend } from "@/test/backend";
 import { sessionCookie } from "@/test/session";
 import * as meRoute from "../../app/api/me/route";
 import * as exportRoute from "../../app/api/me/export/route";
 import { createAccountHandlers } from "./account-handlers";
-import { guestToMerge, profileInput, syncSignIn } from "./account-sync";
+import { guestToMerge, syncSignIn } from "./account-sync";
 import type { ResolveUser } from "./session";
 
 const GUEST = "guest-0f8fad5b-d9cb-469f-a165-70867728950e";
+/** ผู้ใช้เดิมก่อน v1.3.0 (id รูปแบบ <provider>-<providerAccountId>) — ยังต้องใช้งานได้ */
 const GITHUB = "github-12345";
+const IP = "203.0.113.7";
 
 const asUser: ResolveUser = async (r) => {
   const id = r.headers.get("x-user");
@@ -37,33 +39,31 @@ describe("GET /api/me", () => {
     expect((await handlers.get(req("", {}, null))).status).toBe(401);
   });
 
-  it("มีโปรไฟล์ใน Backend แล้ว → คืนโปรไฟล์นั้น", async () => {
-    await backend.accounts.upsert(GITHUB, { provider: "github", name: "Somchai", email: "s@example.com", image: null });
-    const res = await handlers.get(req());
+  it("บัญชีที่ resolve แล้ว → คืนโปรไฟล์นั้น", async () => {
+    const { user } = await backend.accounts.resolve(
+      { provider: "github", providerAccountId: "12345", email: "s@example.com", emailVerified: false, name: "Somchai" },
+      IP,
+    );
+    const res = await handlers.get(req("", {}, user.id));
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: GITHUB, provider: "github", email: "s@example.com" });
+    expect(await res.json()).toMatchObject({ id: user.id, provider: "github", email: "s@example.com", name: "Somchai" });
   });
 
-  it("ยังไม่มีโปรไฟล์ → สร้างจาก session แล้วคืนให้", async () => {
-    const res = await handlers.get(req("", {}, GUEST, "ผู้ใช้ทั่วไป"));
-    expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ id: GUEST, provider: "guest", name: "ผู้ใช้ทั่วไป" });
-    expect(backend.mock.inspect().users.has(GUEST)).toBe(true);
-  });
-
-  it("id ที่ไม่รู้จัก provider → 404 (ไม่ส่ง PUT ผิดสัญญา)", async () => {
-    expect((await handlers.get(req("", {}, "alice"))).status).toBe(404);
+  it("ไม่มีบัญชีใน Backend (เช่น ลบไปแล้ว) → 404 ไม่สร้างใหม่", async () => {
+    expect((await handlers.get(req("", {}, GUEST, "ผู้ใช้ทั่วไป"))).status).toBe(404);
+    expect(backend.mock.inspect().users.size).toBe(0);
   });
 });
 
 describe("DELETE /api/me", () => {
-  it("ลบโปรไฟล์และผังทั้งหมด → 204", async () => {
-    await backend.accounts.upsert(GITHUB, { provider: "github" });
-    await backend.layouts.create(GITHUB, cafeLayout());
-    const res = await handlers.remove(req("", { method: "DELETE" }));
+  it("ลบโปรไฟล์ identities และผังทั้งหมด → 204", async () => {
+    const { user } = await backend.accounts.resolve({ provider: "github", providerAccountId: "1", email: null, emailVerified: false }, IP);
+    await backend.layouts.create(user.id, cafeLayout());
+    const res = await handlers.remove(req("", { method: "DELETE" }, user.id));
     expect(res.status).toBe(204);
-    expect(backend.mock.inspect().users.has(GITHUB)).toBe(false);
-    expect(await backend.layouts.list(GITHUB)).toEqual([]);
+    expect(backend.mock.inspect().users.has(user.id)).toBe(false);
+    expect(backend.mock.inspect().identities.size).toBe(0);
+    expect(await backend.layoutIds(user.id)).toEqual([]);
   });
 
   it("ไม่มี Session → 401", async () => {
@@ -80,6 +80,7 @@ describe("GET /api/me/export", () => {
     expect(res.headers.get("content-disposition")).toBe('attachment; filename="wang-raan-account-2026-10-12.json"');
     const body = await res.json();
     expect(body.user.id).toBe(GITHUB);
+    expect(body.identities).toEqual([]);
     expect(body.layouts.map((l: { layout: { id: string } }) => l.layout.id)).toEqual([layout.id]);
   });
 });
@@ -88,54 +89,44 @@ describe("route files", () => {
   it("ใช้ Session จริง: ไม่มี cookie → 401, มี cookie → ผ่าน handler", async () => {
     expect((await meRoute.GET(new Request("http://localhost/api/me"))).status).toBe(401);
     expect((await exportRoute.GET(new Request("http://localhost/api/me/export"))).status).toBe(401);
+    // cookie ของบัญชีที่ Backend ไม่รู้จัก → ผ่าน session แล้ว handler ตอบ 404 (ไม่ใช่ 401)
     const cookie = await sessionCookie(GUEST);
     const res = await meRoute.GET(new Request("http://localhost/api/me", { headers: { cookie } }));
-    expect(res.status).toBe(200);
-    expect((await res.json()).provider).toBe("guest");
+    expect(res.status).toBe(404);
   });
 });
 
 describe("syncSignIn", () => {
-  it("ล็อกอิน → บันทึกโปรไฟล์ (ตัด email/image ที่ผิดรูปแบบทิ้ง)", async () => {
-    await syncSignIn(backend.accounts, { userId: GITHUB, profile: { name: " Somchai ", email: "not-an-email", image: "https://x.test/a.png" } });
-    expect(await backend.accounts.get(GITHUB)).toMatchObject({ provider: "github", name: "Somchai", email: null, image: "https://x.test/a.png" });
-  });
-
-  it("Guest → GitHub: ย้ายผังเข้าบัญชีใหม่และลบ Guest", async () => {
+  it("Guest → บัญชีใหม่ (usr-): ย้ายผังเข้าบัญชีและลบ Guest", async () => {
+    const guest = (await backend.accounts.resolve({ provider: "guest" }, IP)).user.id;
     const layout = cafeLayout();
-    await backend.layouts.create(GUEST, layout);
-    const result = await syncSignIn(backend.accounts, { userId: GITHUB, profile: { name: "Somchai" }, previousUserId: GUEST });
+    await backend.layouts.create(guest, layout);
+    const { user } = await backend.accounts.resolve({ provider: "google", providerAccountId: "g1", email: "a@example.com", emailVerified: true }, IP);
+    expect(user.id).toMatch(/^usr-/);
+    const result = await syncSignIn(backend.accounts, { userId: user.id, previousUserId: guest });
     expect(result).toEqual({ movedLayouts: 1, movedShares: 0, renamed: [] });
-    expect((await backend.layouts.list(GITHUB)).map((l) => l.id)).toEqual([layout.id]);
-    expect(await backend.layouts.list(GUEST)).toEqual([]);
+    expect(await backend.layoutIds(user.id)).toEqual([layout.id]);
+    expect(await backend.layoutIds(guest)).toEqual([]);
   });
 
-  it("โปรไฟล์บันทึกไม่สำเร็จ → ล็อกอินต่อได้; ย้ายผังไม่สำเร็จ → throw (session Guest เดิมยังอยู่)", async () => {
-    const error = vi.spyOn(console, "error").mockImplementation(() => {});
-    const failing = { ...backend.accounts, upsert: () => Promise.reject(new Error("down")), mergeGuest: () => Promise.reject(new Error("down")) };
-    await expect(syncSignIn(failing, { userId: GITHUB, profile: {} })).resolves.toBeNull();
-    await expect(syncSignIn(failing, { userId: GITHUB, profile: {}, previousUserId: GUEST })).rejects.toThrow("down");
-    error.mockRestore();
+  it("ผู้ใช้เดิม (github-…) ก็ย้ายผัง Guest เข้าได้", async () => {
+    await backend.layouts.create(GUEST, cafeLayout());
+    expect(await syncSignIn(backend.accounts, { userId: GITHUB, previousUserId: GUEST })).toMatchObject({ movedLayouts: 1 });
+  });
+
+  it("ไม่มี Guest เดิม → ไม่เรียก Backend; ย้ายผังไม่สำเร็จ → throw (session Guest เดิมยังอยู่)", async () => {
+    const failing = { ...backend.accounts, mergeGuest: () => Promise.reject(new Error("down")) };
+    await expect(syncSignIn(failing, { userId: GITHUB })).resolves.toBeNull();
+    await expect(syncSignIn(failing, { userId: GITHUB, previousUserId: GUEST })).rejects.toThrow("down");
   });
 
   it("ย้ายเฉพาะ Guest → บัญชีจริงที่ต่างกัน", () => {
     expect(guestToMerge(GITHUB, GUEST)).toBe(GUEST);
-    expect(guestToMerge("email-0f8fad5b-d9cb-469f-a165-70867728950e", GUEST)).toBe(GUEST);
+    expect(guestToMerge("usr-0f8fad5b-d9cb-469f-a165-70867728950e", GUEST)).toBe(GUEST);
     expect(guestToMerge(GITHUB, null)).toBeNull();
     expect(guestToMerge(GITHUB, GITHUB)).toBeNull();
     expect(guestToMerge(GUEST, GUEST.replace("0f8f", "1f8f"))).toBeNull();
     expect(guestToMerge(GITHUB, "github-999")).toBeNull();
     expect(guestToMerge(GITHUB, "guest-not-a-uuid")).toBeNull();
-  });
-
-  it("profileInput: id ที่ไม่รู้จัก provider → null", () => {
-    expect(profileInput("alice", {})).toBeNull();
-    expect(profileInput(GUEST, {})).toEqual({ provider: "guest", name: null, email: null, image: null });
-    expect(profileInput("email-0f8fad5b-d9cb-469f-a165-70867728950e", { email: "a@b.com" })).toEqual({
-      provider: "email",
-      name: null,
-      email: "a@b.com",
-      image: null,
-    });
   });
 });

@@ -12,7 +12,7 @@ import { z } from "zod";
 import type { StoreLayout, ValidationResult } from "@/core/layout";
 import { SaveLayoutRequestSchema, validateLayout } from "@/core/validation";
 import { ContactSchema } from "@/lib/contact-schema";
-import { LAYOUT_LIMIT, SHARE_LIMIT, SHARE_MAX_DAYS } from "@/server/limits";
+import { LAYOUT_LIMIT, LAYOUT_PAGE_DEFAULT, LAYOUT_PAGE_MAX, SHARE_LIMIT, SHARE_MAX_DAYS } from "@/server/limits";
 import { createRateLimiter } from "@/server/rate-limit";
 import { createShareKey } from "@/server/share-key";
 import { verifyInternalToken } from "@/server/token-relay";
@@ -29,6 +29,16 @@ interface OtpRecord {
   expiresAt: number;
   attemptsLeft: number;
   lastRequestedAt: number;
+}
+
+interface IdentityRecord {
+  provider: Exclude<Provider, "guest">;
+  providerAccountId: string;
+  userId: string;
+  email: string | null;
+  emailVerified: boolean;
+  createdAt: string;
+  lastLoginAt: string;
 }
 
 interface UserRecord {
@@ -69,6 +79,8 @@ interface ContactRecord {
 
 export interface MockBackendOptions {
   secret: string;
+  /** สร้าง Guest ได้กี่บัญชีต่อ IP ต่อ 10 นาที (ค่าเริ่มต้นสูงพอให้ E2E รันขนานจาก 127.0.0.1 ได้) */
+  guestLimitPerIp?: number;
   now?: () => Date;
   newShareKey?: () => string;
   newOtpCode?: (email: string) => string;
@@ -101,20 +113,43 @@ const VerifyOtpSchema = z
   .strict();
 const ProfileSchema = z
   .object({
-    provider: z.enum(["guest", "google", "line", "github", "email"]),
     name: z.string().max(200).nullable().optional(),
     email: z.string().email().max(254).nullable().optional(),
     image: z.string().url().max(2048).nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((body) => Object.keys(body).length > 0, "at least one field");
+const ResolveSchema = z.union([
+  z.object({ provider: z.literal("guest") }).strict(),
+  z
+    .object({
+      provider: z.enum(["google", "line", "github"]),
+      providerAccountId: z.string().min(1).max(255),
+      email: z.string().email().max(254).nullable(),
+      emailVerified: z.boolean(),
+      name: z.string().max(200).nullable().optional(),
+      image: z.string().url().max(2048).nullable().optional(),
+    })
+    .strict(),
+]);
+const ListQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(LAYOUT_PAGE_MAX).default(LAYOUT_PAGE_DEFAULT),
+  cursor: z.string().min(1).max(512).optional(),
+});
+/** cursor ทึบของ mock = base64url ของ `<updatedAt>|<id>` (ตัวสุดท้ายของหน้าก่อน) — BFF ห้ามแกะ */
+const encodeCursor = (updatedAt: string, id: string) => Buffer.from(`${updatedAt}|${id}`).toString("base64url");
+function decodeCursor(cursor: string): { updatedAt: string; id: string } | null {
+  const text = Buffer.from(cursor, "base64url").toString();
+  const at = text.indexOf("|");
+  if (at < 0 || Number.isNaN(Date.parse(text.slice(0, at)))) return null;
+  return { updatedAt: text.slice(0, at), id: text.slice(at + 1) };
+}
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
 const MergeGuestSchema = z
   .object({ guestId: z.string().regex(/^guest-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/) })
   .strict();
 
-function providerOf(userId: string): Provider {
-  const prefix = userId.split("-")[0];
-  return prefix === "google" || prefix === "line" || prefix === "github" || prefix === "email" ? (prefix as Provider) : "guest";
-}
+const isGuest = (userId: string) => userId.startsWith("guest-");
 
 export function createMockBackend(options: MockBackendOptions) {
   const now = options.now ?? (() => new Date());
@@ -123,6 +158,8 @@ export function createMockBackend(options: MockBackendOptions) {
   const iso = () => now().toISOString();
 
   let users = new Map<string, UserRecord>();
+  /** key = `<provider>:<providerAccountId>` */
+  let identities = new Map<string, IdentityRecord>();
   let layouts = new Map<string, Map<string, LayoutRecord>>();
   let shares = new Map<string, ShareRecord>();
   let contacts: ContactRecord[] = [];
@@ -133,6 +170,7 @@ export function createMockBackend(options: MockBackendOptions) {
     ip: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
     user: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
     global: createRateLimiter({ limit: 50, windowMs: minute10, now: clock }),
+    guest: createRateLimiter({ limit: options.guestLimitPerIp ?? 1000, windowMs: minute10, now: clock }),
   };
   /** จำนวนคำขอถัดไปที่จะตอบ 503 (Infinity = ล่มจนกว่าจะสั่ง reset/outage 0) — ทั้งระบบ หรือเฉพาะผู้ใช้ (E2E รันขนาน) */
   let outage = 0;
@@ -141,6 +179,7 @@ export function createMockBackend(options: MockBackendOptions) {
 
   function reset() {
     users = new Map();
+    identities = new Map();
     layouts = new Map();
     shares = new Map();
     contacts = [];
@@ -149,6 +188,7 @@ export function createMockBackend(options: MockBackendOptions) {
       ip: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
       user: createRateLimiter({ limit: 5, windowMs: minute10, now: clock }),
       global: createRateLimiter({ limit: 50, windowMs: minute10, now: clock }),
+      guest: createRateLimiter({ limit: options.guestLimitPerIp ?? 1000, windowMs: minute10, now: clock }),
     };
     outage = 0;
     outageBySubject = new Map();
@@ -196,7 +236,7 @@ export function createMockBackend(options: MockBackendOptions) {
     }
   }
 
-  function parse<T>(schema: z.ZodType<T>, body: unknown, code = "INVALID_REQUEST"): T {
+  function parse<T>(schema: z.ZodType<T, z.ZodTypeDef, unknown>, body: unknown, code = "INVALID_REQUEST"): T {
     const result = schema.safeParse(body);
     if (!result.success) throw new HttpProblem(400, code, "request does not match schema", { details: zodDetails(result.error) });
     return result.data;
@@ -243,6 +283,73 @@ export function createMockBackend(options: MockBackendOptions) {
     }
   }
 
+  function requireClientIp(request: Request): string {
+    const clientIp = request.headers.get("x-client-ip");
+    if (!clientIp) throw new HttpProblem(400, "INVALID_REQUEST", "missing X-Client-IP");
+    return clientIp;
+  }
+
+  function newUser(id: string, provider: Provider, profile: { name?: string | null; email?: string | null; image?: string | null }) {
+    const at = iso();
+    const user: UserRecord = {
+      id,
+      provider,
+      name: profile.name ?? null,
+      email: profile.email ?? null,
+      image: profile.image ?? null,
+      createdAt: at,
+      updatedAt: at,
+    };
+    users.set(id, user);
+    return user;
+  }
+
+  /** เชื่ออีเมลของ identity นี้พอจะผูกบัญชีได้ไหม — line/github ไม่เชื่อเสมอ */
+  const trustsEmail = (i: { provider: Provider; emailVerified: boolean }) =>
+    i.emailVerified && (i.provider === "google" || i.provider === "email");
+
+  /**
+   * กติกาผูกบัญชี (สัญญา resolveIdentity) — ใช้ทั้ง OAuth และ OTP
+   * 1. identity เดิม → บัญชีนั้น  2. อีเมลยืนยันแล้วทั้งสองฝั่ง → บัญชีเดิม (สร้างก่อนสุด)  3. สร้างใหม่ usr-<uuid>
+   */
+  function resolveIdentity(input: {
+    provider: Exclude<Provider, "guest">;
+    providerAccountId: string;
+    email: string | null;
+    emailVerified: boolean;
+    name?: string | null;
+    image?: string | null;
+  }) {
+    const key = `${input.provider}:${input.providerAccountId}`;
+    const email = input.email ? normalizeEmail(input.email) : null;
+    const at = iso();
+    let identity = identities.get(key);
+    let user = identity ? users.get(identity.userId) : undefined;
+    if (!user && email && trustsEmail(input)) {
+      const owner = [...identities.values()]
+        .filter((i) => trustsEmail(i) && i.email === email && users.has(i.userId))
+        .map((i) => users.get(i.userId)!)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt))[0];
+      user = owner;
+    }
+    const created = !user;
+    user ??= newUser(`usr-${globalThis.crypto.randomUUID()}`, input.provider, { name: input.name, email, image: input.image });
+    if (!identity) {
+      identity = { provider: input.provider, providerAccountId: input.providerAccountId, userId: user.id, email, emailVerified: input.emailVerified, createdAt: at, lastLoginAt: at };
+      identities.set(key, identity);
+    }
+    identity.lastLoginAt = at;
+    // อีเมลของ identity ใช้ตอนผูกครั้งแรกเท่านั้น — อัปเดตไว้เป็นข้อมูล แต่ไม่ย้ายบัญชี
+    identity.email = email;
+    identity.emailVerified = input.emailVerified;
+    user.provider = input.provider;
+    user.name ??= input.name ?? null;
+    user.email ??= email;
+    user.image ??= input.image ?? null;
+    user.updatedAt = at;
+    return { user, created };
+  }
+
   // ── endpoint ──────────────────────────────────────────────────────────────
   type Handler = (ctx: { request: Request; user: string; params: string[] }) => Promise<Response> | Response;
   interface RouteDef {
@@ -256,8 +363,21 @@ export function createMockBackend(options: MockBackendOptions) {
     {
       method: "GET",
       pattern: /^\/v1\/layouts$/,
-      handle: ({ user }) =>
-        json({ layouts: [...(layouts.get(user)?.values() ?? [])].map(summary).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) }),
+      handle: ({ request, user }) => {
+        const query = parse(ListQuerySchema, Object.fromEntries(new URL(request.url).searchParams));
+        const after = query.cursor ? decodeCursor(query.cursor) : null;
+        if (query.cursor && !after) throw new HttpProblem(400, "INVALID_REQUEST", "invalid cursor");
+        // ใหม่สุดก่อน แล้วตาม id — ลำดับคงที่แม้ updatedAt ซ้ำ
+        const sorted = [...(layouts.get(user)?.values() ?? [])]
+          .map(summary)
+          .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id));
+        const rest = after
+          ? sorted.filter((l) => l.updatedAt < after.updatedAt || (l.updatedAt === after.updatedAt && l.id > after.id))
+          : sorted;
+        const page = rest.slice(0, query.limit);
+        const last = page[page.length - 1];
+        return json({ layouts: page, nextCursor: rest.length > query.limit && last ? encodeCursor(last.updatedAt, last.id) : null });
+      },
     },
     {
       method: "POST",
@@ -393,8 +513,7 @@ export function createMockBackend(options: MockBackendOptions) {
       pattern: /^\/v1\/contact-messages$/,
       anonymous: true,
       handle: async ({ request, user }) => {
-        const clientIp = request.headers.get("x-client-ip");
-        if (!clientIp) throw new HttpProblem(400, "INVALID_REQUEST", "missing X-Client-IP");
+        const clientIp = requireClientIp(request);
         hit(limiters.ip, clientIp);
         if (user !== "anonymous") hit(limiters.user, user);
         hit(limiters.global, "global");
@@ -424,18 +543,12 @@ export function createMockBackend(options: MockBackendOptions) {
       pattern: /^\/v1\/me$/,
       handle: async ({ request, user }) => {
         const body = parse(ProfileSchema, await readBody(request, 4 * KB));
-        const at = iso();
-        const existing = users.get(user);
-        const record: UserRecord = {
-          id: user,
-          provider: body.provider,
-          name: body.name ?? null,
-          email: body.email ?? null,
-          image: body.image ?? null,
-          createdAt: existing?.createdAt ?? at,
-          updatedAt: at,
-        };
-        users.set(user, record);
+        const record = users.get(user);
+        if (!record) throw new HttpProblem(404, "NOT_FOUND", "profile not found");
+        if (body.name !== undefined) record.name = body.name;
+        if (body.email !== undefined) record.email = body.email;
+        if (body.image !== undefined) record.image = body.image;
+        record.updatedAt = iso();
         return json(record);
       },
     },
@@ -452,10 +565,20 @@ export function createMockBackend(options: MockBackendOptions) {
       pattern: /^\/v1\/me\/export$/,
       handle: ({ user }) => {
         const at = iso();
-        const profile = users.get(user) ?? { id: user, provider: providerOf(user), name: null, email: null, image: null, createdAt: at, updatedAt: at };
+        const profile = users.get(user) ?? { id: user, provider: "guest", name: null, email: null, image: null, createdAt: at, updatedAt: at };
         return json({
           exportedAt: at,
           user: profile,
+          identities: [...identities.values()]
+            .filter((i) => i.userId === user)
+            .map(({ provider, providerAccountId, email, emailVerified, createdAt, lastLoginAt }) => ({
+              provider,
+              providerAccountId,
+              email,
+              emailVerified,
+              createdAt,
+              lastLoginAt,
+            })),
           layouts: [...(layouts.get(user)?.values() ?? [])],
           shares: [...shares.values()].filter((s) => s.ownerId === user).map(shareLink),
           contactMessages: contacts
@@ -469,7 +592,7 @@ export function createMockBackend(options: MockBackendOptions) {
       pattern: /^\/v1\/me\/merge-guest$/,
       handle: async ({ request, user }) => {
         const { guestId } = parse(MergeGuestSchema, await readBody(request, KB));
-        if (providerOf(user) === "guest") throw new HttpProblem(400, "INVALID_REQUEST", "cannot merge into a guest account");
+        if (isGuest(user)) throw new HttpProblem(400, "INVALID_REQUEST", "cannot merge into a guest account");
         const moving = layouts.get(guestId) ?? new Map<string, LayoutRecord>();
         const target = layoutsOf(user);
         const renamed: Array<{ from: string; to: string }> = [];
@@ -495,11 +618,27 @@ export function createMockBackend(options: MockBackendOptions) {
     },
     {
       method: "POST",
+      pattern: /^\/v1\/auth\/identities\/resolve$/,
+      anonymous: true,
+      handle: async ({ request }) => {
+        const clientIp = requireClientIp(request);
+        const body = parse(ResolveSchema, await readBody(request, 4 * KB));
+        if (body.provider === "guest") {
+          hit(limiters.guest, clientIp);
+          const user = newUser(`guest-${globalThis.crypto.randomUUID()}`, "guest", { name: "ผู้ใช้ทั่วไป" });
+          return json({ user, created: true });
+        }
+        return json(resolveIdentity(body));
+      },
+    },
+    {
+      method: "POST",
       pattern: /^\/v1\/auth\/otp\/request$/,
       anonymous: true,
       handle: async ({ request }) => {
+        requireClientIp(request);
         const body = parse(RequestOtpSchema, await readBody(request, KB));
-        const email = body.email.trim().toLowerCase();
+        const email = normalizeEmail(body.email);
         const existing = otps.get(email);
         const currentTime = clock();
         if (existing && currentTime - existing.lastRequestedAt < 60_000) {
@@ -522,8 +661,9 @@ export function createMockBackend(options: MockBackendOptions) {
       pattern: /^\/v1\/auth\/otp\/verify$/,
       anonymous: true,
       handle: async ({ request }) => {
+        requireClientIp(request);
         const body = parse(VerifyOtpSchema, await readBody(request, KB));
-        const email = body.email.trim().toLowerCase();
+        const email = normalizeEmail(body.email);
         const record = otps.get(email);
         const currentTime = clock();
         if (!record || record.expiresAt <= currentTime) {
@@ -540,28 +680,19 @@ export function createMockBackend(options: MockBackendOptions) {
           throw new HttpProblem(400, "OTP_INVALID", "รหัสไม่ถูกต้อง", { attemptsLeft: record.attemptsLeft });
         }
         otps.delete(email);
-        let user = [...users.values()].find((u) => u.email?.toLowerCase() === email);
-        if (!user) {
-          const at = iso();
-          const id = `email-${globalThis.crypto.randomUUID()}`;
-          const name = email.split("@")[0] ?? "ผู้ใช้";
-          user = {
-            id,
-            provider: "email",
-            name,
-            email,
-            image: null,
-            createdAt: at,
-            updatedAt: at,
-          };
-          users.set(id, user);
-        }
-        return json({ user });
+        return json(resolveIdentity({ provider: "email", providerAccountId: email, email, emailVerified: true, name: email.split("@")[0] || null }));
       },
     },
   ];
 
   function deleteUser(user: string) {
+    for (const [key, identity] of identities) {
+      if (identity.userId !== user) continue;
+      if (identity.email) otps.delete(identity.email);
+      identities.delete(key);
+    }
+    const email = users.get(user)?.email;
+    if (email) otps.delete(normalizeEmail(email));
     users.delete(user);
     layouts.delete(user);
     for (const [key, s] of shares) if (s.ownerId === user) shares.delete(key);
@@ -629,7 +760,7 @@ export function createMockBackend(options: MockBackendOptions) {
     fetch: handle,
     reset,
     /** สำหรับเทสต์ตรวจสถานะภายใน (เช่น ลบบัญชีแล้วไม่เหลือข้อมูล) */
-    inspect: () => ({ users, layouts, shares, contacts, otps }),
+    inspect: () => ({ users, identities, layouts, shares, contacts, otps }),
   };
 }
 

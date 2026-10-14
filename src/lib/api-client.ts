@@ -14,6 +14,12 @@ export interface LayoutSummaryDto {
   layout: StoreLayout;
 }
 
+export interface LayoutPageDto {
+  layouts: LayoutSummaryDto[];
+  /** null = หน้าสุดท้าย */
+  nextCursor: string | null;
+}
+
 export interface StoredLayoutDto {
   name: string;
   layout: StoreLayout;
@@ -92,7 +98,15 @@ async function request<T>(fetchImpl: typeof fetch, path: string, init: RequestIn
 
 export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...args)) {
   return {
-    listLayouts: () => request<{ layouts: LayoutSummaryDto[] }>(fetchImpl, "/api/layouts").then((r) => r.layouts),
+    /** รายการผังทีละหน้า (ใหม่สุดก่อน) — ส่ง nextCursor ของหน้าก่อนเพื่อโหลดต่อ */
+    listLayoutsPage: (page: { limit?: number; cursor?: string | null } = {}) => {
+      const query = new URLSearchParams();
+      if (page.limit) query.set("limit", String(page.limit));
+      if (page.cursor) query.set("cursor", page.cursor);
+      return request<LayoutPageDto>(fetchImpl, query.size ? `/api/layouts?${query}` : "/api/layouts");
+    },
+    /** ผังล่าสุด 50 ผัง (หน้าแรกขนาดใหญ่สุด) — ใช้ในแผงคลาวด์ของ Playground */
+    listLayouts: () => request<LayoutPageDto>(fetchImpl, "/api/layouts?limit=50").then((r) => r.layouts),
     getLayout: (id: string) => request<StoredLayoutDto>(fetchImpl, `/api/layouts/${encodeURIComponent(id)}`),
     createLayout: (layout: StoreLayout, name?: string) =>
       request<StoredLayoutDto>(fetchImpl, "/api/layouts", {

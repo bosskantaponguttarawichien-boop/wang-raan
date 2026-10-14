@@ -96,3 +96,15 @@ BE ต้องอัปเดตเอกสารฝั่งตัวเอ�
 
 - ใครดูแลโดเมนส่งเมล (SPF/DKIM/DMARC) และเลือก Resend หรือ SES — ผูกกับ feat-044 (ชื่อโดเมนยังไม่ตัดสิน)
 - feat-041 (Google จริง) ยัง blocked รอ Backend จริงบน staging — ระหว่างนี้ใช้ mock OAuth ใน E2E
+
+## 7. สถานะ 2026-10-15 — FE ทำขั้น 1–3 เสร็จแล้ว (รอ BE รีวิวสัญญา)
+
+ขั้น 1 (สัญญา v1.3.0), ขั้น 2 (mock + BFF) และส่วนที่เหลือของขั้น 3 (pagination ใน `/projects`) เสร็จ — ดู `harness/progress.md` 2026-10-15
+
+**FE ตัดสินเองตามร่างของ BE (BE แย้งได้ตอนรีวิว)**
+- `PUT /v1/me` เอา `provider` ออก ส่งเฉพาะช่องที่จะแก้ (`minProperties: 1`), ไม่มีบัญชี → 404
+- Guest: `resolve { provider: "guest" }` → BE สร้าง `guest-<uuid>` เอง (ไม่ใช่ uuid จาก BFF) + 429 ต่อ IP
+- ผูกด้วยอีเมลเมื่อ **ทั้งสองฝั่ง** ยืนยันอีเมลแล้ว (Google `emailVerified` หรือ OTP) — บัญชี GitHub/LINE ที่มีอีเมลเดียวกันจะไม่ถูก OTP/Google ผูกเข้าไป (กันการจองอีเมลคนอื่นไว้ก่อน) · หลายบัญชีตรง → บัญชีที่สร้างก่อน
+- resolve เติม name/image/email ของ `users` เฉพาะช่องที่ว่าง (ไม่ทับค่าที่ผู้ใช้แก้)
+- `Identity` ใน export ใช้รูปแบบของ BE: `{ provider, providerAccountId, email, emailVerified, createdAt, lastLoginAt }`
+- `GET /v1/layouts`: เรียง `updatedAt DESC, id ASC`, cursor ปลอม → 400, `nextCursor` ≤ 512 ตัวอักษร

@@ -21,6 +21,7 @@ interface ParameterObject {
   name: string;
   in: "header" | "path" | "query";
   required?: boolean;
+  schema?: { type?: string };
 }
 interface Operation {
   operationId: string;
@@ -106,6 +107,18 @@ export async function checkRequest(request: Request): Promise<ContractViolation[
   if (needsToken && !/^Bearer .+/.test(request.headers.get("authorization") ?? "")) add("ไม่มี Authorization: Bearer");
   for (const p of route.parameters) {
     if (p.in === "header" && p.required && !request.headers.get(p.name)) add(`ไม่มี header ${p.name}`);
+  }
+  const query = new URL(request.url).searchParams;
+  for (const [name, raw] of query) {
+    const index = route.parameters.findIndex((p) => p.in === "query" && p.name === name);
+    if (index < 0) {
+      add(`query ${name} ไม่อยู่ในสัญญา`);
+      continue;
+    }
+    const p = route.parameters[index]!;
+    const v = ajv.compile(p.schema ?? {});
+    const value = p.schema?.type === "integer" && /^-?\d+$/.test(raw) ? Number(raw) : raw;
+    if (!v(value)) add(`query ${name} ผิด schema: ${describeErrors(v)}`);
   }
 
   const body = request.body ? await request.clone().text() : "";

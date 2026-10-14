@@ -105,16 +105,21 @@ describe("LoginForm (feat-062)", () => {
     expect((screen.getByLabelText("อีเมล") as HTMLInputElement).value).toBe("somchai@example.com");
   });
 
-  it("ขั้นตอนที่ 2: กรอกรหัสผิด → แสดงข้อความแจ้งเตือน", async () => {
+  it.each([
+    ["OTP_INVALID", "รหัสไม่ถูกต้อง กรุณาตรวจอีกครั้ง"],
+    ["OTP_EXPIRED", "รหัสหมดอายุแล้ว กรุณาขอรหัสใหม่"],
+    ["OTP_ATTEMPTS_EXCEEDED", "กรอกรหัสผิดเกินจำนวนที่กำหนด กรุณาขอรหัสใหม่"],
+    ["RATE_LIMITED", "ลองถี่เกินไป กรุณารอสักครู่แล้วลองใหม่"],
+  ])("ขั้นตอนที่ 2: ตรวจรหัสไม่ผ่าน (%s) → แสดงข้อความตามสาเหตุ", async (code, message) => {
     vi.mocked(global.fetch).mockResolvedValueOnce(
       new Response(JSON.stringify({ sent: true, expiresIn: 600 }), { status: 200, headers: { "content-type": "application/json" } }),
     );
     vi.mocked(nextAuthReact.signIn).mockResolvedValueOnce({
-      error: "OTP_INVALID",
-      status: 400,
+      error: "CredentialsSignin",
+      status: 401,
       ok: false,
       url: null,
-      code: undefined,
+      code,
     });
 
     render(<LoginForm />);
@@ -128,7 +133,12 @@ describe("LoginForm (feat-062)", () => {
     const verifyBtn = screen.getByRole("button", { name: "ยืนยันรหัส" });
     fireEvent.click(verifyBtn);
 
-    expect(await screen.findByText("รหัสไม่ถูกต้อง กรุณาตรวจอีกครั้ง")).toBeDefined();
+    expect(await screen.findByText(message)).toBeDefined();
+  });
+
+  it("ไม่ได้ตั้งค่า Google → ไม่แสดงปุ่ม Google", () => {
+    render(<LoginForm hasGoogleProvider={false} />);
+    expect(screen.queryByRole("button", { name: /Google/ })).toBeNull();
   });
 
   it("ขั้นตอนที่ 2: กรอกรหัสถูกต้อง → เข้าสู่ระบบสำเร็จ → แสดงสถานะสำเร็จ", async () => {

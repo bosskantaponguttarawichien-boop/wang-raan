@@ -9,20 +9,30 @@ import {
   randomId,
   type StoreLayout,
 } from "@/core/layout";
-import { api, type LayoutSummaryDto } from "@/lib/api-client";
+import { ApiError, api, type LayoutSummaryDto } from "@/lib/api-client";
 import { CreateProjectDialog, type CreateProjectParams } from "./create-project-dialog";
 import { DeleteConfirmDialog } from "./delete-confirm-dialog";
 import { ProjectCard } from "./project-card";
 
-export const LAYOUT_LIMIT = 20;
+/** โควตาตามสัญญา (src/server/limits.ts) — ใช้แค่ในข้อความ เพราะจำนวนจริงรู้จาก Backend (409 LAYOUT_LIMIT_REACHED) */
+const LAYOUT_LIMIT = 200;
+
+/** รวมหน้าใหม่เข้ารายการเดิมโดยตัด id ซ้ำ (ผังที่แก้ระหว่างไล่หน้าอาจโผล่ซ้ำได้ตามสัญญา) */
+function appendUnique(current: LayoutSummaryDto[], next: LayoutSummaryDto[]) {
+  const seen = new Set(current.map((l) => l.id));
+  return [...current, ...next.filter((l) => !seen.has(l.id))];
+}
 
 export function ProjectsList() {
   const router = useRouter();
   const { status: sessionStatus } = useSession();
 
   const [layouts, setLayouts] = React.useState<LayoutSummaryDto[]>([]);
+  const [nextCursor, setNextCursor] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [loadingMore, setLoadingMore] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [isLimitReached, setLimitReached] = React.useState(false);
 
   // Dialog states
   const [createOpen, setCreateOpen] = React.useState(false);
@@ -55,8 +65,9 @@ export function ProjectsList() {
     setLoading(true);
     setError(null);
     try {
-      const data = await api.listLayouts();
-      setLayouts(data);
+      const page = await api.listLayoutsPage();
+      setLayouts(page.layouts);
+      setNextCursor(page.nextCursor);
     } catch {
       setError("โหลดรายการผังไม่ได้ ระบบจัดเก็บขัดข้องชั่วคราว ผังของคุณไม่หาย ลองใหม่อีกครั้ง");
     } finally {
@@ -70,8 +81,31 @@ export function ProjectsList() {
     }
   }, [sessionStatus, fetchLayouts]);
 
-  // ตรวจสอบโควตา
-  const isLimitReached = layouts.length >= LAYOUT_LIMIT;
+  // โหลดหน้าถัดไป — cursor หมดอายุ (400) ให้โหลดรายการใหม่ทั้งหมด
+  const loadMore = async () => {
+    if (!nextCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const page = await api.listLayoutsPage({ cursor: nextCursor });
+      setLayouts((prev) => appendUnique(prev, page.layouts));
+      setNextCursor(page.nextCursor);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 400) await fetchLayouts();
+      else showToast("โหลดผังเพิ่มไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  /** สร้างไม่สำเร็จ — โควตาเต็มแสดงแถบเตือนค้างไว้ อื่น ๆ แสดง toast */
+  const handleCreateError = (e: unknown, fallback: string) => {
+    if (e instanceof ApiError && e.code === "LAYOUT_LIMIT_REACHED") {
+      setLimitReached(true);
+      setCreateOpen(false);
+    } else {
+      showToast(fallback);
+    }
+  };
 
   // เปิด Dialog สร้างผังใหม่
   const handleOpenCreate = () => {
@@ -93,8 +127,8 @@ export function ProjectsList() {
       await api.createLayout(newLayout, name);
       setCreateOpen(false);
       router.push(`/playground/${newLayout.id}`);
-    } catch {
-      showToast("สร้างผังไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } catch (e) {
+      handleCreateError(e, "สร้างผังไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setCreating(false);
     }
@@ -112,8 +146,8 @@ export function ProjectsList() {
       await api.createLayout(template, name);
       setCreateOpen(false);
       router.push(`/playground/${template.id}`);
-    } catch {
-      showToast("สร้างผังตัวอย่างไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
+    } catch (e) {
+      handleCreateError(e, "สร้างผังตัวอย่างไม่สำเร็จ กรุณาลองใหม่อีกครั้ง");
     } finally {
       setCreating(false);
     }
@@ -126,6 +160,7 @@ export function ProjectsList() {
     try {
       await api.deleteLayout(deleteTarget.id);
       setLayouts((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setLimitReached(false);
       showToast(`ลบผัง “${deleteTarget.name}” แล้ว`);
       setDeleteTarget(null);
     } catch {
@@ -167,7 +202,7 @@ export function ProjectsList() {
           <h1 className="m-0 text-[24px] font-semibold text-[#1e2b40]">ผังของฉัน</h1>
           {!loading && !error && (
             <p id="count" className="m-0 mt-1 text-[13px] text-[#4e627c]">
-              {layouts.length} ผัง
+              {nextCursor ? `แสดง ${layouts.length} ผังล่าสุด` : `${layouts.length} ผัง`}
             </p>
           )}
         </div>
@@ -313,6 +348,22 @@ export function ProjectsList() {
               </button>
             </li>
           </ul>
+        )}
+
+        {/* โหลดหน้าถัดไป (GET /api/layouts?cursor=) */}
+        {!loading && !error && nextCursor && (
+          <div className="mt-6 flex justify-center">
+            <button
+              type="button"
+              id="load-more"
+              onClick={loadMore}
+              disabled={loadingMore}
+              aria-busy={loadingMore}
+              className="inline-flex h-10 items-center justify-center rounded-[10px] border border-[#e2e8f1] bg-white px-5 text-[14px] font-medium text-[#1e2b40] hover:border-[#c8d2e2] cursor-pointer disabled:cursor-wait disabled:opacity-60 focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-2 max-[480px]:w-full"
+            >
+              {loadingMore ? "กำลังโหลด…" : "โหลดผังเพิ่ม"}
+            </button>
+          </div>
         )}
       </div>
 

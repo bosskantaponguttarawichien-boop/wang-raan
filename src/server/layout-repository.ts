@@ -29,8 +29,15 @@ export interface LayoutSummary {
   layout: StoreLayout;
 }
 
+export interface LayoutPage {
+  layouts: LayoutSummary[];
+  /** null = หน้าสุดท้าย — ค่าทึบจาก Backend ห้ามแกะ */
+  nextCursor: string | null;
+}
+
 export interface LayoutRepository {
-  list(ownerId: string): Promise<LayoutSummary[]>;
+  /** cursor ที่ Backend ไม่รับ (ปลอม/เก่า) → "invalid-cursor" */
+  list(ownerId: string, page?: { limit?: number; cursor?: string }): Promise<LayoutPage | "invalid-cursor">;
   get(ownerId: string, id: string): Promise<StoredLayout | null>;
   create(ownerId: string, layout: StoreLayout, name?: string): Promise<StoredLayout | "conflict">;
   update(ownerId: string, layout: StoreLayout, name?: string): Promise<StoredLayout | "not-found">;
@@ -41,10 +48,16 @@ const item = (id: string) => `/v1/layouts/${encodeURIComponent(id)}`;
 
 export function createRemoteLayoutRepository(client: BackendClient = backendClient): LayoutRepository {
   return {
-    async list(ownerId) {
-      const body = await readBody<{ layouts?: unknown }>(await send(client, ownerId, "/v1/layouts"));
-      if (!Array.isArray(body.layouts)) throw new BackendError(502);
-      return body.layouts as LayoutSummary[];
+    async list(ownerId, page = {}) {
+      const query = new URLSearchParams();
+      if (page.limit !== undefined) query.set("limit", String(page.limit));
+      if (page.cursor) query.set("cursor", page.cursor);
+      const path = query.size ? `/v1/layouts?${query}` : "/v1/layouts";
+      const res = await send(client, ownerId, path, {}, page.cursor ? [400] : []);
+      if (res.status === 400) return "invalid-cursor";
+      const body = await readBody<{ layouts?: unknown; nextCursor?: unknown }>(res);
+      if (!Array.isArray(body.layouts) || (body.nextCursor !== null && typeof body.nextCursor !== "string")) throw new BackendError(502);
+      return { layouts: body.layouts as LayoutSummary[], nextCursor: body.nextCursor };
     },
     async get(ownerId, id) {
       const res = await send(client, ownerId, item(id), {}, [404]);

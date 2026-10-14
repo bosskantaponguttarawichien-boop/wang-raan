@@ -4,8 +4,24 @@ import * as React from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { api } from "@/lib/api-client";
-import { getDraftStorage, loadDraft } from "@/lib/draft-storage";
+import { clearDraft, getDraftStorage, loadDraft } from "@/lib/draft-storage";
 import { layoutStore } from "@/store/use-layout-store";
+
+/** ตั้งโดย SaveOnlineDialog ก่อนพาไป /login — มี = ผู้ใช้ขอให้บันทึกร่างนี้เข้าบัญชีจริง */
+export const PENDING_SYNC_KEY = "wang-raan:pending-sync";
+
+/** อ่านแล้วลบ marker ทันที — sync ได้ครั้งเดียวต่อการกดบันทึก (กันสร้างผังซ้ำ/ผังว่างเมื่อหน้าโหลดซ้ำ) */
+function takePendingSync(storage: Storage | null): { name?: string } | null {
+  try {
+    const raw = storage?.getItem(PENDING_SYNC_KEY);
+    if (raw == null) return null;
+    storage!.removeItem(PENDING_SYNC_KEY);
+    const parsed: unknown = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as { name?: string }) : {};
+  } catch {
+    return null;
+  }
+}
 
 export interface UseGuestSyncOptions {
   onToast?: (message: string) => void;
@@ -29,6 +45,11 @@ export function useGuestSync({ onToast }: UseGuestSyncOptions = {}) {
 
     async function syncOnline() {
       const storage = getDraftStorage();
+      const pending = takePendingSync(storage);
+      if (!pending) {
+        router.replace("/playground");
+        return;
+      }
       const draft = storage ? loadDraft(storage) : null;
       const currentStore = layoutStore.getState();
 
@@ -38,12 +59,11 @@ export function useGuestSync({ onToast }: UseGuestSyncOptions = {}) {
         ...baseLayout,
         id: `lay_${globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`,
       };
-      const name = draft?.name ?? currentStore.layoutName ?? `ผังร้าน ${layout.width} × ${layout.depth} ม.`;
+      const name = pending.name ?? draft?.name ?? currentStore.layoutName ?? `ผังร้าน ${layout.width} × ${layout.depth} ม.`;
 
       try {
         const created = await api.createLayout(layout, name);
-        storage?.removeItem("wang-raan:pending-sync");
-        storage?.clear();
+        clearDraft(storage);
         onToast?.("บันทึกผังในบัญชีของคุณเรียบร้อยแล้ว");
         router.replace(`/playground/${created.layout.id}`);
         router.refresh();

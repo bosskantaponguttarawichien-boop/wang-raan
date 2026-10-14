@@ -3,6 +3,16 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-15] feat-061 rework — Identities (สัญญา v1.3.0) + แก้บั๊ก login/projects
+
+- **สัญญา** `contracts/openapi.yaml` 1.3.0 ตามข้อตกลงกับ BE (`harness/handoff-fe-accounts.md`): `resolveIdentity`, OTP คืน `{ user, created }`, `PUT /v1/me` อัปเดตอย่างเดียว, `AccountExport.identities`, `GET /v1/layouts` แบ่งหน้า — `contracts/README.md` อัปเดตตาม; contract checker ตรวจ query parameter แล้ว
+- **mock-backend**: ตาราง identities + กติกาผูกบัญชี, Guest จาก resolve (จำกัดต่อ IP), pagination keyset, ลบบัญชีล้าง identities/OTP
+- **BFF**: id ผู้ใช้มาจาก Backend ทุกทาง (`auth.ts`, `auth-config.oauthIdentity`, `account-repository.resolve/verifyOtp/update`) · `account-sync` เหลือแค่ merge-guest · `/api/me` ไม่สร้างบัญชีแล้ว (404) · `/api/layouts?limit&cursor`
+- **UI**: `/projects` โหลดเพิ่มด้วย nextCursor + โควตาจาก 409 · `/login` แสดงข้อความตาม code (หมดอายุ/ผิดเกิน/ถี่เกิน) และซ่อนปุ่ม Google เมื่อไม่ได้ตั้ง `AUTH_GOOGLE_*`
+- **บั๊กที่แก้**: redirect ซ้อนหลังล็อกอิน OTP ทำให้ `?sync=1` รันสองรอบได้ผังว่าง · `guest-sync` / ปุ่มผังใหม่เรียก `localStorage.clear()` ล้างทุกค่า · รูปโปรไฟล์ `javascript:` ผ่าน zod `.url()` · GitHub ที่ส่ง emailVerified ถูกผูกบัญชีด้วยอีเมล (mock)
+- **QA**: `make test` 794/794, `make lint` ผ่าน, E2E ใหม่ `e2e/auth-identities.spec.ts` 3/3 (HTTP จริงทั้งเส้น), login-otp / projects / playground-id-online ผ่านครบ
+- **ค้าง (มีมาก่อน ไม่ใช่จากงานนี้)**: E2E ชุด UI เก่า 28 เคส (editor-flow, a11y, responsive 320–480, keyboard, account-share-contact) ล้มเพราะ selector ของ playground ก่อน Sprint 3 — baseline commit 6338ab1 ล้ม 32 เคส ชุดเดียวกัน
+
 ## [2026-10-14] feat-064 /playground/[id] + บันทึกออนไลน์จาก Guest
 
 - **State Management & Draft Storage**:

@@ -15,11 +15,18 @@ export function testBackend(options: { now?: () => Date; newShareKey?: () => str
   const mock = createMockBackend({ secret: TEST_BACKEND_SECRET, ...options });
   const checked = contractFetch(mock.fetch);
   const client = createBackendClient({ baseUrl: "http://backend.test", secret: TEST_BACKEND_SECRET, fetch: checked.fetch, retryDelayMs: 0 });
+  const layouts = createRemoteLayoutRepository(client);
   return {
     mock,
     client,
     violations: checked.violations,
-    layouts: createRemoteLayoutRepository(client),
+    layouts,
+    /** id ผังทั้งหมดของผู้ใช้ (หน้าแรกพอสำหรับเทสต์) */
+    async layoutIds(ownerId: string): Promise<string[]> {
+      const page = await layouts.list(ownerId, { limit: 50 });
+      if (page === "invalid-cursor") throw new Error("invalid cursor");
+      return page.layouts.map((l) => l.id);
+    },
     shares: createRemoteShareRepository(client),
     accounts: createRemoteAccountRepository(client),
   };

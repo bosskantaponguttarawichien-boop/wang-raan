@@ -150,6 +150,30 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
 });
 
 describe("Session & ความเป็นเจ้าของ (feat-031)", () => {
+  it("GET แบ่งหน้า: limit + cursor ส่งต่อ Backend, ไล่ nextCursor จนครบ", async () => {
+    for (let i = 0; i < 5; i++) await handlers.create(post({ layout: { ...cafeLayout(), id: `p-${i}` } }));
+    const first = await (await handlers.list(req("?limit=2"))).json();
+    expect(first.layouts.map((l: { id: string }) => l.id)).toEqual(["p-4", "p-3"]);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const ids: string[] = first.layouts.map((l: { id: string }) => l.id);
+    let cursor: string | null = first.nextCursor;
+    while (cursor) {
+      const page = await (await handlers.list(req(`?limit=2&cursor=${encodeURIComponent(cursor)}`))).json();
+      ids.push(...page.layouts.map((l: { id: string }) => l.id));
+      cursor = page.nextCursor;
+    }
+    expect(ids).toEqual(["p-4", "p-3", "p-2", "p-1", "p-0"]);
+  });
+
+  it("GET limit นอกช่วง / query แปลก → 400 โดยไม่เรียก Backend; cursor ปลอม → 400", async () => {
+    for (const q of ["?limit=0", "?limit=51", "?limit=abc", "?owner=bob"]) {
+      expect((await handlers.list(req(q))).status, q).toBe(400);
+    }
+    const res = await handlers.list(req("?cursor=forged"));
+    expect(res.status).toBe(400);
+    expect((await res.json()).error.code).toBe("INVALID_REQUEST");
+  });
+
   it("ไม่มี Session → 401 ทุก endpoint", async () => {
     const layout = cafeLayout();
     const results = await Promise.all([

@@ -44,7 +44,15 @@ JWT เซ็นแบบ **HS256** ด้วย secret เดียวกัน
 | `sub` | id ผู้ใช้ หรือ `anonymous` |
 | `iat` / `exp` | อายุ 300 วินาที |
 
-รูปแบบ id ผู้ใช้: `guest-<uuid>` (ผู้ใช้ทั่วไป) หรือ `<provider>-<providerAccountId>` เช่น `google-1234`, `line-U9f…`
+id ผู้ใช้ **Backend เป็นผู้ออก** (ตั้งแต่ v1.3.0) ผ่าน `POST /v1/auth/identities/resolve` หรือ `POST /v1/auth/otp/verify` — BFF ไม่สร้างเอง
+
+| รูปแบบ | ใคร |
+|---|---|
+| `usr-<uuid>` | บัญชีใหม่ (Google / GitHub / LINE / อีเมล OTP) |
+| `guest-<uuid>` | Guest |
+| `<provider>-<providerAccountId>` | ผู้ใช้เดิมก่อน v1.3.0 — ไม่เปลี่ยน id |
+
+Backend ตรวจ `sub` แค่ความยาว — ห้ามตีความ prefix เป็น provider (ยกเว้นเช็ก `guest-` ใน merge-guest)
 
 ตัวอย่างการตรวจด้วย [`jose`](https://github.com/panva/jose):
 
@@ -72,7 +80,7 @@ export async function userFrom(request: Request): Promise<string | null> {
 
 กติกา:
 - token ไม่มี / ผิด / หมดอายุ → **401**
-- `sub` = `anonymous` ใช้ได้เฉพาะ endpoint ที่มี `x-allow-anonymous: true` (เปิดลิงก์แชร์, ส่งฟอร์มติดต่อ) — ที่อื่นตอบ **401**
+- `sub` = `anonymous` ใช้ได้เฉพาะ endpoint ที่มี `x-allow-anonymous: true` (เปิดลิงก์แชร์, ส่งฟอร์มติดต่อ, `resolve`, `otp/request`, `otp/verify`) — ที่อื่นตอบ **401**
 - ห้ามรับ id ผู้ใช้จาก body หรือ query — ใช้ `sub` เท่านั้น
 
 ## 3. Header อื่น ๆ
@@ -80,7 +88,7 @@ export async function userFrom(request: Request): Promise<string | null> {
 | Header | มีเมื่อ | ใช้ทำอะไร |
 |---|---|---|
 | `X-Request-Id` | ทุกคำขอ | UUID ต่อคำขอ — ใส่ใน log ทุกบรรทัด จะไล่ปัญหาข้าม BFF/Backend ได้ |
-| `X-Client-IP` | เปิดลิงก์แชร์, ส่งฟอร์มติดต่อ | IP จริงของผู้ใช้ (BFF คำนวณให้แล้ว) ใช้นับ rate limit |
+| `X-Client-IP` | endpoint anonymous ทุกตัว (แชร์, ติดต่อ, resolve, OTP) | IP จริงของผู้ใช้ (BFF คำนวณให้แล้ว) ใช้นับ rate limit |
 | `Content-Type: application/json` | คำขอที่มี body | ไม่ใช่ JSON → 415 |
 
 ## 4. Endpoint ทั้งหมด
@@ -88,7 +96,7 @@ export async function userFrom(request: Request): Promise<string | null> {
 | Method | Path | ทำอะไร | anonymous |
 |---|---|---|---|
 | GET | `/health` | สถานะระบบ + ฐานข้อมูล (ไม่ต้องมี token) | — |
-| GET | `/v1/layouts` | รายการผังของผู้ใช้ (ใหม่สุดก่อน) | |
+| GET | `/v1/layouts` | รายการผังทีละหน้า `?limit=1–50` (ค่าเริ่มต้น 24) `&cursor=` → `{ layouts, nextCursor }` | |
 | POST | `/v1/layouts` | บันทึกผังใหม่ | |
 | GET | `/v1/layouts/{layoutId}` | เปิดผัง | |
 | PUT | `/v1/layouts/{layoutId}` | บันทึกทับ | |
@@ -100,10 +108,13 @@ export async function userFrom(request: Request): Promise<string | null> {
 | GET | `/v1/public/shares/{shareKey}` | เปิดผังจากลิงก์แชร์ | ✅ |
 | POST | `/v1/contact-messages` | บันทึกข้อความติดต่อ | ✅ |
 | GET | `/v1/me` | โปรไฟล์ | |
-| PUT | `/v1/me` | สร้าง/อัปเดตโปรไฟล์ (BFF เรียกทุกครั้งที่ล็อกอิน) | |
+| PUT | `/v1/me` | อัปเดตโปรไฟล์ (ไม่สร้างบัญชี — ไม่มีบัญชี = 404, ไม่รับ `provider`) | |
 | DELETE | `/v1/me` | ลบบัญชี + ข้อมูลทั้งหมด (PDPA) | |
 | GET | `/v1/me/export` | ดาวน์โหลดข้อมูลทั้งหมด (PDPA) | |
 | POST | `/v1/me/merge-guest` | ย้ายผังจากบัญชี Guest เข้าบัญชีนี้ | |
+| POST | `/v1/auth/identities/resolve` | ล็อกอิน Guest/OAuth → หา/สร้างบัญชี คืน `{ user, created }` | ✅ |
+| POST | `/v1/auth/otp/request` | ส่งรหัส OTP ไปที่อีเมล (`sent: true` เสมอ) | ✅ |
+| POST | `/v1/auth/otp/verify` | ตรวจรหัส → บัญชีของอีเมลนั้น `{ user, created }` | ✅ |
 
 ## 5. หน้าที่ของ Backend (สำคัญ)
 
@@ -126,10 +137,17 @@ export async function userFrom(request: Request): Promise<string | null> {
 7. **Rate limit** (เก็บใน Postgres หรือ Redis ไม่ใช่หน่วยความจำ):
    - ฟอร์มติดต่อ: 5 ครั้ง/10 นาที ต่อ `X-Client-IP`, 5 ครั้ง/10 นาที ต่อผู้ใช้ที่ล็อกอิน, รวมทั้งระบบ 50 ครั้ง/10 นาที
    - เกิน → 429 `RATE_LIMITED` + header `Retry-After` + `retryAfter` ใน body
-8. **ลบบัญชี** (`DELETE /v1/me`): ลบโปรไฟล์ ผัง ลิงก์แชร์ และข้อความติดต่อของผู้ใช้ถาวร เรียกซ้ำได้
+8. **ลบบัญชี** (`DELETE /v1/me`): ลบโปรไฟล์ identities รหัส OTP ที่ค้าง ผัง ลิงก์แชร์ และข้อความติดต่อของผู้ใช้ถาวรใน transaction เดียว เรียกซ้ำได้
 9. **ย้ายผัง Guest** (`POST /v1/me/merge-guest`): ย้ายผังและลิงก์ทั้งหมด → id ที่ชนให้ตั้งใหม่และรายงานใน `renamed` → ลบบัญชี Guest
    ถ้า `sub` เป็น Guest เอง → 400
 10. **เวลา**: ISO-8601 UTC เช่น `2026-10-10T06:00:00.000Z`
+11. **ผูกบัญชี** (`resolve` / `otp/verify`) — รายละเอียดใน description ของ `resolveIdentity`:
+    1. หา identity `(provider, providerAccountId)` ก่อนเสมอ (เปลี่ยนอีเมลที่ provider ทีหลัง บัญชีไม่หลุด)
+    2. ไม่เจอ + อีเมลยืนยันแล้ว (Google `emailVerified: true` หรือ OTP) → ผูกกับบัญชีที่มี identity อีเมลเดียวกัน **ที่ยืนยันแล้ว** (Google/OTP) — LINE/GitHub ไม่ผูกด้วยอีเมลทั้งสองทาง
+    3. ไม่เจอทั้งคู่ → สร้าง `usr-<uuid>`
+    - เทียบอีเมลหลัง trim + lowercase; `users.provider` = วิธีที่ล็อกอินล่าสุด
+12. **OTP**: เก็บ hash, ใช้ได้ครั้งเดียว, ขอใหม่แล้วรหัสเก่าใช้ไม่ได้, อายุ 600 วินาที, ผิดได้ 5 ครั้ง, ขอใหม่ได้ทุก 60 วินาทีต่ออีเมล + rate limit ต่อ IP, ห้าม log รหัส/อีเมลเต็ม
+13. **รายการผังแบบแบ่งหน้า**: เรียง `updated_at DESC, id ASC` — `nextCursor` เป็นค่าทึบ (เช่น keyset ที่เข้ารหัส/เซ็นแล้ว) cursor ปลอม → 400
 
 ## 6. รูปแบบ Error
 
@@ -158,6 +176,9 @@ export async function userFrom(request: Request): Promise<string | null> {
 | `SHARE_REVOKED` | 410 | ลิงก์ถูกยกเลิก |
 | `SHARE_EXPIRED` | 410 | ลิงก์หมดอายุ |
 | `RATE_LIMITED` | 429 | ถี่เกิน (แนบ `retryAfter`) |
+| `OTP_INVALID` | 400 | รหัสผิด (แนบ `attemptsLeft`) |
+| `OTP_EXPIRED` | 400 | รหัสหมดอายุ หรือยังไม่ได้ขอ |
+| `OTP_ATTEMPTS_EXCEEDED` | 400 | ผิดครบ 5 ครั้ง ต้องขอรหัสใหม่ |
 | `INTERNAL_ERROR` | 5xx | ข้อผิดพลาดภายใน หรือไม่พร้อมชั่วคราว (503) — ห้ามแนบ stack trace; BFF ลองซ้ำเฉพาะ GET 1 ครั้ง |
 
 ## 7. ตารางในฐานข้อมูลที่แนะนำ (ไม่บังคับ)
@@ -165,6 +186,8 @@ export async function userFrom(request: Request): Promise<string | null> {
 | ตาราง | คอลัมน์หลัก |
 |---|---|
 | `users` | `id` (PK), `provider`, `name`, `email`, `image`, `created_at`, `updated_at` |
+| `identities` | `provider` + `provider_account_id` (PK รวม), `user_id` (FK → users, ON DELETE CASCADE), `email`, `email_verified`, `created_at`, `last_login_at` |
+| `otp_codes` | `email` (PK), `code_hash`, `expires_at`, `attempts_left`, `last_requested_at` |
 | `layouts` | `owner_id` + `id` (PK รวม), `layout` (jsonb), `validation` (jsonb), `created_at`, `updated_at` |
 | `share_links` | `share_key` (PK), `owner_id`, `layout_id`, `layout` (jsonb snapshot), `validation` (jsonb), `created_at`, `expires_at`, `revoked_at` |
 | `contact_messages` | `id`, `user_id` (null ได้), `name`, `email`, `message`, `client_ip`, `received_at` |
