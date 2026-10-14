@@ -3,6 +3,16 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-14 21:10 ICT — วางแผนบัญชีผู้ใช้ + หน้ารวมโปรเจกต์
+
+### Core & Dev
+- Sprint 3 (feat-049–060) commit แล้วบน branch `feat/playground-ux-v2` (push แล้ว ยังไม่ได้เปิด PR เพราะเครื่องไม่มี `gh`)
+- งานนี้อยู่บน branch `feat/login-projects` (แตกจาก `feat/playground-ux-v2`) — เพิ่ม feat-061–064, PRD §9 ข้อ 16–19, prototype `design-html/account-ux/`
+
+### Status & Next Steps
+- รอผู้ใช้รีวิว prototype ก่อนเริ่ม feat-061 (สัญญา OTP ใน `contracts/openapi.yaml` ต้องตกลงกับฝั่ง Backend)
+- ส่งเมลจริง / Google OAuth จริง ยังผูกกับ Backend (feat-041, feat-046) — ระหว่างนี้ใช้ mock
+
 ## 2026-10-14 17:20 ICT — เสร็จสิ้น Sprint 3: Playground UX Revamp (feat-050 → feat-060) 100%
 
 ### Core & Dev

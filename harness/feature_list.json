@@ -518,8 +518,8 @@
     },
     {
       "id": "feat-041",
-      "name": "Google & LINE Login + Guest Migration",
-      "description": "เพิ่ม Auth.js providers Google และ LINE (คง GitHub เป็นตัวเลือก), หน้าเข้าสู่ระบบภาษาไทย, flow ย้ายผังที่สร้างตอนเป็น Guest เข้าบัญชีหลังล็อกอิน (เรียก endpoint ตามสัญญา), ทำงานบน Cloudflare Workers",
+      "name": "Google Login (Real OAuth) + Guest Migration",
+      "description": "เพิ่ม Auth.js provider Google (คง GitHub เป็นตัวเลือก) ให้ใช้ได้จริงบน staging/production และ flow ย้ายผัง Guest เข้าบัญชีหลังล็อกอิน (POST /v1/me/merge-guest) ทำงานบน Cloudflare Workers · ตัดสินใจ 2026-10-14: ยกเลิก LINE เพราะช่องทางหลักคือ Google + อีเมล OTP (ดู feat-061/062)",
       "dependencies": [
         "feat-035",
         "feat-039"
@@ -527,7 +527,7 @@
       "gate": "ล็อกอิน Google/LINE ได้จริงบน staging (หรือ mock OAuth ใน E2E), ผัง Guest ย้ายเข้าบัญชีครบ, unit + e2e ผ่าน",
       "status": "blocked",
       "role": "frontend",
-      "summary": "ล็อกอินด้วย Google และ LINE โดยผังที่ทำตอนเป็น Guest ไม่หาย",
+      "summary": "ล็อกอินด้วย Google ได้จริง และผังที่ทำตอนเป็น Guest ไม่หาย",
       "sprint": 2,
       "blocked_reason": "ผู้ใช้สั่งพักไว้จนกว่า Backend จริงจะขึ้น (2026-10-10)"
     },
@@ -825,6 +825,62 @@
       "sprint": 3,
       "ux_ref": "design-html/playground-ux/index.html",
       "evidence": "สร้าง playground-ux-flow.test.tsx ครอบคลุม 9 integration scenarios (ผังใหม่→onboarding, เพิ่มชุดโต๊ะ, selection toolbar สลับที่นั่ง 4↔2/หมุน/ลบ, rail badges, simulation panel gate aria-disabled, sim mode locking, สรุปผลจบรอบคำแนะนำ 1 ประโยค, 3D interaction, status bar 'พาไปดู') ผ่าน 9/9 tests; อัปเดต e2e helpers, responsive.spec.ts, และสร้าง e2e/playground-ux.spec.ts ครบ flow หลักและผ่าน axe WCAG 2.1 AA audit 100% (6/6 tests passed); ปรับ contrast สีใน header, rail, room settings, simulation panel ให้ผ่านเกณฑ์ 4.5:1; make lint ผ่าน (Pure TS boundaries OK), make test ผ่าน 48/48 test files (704 tests passed)"
+    },
+    {
+      "id": "feat-061",
+      "name": "Email OTP — สัญญา API + BFF + Mock",
+      "description": "เพิ่มสัญญา POST /v1/auth/otp/request (ส่งรหัส 6 หลักไปอีเมล, ไม่บอกว่าอีเมลมีบัญชีหรือไม่) และ POST /v1/auth/otp/verify (ตรวจรหัส → คืน user; ครั้งแรกสร้างบัญชีให้อัตโนมัติ ไม่มี register แยก) ใน contracts/openapi.yaml + mock-backend · Auth.js Credentials provider 'email-otp' เรียก verify ผ่าน BFF · Backend เป็นผู้ส่งเมลและเก็บรหัส (ไม่ใช้ adapter ฝั่ง FE) · รหัสหมดอายุ 10 นาที, ผิดได้ 5 ครั้ง, ขอใหม่ได้ทุก 60 วินาที (rate limit อยู่ที่ Backend) · ล็อกอินแล้วเรียก merge-guest เหมือน provider อื่น",
+      "dependencies": [
+        "feat-031",
+        "feat-039"
+      ],
+      "gate": "make lint ผ่านรวม contract check, unit ครอบคลุม: ขอรหัส, รหัสถูก/ผิด/หมดอายุ/ผิดเกิน 5 ครั้ง, อีเมลใหม่สร้างบัญชี, Guest → OTP ย้ายผังครบ",
+      "status": "not-started",
+      "role": "bff",
+      "summary": "ล็อกอินด้วยอีเมล + รหัส OTP โดยไม่ต้องสมัครและไม่มีรหัสผ่าน",
+      "sprint": 4
+    },
+    {
+      "id": "feat-062",
+      "name": "หน้าเข้าสู่ระบบ /login",
+      "description": "หน้า /login ภาษาไทย: ปุ่ม 'เข้าสู่ระบบด้วย Google' (แสดงเมื่อเปิด provider) + ขั้นที่ 1 กรอกอีเมล → ขั้นที่ 2 กรอกรหัส 6 หลัก (ช่องเดียว inputmode=numeric, autocomplete=one-time-code, วางรหัสได้, นับถอยหลังขอรหัสใหม่ 60 วิ, เปลี่ยนอีเมล) · ไม่มีหน้า register — ข้อความ 'ยังไม่มีบัญชี? ใช้อีเมลนี้ได้เลย ระบบจะสร้างให้' · รองรับ ?next= (เฉพาะ path ภายใน) แล้วพากลับหลังล็อกอิน (ค่าเริ่มต้น /projects) · ล็อกอินอยู่แล้วเข้า /login → พาไป /projects · ลิงก์ 'เข้าสู่ระบบ' บน Landing header",
+      "dependencies": [
+        "feat-061"
+      ],
+      "gate": "E2E (mock OTP): อีเมล → รหัส → ถึง /projects และ ?next= พากลับถูก, open redirect ถูกกัน, ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations, ใช้คีย์บอร์ดได้ทั้ง flow",
+      "status": "not-started",
+      "role": "frontend",
+      "summary": "หน้าเข้าสู่ระบบด้วย Google หรืออีเมล OTP",
+      "sprint": 4,
+      "ux_ref": "design-html/account-ux/login.html"
+    },
+    {
+      "id": "feat-063",
+      "name": "หน้ารวมโปรเจกต์ /projects",
+      "description": "หน้า /projects (ต้องล็อกอิน; ยังไม่ล็อกอิน → /login?next=/projects): รายการผังของผู้ใช้จาก GET /api/layouts เรียงตามแก้ไขล่าสุด (ชื่อ, ขนาดร้าน, แก้ไขล่าสุด) · ปุ่ม 'สร้างผังใหม่' → /playground/[id] ของผังใหม่ · ลบผังพร้อม dialog ยืนยัน (Radix) · empty state, loading, error ภาษาไทย, แจ้งเมื่อเต็มโควตา (LAYOUT_LIMIT_REACHED) · header มีเมนูบัญชี (ชื่อ/อีเมล, ออกจากระบบ) · V1 ไม่มี thumbnail/ค้นหา/เปลี่ยนชื่อ",
+      "dependencies": [
+        "feat-062"
+      ],
+      "gate": "E2E: สร้าง → เห็นในรายการ → เปิดได้, ลบ → หายจากรายการและเปิดลิงก์เดิมได้ 404, ผ่าน 6 breakpoints ไม่มี horizontal scroll, axe 0 violations",
+      "status": "not-started",
+      "role": "frontend",
+      "summary": "ที่รวมผังทั้งหมดของผู้ใช้: ดู สร้าง ลบ",
+      "sprint": 4,
+      "ux_ref": "design-html/account-ux/projects.html"
+    },
+    {
+      "id": "feat-064",
+      "name": "/playground/[id] + บันทึกออนไลน์จาก Guest",
+      "description": "เพิ่ม route /playground/[id] เปิดผังจาก Backend (refresh แล้วยังอยู่ผังเดิม; ไม่ใช่เจ้าของ/ไม่มี → หน้า 404 ภาษาไทย) และบันทึกกลับด้วย PUT · /playground (ไม่มี id) ยังใช้แบบ Guest + draft ในเครื่องได้ทันทีโดยไม่ต้องล็อกอิน · Guest กด 'บันทึกออนไลน์' → /login?next=... หลังล็อกอินผังร่างในเครื่องถูกสร้างเป็นผังในบัญชีและพาไป /playground/[id] โดย draft ไม่หาย · header playground มีลิงก์กลับ 'ผังของฉัน' เมื่อล็อกอิน",
+      "dependencies": [
+        "feat-062",
+        "feat-063"
+      ],
+      "gate": "E2E: Guest วาดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → อยู่ที่ /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังเหมือนเดิม, ผัง Blocked ยังบันทึกได้แต่เริ่มจำลองไม่ได้, unit + e2e ผ่าน",
+      "status": "not-started",
+      "role": "frontend",
+      "summary": "ผังแต่ละอันมี URL ของตัวเอง และ Guest บันทึกเข้าบัญชีได้ไม่หาย",
+      "sprint": 4
     }
   ]
 }

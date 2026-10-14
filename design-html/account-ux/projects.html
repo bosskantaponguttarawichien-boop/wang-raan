@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>วางร้าน — ผังของฉัน (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --blue:#3b62f4;--blue-h:#2e50da;--blue-soft:#edf1ff;
+  --ink:#1e2b40;--sec:#66758a;--mut:#8492a5;--line:#e2e8f1;--surf:#f7f9fc;--white:#fff;
+  --danger:#e4685d;--danger-soft:#fdeeec;--danger-ink:#b23d33;
+  --ok-soft:#e7f5f0;--ok-ink:#1f6e55;--warn-soft:#fdf6e7;--warn-ink:#8a6414;
+  --focus:#a4b6ff;
+  --font:"Noto Sans Thai",system-ui,-apple-system,Tahoma,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);color:var(--ink);background:var(--surf);font-size:14px;min-height:100vh}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.mocknav{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--ink);color:#c9d3e3;font-size:12px;overflow-x:auto;white-space:nowrap}
+.mocknav b{color:#fff;font-weight:500;margin-right:6px}
+.mocknav button{background:transparent;border:1px solid #3a4a63;color:#dfe6f1;border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12px}
+.mocknav button.on{background:#fff;color:var(--ink);border-color:#fff}
+
+.hd{display:flex;align-items:center;gap:10px;height:56px;padding:0 clamp(16px,4vw,40px);background:var(--white);border-bottom:1px solid var(--line)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:18px;text-decoration:none;color:var(--ink);flex:none}
+.logo img{width:30px;height:30px}
+.sp{flex:1}
+.menu-wrap{position:relative}
+.acct{display:flex;align-items:center;gap:8px;border:0;background:transparent;border-radius:999px;padding:4px 8px 4px 4px;cursor:pointer;max-width:240px}
+.acct:hover{background:var(--surf)}
+.avatar{width:32px;height:32px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-weight:600;flex:none}
+.acct span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--sec)}
+.menu{position:absolute;right:0;top:calc(100% + 6px);background:#fff;border:1px solid var(--line);border-radius:12px;padding:6px;min-width:220px;box-shadow:0 10px 30px rgba(30,43,64,.12);z-index:40}
+.menu .who{padding:8px 10px;border-bottom:1px solid var(--line);margin-bottom:4px}
+.menu .who small{display:block;color:var(--mut);font-size:12px;word-break:break-all}
+.menu button{display:flex;width:100%;align-items:center;gap:10px;border:0;background:transparent;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left}
+.menu button:hover{background:var(--surf)}
+
+main{max-width:1120px;margin:0 auto;padding:clamp(20px,4vw,40px) clamp(16px,4vw,40px) 60px}
+.title-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+h1{font-size:24px;font-weight:600;margin:0}
+.count{color:var(--sec);margin:4px 0 0}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--line);background:var(--white);cursor:pointer;font-weight:500;white-space:nowrap}
+.btn:hover{border-color:#c8d2e2}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:var(--blue-h)}
+.btn.danger{background:var(--danger-ink);border-color:var(--danger-ink);color:#fff}
+.btn[aria-disabled=true]{opacity:.6;cursor:not-allowed}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:16px;list-style:none;margin:0;padding:0}
+.card{position:relative;background:var(--white);border:1px solid var(--line);border-radius:16px;overflow:hidden;transition:border-color .15s,box-shadow .15s}
+.card:hover{border-color:#c8d2e2;box-shadow:0 6px 20px rgba(30,43,64,.06)}
+.card a.open{display:block;text-decoration:none;color:inherit;padding:16px;border-radius:16px}
+.card a.open::after{content:"";position:absolute;inset:0;border-radius:16px}
+.card a.open:focus-visible{outline:none}
+.card:has(a.open:focus-visible){outline:3px solid var(--focus);outline-offset:2px}
+.ic{width:44px;height:44px;border-radius:12px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center;font-size:22px;margin-bottom:12px}
+.card h2{font-size:16px;font-weight:600;margin:0 0 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-right:36px}
+.meta{color:var(--sec);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 12px}
+.meta span{display:flex;align-items:center;gap:4px}
+.del{position:absolute;top:12px;right:12px;z-index:2;width:34px;height:34px;border-radius:8px;border:0;background:transparent;color:var(--sec);display:grid;place-items:center;cursor:pointer;font-size:18px}
+.del:hover{background:var(--danger-soft);color:var(--danger-ink)}
+
+.new-card{border:1.5px dashed #c8d2e2;background:transparent;border-radius:16px;min-height:142px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--blue);font-weight:500;cursor:pointer;width:100%}
+.new-card:hover{border-color:var(--blue);background:var(--blue-soft)}
+.new-card i{font-size:26px}
+
+.empty{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:clamp(28px,6vw,56px) 20px;text-align:center}
+.empty .ic{margin:0 auto 14px;width:64px;height:64px;font-size:32px;border-radius:16px}
+.empty h2{font-size:18px;font-weight:600;margin:0 0 6px}
+.empty p{color:var(--sec);margin:0 0 20px;line-height:1.6}
+
+.sk{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:16px;height:142px}
+.sk div{background:linear-gradient(90deg,#eef2f7 25%,#f6f8fb 50%,#eef2f7 75%);background-size:200% 100%;animation:sh 1.2s infinite;border-radius:8px}
+@keyframes sh{to{background-position:-200% 0}}
+
+.alert{display:flex;gap:10px;align-items:flex-start;border-radius:12px;padding:12px 14px;margin-bottom:16px;line-height:1.6}
+.alert i{font-size:20px;flex:none}
+.alert.err{background:var(--danger-soft);color:var(--danger-ink)}
+.alert.warn{background:var(--warn-soft);color:var(--warn-ink)}
+.alert .btn{height:32px;margin-left:auto}
+
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:12px;padding:10px 14px;display:flex;gap:12px;align-items:center;box-shadow:0 10px 30px rgba(30,43,64,.2);max-width:calc(100vw - 32px);z-index:60}
+
+.overlay{position:fixed;inset:0;background:rgba(30,43,64,.4);backdrop-filter:blur(2px);display:grid;place-items:center;padding:16px;z-index:50}
+.dialog{background:#fff;border-radius:16px;padding:24px;width:min(420px,100%);box-shadow:0 20px 50px rgba(30,43,64,.2)}
+.dialog h2{font-size:17px;font-weight:600;margin:0 0 8px}
+.dialog p{color:var(--sec);margin:0 0 20px;line-height:1.6}
+.dialog .acts{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+[hidden]{display:none!important}
+
+@media (max-width:480px){
+  .acct span:not(.avatar){display:none}
+  .title-row .btn.pri{width:100%}
+}
+</style>
+</head>
+<body>
+
+<nav class="mocknav" aria-label="สถานะของ mockup">
+  <b>Mockup /projects</b>
+  <button data-go="list" class="on">มีผัง</button>
+  <button data-go="empty">ยังไม่มีผัง</button>
+  <button data-go="loading">กำลังโหลด</button>
+  <button data-go="error">โหลดไม่ได้</button>
+  <button data-go="limit">เต็มโควตา</button>
+  <button onclick="location.href='login.html'">← /login</button>
+</nav>
+
+<header class="hd">
+  <a class="logo" href="#"><img src="../assets/logos/logo-wangraan-minimal-flat.svg" alt="">วางร้าน</a>
+  <div class="sp"></div>
+  <div class="menu-wrap">
+    <button class="acct" id="acct" aria-haspopup="menu" aria-expanded="false" aria-label="เมนูบัญชี">
+      <span class="avatar" aria-hidden="true">ส</span><span>somchai@example.com</span><i class="ti ti-chevron-down" aria-hidden="true"></i>
+    </button>
+    <div class="menu" id="acct-menu" role="menu" hidden>
+      <div class="who"><b>สมชาย</b><small>somchai@example.com · Google</small></div>
+      <button role="menuitem"><i class="ti ti-user" aria-hidden="true"></i>บัญชีและข้อมูลส่วนตัว</button>
+      <button role="menuitem" onclick="location.href='login.html'"><i class="ti ti-logout" aria-hidden="true"></i>ออกจากระบบ</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="title-row">
+    <div>
+      <h1>ผังของฉัน</h1>
+      <p class="count" id="count"></p>
+    </div>
+    <button class="btn pri" id="new-top"><i class="ti ti-plus" aria-hidden="true"></i>สร้างผังใหม่</button>
+  </div>
+
+  <div id="alert"></div>
+  <div id="content" aria-live="polite"></div>
+</main>
+
+<div class="overlay" id="confirm" hidden>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="cf-t" aria-describedby="cf-d">
+    <h2 id="cf-t">ลบผัง “<span id="cf-name"></span>”?</h2>
+    <p id="cf-d">ผังนี้และลิงก์แชร์ทั้งหมดของผังจะถูกลบถาวร กู้คืนไม่ได้</p>
+    <div class="acts">
+      <button class="btn" id="cf-cancel">ยกเลิก</button>
+      <button class="btn danger" id="cf-ok"><i class="ti ti-trash" aria-hidden="true"></i>ลบผัง</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const LIMIT=20;
+let data=[
+  {id:'a1',name:'ร้านกาแฟสาขาสยาม',w:8,h:6,edited:'แก้ไขเมื่อ 5 นาทีที่แล้ว'},
+  {id:'a2',name:'ครัวข้าวมันไก่ ตลาดน้อย',w:12,h:7.5,edited:'แก้ไขเมื่อวาน 18:40'},
+  {id:'a3',name:'ผังทดลอง — จัดโต๊ะแบบยาวริมหน้าต่าง',w:10,h:5,edited:'แก้ไขเมื่อ 12 ต.ค. 2569'},
+  {id:'a4',name:'บาร์ชั้นสอง',w:6.5,h:9,edited:'แก้ไขเมื่อ 2 ต.ค. 2569'},
+];
+let state='list',pending=null;
+const fmt=n=>Number.isInteger(n)?n:n.toFixed(2).replace(/0$/,'');
+
+function render(){
+  const c=$('#content'),a=$('#alert');a.innerHTML='';
+  $('#count').textContent=state==='list'||state==='limit'?`${data.length} ผัง`:'';
+  $('#new-top').hidden=state==='empty'||state==='loading'||state==='error';
+  if(state==='loading'){
+    c.innerHTML=`<ul class="grid" aria-busy="true" aria-label="กำลังโหลดผัง">${'<li class="sk"><div style="width:44px;height:44px;margin-bottom:12px"></div><div style="height:16px;width:70%;margin-bottom:8px"></div><div style="height:12px;width:50%"></div></li>'.repeat(3)}</ul>`;return;
+  }
+  if(state==='error'){
+    c.innerHTML='';a.innerHTML=`<div class="alert err" role="alert"><i class="ti ti-cloud-off" aria-hidden="true"></i><div><b>โหลดรายการผังไม่ได้</b><br>ระบบจัดเก็บขัดข้องชั่วคราว ผังของคุณไม่หาย ลองใหม่อีกครั้ง</div><button class="btn" onclick="go('list')">ลองใหม่</button></div>`;return;
+  }
+  if(state==='empty'||data.length===0){
+    c.innerHTML=`<div class="empty"><div class="ic"><i class="ti ti-layout-dashboard" aria-hidden="true"></i></div><h2>ยังไม่มีผังร้าน</h2><p>เริ่มจากผังเปล่า หรือเลือกผังตัวอย่างคาเฟ่ 8×6 ม. ในหน้าออกแบบ</p><button class="btn pri" onclick="createNew()"><i class="ti ti-plus" aria-hidden="true"></i>สร้างผังแรก</button></div>`;return;
+  }
+  if(state==='limit'){
+    a.innerHTML=`<div class="alert warn" role="status"><i class="ti ti-alert-triangle" aria-hidden="true"></i><div>ผังเต็มโควตา ${LIMIT} ผังแล้ว ลบผังที่ไม่ใช้ก่อนจึงสร้างผังใหม่ได้</div></div>`;
+  }
+  c.innerHTML=`<ul class="grid" aria-label="รายการผัง">${data.map(p=>`
+    <li class="card">
+      <a class="open" href="#/playground/${p.id}">
+        <div class="ic"><i class="ti ti-building-store" aria-hidden="true"></i></div>
+        <h2 title="${p.name}">${p.name}</h2>
+        <div class="meta"><span><i class="ti ti-ruler-2" aria-hidden="true"></i>${fmt(p.w)} × ${fmt(p.h)} ม.</span><span><i class="ti ti-clock" aria-hidden="true"></i>${p.edited}</span></div>
+      </a>
+      <button class="del" aria-label="ลบผัง ${p.name}" data-del="${p.id}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+    </li>`).join('')}
+    <li><button class="new-card" onclick="createNew()" ${state==='limit'?'aria-disabled="true"':''}><i class="ti ti-plus" aria-hidden="true"></i>สร้างผังใหม่</button></li>
+  </ul>`;
+  c.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>askDelete(b.dataset.del,b));
+}
+function go(s){state=s;render();document.querySelectorAll('.mocknav [data-go]').forEach(b=>b.classList.toggle('on',b.dataset.go===s))}
+function createNew(){
+  if(state==='limit')return toast('ผังเต็มโควตา — ลบผังที่ไม่ใช้ก่อน');
+  toast('สร้างผังใหม่แล้ว กำลังเปิดหน้าออกแบบ… (/playground/[id])');
+}
+let lastFocus;
+function askDelete(id,btn){
+  pending=data.find(p=>p.id===id);lastFocus=btn;
+  $('#cf-name').textContent=pending.name;$('#confirm').hidden=false;$('#cf-cancel').focus();
+}
+function closeDialog(){$('#confirm').hidden=true;pending=null;lastFocus&&lastFocus.isConnected&&lastFocus.focus()}
+$('#cf-cancel').onclick=closeDialog;
+$('#cf-ok').onclick=()=>{
+  const name=pending.name;data=data.filter(p=>p!==pending);closeDialog();
+  if(state==='limit')state='list';render();toast(`ลบ “${name}” แล้ว`);$('#new-top').focus();
+};
+$('#confirm').addEventListener('keydown',e=>{
+  if(e.key==='Escape')closeDialog();
+  if(e.key==='Tab'){const f=[$('#cf-cancel'),$('#cf-ok')];const i=f.indexOf(document.activeElement);if(e.shiftKey&&i===0){e.preventDefault();f[1].focus()}else if(!e.shiftKey&&i===1){e.preventDefault();f[0].focus()}}
+});
+$('#confirm').onclick=e=>{if(e.target.id==='confirm')closeDialog()};
+let tt;function toast(m){const t=$('#toast');t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2600)}
+$('#new-top').onclick=createNew;
+const acct=$('#acct'),menu=$('#acct-menu');
+acct.onclick=()=>{const o=menu.hidden;menu.hidden=!o;acct.setAttribute('aria-expanded',o)};
+document.addEventListener('click',e=>{if(!e.target.closest('.menu-wrap')){menu.hidden=true;acct.setAttribute('aria-expanded','false')}});
+document.querySelectorAll('.mocknav [data-go]').forEach(b=>b.onclick=()=>{
+  if(b.dataset.go==='list'&&data.length===0)data=[{id:'a1',name:'ร้านกาแฟสาขาสยาม',w:8,h:6,edited:'แก้ไขเมื่อ 5 นาทีที่แล้ว'}];
+  go(b.dataset.go)
+});
+render();
+</script>
+</body>
+</html>

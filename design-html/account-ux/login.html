@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>วางร้าน — เข้าสู่ระบบ (Mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+:root{
+  --blue:#3b62f4;--blue-h:#2e50da;--blue-soft:#edf1ff;
+  --ink:#1e2b40;--sec:#66758a;--mut:#8492a5;--line:#e2e8f1;--surf:#f7f9fc;--white:#fff;
+  --danger:#e4685d;--danger-soft:#fdeeec;--danger-ink:#b23d33;
+  --ok-ink:#1f6e55;--focus:#a4b6ff;
+  --font:"Noto Sans Thai",system-ui,-apple-system,Tahoma,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--font);color:var(--ink);background:var(--surf);font-size:14px;min-height:100vh;display:flex;flex-direction:column}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+.mocknav{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--ink);color:#c9d3e3;font-size:12px;overflow-x:auto;white-space:nowrap}
+.mocknav b{color:#fff;font-weight:500;margin-right:6px}
+.mocknav button{background:transparent;border:1px solid #3a4a63;color:#dfe6f1;border-radius:999px;padding:3px 10px;cursor:pointer;font-size:12px}
+.mocknav button.on{background:#fff;color:var(--ink);border-color:#fff}
+
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px clamp(16px,4vw,40px)}
+.logo{display:flex;align-items:center;gap:8px;font-weight:600;font-size:18px;text-decoration:none;color:var(--ink)}
+.logo img{width:30px;height:30px}
+.back{color:var(--sec);text-decoration:none;font-size:13px;display:flex;align-items:center;gap:4px;border-radius:8px;padding:6px 8px}
+.back:hover{background:var(--white)}
+
+main{flex:1;display:flex;align-items:flex-start;justify-content:center;padding:clamp(16px,6vh,64px) 16px 40px}
+.card{width:100%;max-width:400px;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:clamp(20px,5vw,32px);box-shadow:0 10px 30px rgba(30,43,64,.06)}
+h1{font-size:22px;font-weight:600;margin:0 0 4px}
+.lead{color:var(--sec);margin:0 0 22px;line-height:1.6}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--white);cursor:pointer;font-weight:500;font-size:14px}
+.btn:hover{border-color:#c8d2e2}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.pri:hover{background:var(--blue-h)}
+.btn[aria-disabled=true]{opacity:.6;cursor:not-allowed}
+.btn.link{border:0;background:transparent;color:var(--blue);height:auto;width:auto;padding:4px 6px;display:inline-flex;font-weight:500}
+.btn.link[aria-disabled=true]{color:var(--mut)}
+.g-logo{width:18px;height:18px}
+
+.or{display:flex;align-items:center;gap:12px;color:var(--mut);font-size:12px;margin:18px 0}
+.or::before,.or::after{content:"";flex:1;border-top:1px solid var(--line)}
+
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.field label{font-size:13px;color:var(--sec);font-weight:500}
+.field input{height:44px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:#fff;width:100%}
+.field input:focus{border-color:var(--blue)}
+.field input[aria-invalid=true]{border-color:var(--danger)}
+.hint{font-size:12px;color:var(--mut);line-height:1.6;margin:10px 0 0}
+.err{display:flex;gap:6px;align-items:flex-start;font-size:13px;color:var(--danger-ink);margin:-4px 0 12px;line-height:1.5}
+
+.otp{letter-spacing:.6em;text-align:center;font-size:22px!important;font-weight:600;padding-left:.6em!important}
+.sent{display:flex;gap:10px;align-items:flex-start;background:var(--blue-soft);border-radius:12px;padding:12px;margin-bottom:18px;line-height:1.6}
+.sent i{color:var(--blue);font-size:20px;flex:none}
+.sent b{word-break:break-all}
+.row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--sec)}
+
+.done{text-align:center;padding:12px 0}
+.done i{font-size:40px;color:var(--ok-ink)}
+.spin{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,.5);border-top-color:#fff;border-radius:50%;animation:s .8s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+
+.legal{text-align:center;font-size:12px;color:var(--mut);margin-top:18px;line-height:1.6}
+.legal a{color:var(--sec)}
+[hidden]{display:none!important}
+</style>
+</head>
+<body>
+
+<nav class="mocknav" aria-label="สถานะของ mockup">
+  <b>Mockup /login</b>
+  <button data-go="email" class="on">1 กรอกอีเมล</button>
+  <button data-go="email-err">1 อีเมลผิดรูปแบบ</button>
+  <button data-go="otp">2 กรอกรหัส</button>
+  <button data-go="otp-err">2 รหัสผิด</button>
+  <button data-go="done">3 สำเร็จ</button>
+  <button onclick="location.href='projects.html'">→ /projects</button>
+</nav>
+
+<header class="top">
+  <a class="logo" href="#"><img src="../assets/logos/logo-wangraan-minimal-flat.svg" alt="">วางร้าน</a>
+  <a class="back" href="#"><i class="ti ti-arrow-left" aria-hidden="true"></i>กลับไปออกแบบต่อ</a>
+</header>
+
+<main>
+  <section class="card" aria-live="polite">
+
+    <!-- Step 1: email -->
+    <div id="s-email">
+      <h1>เข้าสู่ระบบ</h1>
+      <p class="lead">บันทึกผังร้านไว้ในบัญชี เปิดต่อได้จากทุกเครื่อง</p>
+
+      <button class="btn" type="button">
+        <svg class="g-logo" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z"/></svg>
+        เข้าสู่ระบบด้วย Google
+      </button>
+
+      <div class="or">หรือใช้อีเมล</div>
+
+      <form id="f-email" novalidate>
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input id="email" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" aria-describedby="email-err email-hint">
+        </div>
+        <p class="err" id="email-err" hidden><i class="ti ti-alert-circle" aria-hidden="true"></i>อีเมลไม่ถูกต้อง ลองตรวจอีกครั้ง</p>
+        <button class="btn pri" type="submit">ส่งรหัสเข้าสู่ระบบ</button>
+        <p class="hint" id="email-hint">ยังไม่มีบัญชี? ใช้อีเมลนี้ได้เลย ระบบจะสร้างบัญชีให้อัตโนมัติ — ไม่ต้องตั้งรหัสผ่าน</p>
+      </form>
+    </div>
+
+    <!-- Step 2: OTP -->
+    <div id="s-otp" hidden>
+      <h1>กรอกรหัส 6 หลัก</h1>
+      <div class="sent">
+        <i class="ti ti-mail-check" aria-hidden="true"></i>
+        <div>ส่งรหัสไปที่ <b id="sent-to">somchai@example.com</b> แล้ว<br><small style="color:var(--sec)">รหัสใช้ได้ 10 นาที · ไม่เห็นเมล ลองดูในโฟลเดอร์สแปม</small></div>
+      </div>
+      <form id="f-otp" novalidate>
+        <div class="field">
+          <label for="code">รหัสเข้าสู่ระบบ</label>
+          <input id="code" class="otp" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" placeholder="••••••" aria-describedby="code-err">
+        </div>
+        <p class="err" id="code-err" hidden><i class="ti ti-alert-circle" aria-hidden="true"></i>รหัสไม่ถูกต้อง เหลือลองได้อีก 4 ครั้ง</p>
+        <button class="btn pri" type="submit" id="verify">ยืนยันรหัส</button>
+      </form>
+      <div class="row">
+        <button class="btn link" type="button" id="change"><i class="ti ti-arrow-left" aria-hidden="true"></i>เปลี่ยนอีเมล</button>
+        <button class="btn link" type="button" id="resend" aria-disabled="true">ขอรหัสใหม่ได้ใน <span id="cd">60</span> วิ</button>
+      </div>
+    </div>
+
+    <!-- Step 3: done -->
+    <div id="s-done" class="done" hidden>
+      <i class="ti ti-circle-check" aria-hidden="true"></i>
+      <h1 style="margin-top:8px">เข้าสู่ระบบแล้ว</h1>
+      <p class="lead" style="margin:0">ย้ายผังที่ทำไว้เข้าบัญชีเรียบร้อย กำลังพาไปที่ผังของฉัน…</p>
+    </div>
+
+    <p class="legal">การเข้าสู่ระบบถือว่ายอมรับ <a href="#">ข้อกำหนดการใช้งาน</a> และ <a href="#">นโยบายความเป็นส่วนตัว</a></p>
+  </section>
+</main>
+
+<script>
+const $=s=>document.querySelector(s);
+const steps={email:$('#s-email'),otp:$('#s-otp'),done:$('#s-done')};
+let timer;
+function show(name,{err=false}={}){
+  Object.entries(steps).forEach(([k,el])=>el.hidden=k!==name);
+  $('#email-err').hidden=!(name==='email'&&err);
+  $('#email').setAttribute('aria-invalid',name==='email'&&err);
+  $('#code-err').hidden=!(name==='otp'&&err);
+  $('#code').setAttribute('aria-invalid',name==='otp'&&err);
+  if(name==='otp'){startCountdown();setTimeout(()=>$('#code').focus(),0)}
+  if(name==='email')setTimeout(()=>$('#email').focus(),0);
+  if(name==='done')setTimeout(()=>location.href='projects.html',1800);
+}
+function startCountdown(){
+  clearInterval(timer);let n=60;const b=$('#resend');
+  b.setAttribute('aria-disabled','true');b.innerHTML='ขอรหัสใหม่ได้ใน <span id="cd">60</span> วิ';
+  timer=setInterval(()=>{n--;if(n<=0){clearInterval(timer);b.removeAttribute('aria-disabled');b.textContent='ส่งรหัสใหม่';}else $('#cd').textContent=n},1000);
+}
+$('#f-email').addEventListener('submit',e=>{
+  e.preventDefault();const v=$('#email').value.trim();
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v))return show('email',{err:true});
+  $('#sent-to').textContent=v;show('otp');
+});
+$('#code').addEventListener('input',e=>{e.target.value=e.target.value.replace(/\D/g,'').slice(0,6)});
+$('#f-otp').addEventListener('submit',e=>{
+  e.preventDefault();const v=$('#code').value;
+  if(v!=='123456')return show('otp',{err:true});
+  const b=$('#verify');b.innerHTML='<span class="spin" aria-hidden="true"></span>กำลังตรวจรหัส';b.setAttribute('aria-disabled','true');
+  setTimeout(()=>show('done'),700);
+});
+$('#change').onclick=()=>show('email');
+$('#resend').onclick=e=>{if(e.currentTarget.getAttribute('aria-disabled')!=='true')startCountdown()};
+document.querySelectorAll('.mocknav [data-go]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('.mocknav button').forEach(x=>x.classList.toggle('on',x===b));
+  const g=b.dataset.go;
+  if(g==='email-err'){$('#email').value='somchai@';show('email',{err:true})}
+  else if(g==='otp-err'){$('#code').value='111111';show('otp',{err:true})}
+  else show(g);
+});
+</script>
+<!-- mockup: รหัสที่ถูกคือ 123456 -->
+</body>
+</html>

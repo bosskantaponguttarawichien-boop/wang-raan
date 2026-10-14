@@ -3,6 +3,14 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-14] Planning — บัญชีผู้ใช้และหน้ารวมโปรเจกต์ (feat-061–064)
+
+- ข้อสรุปกับผู้ใช้ (บันทึกใน PRD §9 ข้อ 16–19): ไม่บังคับล็อกอินก่อนใช้ playground, เข้าสู่ระบบด้วย Google + อีเมล OTP 6 หลัก (ไม่มี register / รหัสผ่าน, ยกเลิก LINE), `/projects` V1 = รายการ + สร้างใหม่ + ลบ, ผังมี URL `/playground/[id]`
+- เพิ่ม feature: feat-061 (OTP สัญญา + BFF + mock), feat-062 (`/login`), feat-063 (`/projects`), feat-064 (`/playground/[id]` + บันทึกออนไลน์จาก Guest) — sprint 4
+- ปรับ feat-041 เป็น Google อย่างเดียว (ตัด LINE)
+- Prototype: `design-html/account-ux/login.html` (อีเมล → รหัส → สำเร็จ, รหัสใน mock = 123456) และ `design-html/account-ux/projects.html` (มีผัง / ว่าง / โหลด / error / เต็มโควตา + dialog ยืนยันลบ)
+- Verify: ทั้งสองหน้าไม่มี horizontal scroll ที่ 320px, dialog ลบโฟกัสปุ่มยกเลิกก่อนและ Esc ปิดได้; `make status` ผ่าน (65 งาน)
+
 ## [2026-10-14] feat-060 QA — เทสต์และ Audit ของ Playground UX ใหม่
 
 - สร้าง Integration QA Test Suite ใหม่: `src/components/editor/playground-ux-flow.test.tsx` ผ่าน 9/9 tests ครอบคลุม:
