@@ -106,6 +106,9 @@ function RoomSettingsFormInner() {
                         key={w}
                         type="button"
                         aria-pressed={active}
+                        // ไม่ย้ายโฟกัสตอนกดเมาส์: Safari ไม่โฟกัสปุ่มที่คลิก → ช่องที่กำลังพิมพ์ blur ออกนอกฟอร์ม
+                        // ฟอร์มจึงนำค่าไปใช้และถูกสร้างใหม่ก่อน click ทำงาน — ผนังที่เลือกหายเงียบ ๆ
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
                           form.setValue("entranceWall", w, { shouldDirty: true, shouldValidate: true });
                           onSubmit(form.getValues());

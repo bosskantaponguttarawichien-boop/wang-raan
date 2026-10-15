@@ -111,3 +111,11 @@ export async function credentialsSignIn(request: APIRequestContext, provider: st
   const { url } = (await res.json()) as { url: string };
   return new URL(url);
 }
+
+/**
+ * อีเมลไม่ซ้ำต่อการรัน — test ต้องไม่ใช้บัญชีร่วมกัน (Chromium กับ WebKit รันพร้อมกัน, Backend จำลองเก็บข้อมูลข้ามเทสต์)
+ * ใช้อีเมลตายตัวจะชน cooldown ของ OTP (429) และเห็นผังของเบราว์เซอร์อื่นในบัญชีเดียวกัน
+ */
+export function uniqueEmail(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}@example.com`;
+}

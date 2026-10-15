@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { BREAKPOINTS } from "./helpers";
+import { BREAKPOINTS, uniqueEmail } from "./helpers";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -13,12 +13,13 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     await expect(page.getByLabel("อีเมล")).toBeVisible();
 
     // กรอกอีเมล
-    await page.getByLabel("อีเมล").fill("owner@example.com");
+    const owner = uniqueEmail("owner");
+    await page.getByLabel("อีเมล").fill(owner);
     await page.getByRole("button", { name: "ส่งรหัสเข้าสู่ระบบ" }).click();
 
     // เข้าสู่ Step 2: กรอกรหัส
     await expect(page.getByRole("heading", { name: "กรอกรหัส 6 หลัก" })).toBeVisible();
-    await expect(page.getByText("owner@example.com")).toBeVisible();
+    await expect(page.getByText(owner)).toBeVisible();
 
     // ทดสอบกรอกรหัสผิด
     const codeInput = page.getByLabel("รหัสเข้าสู่ระบบ");
@@ -38,7 +39,7 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
   test("พารามิเตอร์ ?next= พากลับหน้าที่ระบุถูกต้อง และกัน Open Redirect", async ({ page }) => {
     // 1. Safe path
     await page.goto("/login?next=/playground");
-    await page.getByLabel("อีเมล").fill("nexttest@example.com");
+    await page.getByLabel("อีเมล").fill(uniqueEmail("nexttest"));
     await page.getByRole("button", { name: "ส่งรหัสเข้าสู่ระบบ" }).click();
     await page.getByLabel("รหัสเข้าสู่ระบบ").fill("123456");
     await page.getByRole("button", { name: "ยืนยันรหัส" }).click();
@@ -49,7 +50,7 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     const context = await page.context().browser()!.newContext();
     const maliciousPage = await context.newPage();
     await maliciousPage.goto("/login?next=https://evil.com");
-    await maliciousPage.getByLabel("อีเมล").fill("attacker@example.com");
+    await maliciousPage.getByLabel("อีเมล").fill(uniqueEmail("attacker"));
     await maliciousPage.getByRole("button", { name: "ส่งรหัสเข้าสู่ระบบ" }).click();
     await maliciousPage.getByLabel("รหัสเข้าสู่ระบบ").fill("123456");
     await maliciousPage.getByRole("button", { name: "ยืนยันรหัส" }).click();
@@ -65,7 +66,7 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     // โฟกัสช่องอีเมลและกด Enter เพื่อส่ง
     const emailField = page.getByLabel("อีเมล");
     await emailField.focus();
-    await emailField.fill("keyboard@example.com");
+    await emailField.fill(uniqueEmail("keyboard"));
     await emailField.press("Enter");
 
     await expect(page.getByRole("heading", { name: "กรอกรหัส 6 หลัก" })).toBeVisible();
@@ -91,7 +92,7 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     expect(res1.violations).toEqual([]);
 
     // ไป Step 2
-    await page.getByLabel("อีเมล").fill("a11y@example.com");
+    await page.getByLabel("อีเมล").fill(uniqueEmail("a11y"));
     await page.getByRole("button", { name: "ส่งรหัสเข้าสู่ระบบ" }).click();
     await expect(page.getByRole("heading", { name: "กรอกรหัส 6 หลัก" })).toBeVisible();
 

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { BREAKPOINTS, credentialsSignIn } from "./helpers";
+import { BREAKPOINTS, credentialsSignIn, uniqueEmail } from "./helpers";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
@@ -51,7 +51,7 @@ test.describe("/playground/[id] และการบันทึกออนไ
     expect(page.url()).toContain("next");
 
     // กรอกอีเมล OTP
-    const email = "guest-migrated@example.com";
+    const email = uniqueEmail("guest-migrated");
     await page.getByLabel("อีเมล").fill(email);
     await page.getByRole("button", { name: "ส่งรหัสเข้าสู่ระบบ" }).click();
 

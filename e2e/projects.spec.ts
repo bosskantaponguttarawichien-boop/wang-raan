@@ -1,10 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
-import { BREAKPOINTS } from "./helpers";
+import { BREAKPOINTS, uniqueEmail } from "./helpers";
 
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
 
-async function loginAsUser(page: Page, email = "owner-proj@example.com") {
+async function loginAsUser(page: Page, email = uniqueEmail("owner-proj")) {
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "เข้าสู่ระบบ" })).toBeVisible();
   await page.getByLabel("อีเมล").fill(email);
@@ -25,7 +25,7 @@ test.describe("หน้ารวมโปรเจกต์ /projects (feat-063
   });
 
   test("โฟลว์ครบวงจร: ว่างเปล่า → สร้างผังใหม่ → เห็นการ์ดพร้อมภาพย่อ → เปิดได้ → ลบผัง", async ({ page }) => {
-    await loginAsUser(page, "flow-user@example.com");
+    await loginAsUser(page, uniqueEmail("flow-user"));
 
     // 1. ตรวจสอบ Empty state
     await expect(page.getByRole("heading", { name: "ผังของฉัน" })).toBeVisible();
@@ -107,7 +107,7 @@ test.describe("หน้ารวมโปรเจกต์ /projects (feat-063
   });
 
   test("เมนู ⋯ รองรับการใช้งานด้วยคีย์บอร์ด (Esc คืนโฟกัสที่ปุ่ม)", async ({ page }) => {
-    await loginAsUser(page, "keyboard-menu@example.com");
+    await loginAsUser(page, uniqueEmail("keyboard-menu"));
 
     // สร้างผัง 1 ใบเพื่อทดสอบเมนู
     await page.getByRole("button", { name: "สร้างผังแรก" }).click();
@@ -132,7 +132,7 @@ test.describe("หน้ารวมโปรเจกต์ /projects (feat-063
   });
 
   test("Axe Accessibility Audit (WCAG 2.1 AA) บนหน้า /projects", async ({ page }) => {
-    await loginAsUser(page, "a11y-user@example.com");
+    await loginAsUser(page, uniqueEmail("a11y-user"));
     await expect(page.getByRole("heading", { name: "ผังของฉัน" })).toBeVisible();
 
     // 1. Audit บนหน้า Empty state
@@ -160,7 +160,7 @@ test.describe("หน้ารวมโปรเจกต์ /projects (feat-063
     for (const width of BREAKPOINTS) {
       test(`${width}px: ไม่มี horizontal scrollbar`, async ({ page }) => {
         await page.setViewportSize({ width, height: 800 });
-        await loginAsUser(page, `resp-${width}@example.com`);
+        await loginAsUser(page, uniqueEmail(`resp-${width}`));
 
         await expect(page.getByRole("heading", { name: "ผังของฉัน" })).toBeVisible();
 
