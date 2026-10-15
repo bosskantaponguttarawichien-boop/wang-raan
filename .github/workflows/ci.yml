@@ -69,6 +69,8 @@ jobs:
             e2e/.report
             e2e/.results
           retention-days: 7
+          # e2e/.report และ e2e/.results ขึ้นต้นด้วยจุด — v4 ข้ามไฟล์ซ่อนเป็นค่าเริ่มต้น (ไม่งั้นได้ artifact ว่าง)
+          include-hidden-files: true
 
   e2e-cloudflare:
     name: E2E (Cloudflare Workers runtime)
@@ -92,6 +94,8 @@ jobs:
             e2e/.report
             e2e/.results
           retention-days: 7
+          # e2e/.report และ e2e/.results ขึ้นต้นด้วยจุด — v4 ข้ามไฟล์ซ่อนเป็นค่าเริ่มต้น (ไม่งั้นได้ artifact ว่าง)
+          include-hidden-files: true
 
   e2e-real:
     name: E2E (Backend จริง)
@@ -163,3 +167,5 @@ jobs:
             e2e/.results
             backend.log
           retention-days: 7
+          # e2e/.report และ e2e/.results ขึ้นต้นด้วยจุด — v4 ข้ามไฟล์ซ่อนเป็นค่าเริ่มต้น (ไม่งั้นได้ artifact ว่าง)
+          include-hidden-files: true
