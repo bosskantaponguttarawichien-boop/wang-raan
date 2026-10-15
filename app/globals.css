@@ -4,6 +4,9 @@
  * ความตรงกันของค่ากับเอกสารถูกตรวจโดย app/design-tokens.test.ts
  * ========================================================================== */
 @import "tailwindcss";
+/* ระบุแหล่ง class ชัดเจน — การตรวจหาอัตโนมัติของ Tailwind v4 พลาด src/ ตอน build บน Cloudflare ทำให้ UI editor ไม่มีสไตล์ */
+@source "../src";
+@source "../app";
 
 /* ── Runtime tokens (design-system.md §2–§5) ─────────────────────────────── */
 :root {
