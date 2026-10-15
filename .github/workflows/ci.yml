@@ -147,7 +147,8 @@ jobs:
         working-directory: ${{ runner.temp }}/backend
         run: |
           node dist/db/migrate.js up
-          HOST=127.0.0.1 PORT=4000 nohup node dist/server.js > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
+          # OTP_TEST_CODE: E2E กรอกรหัส 123456 — Backend ยอมรับเฉพาะนอก production
+          OTP_TEST_CODE=123456 HOST=127.0.0.1 PORT=4000 nohup node dist/server.js > "$GITHUB_WORKSPACE/backend.log" 2>&1 &
           for _ in $(seq 1 30); do
             curl -sf http://127.0.0.1:4000/health && exit 0
             sleep 1
