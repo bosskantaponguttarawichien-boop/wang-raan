@@ -8,6 +8,16 @@ import { safeRedirectPath } from "@/lib/safe-redirect";
 
 const EMAIL_REGEX = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
+/**
+ * ข้อความของ `?error=` ที่ Auth.js ส่งกลับมาหน้านี้ (pages.signIn / pages.error ใน server/auth.ts)
+ * credentials ใช้ redirect: false จึงไม่มาทางนี้ — ที่มาคือ OAuth (Google) เท่านั้น
+ */
+export function oauthErrorMessage(error: string | null): string | null {
+  if (!error || error === "CredentialsSignin") return null;
+  // Auth.js v5 ส่งการกดยกเลิกที่หน้า Google มาเป็น AccessDenied / OAuthCallbackError หรือ Configuration แล้วแต่จังหวะ → ข้อความเดียวครอบทุกกรณี
+  return "เข้าสู่ระบบด้วย Google ไม่สำเร็จหรือถูกยกเลิก ลองใหม่อีกครั้ง หรือใช้อีเมลแทน";
+}
+
 export interface LoginFormProps {
   initialNextUrl?: string;
   hasGoogleProvider?: boolean;
@@ -18,6 +28,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
   const searchParams = useSearchParams();
   const nextParam = searchParams.get("next");
   const nextUrl = safeRedirectPath(nextParam ?? initialNextUrl, "/projects");
+  const oauthError = oauthErrorMessage(searchParams.get("error"));
 
   const { data: session, status } = useSession();
 
@@ -27,6 +38,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
   const [emailError, setEmailError] = React.useState<string | null>(null);
   const [codeError, setCodeError] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState(false);
+  const [googleLoading, setGoogleLoading] = React.useState(false);
   const [countdown, setCountdown] = React.useState(60);
   const [canResend, setCanResend] = React.useState(false);
 
@@ -190,6 +202,18 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
     }
   };
 
+  // OAuth: signIn พาออกไปหน้า Google ทั้งหน้า — ปุ่มค้างสถานะโหลดไว้ (ถ้ากลับมาด้วยปุ่มย้อนกลับ หน้าโหลดใหม่เอง)
+  const handleGoogle = async () => {
+    if (googleLoading) return;
+    setGoogleLoading(true);
+    try {
+      await signIn("google", { redirectTo: nextUrl });
+    } catch {
+      setGoogleLoading(false);
+      setEmailError("เชื่อมต่อ Google ไม่สำเร็จ กรุณาลองใหม่ หรือใช้อีเมลแทน");
+    }
+  };
+
   const handleChangeEmail = () => {
     setStep("email");
     setCode("");
@@ -197,29 +221,44 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
   };
 
   return (
-    <section className="card w-full max-w-[400px] bg-white border border-[#e2e8f1] rounded-[16px] p-6 sm:p-8 shadow-[0_10px_30px_rgba(30,43,64,0.06)]" aria-live="polite">
+    <section className="card w-full max-w-[420px] min-w-0 bg-white border border-[#e2e8f1] rounded-[16px] p-5 min-[375px]:p-6 sm:p-8 shadow-[0_17px_40px_-32px_rgba(29,57,97,0.27)]" aria-live="polite">
       {/* Step 1: กรอกอีเมล */}
       {step === "email" && (
         <div id="s-email">
-          <h1 className="text-[22px] font-semibold text-[#1e2b40] m-0 mb-1">เข้าสู่ระบบ</h1>
-          <p className="text-[#4e627c] text-[14px] m-0 mb-[22px] leading-[1.6]">
-            บันทึกผังร้านไว้ในบัญชี เปิดต่อได้จากทุกเครื่อง
+          <h1 className="text-[24px] font-semibold leading-[1.4] text-[#1e2b40] m-0 mb-1">เข้าสู่ระบบ</h1>
+          <p className="text-[#4e627c] text-[14px] m-0 mb-[22px] leading-[1.75]">
+            {hasGoogleProvider ? "เลือก Google หรือรับรหัสทางอีเมล" : "รับรหัสเข้าสู่ระบบทางอีเมล"}
           </p>
+
+          {oauthError && (
+            <p className="flex items-start gap-[8px] bg-[#fdf0ef] text-[#b23d33] text-[13px] leading-[1.6] rounded-[10px] p-3 m-0 mb-4" role="alert">
+              <svg className="w-4 h-4 shrink-0 mt-[3px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path d="M12 8v4m0 4h.01" />
+              </svg>
+              {oauthError}
+            </p>
+          )}
 
           {hasGoogleProvider && (
             <>
               <button
                 type="button"
-                onClick={() => signIn("google", { callbackUrl: nextUrl })}
-                className="btn flex items-center justify-center gap-2 w-full h-[44px] rounded-[10px] border border-[#e2e8f1] bg-white hover:border-[#c8d2e2] cursor-pointer font-medium text-[14px] text-[#1e2b40] transition-colors focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-2"
+                onClick={handleGoogle}
+                disabled={googleLoading || loading}
+                className="btn flex items-center justify-center gap-2 w-full h-[44px] rounded-[10px] border border-[#e2e8f1] bg-white hover:border-[#c8d2e2] hover:bg-[#f8faff] cursor-pointer font-medium disabled:opacity-60 disabled:cursor-not-allowed text-[14px] text-[#1e2b40] transition-colors focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-2"
               >
-                <svg className="w-[18px] height-[18px]" viewBox="0 0 48 48" aria-hidden="true">
+                {googleLoading ? (
+                  <span className="inline-block w-4 h-4 border-2 border-[#c8d2e2] border-t-[#3b62f4] rounded-full motion-safe:animate-spin" aria-hidden="true" />
+                ) : (
+                <svg className="w-[18px] h-[18px] shrink-0" viewBox="0 0 48 48" aria-hidden="true">
                   <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.5l6.7-6.7C35.6 2.4 30.2 0 24 0 14.6 0 6.6 5.4 2.7 13.3l7.8 6C12.4 13.6 17.7 9.5 24 9.5z" />
                   <path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.1 5.3-4.6 7l7.4 5.7c4.3-4 6.9-9.9 6.9-17.2z" />
                   <path fill="#FBBC05" d="M10.5 28.7A14.5 14.5 0 0 1 9.5 24c0-1.6.3-3.2.8-4.7l-7.8-6A24 24 0 0 0 0 24c0 3.9.9 7.5 2.6 10.7l7.9-6z" />
                   <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.8l-7.9 6C6.6 42.6 14.6 48 24 48z" />
                 </svg>
-                เข้าสู่ระบบด้วย Google
+                )}
+                {googleLoading ? "กำลังไปที่ Google..." : "เข้าสู่ระบบด้วย Google"}
               </button>
 
               <div className="flex items-center gap-3 text-[#52637a] text-[12px] my-[18px] before:content-[''] before:flex-1 before:border-t before:border-[#e2e8f1] after:content-[''] after:flex-1 after:border-t after:border-[#e2e8f1]">
@@ -248,7 +287,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
                 aria-invalid={emailError ? "true" : "false"}
                 aria-describedby={emailError ? "email-err email-hint" : "email-hint"}
                 disabled={loading}
-                className={`h-[44px] border ${emailError ? "border-[#e4685d]" : "border-[#e2e8f1]"} rounded-[10px] px-3 bg-white w-full text-[14px] text-[#1e2b40] focus:border-[#3b62f4] focus:outline-none focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-2`}
+                className={`h-[44px] border ${emailError ? "border-[#e4685d]" : "border-[#e2e8f1]"} rounded-[10px] px-3 bg-white w-full text-[16px] sm:text-[14px] text-[#1e2b40] focus:border-[#3b62f4] focus:outline-none focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-visible:outline-offset-2`}
               />
             </div>
 
@@ -269,7 +308,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
             >
               {loading ? (
                 <>
-                  <span className="inline-block w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                  <span className="inline-block w-4 h-4 border-2 border-white/50 border-t-white rounded-full motion-safe:animate-spin" aria-hidden="true" />
                   กำลังส่งรหัส...
                 </>
               ) : (
@@ -344,7 +383,7 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
             >
               {loading ? (
                 <>
-                  <span className="inline-block w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin" aria-hidden="true" />
+                  <span className="inline-block w-4 h-4 border-2 border-white/50 border-t-white rounded-full motion-safe:animate-spin" aria-hidden="true" />
                   กำลังตรวจรหัส...
                 </>
               ) : (

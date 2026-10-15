@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import * as React from "react";
-import { LoginForm } from "./login-form";
+import { LoginForm, oauthErrorMessage } from "./login-form";
 import * as nextAuthReact from "next-auth/react";
 
 // Mock next/navigation
@@ -134,6 +134,29 @@ describe("LoginForm (feat-062)", () => {
     fireEvent.click(verifyBtn);
 
     expect(await screen.findByText(message)).toBeDefined();
+  });
+
+  it("กดปุ่ม Google → signIn('google') พร้อม ?next= ที่ปลอดภัย และปุ่มแสดงสถานะกำลังไป", async () => {
+    mockSearchParams = new URLSearchParams("next=/playground/abc");
+    vi.mocked(nextAuthReact.signIn).mockReturnValueOnce(new Promise(() => {}));
+    render(<LoginForm />);
+    fireEvent.click(screen.getByRole("button", { name: "เข้าสู่ระบบด้วย Google" }));
+    expect(nextAuthReact.signIn).toHaveBeenCalledWith("google", { redirectTo: "/playground/abc" });
+    const busy = await screen.findByRole("button", { name: "กำลังไปที่ Google..." });
+    expect((busy as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("กลับจาก Google ด้วย ?error= → แสดงข้อความภาษาไทย (role=alert)", () => {
+    mockSearchParams = new URLSearchParams("error=AccessDenied");
+    render(<LoginForm />);
+    expect(screen.getByRole("alert").textContent).toContain("ถูกยกเลิก");
+  });
+
+  it("oauthErrorMessage: error ของ OAuth ทุกแบบมีข้อความ · ไม่มี error หรือเป็นของ credentials → null", () => {
+    expect(oauthErrorMessage(null)).toBeNull();
+    expect(oauthErrorMessage("CredentialsSignin")).toBeNull();
+    expect(oauthErrorMessage("OAuthCallbackError")).toContain("ถูกยกเลิก");
+    expect(oauthErrorMessage("Configuration")).toContain("ใช้อีเมลแทน");
   });
 
   it("ไม่ได้ตั้งค่า Google → ไม่แสดงปุ่ม Google", () => {

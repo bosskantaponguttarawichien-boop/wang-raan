@@ -73,7 +73,9 @@ const providers: Provider[] = [
     },
   }),
 ];
-if (googleLoginEnabled()) providers.push(Google);
+// prompt=select_account: ให้เลือกบัญชีทุกครั้ง (เครื่องที่ล็อกอิน Google หลายบัญชีไม่เข้าผิดบัญชีเงียบ ๆ)
+// client id/secret อ่านจาก AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET อัตโนมัติ (บน Workers ตั้งด้วย `wrangler secret put`)
+if (googleLoginEnabled()) providers.push(Google({ authorization: { params: { prompt: "select_account" } } }));
 if (process.env.AUTH_GITHUB_ID && process.env.AUTH_GITHUB_SECRET) providers.push(GitHub);
 
 /** `sub` ของ session ที่ถืออยู่ก่อนล็อกอินครั้งนี้ (cookie เดิมยังอยู่ในคำขอ callback) */
@@ -93,6 +95,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   trustHost: true,
   session: { strategy: "jwt", maxAge: SESSION_MAX_AGE },
   providers,
+  // OAuth ผิดพลาด/ถูกยกเลิก → กลับมาที่ /login?error=… (หน้า login แสดงข้อความภาษาไทย) แทนหน้า error ภาษาอังกฤษของ Auth.js
+  pages: { signIn: "/login", error: "/login" },
   callbacks: {
     async jwt({ token, user, account, profile, trigger }) {
       if (trigger !== "signIn") return token;

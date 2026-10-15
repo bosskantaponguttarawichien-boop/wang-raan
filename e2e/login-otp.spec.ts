@@ -36,6 +36,34 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     expect(page.url()).toContain("/projects");
   });
 
+  test("ปุ่ม Google: พาไปหน้ายินยอมของ Google ด้วย redirect_uri ของแอป และกลับมาพร้อม error → ข้อความไทย", async ({ page, baseURL }) => {
+    // ไม่ออกไปหา Google จริงจากเบราว์เซอร์ — ดักคำขอไว้แล้วตรวจพารามิเตอร์
+    let authorizeUrl: URL | null = null;
+    await page.route("https://accounts.google.com/**", (route) => {
+      authorizeUrl = new URL(route.request().url());
+      return route.fulfill({ status: 200, contentType: "text/html", body: "<title>Google</title>" });
+    });
+
+    await page.goto("/login?next=/playground");
+    await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Google" }).click();
+    await expect.poll(() => authorizeUrl?.pathname ?? null).toBe("/o/oauth2/v2/auth");
+    const params = authorizeUrl!.searchParams;
+    expect(params.get("client_id")).toBe("e2e-only.apps.googleusercontent.com");
+    // host มาจาก URL ของคำขอ (trustHost) — wrangler dev เขียน host เป็น localhost จึงเทียบแค่ port + path
+    const redirectUri = new URL(params.get("redirect_uri")!);
+    expect(redirectUri.port).toBe(new URL(baseURL!).port);
+    expect(redirectUri.pathname).toBe("/api/auth/callback/google");
+    expect(params.get("scope")).toBe("openid profile email");
+    expect(params.get("prompt")).toBe("select_account");
+    expect(params.get("code_challenge_method")).toBe("S256");
+
+    // Google ส่งกลับมาด้วย error (เช่น ผู้ใช้กดยกเลิก) → Auth.js พากลับ /login พร้อมข้อความ ไม่ใช่หน้า error ภาษาอังกฤษ
+    await page.goto("/api/auth/callback/google?error=access_denied");
+    await page.waitForURL(/\/login\?error=/);
+    await expect(page.getByRole("alert").filter({ hasText: "เข้าสู่ระบบด้วย Google ไม่สำเร็จหรือถูกยกเลิก" })).toBeVisible();
+    await expect(page.getByLabel("อีเมล")).toBeVisible();
+  });
+
   test("พารามิเตอร์ ?next= พากลับหน้าที่ระบุถูกต้อง และกัน Open Redirect", async ({ page }) => {
     // 1. Safe path
     await page.goto("/login?next=/playground");

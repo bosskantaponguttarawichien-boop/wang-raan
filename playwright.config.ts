@@ -26,6 +26,9 @@ const APP_ENV = {
   INTERNAL_TOKEN_SECRET,
   // production build สร้าง URL ของ OG image จาก SITE_URL เท่านั้น (ไม่เชื่อ Host header)
   SITE_URL: BASE_URL,
+  // เปิดปุ่ม Google ด้วย client ปลอม — E2E ตรวจแค่ว่าพาไปหน้า Google ถูกต้อง (ดัก accounts.google.com ไว้ ไม่ออกเน็ตจากเบราว์เซอร์)
+  AUTH_GOOGLE_ID: "e2e-only.apps.googleusercontent.com",
+  AUTH_GOOGLE_SECRET: "e2e-only-not-a-secret",
 };
 const appServer = CLOUDFLARE
   ? {
