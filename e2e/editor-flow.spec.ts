@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe, openAllSections } from "./helpers";
+import { addItem, buildReadyCafe, openAllSections, openTab, placeSelected } from "./helpers";
 
 /**
  * feat-024: เส้นทางการใช้งานจริง — จัดร้าน → ตรวจ → จำลอง, Cascade Delete, P2 Gate,
@@ -9,6 +9,14 @@ import { buildReadyCafe, openAllSections } from "./helpers";
 const stage = (page: Page) => page.getByTestId("artboard-stage");
 const pieces = (page: Page, type: string) => stage(page).locator(`[data-type="${type}"]`);
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
+const toast = (page: Page) => page.getByTestId("toast");
+const undoButton = (page: Page) => page.getByRole("button", { name: /^ย้อนกลับ/ });
+const redoButton = (page: Page) => page.getByRole("button", { name: /^ทำซ้ำ \(/ });
+/** ปุ่มเริ่มจำลองอยู่ในแท็บ "จำลอง" — Blocked ใช้ aria-disabled (กดแล้วพาไปข้อที่ต้องแก้) ไม่ใช่ disabled เงียบ ๆ */
+async function startButton(page: Page) {
+  await openTab(page, "check");
+  return page.getByTestId("start-simulation");
+}
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/playground");
@@ -18,16 +26,20 @@ test.beforeEach(async ({ page }) => {
 
 test.describe("จัดร้าน → ตรวจผัง → จำลอง", () => {
   test("ผังเปล่า Blocked → จัดครบ Ready → เริ่ม/หยุดจำลอง → วางทับกัน Blocked อีกครั้ง", async ({ page }) => {
-    const start = page.getByTestId("start-simulation");
     await expect(statusBar(page)).toHaveAttribute("data-status", "blocked");
-    await expect(start).toBeDisabled();
+    const start = await startButton(page);
+    await expect(start).toHaveAttribute("aria-disabled", "true");
+    // กดตอน Blocked → ไม่เริ่ม และบอกว่าต้องแก้อีกกี่ข้อ (PRD §9 ข้อ 9) — Playwright ไม่คลิกปุ่ม aria-disabled จึงกดด้วย Enter
+    await start.press("Enter");
+    await expect(toast(page)).toContainText("ยังเริ่มจำลองไม่ได้");
+    await expect(page.getByTestId("simulation-status")).not.toContainText("กำลังจำลอง");
 
     await buildReadyCafe(page);
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
-    await expect(start).toBeEnabled();
+    await expect(await startButton(page)).toHaveAttribute("aria-disabled", "false");
     await start.click();
     await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
-    await page.getByRole("button", { name: "■ หยุดจำลอง" }).click();
+    await page.getByTestId("stop-simulation").click();
     await expect(page.getByTestId("simulation-status")).not.toContainText("กำลังจำลอง");
 
     // Non-blocking placement: ลากโต๊ะไปทับครัวได้ แต่ผังกลายเป็น Blocked และปุ่มจำลองถูกปิดทันที
@@ -40,24 +52,24 @@ test.describe("จัดร้าน → ตรวจผัง → จำลอ�
     await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
     await page.mouse.up();
     await expect(statusBar(page)).toHaveAttribute("data-status", "blocked");
-    await expect(start).toBeDisabled();
+    await expect(start).toHaveAttribute("aria-disabled", "true");
     await expect(table).toHaveAttribute("data-issue", "blocked");
 
     // Undo หนึ่งครั้ง = ย้อนการลากทั้งครั้ง
-    await page.getByRole("button", { name: "ย้อนกลับ", exact: true }).click();
+    await undoButton(page).click();
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
   });
 });
 
 test.describe("Table Set Lifecycle", () => {
   test("เพิ่มชุดโต๊ะสร้างเก้าอี้ตาม preset และลบโต๊ะ = Cascade Delete เก้าอี้ลูกทั้งหมด", async ({ page }) => {
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 4 ที่นั่ง/ }).click();
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 2 ที่นั่ง/ }).click();
+    await addItem(page, "ชุดโต๊ะ 4 ที่นั่ง");
+    await addItem(page, "ชุดโต๊ะ 2 ที่นั่ง");
     await expect(pieces(page, "table")).toHaveCount(2);
     await expect(pieces(page, "chair")).toHaveCount(6);
 
-    // ลบด้วยปุ่มใน Inspector (ชุด 2 ที่นั่งที่เพิ่งเพิ่มถูกเลือกอยู่)
-    await page.getByRole("button", { name: "× ลบทั้งชุดโต๊ะ" }).click();
+    // ลบด้วยปุ่มใน selection toolbar (ชุด 2 ที่นั่งที่เพิ่งเพิ่มถูกเลือกอยู่) = ลบทั้งชุด
+    await page.getByTestId("selection-toolbar").getByRole("button", { name: "ลบ" }).click();
     await expect(pieces(page, "table")).toHaveCount(1);
     await expect(pieces(page, "chair")).toHaveCount(4);
 
@@ -75,7 +87,7 @@ test.describe("Table Set Lifecycle", () => {
   });
 
   test("ย้าย/หมุนโต๊ะ เก้าอี้ไปทั้งชุด", async ({ page }) => {
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 2 ที่นั่ง/ }).click();
+    await addItem(page, "ชุดโต๊ะ 2 ที่นั่ง");
     const chairBoxes = async () => Promise.all((await pieces(page, "chair").all()).map((c) => c.boundingBox()));
     const before = await chairBoxes();
     await pieces(page, "table").first().focus();
@@ -94,6 +106,7 @@ test.describe("Table Set Lifecycle", () => {
 
 test.describe("Inspector & Room Settings (feat-027)", () => {
   test("ปรับขนาดร้านและทางเข้าผ่านฟอร์ม", async ({ page }) => {
+    await openTab(page, "shop");
     const form = page.getByTestId("room-settings-form");
     await expect(form.getByRole("button", { name: "นำไปใช้" })).toHaveCount(0);
     await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("10");
@@ -101,8 +114,8 @@ test.describe("Inspector & Room Settings (feat-027)", () => {
     await form.getByLabel("ระยะจากมุม (ม.)").fill("2");
     // ระหว่างพิมพ์และย้ายช่องในฟอร์ม ผังยังไม่เปลี่ยน
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 8 × 6 เมตร");
-    // เปลี่ยนตัวเลือกผนัง = นำทุกช่องที่แก้ไปใช้พร้อมกัน
-    await form.getByLabel("ผนังทางเข้า").selectOption("west");
+    // เปลี่ยนผนัง = นำทุกช่องที่แก้ไปใช้พร้อมกัน
+    await form.getByRole("group", { name: "เลือกผนัง" }).getByRole("button", { name: /ทิศตะวันตก/ }).click();
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
     await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ทิศตะวันตก.*ตำแหน่ง 2\.00 ม\./);
 
@@ -112,15 +125,16 @@ test.describe("Inspector & Room Settings (feat-027)", () => {
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
   });
 
-  test("แก้ตำแหน่งและขนาดครัวด้วย Inspector", async ({ page }) => {
-    await page.getByRole("button", { name: /^เพิ่ม\s*ครัว/ }).click();
-    const inspector = page.getByTestId("object-inspector");
-    await inspector.getByLabel("ตำแหน่ง x (ม.)").fill("0.5");
-    await inspector.getByLabel("ตำแหน่ง y (ม.)").fill("0.5");
-    await inspector.getByLabel("กว้าง (ม.)", { exact: true }).fill("3");
-    await inspector.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");
+  test("ปรับตำแหน่งครัวละเอียดด้วยป๊อปโอเวอร์ X/Y ของ selection toolbar (snap 0.25 ม.)", async ({ page }) => {
+    await addItem(page, "ครัว");
+    await placeSelected(page, 0.5, 0.5);
     await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
-    await expect(inspector).toContainText("พื้นที่บนผัง 3.00 × 1.50 ม.");
+    // ค่าที่ไม่ลงกริด → snap 0.25 ม.
+    await placeSelected(page, 1.1, 0.9);
+    await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 1\.00 ม\. y 1\.00 ม\./);
+    // Undo หนึ่งครั้ง = ย้อนการปรับหนึ่งครั้ง
+    await undoButton(page).click();
+    await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
   });
 });
 
@@ -132,42 +146,44 @@ test.describe("Auto-save Draft (feat-028)", () => {
 
     await page.reload();
     await expect(stage(page)).toBeVisible();
-    await expect(page.getByTestId("draft-notice")).toContainText("กู้คืนผังที่บันทึกไว้");
     await expect(pieces(page, "kitchen")).toHaveCount(1);
     await expect(pieces(page, "counter")).toHaveCount(1);
     await expect(pieces(page, "chair")).toHaveCount(4);
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
 
     // ประวัติกลับมาด้วย: ย้อนจนผังว่างได้ และทำซ้ำกลับได้
-    const undo = page.getByRole("button", { name: "ย้อนกลับ", exact: true });
+    const undo = undoButton(page);
     await expect(undo).toBeEnabled();
     while (await undo.isEnabled()) await undo.click();
-    await expect(pieces(page, "table")).toHaveCount(0);
-    await page.getByRole("button", { name: "ทำซ้ำ", exact: true }).click();
+    await expect(pieces(page, "kitchen")).toHaveCount(0);
+    await redoButton(page).click();
     await expect(pieces(page, "kitchen")).toHaveCount(1);
 
-    // เริ่มผังใหม่ (ยืนยัน) → ล้างร่าง และรีเฟรชแล้วยังว่าง
-    page.once("dialog", (d) => d.accept());
-    await page.getByRole("button", { name: "เริ่มผังใหม่" }).click();
+    // ผังใหม่ (เมนูโปรเจกต์ → เลือกขนาด) → ล้างร่าง และรีเฟรชแล้วยังว่าง
+    await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
+    await page.locator('[data-act="new"]').click();
+    const onboarding = page.getByTestId("onboarding-dialog");
+    await onboarding.getByRole("button", { name: "เริ่มจัดร้าน" }).click();
+    await expect(onboarding).toBeHidden();
     await expect(pieces(page, "kitchen")).toHaveCount(0);
     await page.reload();
     await expect(stage(page)).toBeVisible();
     await expect(pieces(page, "kitchen")).toHaveCount(0);
-    await expect(page.getByTestId("draft-notice")).toHaveCount(0);
   });
 
   test("ร่างเสียใน localStorage ไม่ทำให้ Editor พัง", async ({ page }) => {
     await page.evaluate(() => localStorage.setItem("wang-raan:draft:v1", "{broken"));
     await page.reload();
     await expect(stage(page)).toBeVisible();
-    await expect(page.getByTestId("draft-notice")).toHaveCount(0);
+    await expect(statusBar(page)).toBeVisible();
   });
 });
 
 test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ (feat-025)", () => {
   test("ส่งออก JSON → นำเข้ากลับได้ผังเดิม; ไฟล์ตัวอย่าง PRD สร้าง hierarchy และตัดเก้าอี้กำพร้า", async ({ page }) => {
     await buildReadyCafe(page);
-    const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "ส่งออก JSON" }).click()]);
+    await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
+    const [download] = await Promise.all([page.waitForEvent("download"), page.locator('[data-act="save"]').click()]);
     expect(download.suggestedFilename()).toMatch(/^wang-raan-8x6m-\d{8}-\d{4}\.json$/);
     const file = JSON.parse(await readFile((await download.path())!, "utf8"));
     expect(file).toMatchObject({ contractVersion: "p1-layout-v1", validation: { status: "ready" } });
@@ -191,7 +207,7 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
       validation: { layoutRevision: "x", status: "ready", issues: [] },
     };
     await page.getByTestId("import-input").setInputFiles({ name: "prd-sample.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(sample)) });
-    const message = page.getByTestId("file-message");
+    const message = toast(page);
     await expect(message).toContainText("นำเข้า “prd-sample.json” แล้ว");
     await expect(message).toContainText("ตัดเก้าอี้ที่ไม่มีโต๊ะ 1 ตัว (chair-x)");
     await expect(pieces(page, "table")).toHaveCount(1);
@@ -211,19 +227,23 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
     await expect(pieces(page, "chair")).toHaveCount(4);
 
     // Undo ย้อนการนำเข้าได้
-    await page.getByRole("button", { name: "ย้อนกลับ", exact: true }).click();
+    await undoButton(page).click();
     await expect(pieces(page, "chair")).toHaveCount(1);
   });
 
   test("ส่งออก SVG และ PNG ตามสัดส่วนผังจริง", async ({ page }) => {
     await buildReadyCafe(page);
-    const [svgDownload] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "ภาพ SVG" }).click()]);
+    const exportItem = async (act: "svg" | "png") => {
+      await page.getByRole("button", { name: "ส่งออก", exact: true }).click();
+      return page.locator(`[data-act="${act}"]`);
+    };
+    const [svgDownload] = await Promise.all([page.waitForEvent("download"), (await exportItem("svg")).click()]);
     expect(svgDownload.suggestedFilename()).toMatch(/\.svg$/);
     const svg = await readFile((await svgDownload.path())!, "utf8");
     expect(svg).toContain('width="552" height="432"'); // 8 × 6 ม. × 60 px + ขอบ 36 px
     expect(svg.match(/data-type="chair"/g)).toHaveLength(4);
 
-    const [pngDownload] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "ภาพ PNG" }).click()]);
+    const [pngDownload] = await Promise.all([page.waitForEvent("download"), (await exportItem("png")).click()]);
     expect(pngDownload.suggestedFilename()).toMatch(/\.png$/);
     const png = await readFile((await pngDownload.path())!);
     expect(png.subarray(1, 4).toString()).toBe("PNG");
@@ -242,7 +262,8 @@ test.describe("พิมพ์ / PDF (feat-026)", () => {
     await page.emulateMedia({ media: "print" });
     await expect(report).toBeVisible();
     await expect(page.getByRole("banner")).toBeHidden();
-    await expect(page.getByRole("complementary", { name: "เครื่องมือจัดร้าน" })).toBeHidden();
+    await expect(page.locator("#rail")).toBeHidden();
+    await expect(page.locator("#panel")).toBeHidden();
     await expect(stage(page)).toBeHidden();
     await expect(report.locator("svg")).toBeVisible();
     await expect(report).toContainText("ที่นั่งทั้งหมด4 ที่นั่ง");

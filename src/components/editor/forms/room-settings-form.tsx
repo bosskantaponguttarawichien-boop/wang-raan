@@ -11,6 +11,7 @@ import { useForm } from "react-hook-form";
 import { ENTRANCE_DEFAULT_WIDTH, type Wall } from "@/core/layout";
 import { WALL_LABEL } from "@/components/editor-2d/stage-math";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
+import { cn } from "@/lib/cn";
 import { autoApplyProps, useRestoreFocus } from "./auto-apply";
 import { Field, inputClass } from "./field";
 import { RoomSettingsSchema, type RoomSettingsValues } from "./schemas";
@@ -82,15 +83,51 @@ function RoomSettingsFormInner() {
           {(aria) => <input {...aria} {...numberProps} min={2} max={30} {...register("depth", { valueAsNumber: true })} />}
         </Field>
         <Field id={`${formId}-wall`} label="ผนังทางเข้า" className="col-span-2" error={errors.entranceWall?.message}>
-          {(aria) => (
-            <select {...aria} className={inputClass} {...register("entranceWall")}>
-              {(Object.keys(WALL_LABEL) as Wall[]).map((wall) => (
-                <option key={wall} value={wall}>
-                  {WALL_LABEL[wall]}
-                </option>
-              ))}
-            </select>
-          )}
+          {(aria) => {
+            const currentWall = form.watch("entranceWall");
+            return (
+              <div>
+                <select
+                  {...aria}
+                  className="sr-only"
+                  {...register("entranceWall")}
+                >
+                  {(Object.keys(WALL_LABEL) as Wall[]).map((wall) => (
+                    <option key={wall} value={wall}>
+                      {WALL_LABEL[wall]}
+                    </option>
+                  ))}
+                </select>
+                <div role="group" aria-label="เลือกผนัง" className="grid grid-cols-4 gap-1 rounded-[8px] bg-surface p-1">
+                  {(Object.keys(WALL_LABEL) as Wall[]).map((w) => {
+                    const active = currentWall === w;
+                    return (
+                      <button
+                        key={w}
+                        type="button"
+                        aria-pressed={active}
+                        // ไม่ย้ายโฟกัสตอนกดเมาส์: Safari ไม่โฟกัสปุ่มที่คลิก → ช่องที่กำลังพิมพ์ blur ออกนอกฟอร์ม
+                        // ฟอร์มจึงนำค่าไปใช้และถูกสร้างใหม่ก่อน click ทำงาน — ผนังที่เลือกหายเงียบ ๆ
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          form.setValue("entranceWall", w, { shouldDirty: true, shouldValidate: true });
+                          onSubmit(form.getValues());
+                        }}
+                        className={cn(
+                          "rounded-[6px] py-1.5 text-center text-[12.5px] font-medium transition-colors",
+                          active
+                            ? "bg-white text-blue shadow-[0_1px_3px_rgba(30,43,64,0.08)]"
+                            : "text-[#41536b] hover:text-ink",
+                        )}
+                      >
+                        {WALL_LABEL[w]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          }}
         </Field>
         <Field id={`${formId}-pos`} label="ระยะจากมุม (ม.)" error={errors.entrancePosition?.message}>
           {(aria) => <input {...aria} {...numberProps} min={0} {...register("entrancePosition", { valueAsNumber: true })} />}
@@ -99,8 +136,8 @@ function RoomSettingsFormInner() {
           {(aria) => <input {...aria} {...numberProps} min={0.6} max={3} step={0.05} {...register("entranceWidth", { valueAsNumber: true })} />}
         </Field>
       </div>
-      <p className="mb-0 mt-2 text-[12px] leading-[1.75] text-secondary">
-        ร้าน 2–30 ม. · ผังเปลี่ยนเมื่อกด Enter หรือออกจากช่องกรอก · ลากป้าย “เข้า” ไปตามขอบร้าน หรือโฟกัสแล้วใช้ลูกศร
+      <p className="mb-0 mt-3 text-[11.5px] leading-[1.6] text-secondary">
+        ทางลัด: กดที่ป้าย &ldquo;เข้า&rdquo; บนผังเพื่อมาหน้านี้ · ร้าน 2–30 ม. ปรับทีละ 25 ซม.
       </p>
     </form>
   );

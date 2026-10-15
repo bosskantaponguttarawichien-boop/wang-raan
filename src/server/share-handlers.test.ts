@@ -92,7 +92,10 @@ describe("สร้างและเปิดลิงก์ (feat-030)", () =>
     // ผังที่บันทึกไว้แล้วกลายเป็น Blocked ไม่ได้ผ่าน BFF — จำลองด้วยการใส่ข้อมูลตรงใน Backend
     const layout = withoutType(cafeLayout(), "counter");
     const { layouts } = backend.mock.inspect();
-    layouts.set("google-alice", new Map([[layout.id, { layout, validation: { layoutRevision: "r", status: "blocked", issues: [], validatedAt: new Date(T0).toISOString() }, createdAt: "", updatedAt: "" }]]));
+    layouts.set(
+      "google-alice",
+      new Map([[layout.id, { name: "ผังร้าน", layout, validation: { layoutRevision: "r", status: "blocked", issues: [], validatedAt: new Date(T0).toISOString() }, createdAt: "", updatedAt: "" }]]),
+    );
     const res = await handlers.create(post({ layoutId: layout.id }));
     expect(res.status).toBe(422);
     expect((await res.json()).error).toMatchObject({ code: "LAYOUT_BLOCKED", message: "ผังยังไม่ผ่านกฎจำเป็น จึงบันทึกหรือแชร์ไม่ได้" });

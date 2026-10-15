@@ -14,6 +14,8 @@ import { CATEGORY_LABEL } from "@/components/validation/validation-status-bar";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { formatDateTime, formatNumber as fmt } from "@/lib/format";
 import { useLayoutStore } from "@/store/use-layout-store";
+import { useSimulationStore } from "@/store/use-simulation-store";
+import { formatSimTime } from "@/components/simulation/simulation-panel";
 
 /** true ระหว่างพิมพ์: beforeprint (Ctrl+P / window.print) และ media query "print" (การจำลองสื่อสิ่งพิมพ์) */
 function usePrinting(): boolean {
@@ -43,6 +45,8 @@ export function PrintReport({ live }: { live: LiveValidation }) {
 
 function PrintReportContent({ live }: { live: LiveValidation }) {
   const layout = useLayoutStore((s) => s.layout);
+  const simMetrics = useSimulationStore((s) => s.metrics);
+  const simSeats = useSimulationStore((s) => s.seats);
   const { result, severityById } = live;
   const svg = React.useMemo(
     () => renderPlanSvg(layout, { pxPerMeter: 60, severityById, title: `ผังร้านขนาด ${layout.width} × ${layout.depth} เมตร` }),
@@ -94,6 +98,22 @@ function PrintReportContent({ live }: { live: LiveValidation }) {
             <h2 className="m-0 mb-2 text-[14px] font-semibold">สรุปผัง</h2>
             <SummaryTable rows={rows} compact />
           </section>
+          {simMetrics && (
+            <section className="print-avoid-break">
+              <h2 className="m-0 mb-2 text-[14px] font-semibold">ผลจำลองลูกค้า (รอบล่าสุด)</h2>
+              <SummaryTable
+                rows={[
+                  ["เวลาจำลอง", formatSimTime(simMetrics.time)],
+                  ["ลูกค้าที่เข้ามา", `${simMetrics.arrived} คน`],
+                  ["ได้รับบริการ", `${simMetrics.served} คน`],
+                  ["นั่งทาน", `${simMetrics.seated} / ${simSeats} ที่`],
+                  ["ไม่มีที่นั่ง", `${simMetrics.noSeat} คน`],
+                  ["เวลาเฉลี่ยในร้าน", simMetrics.avgVisitMinutes > 0 ? `${simMetrics.avgVisitMinutes.toFixed(1)} นาที` : "—"],
+                ]}
+                compact
+              />
+            </section>
+          )}
           <section>
             <h2 className="m-0 mb-2 text-[14px] font-semibold">ผลตรวจผัง</h2>
             {result.issues.length === 0 ? (

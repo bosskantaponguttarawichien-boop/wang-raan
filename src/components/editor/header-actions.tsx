@@ -18,10 +18,22 @@ const SAVE_TEXT = {
 
 export function DraftStatusText() {
   const status = useDraftStatus((s) => s.status);
+  const layoutId = useLayoutStore((s) => s.layoutId);
+  const isOnline = layoutId !== null;
+
+  const text = isOnline
+    ? {
+        idle: "บันทึกในบัญชีแล้ว",
+        saving: "กำลังบันทึกออนไลน์…",
+        saved: "บันทึกในบัญชีแล้ว",
+        error: "บันทึกออนไลน์ไม่สำเร็จ",
+      }[status]
+    : SAVE_TEXT[status];
+
   const tone = status === "saved" ? "bg-[var(--save-saved-dot)]" : status === "error" ? "bg-status-blocked" : status === "saving" ? "bg-[var(--save-saving)]" : "bg-[#c5cfdd]";
   return (
     <StatusDot tone={tone} data-testid="draft-status" data-status={status}>
-      {SAVE_TEXT[status]}
+      {text}
     </StatusDot>
   );
 }
@@ -34,8 +46,8 @@ export function HeaderActions() {
   const canUndo = useLayoutStore(selectCanUndo);
   const canRedo = useLayoutStore(selectCanRedo);
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="mr-2 text-[12px] text-secondary max-[700px]:hidden">
+    <div className="flex items-center gap-1.5 border-l border-[#e5eaf2] pl-3 max-[700px]:ml-auto max-[700px]:border-l-0 max-[700px]:pl-0">
+      <span className="mr-2 whitespace-nowrap text-[12px] text-secondary max-[1280px]:hidden">
         <DraftStatusText />
       </span>
       <button

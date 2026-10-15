@@ -63,7 +63,7 @@ flowchart LR
 | **Core Validation ต้องเป็น Pure TS** | โค้ดใน `src/core/validation/` ต้องเป็น Pure TypeScript 100% — **ห้าม import React, ReactDOM, Zustand, หรือ DOM APIs** เพื่อให้รันได้ทั้งบน Client, BFF และ Web Worker |
 | **ห้ามใช้ Three.js / WebGL** | 2D Canvas ใช้ **Hybrid DOM (% CSS) + SVG** และ 3D View ใช้ **Pure SVG Isometric Projection** เท่านั้นเพื่อความเร็วและเบา |
 | **Table Set Lifecycle ต้องสมบูรณ์** | เก้าอี้ลูกต้องสังกัดโต๊ะ (`tableId`), การย้าย/หมุนโต๊ะเก้าอี้ต้องไปตามกันทั้งชุด, การลบโต๊ะต้องทำ **Cascade Delete** เก้าอี้ลูกทั้งหมด (ห้ามเกิด Orphan Chair) |
-| **P2 Validation Gate ต้องเข้มงวด** | หากผังขึ้นสถานะ **Blocked** ปุ่ม "เริ่มจำลอง (Simulation)" ต้องถูก Disabled ทันที จะกดได้เมื่อผังเป็น **Ready** หรือ **Warning** เท่านั้น |
+| **P2 Validation Gate ต้องเข้มงวด** | หากผังขึ้นสถานะ **Blocked** ต้อง **เริ่มจำลองไม่ได้ทุกช่องทาง** (ห้ามสร้าง payload ไป P2) — ปุ่ม "เริ่มจำลอง" ใช้ `aria-disabled="true"` และกดแล้วพาไปข้อที่ต้องแก้แทนการ disabled เงียบ ๆ (PRD §9 ข้อ 9) · เริ่มได้เมื่อผังเป็น **Ready** หรือ **Warning** เท่านั้น |
 | **Snap Grid 0.25 เมตร** | ทุกพิกัดเรขาคณิตต้อง Snap เข้า Grid ละ 0.25 ม. (ขนาดร้านรองรับ 2–30 ม.) |
 | **ระยะ Clearance มาตรฐาน V1** | ทางเดินหลัก ≥ `1.20 ม.`, ทางเดินรอง ≥ `0.90 ม.`, ทางเข้าถึงเก้าอี้ ≥ `0.60 ม.`, เก้าอี้สอดใต้โต๊ะได้ไม่เกิน `0.10 ม.` |
 | **Desktop-First 6 Breakpoints** | รองรับความกว้างหน้าจอ `320px`, `375px`, `480px`, `768px`, `1024px`, `1440px` โดย **ห้ามมี Horizontal Scrollbar เด็ดขาด** |

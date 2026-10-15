@@ -6,6 +6,7 @@
  * - ไม่ re-render React ระหว่างเล่น: วาดลง <canvas> โดยตรง
  * - Canvas ปรับตาม devicePixelRatio จึงคมชัดบน Retina
  * - prefers-reduced-motion: ไม่ interpolate และวาดใหม่ไม่เกินวินาทีละครั้ง (ภาพเปลี่ยนเป็นจังหวะ ไม่เคลื่อนไหวต่อเนื่อง)
+ * - feat-057: แสดง Heatmap รอบล่าสุดแบบจาง (globalAlpha = 0.35) บนผังตอนกลับมาแก้ผัง (สลับเปิด/ปิดได้)
  */
 import * as React from "react";
 import { AGENT_STRIDE } from "@/core/simulation";
@@ -71,6 +72,7 @@ export function interpolateAgents(
 export function SimulationOverlay({ width, depth }: { width: number; depth: number }) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const status = useSimulationStore((s) => s.status);
+  const showHeatmap = useSimulationStore((s) => s.showHeatmap);
   const active = status === "running" || status === "paused";
 
   React.useEffect(() => {
@@ -114,7 +116,7 @@ export function SimulationOverlay({ width, depth }: { width: number; depth: numb
       const { previous, current, heatmap } = controller;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (heatmap && heatCtx) {
+      if (heatmap && heatCtx && showHeatmap) {
         if (heatSource !== heatmap) {
           heatSource = heatmap;
           heat.width = heatmap.cols;
@@ -124,9 +126,11 @@ export function SimulationOverlay({ width, depth }: { width: number; depth: numb
           heatCtx.putImageData(image, 0, 0);
         }
         ctx.imageSmoothingEnabled = true;
+        ctx.globalAlpha = active ? 1 : 0.35;
         // ช่องสุดท้ายอาจยื่นเลยขอบร้าน (ขนาดร้านไม่ลงตัว 0.25) จึงวาดตามขนาดกริดจริง
         const cell = 0.25;
         ctx.drawImage(heat, 0, 0, ((heatmap.cols * cell) / width) * canvas.width, ((heatmap.rows * cell) / depth) * canvas.height);
+        ctx.globalAlpha = 1;
       }
 
       const t = reduceMotion || !current ? 1 : Math.min(1, (now - current.at) / TICK_MS);
@@ -155,7 +159,7 @@ export function SimulationOverlay({ width, depth }: { width: number; depth: numb
       observer?.disconnect();
       unsubscribe();
     };
-  }, [width, depth]);
+  }, [width, depth, active, showHeatmap]);
 
   return (
     <canvas

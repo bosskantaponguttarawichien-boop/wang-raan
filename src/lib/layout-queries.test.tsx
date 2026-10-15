@@ -38,7 +38,16 @@ function setup() {
   return { queryClient, wrapper };
 }
 
-const summary = (id: string, width = 8): LayoutSummaryDto => ({ id, width, depth: 6, objectCount: 7, status: "ready", updatedAt: "2026-10-10T01:00:00.000Z" });
+const summary = (id: string, width = 8): LayoutSummaryDto => ({
+  id,
+  name: `ผังร้าน ${width} × 6 ม.`,
+  width,
+  depth: 6,
+  objectCount: 7,
+  status: "ready",
+  updatedAt: "2026-10-10T01:00:00.000Z",
+  layout: { ...cafeLayout(), id, width },
+});
 const deferred = <T,>() => {
   let resolve!: (v: T) => void;
   const promise = new Promise<T>((r) => (resolve = r));

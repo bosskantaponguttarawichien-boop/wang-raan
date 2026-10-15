@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe, openAllSections } from "./helpers";
+import { addItem, buildReadyCafe, cloud, openAllSections, openTab } from "./helpers";
 
 /** feat-023: WCAG 2.1 AA ด้วย axe-core (ต้องไม่มี violation) */
 const TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
@@ -27,40 +27,42 @@ for (const viewport of [
       expect(await audit(page)).toEqual([]);
     });
 
-    test("Playground (ผังเปล่า / Blocked) + Drawer ที่มีรายการปัญหา", async ({ page }) => {
+    test("Playground (ผังเปล่า / Blocked) + แท็บจำลองที่มีรายการปัญหา", async ({ page }) => {
       await page.goto("/playground");
       await expect(page.getByRole("application")).toBeVisible();
       await openAllSections(page);
       expect(await audit(page)).toEqual([]);
-      await page.getByRole("button", { name: /ดูรายการ/ }).click();
-      await expect(page.getByRole("dialog").getByText("ต้องแก้").first()).toBeVisible();
+      await openTab(page, "check");
+      await expect(page.getByTestId("start-simulation")).toHaveAttribute("aria-disabled", "true");
       expect(await audit(page)).toEqual([]);
     });
 
-    test("Playground ระหว่างจำลอง + Drawer รายการปัญหา", async ({ page }) => {
+    test("Playground ระหว่างจำลอง (แผงจำลอง + แถบสถานะ)", async ({ page }) => {
       await page.goto("/playground");
-      await openAllSections(page);
       await buildReadyCafe(page);
       await expect(page.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
+      await openTab(page, "check");
       await page.getByTestId("start-simulation").click();
       await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
       expect(await audit(page)).toEqual([]);
-      await page.getByRole("button", { name: /ดูรายการ/ }).click();
-      await expect(page.getByRole("dialog")).toBeVisible();
-      expect(await audit(page)).toEqual([]);
     });
 
-    test("Playground: Inspector + ฟอร์มขนาดร้านที่มี error + ข้อความนำเข้าไฟล์", async ({ page }) => {
+    test("Playground: selection toolbar + ป๊อปโอเวอร์พิกัด, ฟอร์มขนาดร้านที่มี error, ข้อความนำเข้าไฟล์", async ({ page }) => {
       await page.goto("/playground");
-      await openAllSections(page);
-      await page.getByRole("button", { name: /^เพิ่ม\s*ครัว/ }).click();
-      await expect(page.getByTestId("object-inspector")).toBeVisible();
+      await addItem(page, "ครัว");
+      const toolbar = page.getByTestId("selection-toolbar");
+      await toolbar.getByRole("button", { name: "ปรับละเอียด" }).click();
+      await expect(toolbar.getByRole("dialog", { name: "ปรับตำแหน่งละเอียด" })).toBeVisible();
+      expect(await audit(page)).toEqual([]);
+      await page.keyboard.press("Escape");
+
+      await openTab(page, "shop");
       const form = page.getByTestId("room-settings-form");
       await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("40");
       await form.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");
       await expect(form.getByRole("alert")).toBeVisible();
       await page.getByTestId("import-input").setInputFiles({ name: "bad.json", mimeType: "application/json", buffer: Buffer.from("{") });
-      await expect(page.getByTestId("file-message")).toContainText("ไม่สำเร็จ");
+      await expect(page.getByTestId("toast")).toContainText("ไม่สำเร็จ");
       expect(await audit(page)).toEqual([]);
     });
 
@@ -74,11 +76,11 @@ for (const viewport of [
     test("Playground: แผงบัญชีหลังเข้าสู่ระบบ + หน้าแชร์", async ({ page, browser }) => {
       test.slow(); // หลายหน้า + axe 3 รอบ — บน wrangler dev (workerd ในเครื่อง) เกิน 30 วินาทีได้
       await page.goto("/playground");
-      await openAllSections(page);
-      await page.getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" }).click();
-      await expect(page.getByTestId("signed-in-as")).toBeVisible();
+      const guest = (await cloud(page)).getByRole("button", { name: "เข้าสู่ระบบแบบผู้ใช้ทั่วไป" });
+      await Promise.all([page.waitForEvent("load"), guest.click()]);
       await buildReadyCafe(page);
-      await page.getByRole("button", { name: "แชร์ลิงก์" }).click();
+      await (await cloud(page)).getByRole("button", { name: "แชร์ลิงก์" }).click();
+      await expect(page.getByTestId("signed-in-as")).toBeVisible();
       await expect(page.getByTestId("share-link")).toBeVisible();
       expect(await audit(page)).toEqual([]);
       const url = (await page.getByTestId("share-link").getAttribute("href"))!;

@@ -6,6 +6,8 @@ import { cn } from "@/lib/cn";
 export interface ViewSwitchOption<T extends string> {
   value: T;
   label: string;
+  /** ป้ายชื่อแบบสั้นสำหรับหน้าจอขนาดเล็ก (< 480px) */
+  shortLabel?: string;
 }
 
 export interface ViewSwitchProps<T extends string> {
@@ -38,15 +40,24 @@ export function ViewSwitch<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={pressed}
+            // จอแคบแสดงแค่ shortLabel — ชื่อสำหรับ screen reader ต้องคงที่ทุกขนาดจอ (มี shortLabel อยู่ในชื่อเต็ม ตาม WCAG 2.5.3)
+            aria-label={option.shortLabel ? option.label : undefined}
             onClick={() => onValueChange(option.value)}
             className={cn(
-              "min-h-7 rounded-[5px] px-3 text-[12px] leading-[1.5] text-[#637288]",
+              "min-h-7 rounded-[5px] px-3 text-[12px] leading-[1.5] text-[#637288] max-[479px]:px-2",
               "transition-colors duration-[180ms] motion-reduce:transition-none",
               "focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
               pressed && "bg-white font-semibold text-blue shadow-[0_1px_3px_rgba(24,49,91,0.09)]",
             )}
           >
-            {option.label}
+            {option.shortLabel ? (
+              <>
+                <span className="max-[479px]:hidden">{option.label}</span>
+                <span className="hidden max-[479px]:inline">{option.shortLabel}</span>
+              </>
+            ) : (
+              option.label
+            )}
           </button>
         );
       })}

@@ -1,0 +1,198 @@
+"use client";
+
+import * as React from "react";
+import { cn } from "@/lib/cn";
+import { PaletteItem } from "@/components/ui";
+import {
+  layoutActions as actions,
+  useLayoutStore,
+} from "@/store/use-layout-store";
+import { useSimulationStore } from "@/store/use-simulation-store";
+import type { LiveValidation } from "@/components/validation/use-live-validation";
+import { RoomSettingsForm } from "./forms/room-settings-form";
+import { SimulationPanel } from "@/components/simulation/simulation-panel";
+
+const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round" as const };
+
+const PALETTE = [
+  {
+    key: "table-2",
+    name: "ชุดโต๊ะ 2 ที่นั่ง",
+    size: "โต๊ะ 0.8 × 0.8 ม. + เก้าอี้ 2",
+    icon: (
+      <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
+        <rect x="7" y="7" width="10" height="10" rx="3" />
+        <path d="M9 3h6M9 21h6" />
+      </svg>
+    ),
+    add: () => actions().addTableSet("table-2-seats"),
+  },
+  {
+    key: "table-4",
+    name: "ชุดโต๊ะ 4 ที่นั่ง",
+    size: "โต๊ะ 1.2 × 1.2 ม. + เก้าอี้ 4",
+    icon: (
+      <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
+        <rect x="6" y="6" width="12" height="12" rx="3" />
+        <path d="M9 3h6M9 21h6M3 9v6M21 9v6" />
+      </svg>
+    ),
+    add: () => actions().addTableSet("table-4-seats"),
+  },
+  {
+    key: "counter",
+    name: "เคาน์เตอร์",
+    size: "2.4 × 0.7 ม.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
+        <rect x="3" y="8" width="18" height="11" rx="2" />
+        <path d="M15 8V5h5v3M3 13h18" />
+      </svg>
+    ),
+    add: () => actions().addCounter(),
+  },
+  {
+    key: "kitchen",
+    name: "ครัว",
+    size: "2.0 × 1.5 ม.",
+    icon: (
+      <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <circle cx="8.5" cy="10" r="2" />
+        <circle cx="15.5" cy="10" r="2" />
+        <path d="M6 15h12" />
+      </svg>
+    ),
+    add: () => actions().addKitchen(),
+  },
+] as const;
+
+export interface PlaygroundPanelProps {
+  live: LiveValidation;
+  sheetOpen?: boolean;
+  onToggleSheet?: () => void;
+  onToast?: (message: string) => void;
+  onFocusIssue?: (index: number) => void;
+}
+
+export function PlaygroundPanel({
+  live,
+  sheetOpen = true,
+  onToggleSheet,
+  onToast = () => {},
+  onFocusIssue,
+}: PlaygroundPanelProps) {
+  const activeTab = useLayoutStore((s) => s.activeTab);
+  const simStatus = useSimulationStore((s) => s.status);
+  const metrics = useSimulationStore((s) => s.metrics);
+  const isSim = simStatus === "running" || simStatus === "paused";
+
+  const handleApplyTemplate = () => {
+    actions().loadSampleLayout();
+    onToast("ใส่ผังตัวอย่างแล้ว ลากปรับได้ตามร้านจริง");
+  };
+
+  return (
+    <aside
+      id="panel"
+      aria-live="polite"
+      className={cn(
+        "[grid-area:panel] min-w-0 border-r border-line bg-white p-4 overflow-y-auto",
+        "max-[767px]:border-r-0 max-[767px]:border-t max-[767px]:max-h-[38vh] max-[767px]:rounded-t-[16px] max-[767px]:p-3.5 max-[767px]:shadow-[0_-6px_20px_rgba(30,43,64,0.06)]",
+        !sheetOpen && "max-[767px]:hidden",
+      )}
+    >
+      {/* Mobile Grip handle */}
+      <button
+        type="button"
+        aria-label="ย่อ/ขยายแผง"
+        onClick={onToggleSheet}
+        className="mx-auto mb-2.5 hidden h-1 w-9 rounded-full bg-[#d4dbe6] max-[767px]:block"
+      />
+
+      {isSim ? (
+        <div>
+          <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">จำลองลูกค้า</h2>
+          <p className="m-0 mb-3 text-[12px] leading-[1.5] text-secondary">
+            ดูว่าลูกค้าเดินเข้า สั่งอาหาร และหาที่นั่งได้สะดวกไหม
+          </p>
+          <SimulationPanel live={live} onFocusIssue={onFocusIssue} onToast={onToast} />
+        </div>
+      ) : activeTab === "shop" ? (
+        <div>
+          <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">ขนาดร้านและทางเข้า</h2>
+          <p className="m-0 mb-3 text-[12px] leading-[1.5] text-secondary">
+            ร้าน 2–30 ม. ปรับทีละ 25 ซม. · กด Enter หรือออกจากช่องเพื่อใช้ค่า
+          </p>
+          <RoomSettingsForm />
+        </div>
+      ) : activeTab === "check" ? (
+        <div>
+          <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">ตรวจผังและจำลอง</h2>
+          <p className="m-0 mb-3 text-[12px] leading-[1.5] text-secondary">
+            ผังต้องผ่านการตรวจก่อน แล้วตั้งค่าการจำลองและกดเริ่ม
+          </p>
+          <SimulationPanel live={live} onFocusIssue={onFocusIssue} onToast={onToast} />
+        </div>
+      ) : (
+        /* Tab "add" */
+        <div>
+          {metrics && (
+            <div className="mb-3.5 rounded-[12px] border border-line bg-[#edf4fe] p-3 text-[12px] text-ink">
+              <div className="mb-1 flex items-center gap-1.5 font-semibold text-blue">
+                <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.8}>
+                  <path d="M3 3v18h18M7 15l4-4 4 4 5-6" />
+                </svg>
+                ผลจำลองรอบล่าสุด
+              </div>
+              <p className="m-0 text-[11.5px] leading-[1.5] text-secondary">
+                ลูกค้าเข้าร้าน {metrics.arrived} คน · รับบริการ {metrics.served} คน · นั่งทาน {metrics.seated} คน
+                {metrics.noSeat > 0 && ` · เดินกลับเพราะไม่มีที่นั่ง ${metrics.noSeat} คน`}
+              </p>
+            </div>
+          )}
+
+          <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">เพิ่มลงผัง</h2>
+          <p className="m-0 mb-3 text-[12px] leading-[1.5] text-secondary">
+            กดเพื่อวางบนผัง แล้วลากไปตำแหน่งที่ต้องการ
+          </p>
+
+          <div className="cat-list grid gap-2 max-[767px]:flex max-[767px]:overflow-x-auto max-[767px]:pb-2 max-[767px]:snap-x max-[767px]:-mx-1 max-[767px]:px-1">
+            {PALETTE.map((item) => (
+              <PaletteItem
+                key={item.key}
+                name={item.name}
+                size={item.size}
+                icon={item.icon}
+                className="max-[767px]:min-w-[195px] max-[767px]:shrink-0 max-[767px]:snap-start"
+                onClick={() => {
+                  item.add();
+                  onToast(`เพิ่ม${item.name}แล้ว ลากไปตำแหน่งที่ต้องการได้เลย`);
+                  if (typeof window !== "undefined" && window.innerWidth < 768 && onToggleSheet) {
+                    onToggleSheet();
+                  }
+                }}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleApplyTemplate}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-[12px] border border-dashed border-blue px-3 py-2.5 text-[13px] font-medium text-blue hover:bg-blue-soft focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={1.8}>
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 9h18M9 21V9" />
+            </svg>
+            ใช้ผังตัวอย่าง (คาเฟ่ 8×6 ม.)
+          </button>
+
+          <p className="mb-0 mt-3 text-[11px] leading-[1.6] text-secondary">
+            คีย์ลัด: ลูกศรขยับ 25 ซม. (Shift = 1 ม.) · R หมุน · Delete ลบ · Esc ยกเลิกเลือก
+          </p>
+        </div>
+      )}
+    </aside>
+  );
+}

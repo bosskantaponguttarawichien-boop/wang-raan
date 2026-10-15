@@ -3,6 +3,85 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-15 ICT — E2E กลับมาเขียวทั้งชุด (89/89)
+
+- spec ชุด UI เก่าปรับตาม Playground UX ใหม่แล้ว — ใช้ helper ใน `e2e/helpers.ts` (openTab / addItem / placeSelected / cloud) แทน selector เดิม
+- แก้บั๊กที่ E2E จับได้ 7 จุด (horizontal scroll มือถือ, พิมพ์เห็นเครื่องมือ, header 320px, ป๊อปโอเวอร์พิกัด, notes นำเข้า, contrast, ชื่อปุ่ม 3D) — ดู progress.md
+- ⚠️ แก้ `app/globals.css` แล้วต้อง `rm -rf .next` ก่อน build/E2E ในเครื่อง (cache ไม่ invalidate)
+
+## 2026-10-15 ICT — feat-061 ทำใหม่ตามสัญญา v1.3.0 (identities)
+
+- สัญญา v1.3.0 + mock + BFF + UI เสร็จบน `feat/login-projects` — **BE รีวิวสัญญาได้แล้ว** (ข้อที่ FE ตัดสินเองอยู่ใน `harness/handoff-fe-accounts.md` §7)
+- BFF ไม่สร้าง user id เองแล้ว; Google เปิดเมื่อตั้ง `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET`
+- E2E ชุด UI เก่า 28 เคสล้มมาตั้งแต่ก่อนงานนี้ (selector ของ playground เดิม) — ควรแยกงานแก้ spec เหล่านี้
+- ยังเปิด: โดเมน/บริการส่งเมล (Resend หรือ SES), feat-041 รอ Backend จริงบน staging
+
+## 2026-10-14 21:55 ICT — FE handoff: Identities + Email OTP
+
+- ข้อตกลงกับ BE และลำดับงาน FE ทั้งหมดอยู่ที่ `harness/handoff-fe-accounts.md` — อ่านก่อนแตะ feat-061–064
+- งาน OTP / `/login` ใน working tree ยังไม่ commit และยังใช้แบบเดิม (BFF สร้าง user id เอง) — ต้องแก้ตาม handoff และคืน feat-061 เป็น `in-progress`
+- BE รอสัญญา v1.3.0 ที่ merge แล้วจึงเริ่ม endpoint
+
+## 2026-10-14 23:05 ICT — เสร็จสิ้น Sprint 4 (feat-061 → feat-064) 100%
+
+### Core & Dev
+- พัฒนาฟีเจอร์บัญชีผู้ใช้และหน้ารวมโปรเจกต์ครบตามเป้าหมายของ Sprint 4:
+  - **feat-061**: Email OTP สัญญา API (`/v1/auth/otp/request`, `/v1/auth/otp/verify`) + Mock Backend + BFF NextAuth Credentials Provider (`email-otp`)
+  - **feat-062**: หน้า `/login` แบบ 2 ขั้นตอน (กรอกอีเมล → OTP 6 หลัก), Safe Redirect ป้องกัน Open Redirect, Color Contrast WCAG 2.1 AA
+  - **feat-063**: หน้ารวมโปรเจกต์ `/projects` การ์ดแบบ Figma พร้อมภาพย่อ SVG ผ่าน `renderPlanSvg`, Dialog สร้างผังใหม่, เมนู ⋯ จัดการผัง, `createStarterLayout` ป้องกันผังเริ่มต้นติด Blocked
+  - **feat-064**: Route `/playground/[id]` + บันทึกออนไลน์จาก Guest (`useGuestSync`, `useOnlineAutosave`, `SaveOnlineDialog`, `InlineLayoutName`, หน้า 404 ภาษาไทย)
+- Zustand Store ซิงก์ชื่อผัง (`layoutName`) และรหัสผัง (`layoutId`) รองรับทั้ง Offline Draft และ Online Layout
+- Header ของ Playground มีปุ่ม 'ผังของฉัน' เมื่อล็อกอินแล้ว และปุ่ม 'บันทึกออนไลน์' เมื่อเป็น Guest (Contrast ≥ 4.5:1)
+
+### QA & Verification
+- Unit Tests: `npm test` ผ่านครบทั้ง 59 test files (760 tests passed 100%)
+- Linter & Boundaries: `make lint` ผ่าน 100% (Pure TS boundary OK, ESLint + TypeScript OK)
+- Contract: `make contract` ผ่านการตรวจสอบของ Redocly OpenAPI 3.1.0 สมบูรณ์ 100%
+- E2E Playwright Tests:
+  - `e2e/login-otp.spec.ts`: 10/10 tests passed
+  - `e2e/projects.spec.ts`: 10/10 tests passed (Axe audit 0 violations, Responsive 6 breakpoints passed)
+  - `e2e/playground-id-online.spec.ts`: 10/10 tests passed (Axe audit 0 violations, Responsive 6 breakpoints passed)
+
+### Status & Next Steps
+- ฟีเจอร์ `feat-061`, `feat-062`, `feat-063`, และ `feat-064` เสร็จสมบูรณ์ทุกข้อ (สถานะ `done` ใน `harness/feature_list.json`)
+- พร้อมส่งต่องานสำหรับ Sprint ถัดไป
+
+## 2026-10-14 21:10 ICT — วางแผนบัญชีผู้ใช้ + หน้ารวมโปรเจกต์
+
+### Core & Dev
+- Sprint 3 (feat-049–060) commit แล้วบน branch `feat/playground-ux-v2` (push แล้ว ยังไม่ได้เปิด PR เพราะเครื่องไม่มี `gh`)
+- งานนี้อยู่บน branch `feat/login-projects` (แตกจาก `feat/playground-ux-v2`) — เพิ่ม feat-061–064, PRD §9 ข้อ 16–19, prototype `design-html/account-ux/`
+
+### Status & Next Steps
+- รอผู้ใช้รีวิว prototype ก่อนเริ่ม feat-061 (สัญญา OTP ใน `contracts/openapi.yaml` ต้องตกลงกับฝั่ง Backend)
+- ส่งเมลจริง / Google OAuth จริง ยังผูกกับ Backend (feat-041, feat-046) — ระหว่างนี้ใช้ mock
+
+## 2026-10-14 17:20 ICT — เสร็จสิ้น Sprint 3: Playground UX Revamp (feat-050 → feat-060) 100%
+
+### Core & Dev
+- พัฒนา Playground UX ใหม่ครบตาม Mockup `design-html/playground-ux/index.html` และ PRD §9 ข้อ 9–15:
+  - **feat-050**: App Shell ใหม่ (Header, Rail, Panel, Stage, Status Bar)
+  - **feat-051**: แท็บ 'เพิ่ม' — แคตตาล็อกเลื่อนได้, วางโต๊ะอัตโนมัติ, ผังตัวอย่าง (คาเฟ่ 8×6 ม.), Empty state
+  - **feat-052**: แท็บ 'ร้าน' (ขนาดร้าน 2-30 ม., ประตู 4 ทิศ) + Onboarding Dialog ผังใหม่
+  - **feat-053**: Floating Selection Toolbar ลอยติดวัตถุ (หมุน, สลับที่นั่ง 4↔2, ปรับพิกัด, Cascade Delete)
+  - **feat-054**: Humanizer & Formatter ข้อความปัญหาผังเป็นภาษาคน (บอกชื่อโต๊ะ 1/2/3 และระยะ ซม.)
+  - **feat-055**: แท็บ 'จำลอง' รวมตรวจผัง + ตั้งค่าจำลองในที่เดียว, ปุ่มเริ่มใช้ `aria-disabled="true"`
+  - **feat-056**: โหมดจำลอง — ล็อกผังเข้มงวดทั้ง 2D และ 3D (ซ่อน rail, แสดง chip lock, ปิด undo/redo)
+  - **feat-057**: สรุปผลจบรอบ — การ์ดสรุปผลล่าสุด + คำแนะนำ 1 ประโยค (PRD §9 ข้อ 11) + Heatmap จางบนผัง
+  - **feat-058**: มุมมอง 3D — คลิกเลือกวัตถุ, แสดงกรอบไฮไลต์, Toolbar ลอยตัว, ขยับด้วยลูกศร snap 0.25 ม., R หมุน, Delete ลบ (Pure SVG ไม่ใช้ Three.js)
+  - **feat-059**: Playground มือถือ — Rail เป็น Bottom Tab Bar, Panel เป็น Bottom Sheet (Grip handle, auto-fold เมื่อเลือกของ), ViewSwitch ย่อ 2D/3D ต่ำกว่า 480px, รองรับ 6 breakpoints
+  - **feat-060**: รวมเทสต์ Integration และ E2E Flow ใหม่ (`playground-ux-flow.test.tsx`, `e2e/playground-ux.spec.ts`) และตรวจสอบ WCAG 2.1 AA (Axe audit) ผ่าน 100%
+
+### QA & Verification
+- Unit & Integration Tests: `make test` ผ่าน 48/48 test files (704/704 tests passed, 100%)
+- Linter & Architectural Boundaries: `make lint` ผ่าน 100% (Pure TS boundaries OK, 0 errors, 0 warnings, OpenAPI contract OK)
+- E2E Playwright Tests: `npx playwright test e2e/playground-ux.spec.ts` ผ่าน 6/6 tests (100%)
+- Accessibility: Axe WCAG 2.1 AA audit ผ่าน 100% ไม่มี violation
+
+### Status & Next Steps
+- Sprint 3 (feat-049 → feat-060) สำเร็จครบถ้วน 100%
+- งานถัดไป: ตรวจสอบ CI (`feat-043`) หรือเตรียม Backend จริงตามที่ผู้ใช้มอบหมาย
+
 ## 2026-10-12 12:40 ICT — ต่อ FE กับ `/v1/me`
 
 ### Core & Dev
@@ -77,26 +156,3 @@
 - feat-041 → feat-048 = `blocked` (ผู้ใช้สั่งพักจนกว่า Backend จริงจะขึ้น) — ห้ามเริ่มจนกว่าผู้ใช้บอก
 1. feat-035 ลองรันบน Cloudflare
 2. feat-043 CI
-
-## 2026-10-10 14:30 ICT — feat-036 ปิด, feat-037 เสร็จ
-
-### Core & Dev
-- package กฎผังสำหรับ Backend: `@bosskantaponguttarawichien-boop/wang-raan-core` อยู่ที่ `packages/core` (คู่มือติดตั้ง: `packages/core/README.md`)
-- โค้ดจริงยังอยู่ `src/core` — แก้ที่นั่นที่เดียว แล้ว `npm run core:smoke` ต้องผ่าน
-- ห้ามใช้ DOM API ใน `src/core` — นอกจาก boundary check แล้ว build package จะ fail ด้วย (lib ไม่มี dom)
-- แก้กฎจนผลตรวจเปลี่ยน → `packages/core/test/fixtures.test.ts` fail → ตรวจว่าตั้งใจ แล้ว `UPDATE_CORE_FIXTURES=1 npx vitest run packages/core` + ขยับเวอร์ชัน major + CHANGELOG
-- ปล่อยเวอร์ชัน: push tag `core-v<version>` (ต้องตรงกับ version ใน `packages/core/package.json`)
-
-### QA
-- unit 571, lint + contract ผ่าน, core:smoke ผ่าน
-
-### Active Blockers / Open Questions
-- ยังไม่ได้ publish package จริง — ต้อง commit + push แล้ว push tag `core-v1.0.0` (ผู้ใช้สั่ง)
-- Backend ต้องมี token `read:packages` (หรือเพิ่ม repo Backend ใน Manage Actions access ของ package)
-- ยังไม่ตัดสินใจ: คง Guest ไว้ไหม (feat-041), ชื่อโดเมน (feat-044), ช่องทางแจ้งเตือน (feat-045)
-
-### Next Steps
-1. feat-038 Backend จำลองตามสัญญา
-2. feat-035 ลองรันบน Cloudflare
-3. feat-039 ต่อ BFF กับ Backend ตามสัญญา
-

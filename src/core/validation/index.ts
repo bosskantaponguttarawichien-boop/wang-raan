@@ -9,3 +9,5 @@ export * from "./routes";
 export * from "./service-points";
 export * from "./walk-grid";
 export * from "./layout.schema";
+export * from "./formatter";
+

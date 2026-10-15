@@ -121,6 +121,11 @@ export const P1LayoutContractSchema = z
   });
 
 /** Request body ของ BFF POST/PUT /api/layouts */
-export const SaveLayoutRequestSchema = z.object({ layout: StoreLayoutSchema }).strict();
+export const SaveLayoutRequestSchema = z
+  .object({
+    name: z.string().trim().min(1).max(80).optional(),
+    layout: StoreLayoutSchema,
+  })
+  .strict();
 
 export type SaveLayoutRequest = z.infer<typeof SaveLayoutRequestSchema>;

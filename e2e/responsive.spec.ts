@@ -37,11 +37,20 @@ for (const width of BREAKPOINTS) {
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-      const side = page.getByRole("complementary", { name: "เครื่องมือจัดร้าน" });
-      await expect(side).toBeAttached();
-      // แถบซ้ายแบบหัวข้อ: มีครบทุกหัวข้อ (ชิ้นงานที่เลือกโผล่เมื่อเลือกชิ้นงานเท่านั้น)
-      for (const key of ["room", "add", "simulation", "file", "cloud"]) {
-        await expect(side.locator(`[data-section-toggle="${key}"]`)).toBeVisible();
+      // ตรวจสอบแถบเครื่องมือ: รองรับ PlaygroundRail ใหม่ (3 แท็บหลัก add, shop, check) หรือโครงสร้างเดิม
+      const rail = page.locator("#rail");
+      if (await rail.count() > 0) {
+        await expect(rail).toBeVisible();
+        for (const tabKey of ["add", "shop", "check"]) {
+          await expect(rail.locator(`[data-tab="${tabKey}"]`)).toBeVisible();
+        }
+        await expect(page.locator("#panel")).toBeAttached();
+      } else {
+        const side = page.getByRole("complementary", { name: "เครื่องมือจัดร้าน" });
+        await expect(side).toBeAttached();
+        for (const key of ["room", "add", "simulation", "file", "cloud"]) {
+          await expect(side.locator(`[data-section-toggle="${key}"]`)).toBeVisible();
+        }
       }
       await expect(page.getByTestId("validation-status-bar")).toBeVisible();
       await page.screenshot({ path: `e2e/.results/screens/playground-${width}.png`, fullPage: true });

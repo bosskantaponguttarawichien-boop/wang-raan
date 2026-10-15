@@ -135,28 +135,29 @@ function Panel() {
   return <SimulationPanel live={live} />;
 }
 
-describe("ปุ่มเริ่มจำลอง (feat-020)", () => {
+describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () => {
   beforeEach(() => {
     layoutStore.getState().loadLayout(cafeLayout());
     simulationStore.setState({ status: "idle", message: null, metrics: null });
   });
 
-  it("Blocked → ปุ่ม disabled และบอกเหตุผลเป็นข้อความ (aria-describedby)", () => {
+  it("Blocked → ปุ่ม aria-disabled=\"true\" และบอกเหตุผลเป็นข้อความ (aria-describedby)", () => {
     layoutStore.getState().loadLayout(withoutType(cafeLayout(), "counter"));
     render(<Panel />);
     const button = screen.getByTestId("start-simulation");
-    expect(button).toBeDisabled();
-    expect(button).toHaveTextContent("เริ่มจำลอง (ต้องแก้ผังก่อน)");
+    expect(button).toHaveAttribute("aria-disabled", "true");
+    expect(button).not.toBeDisabled();
+    expect(button).toHaveTextContent("แก้อีก 1 ข้อก่อนเริ่ม");
     expect(button).toHaveAccessibleDescription("ต้องแก้ผัง 1 ข้อก่อน ปุ่มเริ่มจำลองจะกดได้เมื่อผังพร้อม");
   });
 
-  it("Ready → กดได้; แก้ผังจน Blocked → ปุ่ม disabled ทันที", () => {
+  it("Ready → กดได้; แก้ผังจน Blocked → ปุ่ม aria-disabled=\"true\" ทันที", () => {
     render(<Panel />);
     const button = screen.getByTestId("start-simulation");
-    expect(button).toBeEnabled();
+    expect(button).toHaveAttribute("aria-disabled", "false");
     const kitchen = layoutStore.getState().layout.objects.find((o) => o.type === "kitchen")!;
     act(() => layoutStore.getState().deleteObject(kitchen.id));
-    expect(screen.getByTestId("start-simulation")).toBeDisabled();
+    expect(screen.getByTestId("start-simulation")).toHaveAttribute("aria-disabled", "true");
   });
 
   it("Warning → ยังกดเริ่มจำลองได้", () => {
@@ -165,21 +166,27 @@ describe("ปุ่มเริ่มจำลอง (feat-020)", () => {
       objects: [...cafeLayout().objects, { id: "t-empty", type: "table", x: 6, y: 5, width: 0.8, depth: 0.8, rotation: 0, chairIds: [] }],
     });
     render(<Panel />);
-    expect(screen.getByTestId("start-simulation")).toBeEnabled();
+    expect(screen.getByTestId("start-simulation")).toHaveAttribute("aria-disabled", "false");
   });
 
-  it("disabled แล้วคลิกหรือกด Enter ก็ไม่เริ่ม", async () => {
+  it("Blocked แล้วคลิกหรือกด Enter ก็ไม่เริ่ม และเรียก toast เตือน (PRD §9 ข้อ 9)", async () => {
     const user = userEvent.setup();
     layoutStore.getState().loadLayout(withoutType(cafeLayout(), "kitchen"));
     const start = vi.spyOn(SimulationController.prototype, "start");
-    render(<Panel />);
+    const onToast = vi.fn();
+    const onFocus = vi.fn();
+    function PanelWithMocks() {
+      const live = useLiveValidation();
+      return <SimulationPanel live={live} onToast={onToast} onFocusIssue={onFocus} />;
+    }
+    render(<PanelWithMocks />);
     await user.click(screen.getByTestId("start-simulation"));
-    await user.keyboard("{Enter}");
     expect(start).not.toHaveBeenCalled();
+    expect(onToast).toHaveBeenCalledWith(expect.stringContaining("ยังเริ่มจำลองไม่ได้"));
     start.mockRestore();
   });
 
-  it("ระหว่างจำลองแสดงปุ่มหยุดชั่วคราว/หยุด และตัวเลขสรุป", () => {
+  it("ระหว่างจำลองแสดงปุ่มหยุดชั่วคราว/จบรอบ และตัวเลขสรุป", () => {
     simulationStore.setState({
       status: "running",
       seats: 6,
@@ -187,7 +194,7 @@ describe("ปุ่มเริ่มจำลอง (feat-020)", () => {
     });
     render(<Panel />);
     expect(screen.getByRole("button", { name: "⏸ หยุดชั่วคราว" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "■ หยุดจำลอง" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "■ จบรอบ" })).toBeInTheDocument();
     expect(screen.getByTestId("simulation-metrics")).toHaveTextContent("1 ชม. 05 นาที");
     expect(screen.getByTestId("simulation-metrics")).toHaveTextContent("3 / 6 ที่");
   });

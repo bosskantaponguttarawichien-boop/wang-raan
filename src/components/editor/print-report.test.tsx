@@ -39,4 +39,22 @@ describe("PrintReport (สร้างเฉพาะตอนพิมพ์)",
     });
     expect(screen.queryByTestId("print-report")).toBeNull();
   });
+
+  it("มีผลจำลองรอบล่าสุด → รวมผลจำลองลงในรายงานพิมพ์ (feat-057)", async () => {
+    const { simulationStore } = await import("@/store/use-simulation-store");
+    simulationStore.setState({
+      metrics: { time: 3600, arrived: 15, served: 12, noSeat: 2, inStore: 1, queuing: 0, seated: 1, maxQueue: 1, avgVisitMinutes: 20 },
+      seats: 6,
+    });
+    render(<PrintReport live={live()} />);
+    act(() => {
+      window.dispatchEvent(new Event("beforeprint"));
+    });
+    const report = screen.getByTestId("print-report");
+    expect(report).toHaveTextContent("ผลจำลองลูกค้า (รอบล่าสุด)");
+    expect(report).toHaveTextContent("ลูกค้าที่เข้ามา");
+    expect(report).toHaveTextContent("15 คน");
+    expect(report).toHaveTextContent("ไม่มีที่นั่ง");
+    expect(report).toHaveTextContent("2 คน");
+  });
 });

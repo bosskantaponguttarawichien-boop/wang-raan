@@ -4,18 +4,15 @@ import "server-only";
  * ทุก endpoint ต้องมี Session (401) และจัดการได้เฉพาะบัญชีของตนเอง
  */
 import type { AccountRepository } from "./account-repository";
-import { profileInput } from "./account-sync";
 import { json, problem, withUser } from "./http";
 import type { ResolveUser } from "./session";
 
 export function createAccountHandlers(repo: AccountRepository, resolveUser: ResolveUser) {
   return {
-    /** โปรไฟล์ — ยังไม่มีใน Backend (session ก่อนเปิดซิงก์ หรือซิงก์ตอนล็อกอินล้มเหลว) → สร้างจาก session ตอนนี้ */
+    /** โปรไฟล์ — บัญชีเกิดตอนล็อกอินเท่านั้น (resolve / verifyOtp) ไม่มีใน Backend = 404 (เช่น ลบบัญชีไปแล้ว) */
     get: withUser(resolveUser, async (user) => {
       const profile = await repo.get(user.id);
-      if (profile) return json(profile);
-      const input = profileInput(user.id, { name: user.name });
-      return input ? json(await repo.upsert(user.id, input)) : problem(404, "NOT_FOUND", "ไม่พบบัญชีผู้ใช้");
+      return profile ? json(profile) : problem(404, "NOT_FOUND", "ไม่พบบัญชีผู้ใช้");
     }),
 
     /** ลบบัญชีและข้อมูลทั้งหมดถาวร (ผัง ลิงก์แชร์ ข้อความติดต่อ) — Client ต้องออกจากระบบต่อเอง */

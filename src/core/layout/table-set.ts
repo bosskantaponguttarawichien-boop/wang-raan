@@ -305,3 +305,54 @@ export function resizeObject(layout: StoreLayout, id: string, width: Meters, dep
   if (next.width === obj.width && next.depth === obj.depth) return layout;
   return replaceObjects(layout, new Map([[obj.id, next]]));
 }
+
+/**
+ * สลับ preset โต๊ะ (table-2-seats ↔ table-4-seats)
+ * - ลบเก้าอี้เดิมของโต๊ะออก
+ * - คำนวณตำแหน่งกึ่งกลางเดิม แล้วสร้าง TableSet ใหม่ตาม preset ใหม่ที่จุดเดิม
+ * - หมุน TableSet ใหม่ให้มี rotation เท่ากับโต๊ะเดิม
+ * - คืนผังใหม่และ id ของโต๊ะใหม่ (หรือคืน null ถ้าไม่พบโต๊ะ)
+ */
+export function toggleTablePreset(
+  layout: StoreLayout,
+  tableId: string,
+  newId: IdFactory = randomId,
+): { layout: StoreLayout; newTable: Table } | null {
+  const table = findObject(layout, tableId);
+  if (!table || table.type !== "table") return null;
+
+  const currentPreset = table.preset ?? "table-4-seats";
+  const targetPreset: TableSetPreset =
+    currentPreset === "table-2-seats" ? "table-4-seats" : "table-2-seats";
+
+  // ลบโต๊ะเดิมและเก้าอี้เดิมออกจากผัง
+  const oldChairs = getChairsOfTable(layout, table);
+  const oldIds = new Set([table.id, ...oldChairs.map((c) => c.id)]);
+  const remainingObjects = layout.objects.filter((o) => !oldIds.has(o.id));
+
+  // หาจุดศูนย์กลางเดิมของโต๊ะ
+  const center = objectCenter(table);
+  const newSpec = TABLE_SET_PRESETS[targetPreset];
+  const initialPos = snapPoint({
+    x: center.x - newSpec.tableWidth / 2,
+    y: center.y - newSpec.tableDepth / 2,
+  });
+
+  // สร้างชุดโต๊ะใหม่ที่ initialPos
+  const newSet = createTableSet(targetPreset, initialPos, newId);
+
+  // ใส่ชุดโต๊ะใหม่เข้าผังชั่วคราว
+  let tempLayout: StoreLayout = {
+    ...layout,
+    objects: [...remainingObjects, newSet.table, ...newSet.chairs],
+  };
+
+  // ถ้าโต๊ะเดิมมีมุมหมุน ให้หมุนชุดใหม่ตาม
+  if (table.rotation !== 0) {
+    tempLayout = rotateObject(tempLayout, newSet.table.id, table.rotation);
+  }
+
+  const finalTable = findObject(tempLayout, newSet.table.id) as Table;
+  return { layout: tempLayout, newTable: finalTable };
+}
+

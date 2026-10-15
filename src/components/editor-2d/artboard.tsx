@@ -11,7 +11,9 @@ import * as React from "react";
 import { GRID_STEP, SIZE_STEP, footprint, type Entrance, type IssueSeverity, type LayoutObject, type Rect } from "@/core/layout";
 import { cn } from "@/lib/cn";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
+import { useSimulationStore } from "@/store/use-simulation-store";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
+import { getTableNumbers } from "@/core/validation";
 import { SimulationOverlay } from "@/components/simulation/simulation-overlay";
 import { GridOverlay } from "./grid-overlay";
 import { SelectionToolbar } from "./selection-toolbar";
@@ -88,12 +90,15 @@ function PieceDecoration({ obj }: { obj: LayoutObject }) {
 
 export interface ArtboardProps {
   live: LiveValidation;
+  onToast?: (message: string) => void;
 }
 
-export function Artboard({ live }: ArtboardProps) {
+export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const layout = useLayoutStore((s) => s.layout);
   const selectedId = useLayoutStore((s) => s.selectedObjectId);
   const zoom = useLayoutStore((s) => s.zoom);
+  const simStatus = useSimulationStore((s) => s.status);
+  const isSim = simStatus === "running" || simStatus === "paused";
   const stageRef = React.useRef<HTMLDivElement>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const drag = React.useRef<DragState | null>(null);
@@ -111,6 +116,7 @@ export function Artboard({ live }: ArtboardProps) {
   }, [layout.objects, groupTableId]);
 
   const room = { width: layout.width, depth: layout.depth };
+  const tableNumbers = React.useMemo(() => getTableNumbers(layout), [layout]);
 
   // ── Pointer: ย้าย / ปรับขนาด / ลากทางเข้า ───────────────────────────────
   const startDrag = (event: React.PointerEvent<HTMLElement>, state: DragState) => {
@@ -214,12 +220,14 @@ export function Artboard({ live }: ArtboardProps) {
 
   // ── Render ───────────────────────────────────────────────────────────────
   const ratio = layout.width / layout.depth;
+  // พอดีพื้นที่ Canvas แบบเดียวกับมุมมอง 3D (เผื่อความสูงให้ header, ป้ายความกว้าง, คำแนะนำ และแถบสถานะ)
+  const fitWidth = `min(100%, max(240px, 100dvh - 245px) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
 
   return (
-    <div className="flex min-w-0 flex-col items-center">
-      <div className="mb-3 flex w-full max-w-[760px] items-center gap-3 text-[12px] text-secondary-strong" aria-hidden="true">
+    <div className="flex w-full min-w-0 flex-col items-center">
+      <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: "100%" }} aria-hidden="true">
         <span className="h-px flex-1 bg-[#ccd6e4]" />
         {layout.width} เมตร
         <span className="h-px flex-1 bg-[#ccd6e4]" />
@@ -228,7 +236,7 @@ export function Artboard({ live }: ArtboardProps) {
         ref={boxRef}
         className="relative rounded-[2px] border-4 border-[var(--plan-wall)] bg-white"
         style={{
-          width: `calc(min(100%, 760px, 64dvh * ${ratio}) * ${zoom})`,
+          width: `calc(${fitWidth} * ${zoom})`,
           aspectRatio: `${layout.width} / ${layout.depth}`,
           touchAction: "none",
         }}
@@ -242,6 +250,19 @@ export function Artboard({ live }: ArtboardProps) {
           data-testid="artboard-stage"
         >
           <GridOverlay width={layout.width} depth={layout.depth} />
+
+          {isSim && (
+            <div
+              data-testid="chip-lock"
+              className="pointer-events-none absolute right-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-[#1e2b40]/85 px-3 py-1 text-[12px] font-medium text-white shadow-[0_4px_12px_rgba(0,0,0,0.18)] backdrop-blur-sm select-none"
+            >
+              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+              </svg>
+              <span>ผังล็อกระหว่างจำลอง</span>
+            </div>
+          )}
 
           {groupRect && (
             <div
@@ -267,33 +288,58 @@ export function Artboard({ live }: ArtboardProps) {
                 aria-label={objectAriaLabel(obj, live.messageById.get(obj.id))}
                 className={cn(
                   "absolute flex select-none items-center justify-center overflow-hidden whitespace-nowrap text-[clamp(9px,1.4vw,12px)] font-medium leading-none text-[#53677f]",
-                  "cursor-grab touch-none transition-[box-shadow,border-color,opacity] duration-150 motion-reduce:transition-none",
+                  isSim ? "cursor-default" : "cursor-grab touch-none",
+                  "transition-[box-shadow,border-color,opacity] duration-150 motion-reduce:transition-none",
                   "focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
                   PIECE_STYLE[obj.type],
                   severity && RING[severity],
-                  isSelected && "z-[10] border-2 border-blue shadow-[0_0_0_5px_#3b62f422]",
-                  isSelected && severity === "blocked" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-blocked)]",
-                  isSelected && severity === "warning" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-warning)]",
+                  isSelected && !isSim && "z-[10] border-2 border-blue shadow-[0_0_0_5px_#3b62f422]",
+                  isSelected && !isSim && severity === "blocked" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-blocked)]",
+                  isSelected && !isSim && severity === "warning" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-warning)]",
                   draggingId === obj.id && "cursor-grabbing opacity-80 transition-none",
                 )}
                 style={boxStyle(rect, room)}
                 onPointerDown={(e) => {
+                  if (isSim) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToast('ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข');
+                    return;
+                  }
                   actions().selectObject(obj.id);
                   startDrag(e, { mode: "move", id: obj.id, pointerId: e.pointerId, start: { x: e.clientX, y: e.clientY }, origin: { x: obj.x, y: obj.y } });
                 }}
-                onPointerMove={onPointerMove}
-                onPointerUp={endDrag}
-                onPointerCancel={endDrag}
-                onClick={() => actions().selectObject(obj.id)}
-                onKeyDown={(e) => onPieceKeyDown(e, obj)}
+                onPointerMove={isSim ? undefined : onPointerMove}
+                onPointerUp={isSim ? undefined : endDrag}
+                onPointerCancel={isSim ? undefined : endDrag}
+                onClick={(e) => {
+                  if (isSim) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToast('ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข');
+                    return;
+                  }
+                  actions().selectObject(obj.id);
+                }}
+                onKeyDown={(e) => {
+                  if (isSim) {
+                    e.preventDefault();
+                    return;
+                  }
+                  onPieceKeyDown(e, obj);
+                }}
               >
                 <PieceDecoration obj={obj} />
-                {obj.type !== "chair" && <span className="relative px-1">{objectLabel(obj)}</span>}
+                {obj.type === "table" ? (
+                  <span className="relative px-1 font-semibold">{`โต๊ะ ${tableNumbers.get(obj.id) ?? ""}`}</span>
+                ) : obj.type !== "chair" ? (
+                  <span className="relative px-1">{objectLabel(obj)}</span>
+                ) : null}
               </button>
             );
           })}
 
-          {selected && (selected.type === "kitchen" || selected.type === "counter") && (
+          {!isSim && selected && (selected.type === "kitchen" || selected.type === "counter") && (
             <button
               type="button"
               aria-label={`ปรับขนาด${objectLabel(selected)} (ลูกศรเพื่อปรับทีละ 0.05 ม.)`}
@@ -324,15 +370,36 @@ export function Artboard({ live }: ArtboardProps) {
               severity={entranceSeverity}
               message={live.messageById.get(entrance.id)}
               dragging={draggingId === "entrance"}
-              onPointerDown={(e) => startDrag(e, { mode: "entrance", pointerId: e.pointerId })}
-              onPointerMove={onPointerMove}
-              onPointerUp={endDrag}
-              onKeyDown={onEntranceKeyDown}
+              onPointerDown={(e) => {
+                if (isSim) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToast('ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข');
+                  return;
+                }
+                startDrag(e, { mode: "entrance", pointerId: e.pointerId });
+              }}
+              onPointerMove={isSim ? () => {} : onPointerMove}
+              onPointerUp={isSim ? () => {} : endDrag}
+              onKeyDown={(e) => {
+                if (isSim) {
+                  e.preventDefault();
+                  return;
+                }
+                onEntranceKeyDown(e);
+              }}
             />
           )}
         </div>
-        {selected && !draggingId && (
-          <SelectionToolbar boxRef={boxRef} room={room} objects={layout.objects} selected={selected} groupRect={groupRect} />
+        {!isSim && selected && !draggingId && (
+          <SelectionToolbar
+            boxRef={boxRef}
+            room={room}
+            objects={layout.objects}
+            selected={selected}
+            groupRect={groupRect}
+            onToast={onToast}
+          />
         )}
       </div>
       <p id={hintId} className="mt-3 max-w-[560px] text-center text-[12px] leading-[1.75] text-secondary-strong">

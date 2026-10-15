@@ -5,14 +5,23 @@ import type { StoreLayout, ValidationResult } from "@/core/layout";
 
 export interface LayoutSummaryDto {
   id: string;
+  name: string;
   width: number;
   depth: number;
   objectCount: number;
   status: ValidationResult["status"];
   updatedAt: string;
+  layout: StoreLayout;
+}
+
+export interface LayoutPageDto {
+  layouts: LayoutSummaryDto[];
+  /** null = หน้าสุดท้าย */
+  nextCursor: string | null;
 }
 
 export interface StoredLayoutDto {
+  name: string;
   layout: StoreLayout;
   validation: ValidationResult;
   createdAt: string;
@@ -89,11 +98,29 @@ async function request<T>(fetchImpl: typeof fetch, path: string, init: RequestIn
 
 export function createApiClient(fetchImpl: typeof fetch = (...args) => fetch(...args)) {
   return {
-    listLayouts: () => request<{ layouts: LayoutSummaryDto[] }>(fetchImpl, "/api/layouts").then((r) => r.layouts),
+    /** รายการผังทีละหน้า (ใหม่สุดก่อน) — ส่ง nextCursor ของหน้าก่อนเพื่อโหลดต่อ */
+    listLayoutsPage: (page: { limit?: number; cursor?: string | null } = {}) => {
+      const query = new URLSearchParams();
+      if (page.limit) query.set("limit", String(page.limit));
+      if (page.cursor) query.set("cursor", page.cursor);
+      return request<LayoutPageDto>(fetchImpl, query.size ? `/api/layouts?${query}` : "/api/layouts");
+    },
+    /** ผังล่าสุด 50 ผัง (หน้าแรกขนาดใหญ่สุด) — ใช้ในแผงคลาวด์ของ Playground */
+    listLayouts: () => request<LayoutPageDto>(fetchImpl, "/api/layouts?limit=50").then((r) => r.layouts),
     getLayout: (id: string) => request<StoredLayoutDto>(fetchImpl, `/api/layouts/${encodeURIComponent(id)}`),
+    createLayout: (layout: StoreLayout, name?: string) =>
+      request<StoredLayoutDto>(fetchImpl, "/api/layouts", {
+        method: "POST",
+        body: JSON.stringify({ layout, ...(name ? { name } : {}) }),
+      }),
+    updateLayout: (layout: StoreLayout, name?: string) =>
+      request<StoredLayoutDto>(fetchImpl, `/api/layouts/${encodeURIComponent(layout.id)}`, {
+        method: "PUT",
+        body: JSON.stringify({ layout, ...(name ? { name } : {}) }),
+      }),
     /** บันทึก: อัปเดตถ้ามีอยู่แล้ว ไม่งั้นสร้างใหม่ (ถ้าเดาผิดจะสลับให้อัตโนมัติ) */
-    async saveLayout(layout: StoreLayout, exists: boolean): Promise<StoredLayoutDto> {
-      const body = JSON.stringify({ layout });
+    async saveLayout(layout: StoreLayout, exists: boolean, name?: string): Promise<StoredLayoutDto> {
+      const body = JSON.stringify({ layout, ...(name ? { name } : {}) });
       const put = () => request<StoredLayoutDto>(fetchImpl, `/api/layouts/${encodeURIComponent(layout.id)}`, { method: "PUT", body });
       const post = () => request<StoredLayoutDto>(fetchImpl, "/api/layouts", { method: "POST", body });
       try {

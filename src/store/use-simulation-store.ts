@@ -21,7 +21,9 @@ export interface SimulationStoreState {
   metrics: SimulationMetrics | null;
   seats: number;
   config: SimulationConfigState;
+  showHeatmap: boolean;
   setConfig: (patch: Partial<SimulationConfigState>) => void;
+  setShowHeatmap: (show: boolean) => void;
 }
 
 export const CUSTOMER_RATE_OPTIONS = [10, 20, 40, 80] as const;
@@ -34,7 +36,9 @@ export function createSimulationStore() {
     metrics: null,
     seats: 0,
     config: { customersPerHour: 20, speed: 60 },
+    showHeatmap: true,
     setConfig: (patch) => set({ config: { ...get().config, ...patch } }),
+    setShowHeatmap: (showHeatmap) => set({ showHeatmap }),
   }));
 }
 
