@@ -234,7 +234,8 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
   test("ส่งออก SVG และ PNG ตามสัดส่วนผังจริง", async ({ page }) => {
     await buildReadyCafe(page);
     const exportItem = async (act: "svg" | "png") => {
-      await page.getByRole("button", { name: "ส่งออก", exact: true }).click();
+      // ส่งออกรวมอยู่ในเมนูโปรเจกต์ (หมวด "ส่งออกและแชร์")
+      await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
       return page.locator(`[data-act="${act}"]`);
     };
     const [svgDownload] = await Promise.all([page.waitForEvent("download"), (await exportItem("svg")).click()]);

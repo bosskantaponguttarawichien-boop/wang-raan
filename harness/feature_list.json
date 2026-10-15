@@ -525,11 +525,11 @@
         "feat-039"
       ],
       "gate": "ล็อกอิน Google/LINE ได้จริงบน staging (หรือ mock OAuth ใน E2E), ผัง Guest ย้ายเข้าบัญชีครบ, unit + e2e ผ่าน",
-      "status": "blocked",
+      "status": "in-progress",
       "role": "frontend",
       "summary": "ล็อกอินด้วย Google ได้จริง และผังที่ทำตอนเป็น Guest ไม่หาย",
       "sprint": 2,
-      "blocked_reason": "ผู้ใช้สั่งพักไว้จนกว่า Backend จริงจะขึ้น (2026-10-10)"
+      "progress_note": "2026-10-15: OAuth client ตั้งแล้ว ฝั่ง Google ผ่าน · ล็อกอินเคยล้มเพราะ DB production บน Railway ไม่มีตารางเลย (log: relation \"users\"/\"identities\"/\"rate_limits\" does not exist) — ผู้ใช้รัน `railway ssh -- node dist/db/migrate.js up` แล้ว: Applied 001–003, probe หลังรัน /v1/me 404, /v1/layouts 200 · เหลือ: ผู้ใช้ทดสอบ Google login จริงอีกรอบ, หาสาเหตุที่ pre-deploy ใน railway.json ไม่ทำงาน (serviceManifest.preDeployCommand = null, ไม่มี log 'Applied migrations')"
     },
     {
       "id": "feat-042",
@@ -885,6 +885,35 @@
       "summary": "ผังแต่ละอันมี URL ของตัวเอง และ Guest บันทึกเข้าบัญชีได้ไม่หาย",
       "sprint": 4,
       "evidence": "1. zustand store: เพิ่ม layoutName, layoutId, loadLayout(layout, name?, id?), resetLayout, restoreHistory (unit tests 27/27 passed)\n2. draft storage & autosave: รองรับ name ใน Draft schema และข้ามบันทึก local draft เมื่อเป็นผังออนไลน์ (unit tests 12/12 passed)\n3. สร้าง InlineLayoutName (src/components/editor/inline-layout-name.tsx): แก้ไขชื่อ inline, Enter/blur บันทึก, Esc ยกเลิก, ค่าว่างคืนชื่อเดิม, ยิง PUT เมื่อเป็นผังออนไลน์ (unit tests 5/5 passed)\n4. สร้าง SaveOnlineDialog (src/components/editor/save-online-dialog.tsx): Radix Dialog ถามชื่อผังก่อนนำทางไป /login?next=/playground?sync=1 (unit tests 1/1 passed)\n5. สร้าง useOnlineAutosave (src/lib/online-autosave.ts): debounce save ผังออนไลน์เมื่อมีการแก้ไข โดยตรวจสอบ validation ก่อน (unit tests 2/2 passed)\n6. สร้าง useGuestSync (src/lib/guest-sync.ts): เมื่อล็อกอินเสร็จกลับมาที่ ?sync=1 จะ sync ผังและชื่อเข้า backend พร้อมสุ่ม ID เฉพาะของผู้ใช้ แล้ว redirect ไป /playground/[id] (unit tests 4/4 passed)\n7. อัปเดต PlaygroundHeader: แสดง InlineLayoutName, เมนูโปรเจกต์, ปุ่มลิงก์ 'ผังของฉัน' เมื่อล็อกอินแล้ว, ปุ่ม 'บันทึกออนไลน์' (contrast WCAG 2.1 AA ผ่าน) เมื่อเป็น Guest\n8. สร้าง route /playground/[id] และหน้า 404 ภาษาไทย app/(app)/playground/[id]/not-found.tsx พร้อมปุ่มนำทางกลับ\n9. Playwright E2E: e2e/playground-id-online.spec.ts ผ่านครบ 10/10 tests (Guest จัดผัง → บันทึกออนไลน์ → ล็อกอิน OTP → /playground/[id] ผังครบทุกวัตถุ, refresh แล้วยังอยู่, inline name edit, 404 ไม่ใช่เจ้าของ, blocked gate, Axe 0 violations, responsive 6 breakpoints 320-1440px)\n10. make lint, make contract, make test (59 test files, 760 tests) ผ่าน 100%\n[2026-10-15] แก้ race redirect ซ้อนหลังล็อกอิน OTP (ได้ผังว่าง) + guest-sync ทำงานครั้งเดียวด้วย marker pending-sync และไม่ล้าง localStorage ทั้งหมด"
+    },
+    {
+      "id": "feat-065",
+      "name": "ปรับหน้า /login + ปุ่ม Google (Auth.js) บน Cloudflare Workers",
+      "description": "แก้โลโก้เสียบนหน้า /login (ชี้ไฟล์ที่ไม่มี) · layout ใหม่ตาม design-system: การ์ดฟอร์ม + แผงแบรนด์ (kicker, ข้อดี 3 ข้อ, ภาพประกอบ) 2 คอลัมน์ ≥1024px / ซ้อนแนวตั้งบนจอเล็ก · ปุ่ม Google มีสถานะกำลังไป, Auth.js pages.signIn/error = /login พร้อมข้อความ error ภาษาไทย, prompt=select_account · คงอีเมล OTP เหมือนเดิม",
+      "dependencies": [
+        "feat-062"
+      ],
+      "gate": "ไม่มี horizontal scroll 6 breakpoints, axe 0 violations, E2E ปุ่ม Google พาไป accounts.google.com ด้วย redirect_uri ของแอป, make test + make lint ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "หน้าเข้าสู่ระบบดูครบ โลโก้แสดงได้ และปุ่ม Google พร้อมใช้เมื่อตั้ง secret",
+      "sprint": 4,
+      "evidence": "app/login/page.tsx: โลโก้ clear-channel (เดิมชี้ไฟล์ไม่มี), layout การ์ด + แผงแบรนด์ 2 คอลัมน์ ≥1024px; login-form.tsx: ปุ่ม Google มีสถานะโหลด, oauthErrorMessage แสดง ?error= ภาษาไทย, ช่องกรอก 16px บนมือถือ; server/auth.ts: pages.signIn/error=/login, Google prompt=select_account; unit login-form 15 เคส (+3); E2E ใหม่ 'ปุ่ม Google' ดัก accounts.google.com ตรวจ client_id/redirect_uri/scope/PKCE S256 และ error กลับ /login; make test 804/804, make lint ผ่าน, make e2e 91/91 (Node), E2E_TARGET=cloudflare login-otp+auth-identities 14/14 (workerd); เบราว์เซอร์: overflow 0 ที่ 320/375/480/768/1024/1440, โลโก้โหลดได้; ยังไม่ได้ล็อกอิน Google จริง — ไม่มี OAuth client/secret บน worker"
+    },
+    {
+      "id": "feat-066",
+      "name": "รวมคำสั่งของ Playground ไว้ในเมนูเดียว + จัดสมดุล header",
+      "description": "ย้ายปุ่ม 'ผังของฉัน' และเมนู 'ส่งออก ▾' บนแถบหัวเข้าเมนูโปรเจกต์ แบ่งหมวด บัญชี / ไฟล์ / ส่งออกและแชร์ / ร้าน (role=group) · Guest ยังมีปุ่มลัด 'บันทึกออนไลน์' · จอ <768px เมนูยึดเต็มความกว้างจอและเลื่อนได้ · PRD §9 ข้อ 14 อัปเดตตาม · header เป็น grid 3 คอลัมน์: ซ้าย โลโก้+ชื่อผัง / กลาง 2D|3D (กลางจอจริงที่ ≥768px) / ขวา สถานะ·ย้อนกลับ/ทำซ้ำ·(Guest) บันทึกออนไลน์·เมนู (เมนูเปิดชิดขวา)",
+      "dependencies": [
+        "feat-050",
+        "feat-064"
+      ],
+      "gate": "ไม่มี horizontal scroll และเมนูอยู่ในจอทั้ง 6 breakpoints, E2E ส่งออก SVG/PNG และไป /projects ผ่านเมนูผ่าน, make test + make lint ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "คำสั่งทั้งหมดของ Playground อยู่ในเมนูเดียว แถบหัวโล่งขึ้น",
+      "sprint": 4,
+      "evidence": "src/components/editor/playground-header.tsx: เมนูเดียว + helper MenuButton/MenuIcon/MenuText/MenuSection, ลบ #expBtn/#myProjectsLink, hint ใช้ text-secondary (เดิม text-muted ไม่ผ่าน AA); unit 'เมนูโปรเจกต์รวมทุกคำสั่ง' (playground-ux-flow.test.tsx); E2E editor-flow (ส่งออก SVG/PNG) และ playground-id-online (ไป /projects) ใช้เมนู; make test 805/805, make lint ผ่าน, make e2e 91/91; เบราว์เซอร์: เมนูอยู่ในจอ 320/375/480 (fixed inset 8px, เลื่อนได้) และ 768/1024/1440, page overflow 0; จัด header ใหม่: ปุ่ม 2D|3D ห่างจากกลางจอ 0px ที่ 768/1024/1440, ไม่มีกลุ่มทับกันที่ 320/375/480, เมนูอยู่ในจอทุกขนาด; make test 805/805, make lint, make e2e 91/91 รอบสอง"
     }
   ]
 }

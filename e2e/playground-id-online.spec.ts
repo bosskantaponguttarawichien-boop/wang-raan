@@ -85,10 +85,9 @@ test.describe("/playground/[id] และการบันทึกออนไ
     await editInput.press("Enter");
     await expect(page.locator("#inlineLayoutNameBtn")).toContainText("คาเฟ่ริมน้ำนายสุข (ปรับปรุงใหม่)");
 
-    // 9. ไปที่หน้า 'ผังของฉัน' (/projects) ผ่านลิงก์ใน header
-    const myProjectsLink = page.locator("#myProjectsLink");
-    await expect(myProjectsLink).toBeVisible();
-    await myProjectsLink.click();
+    // 9. ไปที่หน้า 'ผังของฉัน' (/projects) ผ่านเมนูโปรเจกต์
+    await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
+    await page.getByRole("menuitem", { name: /ผังของฉัน/ }).click();
     await page.waitForURL("**/projects", { timeout: 10000 });
 
     // ตรวจสอบว่าการ์ดใน /projects มีชื่อที่แก้ไขตรงกัน

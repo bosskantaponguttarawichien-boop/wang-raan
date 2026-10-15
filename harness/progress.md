@@ -3,6 +3,24 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-15] feat-066 — รวมคำสั่งของ Playground ไว้ในเมนูเดียว
+
+- แถบหัวไม่มีปุ่ม "ผังของฉัน" และ "ส่งออก ▾" แล้ว — ย้ายเข้าเมนูโปรเจกต์ แบ่งหมวด บัญชี / ไฟล์ / ส่งออกและแชร์ / ร้าน (Guest ยังมีปุ่มลัด "บันทึกออนไลน์")
+- จอ < 768px เมนูเดิมล้นขอบขวา (ปุ่มอยู่กลางแถบหัว) → `fixed inset-x-2` + เลื่อนในเมนูได้ · hint ในเมนูเปลี่ยนจาก `text-muted` เป็น `text-secondary` (AA)
+- PRD §9 ข้อ 14 อัปเดตตามที่อยู่ใหม่ของคำสั่ง
+- **header สมดุล**: grid 3 คอลัมน์ (`1fr auto 1fr`) — ซ้าย โลโก้+ชื่อผัง · กลาง 2D|3D อยู่กลางจอจริง · ขวา สถานะ, ย้อนกลับ/ทำซ้ำ, (Guest) บันทึกออนไลน์, เมนู (ย้ายจากซ้าย, เปิดชิดขวา) · จอ < 768px ใช้ `1fr auto auto` ให้ชื่อผังหดแทน
+- **QA**: `make test` 805/805 · `make lint` ผ่าน · `make e2e` 91/91 · เบราว์เซอร์ 6 breakpoints เมนูอยู่ในจอ, overflow 0
+- ⚠️ dev server ไม่ generate คลาส Tailwind ใหม่จากการแก้ `.tsx` ด้วย (ไม่ใช่แค่ globals.css) — ต้อง `rm -rf .next` แล้วเปิดใหม่
+
+## [2026-10-15] feat-065 — ปรับหน้า /login + ปุ่ม Google (Auth.js) บน Workers
+
+- **โลโก้เสีย**: `app/login/page.tsx` ชี้ `logo-wangraan-minimal-flat.svg` ที่ไม่มีใน `public/` → ใช้ `logo-wangraan-clear-channel.svg` (ไฟล์ทางการ design-system §6.1)
+- **Layout**: การ์ดฟอร์ม + แผงแบรนด์ (kicker, หัวข้อ, ข้อดี 3 ข้อ, ภาพ `store-planning-illustration.jpg`) — 2 คอลัมน์และกึ่งกลางแนวตั้งที่ ≥1024px, ซ้อนแนวตั้ง (การ์ดก่อน) บนจอเล็ก, ซ่อนภาพ <480px · header/footer จำกัด 1280px · ช่องกรอก 16px บนมือถือ (กัน iOS ซูม) · spinner เป็น `motion-safe`
+- **Google**: ปุ่มแสดงเมื่อมี `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET` (เหมือนเดิม) · มีสถานะ "กำลังไปที่ Google..." · `prompt=select_account` · Auth.js `pages.signIn/error = /login` → error OAuth แสดงข้อความไทยบนหน้า login (`oauthErrorMessage`) แทนหน้า error ภาษาอังกฤษ
+- การผูกบัญชีไม่ได้เปลี่ยน: jwt callback → `oauthIdentity` → `POST /v1/auth/identities/resolve` (providerAccountId + email_verified ของ Google) → `sub` จาก Backend, แล้ว `syncSignIn` ย้ายผัง Guest
+- **ยังไม่ได้ทดสอบกับ Google จริง**: ไม่มี OAuth client — `wrangler secret list` ของ worker `wang-raan` ว่าง
+- **QA**: `make test` 804/804 · `make lint` ผ่าน · `make e2e` 91/91 · workerd (`E2E_TARGET=cloudflare`) login-otp + auth-identities 14/14 · เบราว์เซอร์ (dev + client ปลอม): overflow 0 ทั้ง 6 breakpoints, ปุ่ม Google ได้ URL `accounts.google.com/o/oauth2/v2/auth` พร้อม redirect_uri `/api/auth/callback/google`, callback error → `/login?error=` แสดงข้อความไทย
+
 ## [2026-10-15] Code review FE (feat-061–064) + BE (feat-013)
 
 - **Security**: `safeRedirectPath` ปล่อย `/\t/evil.com` ผ่าน (เบราว์เซอร์ตัด tab → `//evil.com` = open redirect หลังล็อกอิน) → ปฏิเสธอักขระควบคุม/ช่องว่าง + ตรวจ origin ด้วย URL parser

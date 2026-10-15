@@ -10,6 +10,7 @@ import { PlaygroundRail } from "./playground-rail";
 import { PlaygroundPanel } from "./playground-panel";
 import { PlaygroundStatusBar } from "./playground-status-bar";
 import { PlaygroundHeader } from "./playground-header";
+import * as nextAuthReact from "next-auth/react";
 import { SelectionToolbar } from "@/components/editor-2d/selection-toolbar";
 import { IsometricView } from "@/components/preview-3d/isometric-view";
 import { summarizeIssues, type LiveValidation } from "@/components/validation/use-live-validation";
@@ -68,6 +69,33 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
   });
 
   afterEach(cleanup);
+
+  it("0. เมนูโปรเจกต์รวมทุกคำสั่ง (ผังของฉัน + ไฟล์ + ส่งออกและแชร์ + ร้าน) — แถบหัวไม่มีปุ่มส่งออก/ผังของฉันซ้ำ", async () => {
+    vi.mocked(nextAuthReact.useSession).mockReturnValue({
+      data: { user: { id: "usr-1" }, expires: "2099-01-01" },
+      status: "authenticated",
+      update: vi.fn(),
+    } as unknown as ReturnType<typeof nextAuthReact.useSession>);
+    const user = userEvent.setup();
+    render(<PlaygroundHeader />);
+
+    expect(screen.queryByRole("button", { name: "ส่งออก" })).toBeNull();
+    expect(screen.queryByRole("link", { name: /ผังของฉัน/ })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "เมนูโปรเจกต์" }));
+    const menu = screen.getByRole("menu", { name: "เมนูโปรเจกต์" });
+    expect(screen.getByRole("menuitem", { name: /ผังของฉัน/ }).getAttribute("href")).toBe("/projects");
+    for (const group of ["ไฟล์", "ส่งออกและแชร์", "ร้าน"]) {
+      expect(screen.getByRole("group", { name: group })).toBeInTheDocument();
+    }
+    const exportGroup = screen.getByRole("group", { name: "ส่งออกและแชร์" });
+    expect([...exportGroup.querySelectorAll("[role=menuitem]")].map((el) => el.getAttribute("data-act"))).toEqual(["png", "svg", "pdf", "share"]);
+    expect(menu.querySelectorAll("[role=menuitem]")).toHaveLength(10);
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).toBeNull();
+    vi.mocked(nextAuthReact.useSession).mockReturnValue({ data: null, status: "unauthenticated", update: vi.fn() });
+  });
 
   it("1. ผังใหม่ → Onboarding Dialog → เลือกขนาดร้านและสร้างผังใหม่", async () => {
     const user = userEvent.setup();
