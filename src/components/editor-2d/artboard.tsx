@@ -21,7 +21,6 @@ import {
   type Rect,
 } from "@/core/layout";
 import { cn } from "@/lib/cn";
-import { useContainerUnits } from "@/lib/use-container-units";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
@@ -144,7 +143,6 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const drag = React.useRef<DragState | null>(null);
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const hintId = React.useId();
-  const cq = useContainerUnits(boxRef);
 
   const selected = layout.objects.find((o) => o.id === selectedId) ?? null;
   const groupTableId = selected?.type === "table" ? selected.id : selected?.type === "chair" ? selected.tableId : null;
@@ -279,7 +277,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Render ───────────────────────────────────────────────────────────────
   const ratio = layout.width / layout.depth;
   // พอดีพื้นที่ Canvas จริง (cqw/cqh จาก container ของ Stage) เผื่อความสูงให้ป้ายความกว้างและคำแนะนำ (--artboard-chrome)
-  const fitWidth = `min(${cq.width}, max(140px, ${cq.height} - var(--artboard-chrome)) * ${ratio})`;
+  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome)) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
 

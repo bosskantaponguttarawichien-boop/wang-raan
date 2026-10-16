@@ -137,7 +137,7 @@ export function PlaygroundEditor() {
         >
           {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ
               touch-action: pan → นิ้วเดียวเลื่อนดูได้ ส่วนสองนิ้วให้ usePinchZoom ซูมแทนการซูมทั้งหน้าเว็บ */}
-          <div data-size-container className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] [touch-action:pan-x_pan-y] max-[767px]:p-2">
+          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] [touch-action:pan-x_pan-y] max-[767px]:p-2">
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 

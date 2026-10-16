@@ -3,6 +3,12 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-16] เกณฑ์เบราว์เซอร์ขั้นต่ำ + แจ้งเตือนเบราว์เซอร์เก่า
+
+- ตัดสินใจ (ทาง A): รองรับขั้นต่ำตาม baseline ของ Tailwind v4 — Chrome/Edge 111, Safari 16.4, Firefox 128; ถอน fallback รอบก่อน (`@csstools/postcss-media-minmax`, `useContainerUnits`) เพราะรีวิวพบว่าเบราว์เซอร์เก่ายังพังจาก `dvh`, `translate`, `safe center` อยู่ดี
+- เพิ่ม `src/components/ui/browser-support-notice.tsx` (ใส่ใน root layout): ตรวจ `CSS.supports` ของ `color-mix`, `cqw`, `dvh` ถ้าไม่ผ่านแสดงแถบเตือนให้อัปเดตเบราว์เซอร์ (inline style เพื่อให้แสดงได้แม้ Tailwind ใช้ไม่ได้) ปิดได้
+- **QA**: unit test ใหม่ 4 เคส · `npm test` 64 files / 852 tests, lint, typecheck ผ่าน · Playwright: เบราว์เซอร์ใหม่ไม่แสดงแถบ, จำลองไม่รองรับ `cqw` → แสดงแถบ
+
 ## [2026-10-16] fix — มือถือ: แท็บจำลองทำให้ทั้งหน้าเลื่อนได้ เหลือที่ว่างใต้แถบเมนู
 
 - สาเหตุ: ข้อความ `sr-only` (position: absolute) ในแผงจำลองไม่มี ancestor ที่ positioned → อิง `<body>` ทำให้เอกสารสูงเกิน `100dvh` (เช่น 1198 จาก 860px) หน้าจึงเลื่อนขึ้นได้ หัวหายและเหลือที่ว่างด้านล่าง
@@ -28,13 +34,6 @@
 - ฉาก Three.js โหลดแบบ dynamic เฉพาะเมื่อเข้าหน้านี้ มีพื้น, grid, แสง, เงา และ GLB `cafe-customer`; ใช้เฉพาะ animation `Idle` จึงยังไม่มีการเดินหรือ state จาก Worker
 - รองรับกรณีลดการเคลื่อนไหว, WebGL ใช้ไม่ได้ และโหลดโมเดลล้มเหลวด้วยข้อความสถานะในหน้าเดียวกัน
 - **QA**: `npm test` 64 files / 850 tests, `npm run typecheck`, `npm run lint`, `npm run build` ผ่าน · build พบ route `/character-lab` เป็น static page ขนาด 2.45 kB (First Load 109 kB)
-
-## [2026-10-16] fix — ผัง 2D หาย / UI มือถือเพี้ยนบนเบราว์เซอร์รุ่นเก่า
-
-- อาการ: บนมือถือบางเครื่อง ผังหดเหลือจุดเล็กใต้ป้าย “8 เมตร”, คำแนะนำคีย์บอร์ดโผล่, แผงล่างไม่มีที่จับและการ์ดเรียงแนวตั้ง
-- สาเหตุ: Tailwind v4 สร้าง breakpoint แบบ range (`@media (width < 767px)`) และผังใช้หน่วย `cqw/cqh` — Chromium < 104/105 ไม่รู้จักทั้งสองอย่าง จึงทิ้งกฎ `max-[767px]:*` ทั้งหมด และทิ้ง width ของผัง (เหลือ 0)
-- แก้: เพิ่ม `@csstools/postcss-media-minmax` ต่อจาก Tailwind ใน `postcss.config.mjs` (แปลงเป็น `max-width/min-width`); hook `src/lib/use-container-units.ts` วัดขนาด `[data-size-container]` เป็น px เมื่อ `CSS.supports("width","1cqw")` เป็นเท็จ ใช้ทั้ง Artboard 2D และ Isometric
-- **QA**: `npm test` 64 files / 850 tests, `npm run lint`, typecheck, `npm run build` ผ่าน · CSS production ไม่มี range media query เหลือ · Playwright จำลองเบราว์เซอร์ไม่รองรับ cq/range MQ ที่ 412px → ผังแสดงเต็มเหมือนเบราว์เซอร์ใหม่
 
 ## [2026-10-16] feat-075 — แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย
 

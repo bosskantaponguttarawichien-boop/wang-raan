@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
+import { BrowserSupportNotice } from "@/components/ui/browser-support-notice";
 import "./globals.css";
 
 const notoSansThai = Noto_Sans_Thai({
@@ -27,7 +28,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="th" className={notoSansThai.variable}>
-      <body>{children}</body>
+      <body>
+        <BrowserSupportNotice />
+        {children}
+      </body>
     </html>
   );
 }
