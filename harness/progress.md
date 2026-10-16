@@ -3,6 +3,13 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-16] fix — ผัง 2D หดเหลือแค่ป้าย "8 เมตร" + ประตูทางเข้า
+
+- อาการ: Canvas ว่าง ผังกว้าง ~10px ทั้งที่เบราว์เซอร์รองรับ cqw (Chrome 152)
+- สาเหตุ: CSS ที่ serve ไม่มี class `[container-type:size]`, `[--artboard-chrome:96px]`, `items-center-safe` (webpack persistent cache ใน `.next/cache` คืน `globals.css` เก่า — คอมไพล์ Tailwind ตรง ๆ ได้ครบ) → `var(--artboard-chrome)` ไม่มีค่า ทำให้ `width: calc(...)` ทั้งก้อน invalid → `auto` ผังจึงหด
+- แก้: ลบ `.next` (backup ไว้ใน scratchpad) และกันซ้ำในโค้ด — `containerType`/`touchAction` ของ Stage เป็น inline style (`playground-editor.tsx`), ใส่ fallback `var(--artboard-chrome, 96px)` (`artboard.tsx`)
+- **QA**: `make test` 64 files / 852 tests (รอบแรก fail แบบ flaky ระหว่าง dev server คอมไพล์ รันซ้ำผ่าน), `make lint` ผ่าน · Browser: ผังกว้าง 616px, ถอด class `--artboard-chrome` ทิ้งแล้วยัง 616px
+
 ## [2026-10-16] เกณฑ์เบราว์เซอร์ขั้นต่ำ + แจ้งเตือนเบราว์เซอร์เก่า
 
 - ตัดสินใจ (ทาง A): รองรับขั้นต่ำตาม baseline ของ Tailwind v4 — Chrome/Edge 111, Safari 16.4, Firefox 128; ถอน fallback รอบก่อน (`@csstools/postcss-media-minmax`, `useContainerUnits`) เพราะรีวิวพบว่าเบราว์เซอร์เก่ายังพังจาก `dvh`, `translate`, `safe center` อยู่ดี

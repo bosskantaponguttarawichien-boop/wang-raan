@@ -277,7 +277,8 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Render ───────────────────────────────────────────────────────────────
   const ratio = layout.width / layout.depth;
   // พอดีพื้นที่ Canvas จริง (cqw/cqh จาก container ของ Stage) เผื่อความสูงให้ป้ายความกว้างและคำแนะนำ (--artboard-chrome)
-  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome)) * ${ratio})`;
+  // ค่า fallback 96px กัน width ทั้งก้อนเป็น invalid → auto (ผังหดเหลือแค่ขอบ) เมื่อ class ตั้งตัวแปรไม่ถูก generate
+  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome, 96px)) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
 

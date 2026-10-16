@@ -136,8 +136,12 @@ export function PlaygroundEditor() {
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-surface [grid-area:stage]"
         >
           {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ
-              touch-action: pan → นิ้วเดียวเลื่อนดูได้ ส่วนสองนิ้วให้ usePinchZoom ซูมแทนการซูมทั้งหน้าเว็บ */}
-          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] [touch-action:pan-x_pan-y] max-[767px]:p-2">
+              touch-action: pan → นิ้วเดียวเลื่อนดูได้ ส่วนสองนิ้วให้ usePinchZoom ซูมแทนการซูมทั้งหน้าเว็บ
+              ใส่เป็น inline style เพราะถ้า Tailwind พลาด class นี้ (cache/scan) ผังจะหดเหลือ ~10px */}
+          <div
+            className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 max-[767px]:p-2"
+            style={{ containerType: "size", touchAction: "pan-x pan-y" }}
+          >
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 

@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-16 ICT — fix ผัง 2D หด (เสร็จแล้ว, ยังไม่ commit)
+
+- สาเหตุหลักคือ `.next/cache` เก่าทำให้ CSS ขาด class arbitrary ของ Stage/Artboard; ถ้าเจออีกให้ลบ `.next` แล้วรัน dev ใหม่
+- กันซ้ำ: inline `containerType: "size"` ใน `playground-editor.tsx` และ fallback `var(--artboard-chrome, 96px)` ใน `artboard.tsx`
+- ยังไม่ได้ตรวจ production (Cloudflare) ว่าเจออาการเดียวกันหรือไม่
+
 ## 2026-10-16 ICT — feat-078 Character Lab V1.2: เดินไปยังจุดหมาย (เสร็จแล้ว)
 
 - คลิกพื้นใน `/character-lab` เพื่อสร้าง marker เป้าหมาย; GLB หันตามเวกเตอร์แล้วเดิน 1.15 ม./วินาที, ใช้ Walk ระหว่างเคลื่อนและ Idle เมื่อถึงจุด
