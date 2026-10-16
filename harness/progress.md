@@ -3,6 +3,26 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-16] feat-078 — Character Lab V1.2: เดินไปยังจุดหมาย
+
+- คลิกหรือแตะพื้นใน Character Lab เพื่อกำหนดจุดหมาย; raycast พิกัดหน้าจอเข้าระนาบพื้นและรับเฉพาะจุดในวงพื้นทดลอง
+- แสดงวงเป้าหมาย, ตัวละครหันไปทิศทางการเดิน, เดินด้วยความเร็ว 1.15 ม./วินาที และสลับ `Idle → Walk → Idle` เมื่อเริ่ม/ถึงจุดหมาย
+- ไม่เชื่อมกับ Simulation Worker หรือผังร้าน จึงใช้ทดสอบการเคลื่อนที่ของ asset ได้แยกส่วน
+- **QA**: `make test` 64 files / 850 tests, typecheck, lint, production build และ harness status ผ่าน
+
+## [2026-10-16] feat-077 — Character Lab V1.1: หันตัวละคร
+
+- เพิ่มปุ่ม หันหน้า / ขวา / หลัง / ซ้าย ใน Character Lab พร้อมสถานะ `aria-pressed` เพื่อใช้ตรวจโมเดลทั้งสี่ด้าน
+- โมเดลคงตำแหน่งและใช้ Idle เหมือนเดิม; scene หมุนผ่าน shortest angle และค่อย ๆ เข้าองศาเป้าหมาย จึงไม่หมุนอ้อมเกินจำเป็น
+- **QA**: `npm run typecheck`, `npm run lint`, `make status` ผ่าน
+
+## [2026-10-16] feat-076 — Character Lab V1: ตัวละครยืน
+
+- เพิ่ม route `/character-lab` เป็นพื้นที่ทดลองแยกจาก Playground และ Simulation Engine เพื่อเช็ก asset ก่อนเริ่มทำ pathfinding หรือพฤติกรรม
+- ฉาก Three.js โหลดแบบ dynamic เฉพาะเมื่อเข้าหน้านี้ มีพื้น, grid, แสง, เงา และ GLB `cafe-customer`; ใช้เฉพาะ animation `Idle` จึงยังไม่มีการเดินหรือ state จาก Worker
+- รองรับกรณีลดการเคลื่อนไหว, WebGL ใช้ไม่ได้ และโหลดโมเดลล้มเหลวด้วยข้อความสถานะในหน้าเดียวกัน
+- **QA**: `npm test` 64 files / 850 tests, `npm run typecheck`, `npm run lint`, `npm run build` ผ่าน · build พบ route `/character-lab` เป็น static page ขนาด 2.45 kB (First Load 109 kB)
+
 ## [2026-10-16] fix — ผัง 2D หาย / UI มือถือเพี้ยนบนเบราว์เซอร์รุ่นเก่า
 
 - อาการ: บนมือถือบางเครื่อง ผังหดเหลือจุดเล็กใต้ป้าย “8 เมตร”, คำแนะนำคีย์บอร์ดโผล่, แผงล่างไม่มีที่จับและการ์ดเรียงแนวตั้ง

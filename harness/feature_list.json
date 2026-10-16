@@ -1041,6 +1041,48 @@
       "summary": "รวมการแก้ไขชุดโต๊ะที่เลือกไว้ในแผงซ้าย",
       "sprint": 4,
       "evidence": "เพิ่ม TableSetEditPanel ที่แสดงทันทีเมื่อเลือกโต๊ะหรือ Chair ลูก โดยรวมจำนวนเก้าอี้ ขนาด/รูปแบบ ตำแหน่ง หมุน ทำซ้ำ และลบไว้ทางซ้าย; toolbar ลอยถูกซ่อนสำหรับ Table/Chair ทั้ง 2D และ SVG isometric. Core setTableSetChairCount คง id ของโต๊ะ/เก้าอี้เดิมเท่าที่ทำได้, เพิ่ม/ลบลูกอย่างปลอดภัย, ตรวจ capacity และไม่มี orphan; การทำซ้ำคงจำนวนเก้าอี้จริงด้วย. QA: make test 62 files/843 tests, make lint, make status ผ่าน; ตรวจ Chrome เลือกโต๊ะและเพิ่มจาก 2 เป็น 3 ตัวในแผงซ้ายแล้ว. ไม่เขียนหรือรัน E2E ตามคำขอผู้ใช้."
+    },
+    {
+      "id": "feat-076",
+      "name": "Character Lab V1 — ตัวละครยืน",
+      "description": "เพิ่มหน้าแยก `/character-lab` เพื่อทดลอง asset ตัวละครโดยไม่เชื่อมกับผังหรือ simulation worker ใน V1: โหลด GLB local, วางตัวละครยืนบนพื้นพร้อมแสงและ grid, เล่นเฉพาะ Idle และมีข้อความ fallback เมื่ออุปกรณ์ปิด motion, ไม่รองรับ WebGL หรือโหลดโมเดลไม่สำเร็จ.",
+      "dependencies": [
+        "feat-070"
+      ],
+      "gate": "เปิด `/character-lab` ได้จาก production build, โมเดล GLB แสดงท่า Idle โดยไม่มี logic เดิน, WebGL/reduced-motion/model-load fallback มีข้อความชัดเจน, typecheck/lint/test/build ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "มีพื้นที่ทดลองโมเดลตัวละครยืนแยกจาก Simulator หลัก",
+      "sprint": 4,
+      "evidence": "เพิ่ม app/(app)/character-lab/page.tsx, character-lab.tsx และ character-lab-scene.tsx; Three.js ถูก dynamic import เฉพาะหน้าทดลอง, GLB ใช้ clip Idle เท่านั้น, หน้า production แสดง bundle route `/character-lab` 2.45 kB/First Load 109 kB. QA: npm test 64 files/850 tests, npm run typecheck, npm run lint, npm run build ผ่าน."
+    },
+    {
+      "id": "feat-077",
+      "name": "Character Lab V1.1 — หันตัวละคร",
+      "description": "เพิ่มตัวควบคุมเลือกทิศหันหน้า/ขวา/หลัง/ซ้ายใน Character Lab เพื่อทดลอง asset ครบสี่ด้าน โดยโมเดลยังอยู่ตำแหน่งเดิมและใช้ Idle เท่านั้น. การหมุนใช้ shortest angle และ interpolate ใน render loop จึงไม่หมุนอ้อมเกิน 180 องศา.",
+      "dependencies": [
+        "feat-076"
+      ],
+      "gate": "ปุ่มทั้งสี่เข้าถึงด้วยคีย์บอร์ดและบอกสถานะ aria-pressed, โมเดลหมุนไปทิศที่เลือกโดยไม่เคลื่อนตำแหน่งหรือเข้าสู่ Walk, typecheck/lint/test/build ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ตรวจสัดส่วนและหน้าตาตัวละครได้ครบทั้งสี่ด้านก่อนเริ่มทำการเดิน",
+      "sprint": 4,
+      "evidence": "character-lab.tsx เพิ่มตัวเลือกทิศ 4 ปุ่มและข้อความสถานะ; character-lab-scene.tsx รับ facing, เก็บองศาเป้าหมายใน ref และใช้ shortestAngle ใน animation frame เพื่อหมุนแบบต่อเนื่อง. QA: npm run typecheck, npm run lint และ make status ผ่าน."
+    },
+    {
+      "id": "feat-078",
+      "name": "Character Lab V1.2 — เดินไปยังจุดหมาย",
+      "description": "ให้ผู้ใช้คลิก/แตะพื้นใน Character Lab เพื่อกำหนดจุดหมาย: raycast ตำแหน่งหน้าจอเข้ากับระนาบพื้น, จำกัดเป้าหมายในวงพื้นทดลอง, แสดงวงเป้าหมาย, หมุนตัวละครตามเวกเตอร์การเดิน, เคลื่อนที่ด้วยความเร็วคงที่ 1.15 ม./วินาที และสลับ Idle/Walk เมื่อเริ่มหรือจบ.",
+      "dependencies": [
+        "feat-077"
+      ],
+      "gate": "คลิกพื้นแล้วแสดงเป้าหมายและตัวละครเดินถึงโดยไม่ออกนอกพื้น, ระหว่างเดินเล่น Walk และเมื่อถึงกลับ Idle, Simulator/Worker ไม่ถูกแตะ, typecheck/lint/test/build ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ทดลองการเดินแบบกำหนดจุดหมายได้ใน Character Lab ก่อนทำ pathfinding จริง",
+      "sprint": 4,
+      "evidence": "character-lab-scene.tsx เพิ่ม Raycaster/Plane, marker, walkTarget และ animation switch; character-lab.tsx แสดงคำแนะนำและสถานะ Idle/Walk. QA: make test 64 files/850 tests, npm run typecheck, npm run lint, npm run build และ make status ผ่าน."
     }
   ]
 }
