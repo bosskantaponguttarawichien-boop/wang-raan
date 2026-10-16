@@ -139,7 +139,7 @@ export function IsometricScene({
 
   // fill = เต็มพื้นที่ Canvas ของ Editor (cqw/cqh จาก container ของ Stage เผื่อความสูงให้คำอธิบาย); หน้าแชร์ใช้ขนาดคงที่
   const [, , vbWidth = 1, vbHeight = 1] = scene.viewBox.split(" ").map(Number);
-  const fitWidth = fill ? `min(100cqw, max(200px, 100cqh - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
+  const fitWidth = fill ? `min(100cqw, max(140px, 100cqh - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
   const counts = {
     table: layout.objects.filter((o) => o.type === "table").length,
     chair: layout.objects.filter((o) => o.type === "chair").length,

@@ -141,8 +141,6 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const stageRef = React.useRef<HTMLDivElement>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const drag = React.useRef<DragState | null>(null);
-  // นิ้วที่แตะผังอยู่ — ถ้าเกิน 1 นิ้วคือกำลัง pinch ซูม จึงหยุด/ไม่เริ่มลากวัตถุ
-  const touches = React.useRef(new Set<number>());
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const hintId = React.useId();
 
@@ -162,7 +160,8 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Pointer: ย้าย / ปรับขนาด / ลากทางเข้า ───────────────────────────────
   const startDrag = (event: React.PointerEvent<HTMLElement>, state: DragState) => {
     if (event.button !== 0) return;
-    if (touches.current.size > 1) return;
+    // นิ้วที่สอง (isPrimary = false) คือกำลัง pinch ซูม — ไม่เริ่มลากวัตถุ
+    if (event.pointerType === "touch" && !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -208,14 +207,16 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     finishDrag();
   };
 
-  const onTouchPointerDown = (event: React.PointerEvent<HTMLElement>) => {
-    if (event.pointerType !== "touch") return;
-    touches.current.add(event.pointerId);
-    if (touches.current.size > 1 && drag.current) finishDrag();
-  };
-  const onTouchPointerUp = (event: React.PointerEvent<HTMLElement>) => {
-    touches.current.delete(event.pointerId);
-  };
+  // นิ้วที่สองแตะที่ใดก็ได้บนหน้าจอระหว่างลาก = เริ่ม pinch ซูม → หยุดลากทันที เพื่อไม่ให้วัตถุเลื่อนตามนิ้วแรก
+  const finishDragRef = React.useRef(finishDrag);
+  finishDragRef.current = finishDrag;
+  React.useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "touch" && !event.isPrimary && drag.current) finishDragRef.current();
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, []);
 
   // ── Keyboard ─────────────────────────────────────────────────────────────
   const onPieceKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, obj: LayoutObject) => {
@@ -290,9 +291,6 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
       <div
         ref={boxRef}
         className="relative rounded-[2px] border-4 border-[var(--plan-wall)] bg-white"
-        onPointerDownCapture={onTouchPointerDown}
-        onPointerUpCapture={onTouchPointerUp}
-        onPointerCancelCapture={onTouchPointerUp}
         style={{
           width: `calc(${fitWidth} * ${zoom})`,
           aspectRatio: `${layout.width} / ${layout.depth}`,

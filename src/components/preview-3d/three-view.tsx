@@ -333,7 +333,7 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
 
   return (
     <figure
-      className="relative m-0 h-full min-h-[260px] w-full overflow-hidden rounded-[20px]"
+      className="relative m-0 h-full min-h-[260px] w-full max-[767px]:min-h-[160px] overflow-hidden rounded-[20px]"
       aria-label={`มุมมองร้าน 3 มิติ ขนาด ${layout.width} × ${layout.depth} เมตร`}
       data-testid="three-view"
     >
