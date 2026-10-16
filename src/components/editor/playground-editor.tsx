@@ -17,6 +17,7 @@ import { restoreDraft, startAutosave } from "@/lib/draft-autosave";
 import { useOnlineAutosave } from "@/lib/online-autosave";
 import { useGuestSync } from "@/lib/guest-sync";
 import { ZoomControls } from "./canvas-controls";
+import { usePinchZoom } from "./use-pinch-zoom";
 import { PlaygroundHeader } from "./playground-header";
 import { PlaygroundRail } from "./playground-rail";
 import { PlaygroundPanel } from "./playground-panel";
@@ -79,6 +80,9 @@ export function PlaygroundEditor() {
   const simStatus = useSimulationStore((s) => s.status);
   const isSim = simStatus === "running" || simStatus === "paused";
 
+  const stageRef = React.useRef<HTMLElement>(null);
+  usePinchZoom(stageRef);
+
   const [sheetOpen, setSheetOpen] = React.useState(true);
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
   const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -126,14 +130,18 @@ export function PlaygroundEditor() {
         />
 
         <main
+          ref={stageRef}
           id="stage"
           aria-label="พื้นที่จัดผังร้าน"
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-surface [grid-area:stage]"
         >
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6 max-[767px]:p-2.5">
+          {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ
+              touch-action: pan → นิ้วเดียวเลื่อนดูได้ ส่วนสองนิ้วให้ usePinchZoom ซูมแทนการซูมทั้งหน้าเว็บ */}
+          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] [touch-action:pan-x_pan-y] max-[767px]:p-2">
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 
+          {/* มือถือซูมด้วยสองนิ้วแทนปุ่ม */}
           <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:hidden" />
         </main>
 
@@ -146,7 +154,7 @@ export function PlaygroundEditor() {
           role="status"
           aria-live="polite"
           data-testid="toast"
-          className="fixed bottom-[76px] left-1/2 z-50 max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
+          className="fixed bottom-[76px] left-1/2 z-50 max-[767px]:bottom-auto max-[767px]:top-[60px] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
         >
           {toastMsg}
         </div>

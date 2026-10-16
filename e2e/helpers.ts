@@ -52,12 +52,17 @@ export async function cloud(page: Page) {
 export async function addItem(page: Page, name: "ครัว" | "เคาน์เตอร์" | "โต๊ะ") {
   await closeDialogs(page);
   await openTab(page, "add");
+  // โต๊ะที่เลือกอยู่ทำให้แท็บ "เพิ่ม" แสดงแผงแก้ไขโต๊ะแทนรายการของ — กด "กลับ" ก่อน
+  const editPanel = page.getByRole("region", { name: "แก้ไขโต๊ะ" });
+  if (await editPanel.isVisible()) await editPanel.getByRole("button", { name: "กลับ" }).click();
   await page.getByRole("button", { name: new RegExp(`^เพิ่ม\\s*${name}`) }).click();
   if (name === "โต๊ะ") {
     const panel = page.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
     await expect(panel).toBeVisible();
     await panel.getByRole("button", { name: "เพิ่มโต๊ะพร้อมเก้าอี้ 4 ตัว ลงผัง" }).click();
-    await expect(page.getByRole("region", { name: "แก้ไขโต๊ะ" })).toBeVisible();
+    // มือถือ: sheet พับเองหลังวางโต๊ะ — เปิดกลับมาเพื่อใช้แผงแก้ไขโต๊ะ
+    await openTab(page, "add");
+    await expect(editPanel).toBeVisible();
     return;
   }
   await page.getByTestId("selection-toolbar").waitFor();

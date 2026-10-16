@@ -35,7 +35,7 @@ const pieces = (page: Page, type: string) => stage(page).locator(`[data-type="${
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
 
 async function createTableSet(page: Page, seats: 2 | 4) {
-  await page.getByRole("button", { name: /^เพิ่ม\\s*โต๊ะ/ }).click();
+  await page.getByRole("button", { name: /^เพิ่ม\s*โต๊ะ/ }).click();
   const panel = page.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
   await expect(panel).toBeVisible();
   for (let count = 4; count > seats; count--) await panel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();

@@ -160,6 +160,8 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Pointer: ย้าย / ปรับขนาด / ลากทางเข้า ───────────────────────────────
   const startDrag = (event: React.PointerEvent<HTMLElement>, state: DragState) => {
     if (event.button !== 0) return;
+    // นิ้วที่สอง (isPrimary = false) คือกำลัง pinch ซูม — ไม่เริ่มลากวัตถุ
+    if (event.pointerType === "touch" && !event.isPrimary) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -194,12 +196,27 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     }
   };
 
-  const endDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+  const finishDrag = () => {
     drag.current = null;
     actions().endInteraction();
     setDraggingId(null);
   };
+
+  const endDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+    finishDrag();
+  };
+
+  // นิ้วที่สองแตะที่ใดก็ได้บนหน้าจอระหว่างลาก = เริ่ม pinch ซูม → หยุดลากทันที เพื่อไม่ให้วัตถุเลื่อนตามนิ้วแรก
+  const finishDragRef = React.useRef(finishDrag);
+  finishDragRef.current = finishDrag;
+  React.useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      if (event.pointerType === "touch" && !event.isPrimary && drag.current) finishDragRef.current();
+    };
+    window.addEventListener("pointerdown", onPointerDown, true);
+    return () => window.removeEventListener("pointerdown", onPointerDown, true);
+  }, []);
 
   // ── Keyboard ─────────────────────────────────────────────────────────────
   const onPieceKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, obj: LayoutObject) => {
@@ -259,14 +276,14 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
 
   // ── Render ───────────────────────────────────────────────────────────────
   const ratio = layout.width / layout.depth;
-  // พอดีพื้นที่ Canvas แบบเดียวกับมุมมอง 3D (เผื่อความสูงให้ header, ป้ายความกว้าง, คำแนะนำ และแถบสถานะ)
-  const fitWidth = `min(100%, max(240px, 100dvh - 245px) * ${ratio})`;
+  // พอดีพื้นที่ Canvas จริง (cqw/cqh จาก container ของ Stage) เผื่อความสูงให้ป้ายความกว้างและคำแนะนำ (--artboard-chrome)
+  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome)) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-center">
-      <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: "100%" }} aria-hidden="true">
+    <div className="flex w-full min-w-0 flex-col items-center [--artboard-chrome:96px] max-[767px]:[--artboard-chrome:32px]">
+      <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong max-[767px]:mb-1.5" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: "100%" }} aria-hidden="true">
         <span className="h-px flex-1 bg-[#ccd6e4]" />
         {layout.width} เมตร
         <span className="h-px flex-1 bg-[#ccd6e4]" />
@@ -445,7 +462,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
           />
         )}
       </div>
-      <p id={hintId} className="mt-3 max-w-[560px] text-center text-[12px] leading-[1.75] text-secondary-strong">
+      <p id={hintId} className="mt-3 max-w-[560px] text-center max-[767px]:sr-only text-[12px] leading-[1.75] text-secondary-strong">
         ลากเพื่อย้าย · ลูกศรเลื่อนทีละ 0.25 ม. (Shift = 1 ม.) · R หมุน 90° · Delete ลบ · กริดย่อย 0.25 ม. กริดหลัก 1 ม.
       </p>
     </div>

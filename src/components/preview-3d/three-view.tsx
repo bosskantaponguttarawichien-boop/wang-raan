@@ -30,6 +30,7 @@ type AnimatedCustomer = {
 };
 
 const MODEL_URL = "/assets/models/cafe-customer.glb";
+const WALL_HEIGHT = 2.7;
 
 function createRoom(scene: THREE.Scene, layout: StoreLayout) {
   const floor = new THREE.Mesh(
@@ -42,11 +43,11 @@ function createRoom(scene: THREE.Scene, layout: StoreLayout) {
   scene.add(floor);
 
   const wallMaterial = new THREE.MeshStandardMaterial({ color: "#ffffff", roughness: 0.88 });
-  const northWall = new THREE.Mesh(new THREE.BoxGeometry(layout.width, 2.7, 0.14), wallMaterial);
-  northWall.position.set(layout.width / 2, 1.35, 0);
+  const northWall = new THREE.Mesh(new THREE.BoxGeometry(layout.width, WALL_HEIGHT, 0.14), wallMaterial);
+  northWall.position.set(layout.width / 2, WALL_HEIGHT / 2, 0);
   northWall.receiveShadow = true;
-  const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.7, layout.depth), wallMaterial);
-  westWall.position.set(0, 1.35, layout.depth / 2);
+  const westWall = new THREE.Mesh(new THREE.BoxGeometry(0.14, WALL_HEIGHT, layout.depth), wallMaterial);
+  westWall.position.set(0, WALL_HEIGHT / 2, layout.depth / 2);
   westWall.receiveShadow = true;
   scene.add(northWall, westWall);
 }
@@ -134,20 +135,50 @@ function createCamera(layout: StoreLayout, element: HTMLElement) {
   const aspect = Math.max(1, element.clientWidth) / Math.max(1, element.clientHeight);
   // Orthographic isometric: ระยะเยื้องแกน X/Y/Z ต้องเท่ากัน
   // จึงได้ azimuth 45° และ elevation 35.264° ทำให้แกนพื้นทั้งสองย่อเท่ากันบนจอ
-  const span = Math.max(layout.width, layout.depth) * 0.56 + 1.2;
-  const camera = new THREE.OrthographicCamera(-span * aspect, span * aspect, span, -span, 0.1, 100);
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
   const targetX = layout.width / 2;
   const targetY = 0.45;
   const targetZ = layout.depth / 2;
   const isoDistance = Math.max(layout.width, layout.depth) * 1.6 + 1;
   camera.position.set(targetX + isoDistance, targetY + isoDistance, targetZ + isoDistance);
   camera.lookAt(targetX, targetY, targetZ);
+  camera.updateMatrixWorld();
+
+  // พอดีกรอบ: ฉายมุมห้อง (พื้น + ยอดผนัง) ลงพิกัดกล้อง แล้วขยายด้านที่ขาดให้ตรงสัดส่วนจอ — เต็มจอทั้งแนวตั้งและแนวนอน
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const corner = new THREE.Vector3();
+  for (const x of [0, layout.width]) {
+    for (const z of [0, layout.depth]) {
+      for (const y of [0, WALL_HEIGHT]) {
+        corner.set(x, y, z).applyMatrix4(camera.matrixWorldInverse);
+        minX = Math.min(minX, corner.x);
+        maxX = Math.max(maxX, corner.x);
+        minY = Math.min(minY, corner.y);
+        maxY = Math.max(maxY, corner.y);
+      }
+    }
+  }
+  const pad = 0.06;
+  let halfW = ((maxX - minX) / 2) * (1 + pad);
+  let halfH = ((maxY - minY) / 2) * (1 + pad);
+  if (halfW / halfH > aspect) halfH = halfW / aspect;
+  else halfW = halfH * aspect;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  camera.left = cx - halfW;
+  camera.right = cx + halfW;
+  camera.top = cy + halfH;
+  camera.bottom = cy - halfH;
+  camera.updateProjectionMatrix();
   return camera;
 }
 
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
 export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
+  // ซูมผ่านกล้อง (ไม่ใช้ CSS scale) เพื่อให้ภาพยังอยู่ในกรอบ Canvas เต็มพื้นที่
+  const zoomRef = React.useRef(zoom);
+  const applyZoomRef = React.useRef<(zoom: number) => void>(() => {});
 
   React.useEffect(() => {
     const host = hostRef.current;
@@ -215,8 +246,14 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
       camera.bottom = next.bottom;
       camera.position.copy(next.position);
       camera.lookAt(layout.width / 2, 0.45, layout.depth / 2);
+      camera.zoom = zoomRef.current;
       camera.updateProjectionMatrix();
       renderer.setSize(width, height, false);
+    };
+    applyZoomRef.current = (next) => {
+      camera.zoom = next;
+      camera.updateProjectionMatrix();
+      renderer.render(scene, camera);
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -282,18 +319,23 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
 
     return () => {
       cancelAnimationFrame(frame);
+      applyZoomRef.current = () => {};
       observer.disconnect();
       renderer.dispose();
       renderer.domElement.remove();
     };
   }, [isSim, layout, onUnavailable]);
 
+  React.useEffect(() => {
+    zoomRef.current = zoom;
+    applyZoomRef.current(zoom);
+  }, [zoom]);
+
   return (
     <figure
-      className="relative m-0 h-full min-h-[260px] w-full overflow-hidden rounded-[20px]"
+      className="relative m-0 h-full min-h-[260px] w-full max-[767px]:min-h-[160px] overflow-hidden rounded-[20px]"
       aria-label={`มุมมองร้าน 3 มิติ ขนาด ${layout.width} × ${layout.depth} เมตร`}
       data-testid="three-view"
-      style={{ transform: `scale(${zoom})`, transformOrigin: "center" }}
     >
       <div ref={hostRef} className="absolute inset-0" />
     </figure>

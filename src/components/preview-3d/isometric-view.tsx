@@ -137,9 +137,9 @@ export function IsometricScene({
   const boxRef = React.useRef<HTMLDivElement>(null);
   const warnedRef = React.useRef(false);
 
-  // fill = เต็มพื้นที่ Canvas ของ Editor (เผื่อความสูงให้แถบหัว คำอธิบาย และแถบสถานะ); หน้าแชร์ใช้ขนาดคงที่
+  // fill = เต็มพื้นที่ Canvas ของ Editor (cqw/cqh จาก container ของ Stage เผื่อความสูงให้คำอธิบาย); หน้าแชร์ใช้ขนาดคงที่
   const [, , vbWidth = 1, vbHeight = 1] = scene.viewBox.split(" ").map(Number);
-  const fitWidth = fill ? `min(100%, max(240px, 100dvh - 205px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
+  const fitWidth = fill ? `min(100cqw, max(140px, 100cqh - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
   const counts = {
     table: layout.objects.filter((o) => o.type === "table").length,
     chair: layout.objects.filter((o) => o.type === "chair").length,
@@ -244,7 +244,7 @@ export function IsometricScene({
   const room = { width: layout.width, depth: layout.depth };
 
   return (
-    <figure className="relative m-0 flex w-full flex-col items-center gap-3">
+    <figure className="relative m-0 flex w-full flex-col items-center gap-3 max-[767px]:gap-0">
       {isSim && (
         <div
           data-testid="chip-lock"
@@ -406,7 +406,7 @@ export function IsometricScene({
         )}
       </div>
 
-      <figcaption className="px-2 text-center text-[12px] leading-[1.6] text-secondary-strong">
+      <figcaption className="px-2 text-center max-[767px]:sr-only text-[12px] leading-[1.6] text-secondary-strong">
         ภาพตัวอย่าง Isometric จากผัง 2D เดียวกัน · คลิกเลือกวัตถุแล้วขยับด้วยปุ่มลูกศร
       </figcaption>
     </figure>

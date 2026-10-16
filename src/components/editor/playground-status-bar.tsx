@@ -98,7 +98,7 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
       <button
         type="button"
         onClick={handleBackToEdit}
-        className="inline-flex items-center gap-1.5 rounded-[10px] border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink hover:border-[#c8d2e2] hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+        className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] border border-line bg-white px-3 py-1.5 text-[13px] font-medium text-ink hover:border-[#c8d2e2] hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
       >
         <svg viewBox="0 0 24 24" className="size-3.5 text-secondary" aria-hidden="true" {...ICON}>
           <path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
@@ -113,7 +113,7 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
         onClick={handleCta}
         aria-disabled={!isReady}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-[10px] px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus",
+          "inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 py-1.5 text-[13px] font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus",
           isReady
             ? "bg-blue text-white hover:bg-blue-hover"
             : "border border-line bg-white text-secondary hover:bg-surface hover:text-ink",
@@ -142,7 +142,11 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
       id="status"
       data-testid="validation-status-bar"
       data-status={result.status}
-      className="[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:h-auto max-[767px]:flex-wrap max-[767px]:px-3 max-[767px]:py-2"
+      className={cn(
+        "[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:gap-2 max-[767px]:px-3",
+        // มือถือ: สถานะดูได้จาก badge ที่แท็บ "จำลอง" แล้ว — เก็บแถบไว้เฉพาะตอนจำลอง
+        !isSim && "max-[767px]:hidden",
+      )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-ink" id="stMsg">
         <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", dotColor)} />

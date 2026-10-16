@@ -72,7 +72,8 @@ function Segmented<V extends string>({
             key={o.value}
             className={cn(
               "flex min-h-9 cursor-pointer items-center justify-center rounded-[6px] px-2 text-[13px] has-[:focus-visible]:outline-3 has-[:focus-visible]:outline-solid has-[:focus-visible]:outline-focus",
-              value === o.value ? "bg-white font-semibold text-ink shadow-sm" : "text-secondary",
+              // text-secondary-strong: ผ่าน 4.5:1 บนพื้น #f1f4f9 (text-secondary ได้แค่ 4.26:1)
+              value === o.value ? "bg-white font-semibold text-ink shadow-sm" : "text-secondary-strong",
             )}
           >
             <input

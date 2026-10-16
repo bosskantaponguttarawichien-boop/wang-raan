@@ -158,6 +158,18 @@ describe("Pointer drag", () => {
     expect(document.querySelector(`[data-id="${table.id}"]`)).toHaveAttribute("data-issue", "blocked");
   });
 
+  it("นิ้วที่สองแตะระหว่างลาก (pinch ซูม) → หยุดลาก วัตถุไม่เลื่อนตามนิ้วแรก และนิ้วที่สองไม่เริ่มลากใหม่", () => {
+    render(<Harness />);
+    const table = state().layout.objects.find((o) => o.type === "table")!;
+    const el = document.querySelector<HTMLButtonElement>(`[data-id="${table.id}"]`)!;
+    const touch = { pointerType: "touch", button: 0 };
+    fireEvent.pointerDown(el, { ...touch, pointerId: 1, isPrimary: true, clientX: 400, clientY: 400 });
+    fireEvent.pointerDown(el, { ...touch, pointerId: 2, isPrimary: false, clientX: 500, clientY: 400 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 150, clientY: 150 });
+    fireEvent.pointerMove(el, { pointerId: 2, clientX: 150, clientY: 150 });
+    expect(find(table.id)).toMatchObject({ x: 3, y: 3 });
+  });
+
   it("pointer อื่น / ปุ่มขวา ไม่เริ่มการลาก", () => {
     render(<Harness />);
     const kitchen = state().layout.objects[0]!;

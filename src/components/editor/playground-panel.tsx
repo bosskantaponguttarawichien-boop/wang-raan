@@ -105,17 +105,19 @@ export function PlaygroundPanel({
       aria-live="polite"
       className={cn(
         "[grid-area:panel] min-w-0 border-r border-line bg-white p-4 overflow-y-auto",
-        "max-[767px]:border-r-0 max-[767px]:border-t max-[767px]:max-h-[38vh] max-[767px]:rounded-t-[16px] max-[767px]:p-3.5 max-[767px]:shadow-[0_-6px_20px_rgba(30,43,64,0.06)]",
+        "max-[767px]:border-r-0 max-[767px]:border-t max-[767px]:max-h-[40dvh] max-[767px]:rounded-t-[16px] max-[767px]:px-4 max-[767px]:pb-4 max-[767px]:pt-0 max-[767px]:shadow-[0_-6px_20px_rgba(30,43,64,0.06)]",
         !sheetOpen && "max-[767px]:hidden",
       )}
     >
-      {/* Mobile Grip handle */}
+      {/* Mobile Grip handle — พื้นที่กดเต็มความกว้าง ติดขอบบนขณะเลื่อนเนื้อหาในแผง */}
       <button
         type="button"
         aria-label="ย่อ/ขยายแผง"
         onClick={onToggleSheet}
-        className="mx-auto mb-2.5 hidden h-1 w-9 rounded-full bg-[#d4dbe6] max-[767px]:block"
-      />
+        className="sticky top-0 z-10 -mx-4 mb-1 hidden h-6 w-[calc(100%+2rem)] place-items-center bg-white focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus max-[767px]:grid"
+      >
+        <span aria-hidden="true" className="block h-1 w-9 rounded-full bg-[#d4dbe6]" />
+      </button>
 
       {isSim ? (
         <div>
@@ -135,7 +137,7 @@ export function PlaygroundPanel({
         <div>
           <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">ขนาดร้านและทางเข้า</h2>
           <p className="m-0 mb-3 text-[12px] leading-[1.5] text-secondary">
-            ร้าน 2–30 ม. ปรับทีละ 25 ซม. · กด Enter หรือออกจากช่องเพื่อใช้ค่า
+            ร้าน 2–30 ม. ปรับทีละ 25 ซม.<span className="max-[767px]:hidden"> · กด Enter หรือออกจากช่องเพื่อใช้ค่า</span>
           </p>
           <RoomSettingsForm />
         </div>
@@ -172,14 +174,15 @@ export function PlaygroundPanel({
             กดเพื่อวางบนผัง แล้วลากไปตำแหน่งที่ต้องการ
           </p>
 
-          <div className="cat-list grid gap-2 max-[767px]:flex max-[767px]:overflow-x-auto max-[767px]:pb-2 max-[767px]:snap-x max-[767px]:-mx-1 max-[767px]:px-1">
+          {/* มือถือ: 3 ไทล์เรียงแถวเดียว เห็นครบทุกชนิดโดยไม่ต้องเลื่อน */}
+          <div className="cat-list grid gap-2 max-[767px]:grid-cols-3">
             {PALETTE.map((item) => (
               <PaletteItem
                 key={item.key}
                 name={item.name}
                 size={item.size}
                 icon={item.icon}
-                className="max-[767px]:min-w-[195px] max-[767px]:shrink-0 max-[767px]:snap-start"
+                compactOnMobile
                 onClick={() => {
                   if ("configuresTable" in item) {
                     setConfiguringTable(true);
@@ -207,7 +210,7 @@ export function PlaygroundPanel({
             ใช้ผังตัวอย่าง (คาเฟ่ 8×6 ม.)
           </button>
 
-          <p className="mb-0 mt-3 text-[11px] leading-[1.6] text-secondary">
+          <p className="mb-0 mt-3 text-[11px] leading-[1.6] text-secondary max-[767px]:hidden">
             คีย์ลัด: ลูกศรขยับ 25 ซม. (Shift = 1 ม.) · R หมุน · Delete ลบ · Esc ยกเลิกเลือก
           </p>
         </div>
