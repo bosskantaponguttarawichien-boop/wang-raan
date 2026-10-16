@@ -1,5 +1,14 @@
 # Changelog — @bosskantaponguttarawichien-boop/wang-raan-core
 
+## 1.1.0 — 2026-10-16
+
+เพิ่มเติม (ไม่มี breaking change)
+
+- `TableSchema` / `ChairSchema` รับ `style` (ไม่บังคับ): โต๊ะ `shape` · `legStyle` · `color`, เก้าอี้ `kind` · `legStyle` · `color` — Backend ที่ใช้ 1.0.0 ปฏิเสธผังที่มี `style` ด้วย 400 INVALID_LAYOUT_SCHEMA
+- `SaveLayoutRequestSchema` รับ `name` (ไม่บังคับ, 1–80 ตัวอักษรหลัง trim)
+- Table set: กำหนดจำนวนเก้าอี้ตามความจุของโต๊ะ (`setTableSetChairCount` และฟังก์ชันคำนวณความจุ), ผังตัวอย่าง, ตัวหาตำแหน่งว่าง
+- `formatter` สำหรับข้อความผลตรวจ; ใช้ค่า epsilon ร่วมกันใน geometry / validation
+
 ## 1.0.0 — 2026-10-10
 
 เวอร์ชันแรก (feat-037)

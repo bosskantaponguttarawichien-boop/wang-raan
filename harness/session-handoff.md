@@ -21,11 +21,11 @@
 - มี fallback เมื่อ reduced motion, WebGL หรือ model load ใช้ไม่ได้
 - QA: `npm test` 64 files / 850 tests, typecheck, lint และ production build ผ่าน; เปิด dev server บนเครื่องนี้ไม่ได้เพราะ Node 24 เรียก `uv_interface_addresses` แล้วระบบตอบ error จึงยังไม่ได้ตรวจ browser ในรอบนี้
 
-## 2026-10-16 ICT — fix ผังหาย/UI มือถือเพี้ยนบนเบราว์เซอร์เก่า (เสร็จแล้ว)
+## 2026-10-16 ICT — เกณฑ์เบราว์เซอร์ขั้นต่ำ + fix แท็บจำลองบนมือถือ (เสร็จแล้ว)
 
-- `postcss.config.mjs` เพิ่ม `@csstools/postcss-media-minmax` แปลง `@media (width < Npx)` ของ Tailwind v4 เป็น `max-width` ให้ Chromium < 104 อ่านได้
-- `useContainerUnits` (`src/lib/use-container-units.ts`) เป็น fallback ของ `100cqw/100cqh` ใน Artboard และ IsometricView; container ต้องมี `data-size-container` (ใส่แล้วใน `playground-editor.tsx`)
-- QA: `npm test` 850 tests, lint, typecheck, build ผ่าน; ยังไม่ได้ยืนยันกับเบราว์เซอร์จริงของผู้ใช้
+- รองรับขั้นต่ำ Chrome/Edge 111, Safari 16.4, Firefox 128 (baseline Tailwind v4); เบราว์เซอร์เก่ากว่าเห็นแถบ `BrowserSupportNotice` ให้อัปเดต — ไม่มี CSS fallback สำหรับรุ่นเก่า
+- แท็บจำลองบนมือถือ: ใส่ `relative` ให้ `#panel` และ wrapper `/playground` เพื่อไม่ให้ `sr-only` ดันหน้าสูงเกินจอ; E2E ใน `e2e/responsive.spec.ts`
+- QA: `npm test` 852 tests, lint, typecheck ผ่าน · Workers Builds ใน PR ล้มก่อน build (0 วินาที, เป็นมาตั้งแต่ PR #12) ต้องดู log ใน Cloudflare dashboard
 
 ## 2026-10-16 ICT — feat-075 แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย (เสร็จแล้ว)
 
@@ -33,24 +33,3 @@
 - คำสั่งของชุดโต๊ะย้ายมาไว้ในแผงซ้าย: ปรับจำนวนเก้าอี้ตาม capacity, ขนาด/สไตล์, พิกัด, หมุน, ทำซ้ำ และลบ; toolbar ลอยถูกซ่อนสำหรับ Table/Chair ทั้ง 2D/3D SVG
 - `setTableSetChairCount` ใน Pure Core คง id โต๊ะและเก้าอี้เดิมเท่าที่ทำได้, ไม่มี orphan และการทำซ้ำคงจำนวนเก้าอี้จริง
 - QA: `make test` 62 files / 843 tests, `make lint`, `make status` ผ่าน; Chrome ตรวจเลือกโต๊ะและเพิ่ม 2 → 3 ตัวในแผงซ้าย · ตามคำขอผู้ใช้ **ไม่ได้เขียนหรือรัน E2E**
-
-## 2026-10-16 ICT — feat-074 กำหนดจำนวนเก้าอี้ตามความจุของโต๊ะ (เสร็จแล้ว)
-
-- หน้าเพิ่มโต๊ะใช้ปุ่ม `− / +` เลือกจำนวนเก้าอี้ได้ แทน preset 2/4 ที่นั่ง และบอกความจุสูงสุดของขนาดโต๊ะปัจจุบัน
-- Pure Core ตรวจ capacity ก่อนสร้างและจัดเก้าอี้รอบโต๊ะโดยไม่ทับกัน; สร้างเกินความจุถูกปฏิเสธ และการย่อโต๊ะจนรองรับเก้าอี้เดิมไม่พอจะไม่เปลี่ยนผัง
-- QA: `make test` 62 files / 839 tests, `make lint`, `make status` ผ่าน; ตรวจ Chrome: โต๊ะ 1.2 × 1.2 ม. เพิ่มถึง 8 ตัวแล้วปุ่ม `+` ถูกปิด
-- ตามคำขอผู้ใช้ รอบนี้ **ไม่ได้เขียนหรือรัน E2E**
-
-## 2026-10-16 ICT — feat-073 รวมการเพิ่มโต๊ะเป็นหน้าตั้งค่าในแผงซ้าย (เสร็จแล้ว)
-
-- แท็บเพิ่มเหลือการ์ด “โต๊ะ” รายการเดียว; คลิกแล้วแทนเนื้อหาแผงซ้ายด้วย `table-set-create-panel.tsx` ซึ่งเลือกจำนวนที่นั่ง ขนาด และสไตล์ได้
-- ปุ่ม “กลับ” ด้านบนออกจากหน้าตั้งค่าโดยไม่แก้ผัง; ปุ่มยืนยันเท่านั้นที่เรียก `addTableSet` จึงคง Table–Chair lifecycle เดิม
-- QA: `make test` 62 files / 838 tests, `make lint`, `make status` ผ่าน
-- ตามคำขอผู้ใช้ รอบนี้ **ไม่ได้เขียนหรือรัน E2E**; selectors E2E ที่ยังอ้าง dialog เก่าควรปรับรวมในรอบ E2E ภายหลัง
-- 2026-10-16: หน้า `/playground` เคยค้างที่ dynamic loading เพราะ dev server พอร์ต 3000 ถือ `.next` cache คนละรุ่นกับโค้ด; ล้าง cache generated และรีสตาร์ต server เดียวบนพอร์ต 3000 แล้วตรวจใน Chrome ว่า editor แสดงครบและ console สะอาด
-
-## 2026-10-16 ICT — feat-072 ตั้งค่าชุดโต๊ะก่อนวาง (เสร็จแล้ว)
-
-- Palette ชุดโต๊ะ 2/4 ที่นั่งเปิด `table-set-create-dialog.tsx` ก่อนเพิ่มจริง เลือกจำนวนที่นั่ง, ขนาด, ทรง/ขา/สีโต๊ะ และแบบ/ขา/สีเก้าอี้ได้ครบ; ยกเลิกแล้วไม่มีวัตถุใหม่บนผัง
-- `addTableSet(..., options)` ใน Core จัดขนาดและสไตล์ด้วย lifecycle เดิมใน state commit เดียว: เก้าอี้ลูกทุกตัวยังสัมพันธ์กับโต๊ะแม่และไม่มี orphan
-- QA ล่าสุด: `make test` 62 files / 838 tests, `make lint` ผ่าน, Playwright `playground-ux` + `keyboard` 12/12 และ `editor-flow` 10/10 ผ่าน

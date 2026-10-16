@@ -43,7 +43,6 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
-    "@csstools/postcss-media-minmax": "^3.0.8",
     "@eslint/eslintrc": "^3.3.7",
     "@opennextjs/cloudflare": "^1.20.10",
     "@playwright/test": "^1.64.0",

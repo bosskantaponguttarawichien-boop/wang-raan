@@ -14,7 +14,6 @@ import { SelectionToolbar } from "@/components/editor-2d/selection-toolbar";
 import { IsoHeatmapLayer, IsoSimulationOverlay } from "@/components/simulation/iso-simulation-overlay";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
-import { useContainerUnits } from "@/lib/use-container-units";
 
 const SELECTION_BLUE = "#3b62f4";
 const ThreeView = dynamic(() => import("./three-view").then((module) => module.ThreeView), { ssr: false });
@@ -137,11 +136,10 @@ export function IsometricScene({
   };
   const boxRef = React.useRef<HTMLDivElement>(null);
   const warnedRef = React.useRef(false);
-  const cq = useContainerUnits(boxRef);
 
   // fill = เต็มพื้นที่ Canvas ของ Editor (cqw/cqh จาก container ของ Stage เผื่อความสูงให้คำอธิบาย); หน้าแชร์ใช้ขนาดคงที่
   const [, , vbWidth = 1, vbHeight = 1] = scene.viewBox.split(" ").map(Number);
-  const fitWidth = fill ? `min(${cq.width}, max(140px, ${cq.height} - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
+  const fitWidth = fill ? `min(100cqw, max(140px, 100cqh - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
   const counts = {
     table: layout.objects.filter((o) => o.type === "table").length,
     chair: layout.objects.filter((o) => o.type === "chair").length,
