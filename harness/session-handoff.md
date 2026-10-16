@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-16 ICT — fix ผังหาย/UI มือถือเพี้ยนบนเบราว์เซอร์เก่า (เสร็จแล้ว)
+
+- `postcss.config.mjs` เพิ่ม `@csstools/postcss-media-minmax` แปลง `@media (width < Npx)` ของ Tailwind v4 เป็น `max-width` ให้ Chromium < 104 อ่านได้
+- `useContainerUnits` (`src/lib/use-container-units.ts`) เป็น fallback ของ `100cqw/100cqh` ใน Artboard และ IsometricView; container ต้องมี `data-size-container` (ใส่แล้วใน `playground-editor.tsx`)
+- QA: `npm test` 850 tests, lint, typecheck, build ผ่าน; ยังไม่ได้ยืนยันกับเบราว์เซอร์จริงของผู้ใช้
+
 ## 2026-10-16 ICT — feat-075 แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย (เสร็จแล้ว)
 
 - เลือกโต๊ะหรือเก้าอี้ลูกแล้ว แผงซ้ายจะเป็นหน้า “แก้ไขโต๊ะ” ของชุดโต๊ะแม่ทันที; กดกลับเพื่อเลิกเลือกและคืนหน้าเพิ่มลงผัง
@@ -30,9 +36,3 @@
 - Palette ชุดโต๊ะ 2/4 ที่นั่งเปิด `table-set-create-dialog.tsx` ก่อนเพิ่มจริง เลือกจำนวนที่นั่ง, ขนาด, ทรง/ขา/สีโต๊ะ และแบบ/ขา/สีเก้าอี้ได้ครบ; ยกเลิกแล้วไม่มีวัตถุใหม่บนผัง
 - `addTableSet(..., options)` ใน Core จัดขนาดและสไตล์ด้วย lifecycle เดิมใน state commit เดียว: เก้าอี้ลูกทุกตัวยังสัมพันธ์กับโต๊ะแม่และไม่มี orphan
 - QA ล่าสุด: `make test` 62 files / 838 tests, `make lint` ผ่าน, Playwright `playground-ux` + `keyboard` 12/12 และ `editor-flow` 10/10 ผ่าน
-
-## 2026-10-16 ICT — feat-071 แบบโต๊ะ/เก้าอี้ (เสร็จแล้ว)
-
-- เลือกโต๊ะ → ปุ่ม "แบบ" ในแถบเครื่องมือ: ขนาด (0.60–3.00 ม.), ทรง, ขา, สีโต๊ะ และแบบ/ขา/สีเก้าอี้ทั้งชุด
-- ⚠️ **Backend (wang-raan-service)**: `contracts/openapi.yaml` เพิ่ม `style` ใน Table/Chair แล้ว — ถ้า backend ตรวจ `additionalProperties: false` ตามสัญญาเดิม การบันทึกออนไลน์ผังที่มี style จะถูกปฏิเสธจนกว่าจะอัปเดตฝั่ง service
-- โต๊ะกลมยังตรวจระยะด้วยกรอบจัตุรัส (เผื่อปลอดภัย) · ยังไม่ได้รัน `make e2e`

@@ -3,6 +3,13 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-16] fix — ผัง 2D หาย / UI มือถือเพี้ยนบนเบราว์เซอร์รุ่นเก่า
+
+- อาการ: บนมือถือบางเครื่อง ผังหดเหลือจุดเล็กใต้ป้าย “8 เมตร”, คำแนะนำคีย์บอร์ดโผล่, แผงล่างไม่มีที่จับและการ์ดเรียงแนวตั้ง
+- สาเหตุ: Tailwind v4 สร้าง breakpoint แบบ range (`@media (width < 767px)`) และผังใช้หน่วย `cqw/cqh` — Chromium < 104/105 ไม่รู้จักทั้งสองอย่าง จึงทิ้งกฎ `max-[767px]:*` ทั้งหมด และทิ้ง width ของผัง (เหลือ 0)
+- แก้: เพิ่ม `@csstools/postcss-media-minmax` ต่อจาก Tailwind ใน `postcss.config.mjs` (แปลงเป็น `max-width/min-width`); hook `src/lib/use-container-units.ts` วัดขนาด `[data-size-container]` เป็น px เมื่อ `CSS.supports("width","1cqw")` เป็นเท็จ ใช้ทั้ง Artboard 2D และ Isometric
+- **QA**: `npm test` 64 files / 850 tests, `npm run lint`, typecheck, `npm run build` ผ่าน · CSS production ไม่มี range media query เหลือ · Playwright จำลองเบราว์เซอร์ไม่รองรับ cq/range MQ ที่ 412px → ผังแสดงเต็มเหมือนเบราว์เซอร์ใหม่
+
 ## [2026-10-16] feat-075 — แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย
 
 - เลือกโต๊ะหรือเก้าอี้ลูกแล้ว แผงซ้ายเปลี่ยนเป็น “แก้ไขโต๊ะ” ของชุดโต๊ะแม่ทันที; ปุ่มกลับยกเลิกการเลือกและคืนหน้ารายการเพิ่ม
