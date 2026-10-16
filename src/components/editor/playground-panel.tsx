@@ -104,7 +104,7 @@ export function PlaygroundPanel({
       id="panel"
       aria-live="polite"
       className={cn(
-        "[grid-area:panel] min-w-0 border-r border-line bg-white p-4 overflow-y-auto",
+        "relative [grid-area:panel] min-w-0 border-r border-line bg-white p-4 overflow-y-auto",
         "max-[767px]:border-r-0 max-[767px]:border-t max-[767px]:max-h-[40dvh] max-[767px]:rounded-t-[16px] max-[767px]:px-4 max-[767px]:pb-4 max-[767px]:pt-0 max-[767px]:shadow-[0_-6px_20px_rgba(30,43,64,0.06)]",
         !sheetOpen && "max-[767px]:hidden",
       )}

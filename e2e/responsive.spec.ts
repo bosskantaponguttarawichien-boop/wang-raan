@@ -58,5 +58,14 @@ for (const width of BREAKPOINTS) {
       else await expect(statusBar).toBeVisible();
       await page.screenshot({ path: `e2e/.results/screens/playground-${width}.png`, fullPage: true });
     });
+
+    test("Playground แท็บจำลอง: หน้าไม่สูงเกินจอ (ไม่มี vertical scroll ทั้งหน้า)", async ({ page }) => {
+      await page.goto("/playground");
+      await expect(page.getByRole("application")).toBeVisible();
+      await page.locator('#rail [data-tab="check"]').click();
+      await expect(page.getByTestId("simulation-panel")).toBeVisible();
+      // ข้อความ sr-only (position: absolute) ในแผงเคยหลุดไปอิง <body> → หน้าสูงเกินจอ เลื่อนแล้วเหลือที่ว่างใต้แถบเมนู
+      expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight)).toBeLessThanOrEqual(0);
+    });
   });
 }
