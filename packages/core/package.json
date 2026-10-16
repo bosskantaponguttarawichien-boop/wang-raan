@@ -1,6 +1,6 @@
 {
   "name": "@bosskantaponguttarawichien-boop/wang-raan-core",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "กฎผังร้านของวางร้าน (types, geometry, table-set lifecycle, Validation Engine, Zod schemas) — Pure TypeScript ใช้ร่วมกันระหว่างหน้าเว็บและ Backend",
   "license": "UNLICENSED",
   "private": false,
