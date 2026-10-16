@@ -142,7 +142,11 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
       id="status"
       data-testid="validation-status-bar"
       data-status={result.status}
-      className="[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:gap-2 max-[767px]:px-3"
+      className={cn(
+        "[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:gap-2 max-[767px]:px-3",
+        // มือถือ: สถานะดูได้จาก badge ที่แท็บ "จำลอง" แล้ว — เก็บแถบไว้เฉพาะตอนจำลอง
+        !isSim && "max-[767px]:hidden",
+      )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-ink" id="stMsg">
         <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", dotColor)} />

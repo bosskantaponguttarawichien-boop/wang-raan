@@ -368,7 +368,8 @@
 @media (max-width: 767px) {
   .playground-shell {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 52px minmax(0, 1fr) auto 52px 56px;
+    /* แถบสถานะ (auto) ซ่อนบนมือถือตอนแก้ผัง — แสดงเฉพาะตอนจำลองเพื่อปุ่ม "กลับไปแก้ผัง" */
+    grid-template-rows: 52px minmax(0, 1fr) auto auto 56px;
     grid-template-areas:
       "hd"
       "stage"
@@ -378,7 +379,7 @@
   }
   .playground-shell.sim-mode {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: 52px minmax(0, 1fr) auto 52px 0px;
+    grid-template-rows: 52px minmax(0, 1fr) auto auto 0px;
     grid-template-areas:
       "hd"
       "stage"
