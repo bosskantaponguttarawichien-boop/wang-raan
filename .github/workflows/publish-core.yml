@@ -1,10 +1,13 @@
 # เผยแพร่ package core ไป GitHub Packages (feat-037)
-# วิธีปล่อยเวอร์ชันใหม่: แก้ version ใน packages/core/package.json + CHANGELOG.md → merge → push tag `core-v<version>` เช่น core-v1.0.0
+# วิธีปล่อยเวอร์ชันใหม่: แก้ version ใน packages/core/package.json + CHANGELOG.md → merge เข้า main
+#   (merge แล้ว publish อัตโนมัติถ้า version นั้นยังไม่มีใน registry) หรือ push tag `core-v<version>` เช่น core-v1.0.0
 name: Publish core package
 
 on:
   push:
     tags: ["core-v*"]
+    branches: [main]
+    paths: ["packages/core/package.json"]
 
 permissions:
   contents: read
@@ -23,9 +26,23 @@ jobs:
           registry-url: https://npm.pkg.github.com
           scope: "@bosskantaponguttarawichien-boop"
 
+      - name: ข้ามถ้า version นี้ publish ไปแล้ว (push เข้า main ที่ไม่ได้เปลี่ยน version)
+        id: check
+        run: |
+          VERSION="$(node -p "require('./packages/core/package.json').version")"
+          if npm view "@bosskantaponguttarawichien-boop/wang-raan-core@${VERSION}" version >/dev/null 2>&1; then
+            echo "version ${VERSION} มีอยู่แล้ว — ไม่ publish ซ้ำ"; echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - run: npm ci
+        if: steps.check.outputs.skip != 'true'
 
       - name: tag ต้องตรงกับ version ใน package.json
+        if: github.ref_type == 'tag'
         run: |
           VERSION="$(node -p "require('./packages/core/package.json').version")"
           if [ "${GITHUB_REF_NAME}" != "core-v${VERSION}" ]; then
@@ -33,12 +50,15 @@ jobs:
           fi
 
       - name: เทสต์ทั้งหมด (กฎใน src/core ต้องผ่านก่อนเผยแพร่)
+        if: steps.check.outputs.skip != 'true'
         run: npm test
 
       - name: Smoke test (build + pack + ติดตั้งในโปรเจกต์เปล่า)
+        if: steps.check.outputs.skip != 'true'
         run: npm run core:smoke
 
       - name: Publish
+        if: steps.check.outputs.skip != 'true'
         working-directory: packages/core
         run: npm publish
         env:
