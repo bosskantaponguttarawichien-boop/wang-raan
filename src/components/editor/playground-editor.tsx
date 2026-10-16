@@ -130,11 +130,12 @@ export function PlaygroundEditor() {
           aria-label="พื้นที่จัดผังร้าน"
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-surface [grid-area:stage]"
         >
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-6 max-[767px]:p-2.5">
+          {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ */}
+          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] max-[767px]:p-2">
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 
-          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:hidden" />
+          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:bottom-2 max-[767px]:left-2" />
         </main>
 
         <PlaygroundStatusBar live={live} onFocusIssue={focusIssue} />
