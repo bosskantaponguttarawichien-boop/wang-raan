@@ -141,6 +141,8 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const stageRef = React.useRef<HTMLDivElement>(null);
   const boxRef = React.useRef<HTMLDivElement>(null);
   const drag = React.useRef<DragState | null>(null);
+  // นิ้วที่แตะผังอยู่ — ถ้าเกิน 1 นิ้วคือกำลัง pinch ซูม จึงหยุด/ไม่เริ่มลากวัตถุ
+  const touches = React.useRef(new Set<number>());
   const [draggingId, setDraggingId] = React.useState<string | null>(null);
   const hintId = React.useId();
 
@@ -160,6 +162,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Pointer: ย้าย / ปรับขนาด / ลากทางเข้า ───────────────────────────────
   const startDrag = (event: React.PointerEvent<HTMLElement>, state: DragState) => {
     if (event.button !== 0) return;
+    if (touches.current.size > 1) return;
     event.preventDefault();
     event.stopPropagation();
     event.currentTarget.setPointerCapture?.(event.pointerId);
@@ -194,11 +197,24 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     }
   };
 
-  const endDrag = (event: React.PointerEvent<HTMLElement>) => {
-    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+  const finishDrag = () => {
     drag.current = null;
     actions().endInteraction();
     setDraggingId(null);
+  };
+
+  const endDrag = (event: React.PointerEvent<HTMLElement>) => {
+    if (!drag.current || drag.current.pointerId !== event.pointerId) return;
+    finishDrag();
+  };
+
+  const onTouchPointerDown = (event: React.PointerEvent<HTMLElement>) => {
+    if (event.pointerType !== "touch") return;
+    touches.current.add(event.pointerId);
+    if (touches.current.size > 1 && drag.current) finishDrag();
+  };
+  const onTouchPointerUp = (event: React.PointerEvent<HTMLElement>) => {
+    touches.current.delete(event.pointerId);
   };
 
   // ── Keyboard ─────────────────────────────────────────────────────────────
@@ -274,6 +290,9 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
       <div
         ref={boxRef}
         className="relative rounded-[2px] border-4 border-[var(--plan-wall)] bg-white"
+        onPointerDownCapture={onTouchPointerDown}
+        onPointerUpCapture={onTouchPointerUp}
+        onPointerCancelCapture={onTouchPointerUp}
         style={{
           width: `calc(${fitWidth} * ${zoom})`,
           aspectRatio: `${layout.width} / ${layout.depth}`,

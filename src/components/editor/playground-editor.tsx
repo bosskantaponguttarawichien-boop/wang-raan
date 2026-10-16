@@ -17,6 +17,7 @@ import { restoreDraft, startAutosave } from "@/lib/draft-autosave";
 import { useOnlineAutosave } from "@/lib/online-autosave";
 import { useGuestSync } from "@/lib/guest-sync";
 import { ZoomControls } from "./canvas-controls";
+import { usePinchZoom } from "./use-pinch-zoom";
 import { PlaygroundHeader } from "./playground-header";
 import { PlaygroundRail } from "./playground-rail";
 import { PlaygroundPanel } from "./playground-panel";
@@ -79,6 +80,9 @@ export function PlaygroundEditor() {
   const simStatus = useSimulationStore((s) => s.status);
   const isSim = simStatus === "running" || simStatus === "paused";
 
+  const stageRef = React.useRef<HTMLElement>(null);
+  usePinchZoom(stageRef);
+
   const [sheetOpen, setSheetOpen] = React.useState(true);
   const [toastMsg, setToastMsg] = React.useState<string | null>(null);
   const toastTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -126,16 +130,19 @@ export function PlaygroundEditor() {
         />
 
         <main
+          ref={stageRef}
           id="stage"
           aria-label="พื้นที่จัดผังร้าน"
           className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-auto bg-surface [grid-area:stage]"
         >
-          {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ */}
-          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] max-[767px]:p-2">
+          {/* container-type: size → ผัง 2D/3D คำนวณขนาดพอดีจากพื้นที่จริง (cqw/cqh) ไม่ใช่ความสูงทั้งหน้าจอ
+              touch-action: pan → นิ้วเดียวเลื่อนดูได้ ส่วนสองนิ้วให้ usePinchZoom ซูมแทนการซูมทั้งหน้าเว็บ */}
+          <div className="flex min-h-0 flex-1 items-center-safe justify-center-safe overflow-auto p-6 [container-type:size] [touch-action:pan-x_pan-y] max-[767px]:p-2">
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 
-          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:bottom-2 max-[767px]:left-2" />
+          {/* มือถือซูมด้วยสองนิ้วแทนปุ่ม */}
+          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:hidden" />
         </main>
 
         <PlaygroundStatusBar live={live} onFocusIssue={focusIssue} />
