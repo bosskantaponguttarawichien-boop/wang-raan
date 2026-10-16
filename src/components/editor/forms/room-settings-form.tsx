@@ -136,7 +136,7 @@ function RoomSettingsFormInner() {
           {(aria) => <input {...aria} {...numberProps} min={0.6} max={3} step={0.05} {...register("entranceWidth", { valueAsNumber: true })} />}
         </Field>
       </div>
-      <p className="mb-0 mt-3 text-[11.5px] leading-[1.6] text-secondary">
+      <p className="mb-0 mt-3 text-[11.5px] leading-[1.6] text-secondary max-[767px]:hidden">
         ทางลัด: กดที่ป้าย &ldquo;เข้า&rdquo; บนผังเพื่อมาหน้านี้ · ร้าน 2–30 ม. ปรับทีละ 25 ซม.
       </p>
     </form>

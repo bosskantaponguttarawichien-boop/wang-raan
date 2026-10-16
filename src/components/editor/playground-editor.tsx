@@ -154,7 +154,7 @@ export function PlaygroundEditor() {
           role="status"
           aria-live="polite"
           data-testid="toast"
-          className="fixed bottom-[76px] left-1/2 z-50 max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
+          className="fixed bottom-[76px] left-1/2 z-50 max-[767px]:bottom-auto max-[767px]:top-[60px] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
         >
           {toastMsg}
         </div>

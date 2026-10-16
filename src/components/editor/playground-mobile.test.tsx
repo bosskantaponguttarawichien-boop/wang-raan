@@ -69,13 +69,13 @@ describe("feat-059: Playground มือถือ — Bottom Tab Bar + Bottom Sh
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
-  it("แคตตาล็อกในแท็บเพิ่มมี class เลื่อนแนวนอนบน mobile (overflow-x-auto, shrink-0)", () => {
+  it("แคตตาล็อกในแท็บเพิ่มเป็นไทล์ 3 ช่องบน mobile (เห็นครบโดยไม่ต้องเลื่อน)", () => {
     const { container } = render(<PanelHarness sheetOpen={true} onToggleSheet={() => {}} />);
     const catList = container.querySelector(".cat-list");
-    expect(catList).toHaveClass("max-[767px]:overflow-x-auto");
+    expect(catList).toHaveClass("max-[767px]:grid-cols-3");
 
     const item = screen.getByRole("button", { name: /เพิ่มโต๊ะ/i });
-    expect(item).toHaveClass("max-[767px]:shrink-0");
+    expect(item).toHaveClass("max-[767px]:flex-col");
   });
 
   it("ViewSwitch ใน Header มีป้ายชื่อสั้น 2D / 3D สำหรับหน้าจอมือถือ (< 480px)", () => {
