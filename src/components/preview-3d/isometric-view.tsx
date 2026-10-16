@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import {
   type LayoutObject,
   type StoreLayout,
@@ -8,22 +9,86 @@ import {
   footprint,
   getChairsOfTable,
 } from "@/core/layout";
-import { buildIsoScene, ISO_PALETTE } from "@/core/preview/isometric";
+import { buildIsoScene, isoFloorRect, ISO_PALETTE } from "@/core/preview/isometric";
 import { SelectionToolbar } from "@/components/editor-2d/selection-toolbar";
+import { IsoHeatmapLayer, IsoSimulationOverlay } from "@/components/simulation/iso-simulation-overlay";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
+
+const SELECTION_BLUE = "#3b62f4";
+const ThreeView = dynamic(() => import("./three-view").then((module) => module.ThreeView), { ssr: false });
 
 export interface IsometricViewProps {
   onToast?: (message: string) => void;
 }
 
-/** มุมมอง 3D Isometric ของผังใน Editor (อ่านจาก store) */
+/** มุมมอง 3D ของผังใน Editor — Three.js ถูกแยกเป็น lazy chunk; SVG ด้านล่างเป็น fallback */
 export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
   const layout = useLayoutStore((s) => s.layout);
   const zoom = useLayoutStore((s) => s.zoom);
   const selectedObjectId = useLayoutStore((s) => s.selectedObjectId);
   const simStatus = useSimulationStore((s) => s.status);
   const isSim = simStatus === "running" || simStatus === "paused";
+  // JSDOM และเบราว์เซอร์ที่ไม่มี WebGL ต้องเห็น SVG ทันที ไม่รอ effect ของ ThreeView
+  const [useSvgFallback, setUseSvgFallback] = React.useState(
+    () =>
+      typeof window === "undefined" ||
+      typeof window.WebGLRenderingContext === "undefined" ||
+      typeof window.matchMedia !== "function" ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
+  const showFallback = React.useCallback(() => setUseSvgFallback(true), []);
+  const selected = layout.objects.find((object) => object.id === selectedObjectId) ?? null;
+  const selectedTable =
+    selected?.type === "table"
+      ? (selected as Table)
+      : selected?.type === "chair"
+        ? (layout.objects.find((object) => object.id === selected.tableId) as Table | undefined)
+        : undefined;
+  const keyboardTarget: LayoutObject | null = selectedTable ?? selected;
+
+  // WebGL ต้องคงการแก้ผังด้วยคีย์บอร์ดแบบเดียวกับ SVG fallback ไว้
+  React.useEffect(() => {
+    if (useSvgFallback || isSim || !keyboardTarget) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      const active = event.target as HTMLElement | null;
+      if (active?.closest("input, textarea, select, [contenteditable=true]")) return;
+
+      const step = event.shiftKey ? 1 : 0.25;
+      const moves: Record<string, [number, number]> = {
+        ArrowLeft: [-step, 0],
+        ArrowRight: [step, 0],
+        ArrowUp: [0, -step],
+        ArrowDown: [0, step],
+      };
+      const move = moves[event.key];
+      if (move) {
+        event.preventDefault();
+        actions().updateObjectPosition(keyboardTarget.id, keyboardTarget.x + move[0], keyboardTarget.y + move[1]);
+      } else if (event.key === "r" || event.key === "R") {
+        event.preventDefault();
+        actions().rotateObject(keyboardTarget.id, event.shiftKey ? -90 : 90);
+      } else if (event.key === "Delete" || event.key === "Backspace") {
+        event.preventDefault();
+        const chairs =
+          keyboardTarget.type === "table" ? getChairsOfTable(layout, keyboardTarget as Table) : [];
+        actions().deleteObject(keyboardTarget.id);
+        onToast(
+          keyboardTarget.type === "table" && chairs.length > 0
+            ? `ลบโต๊ะพร้อมเก้าอี้ ${chairs.length} ตัวแล้ว · กด Ctrl+Z เพื่อย้อน`
+            : "ลบแล้ว · กด Ctrl+Z เพื่อย้อน",
+        );
+      } else if (event.key === "Escape") {
+        actions().selectObject(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isSim, keyboardTarget, layout, onToast, useSvgFallback]);
+
+  if (!useSvgFallback) {
+    return <ThreeView layout={layout} zoom={zoom} isSim={isSim} onUnavailable={showFallback} />;
+  }
 
   return (
     <IsometricScene
@@ -31,6 +96,7 @@ export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
       zoom={zoom}
       fill
       isSim={isSim}
+      simulate
       selectedObjectId={selectedObjectId}
       onToast={onToast}
     />
@@ -43,6 +109,7 @@ export function IsometricScene({
   zoom = 1,
   fill = false,
   isSim = false,
+  simulate = false,
   selectedObjectId = null,
   onToast = () => {},
 }: {
@@ -50,10 +117,23 @@ export function IsometricScene({
   zoom?: number;
   fill?: boolean;
   isSim?: boolean;
+  /** แสดงลูกค้าจำลองและ heatmap (เฉพาะ Editor — หน้าแชร์ไม่มีการจำลอง) */
+  simulate?: boolean;
   selectedObjectId?: string | null;
   onToast?: (message: string) => void;
 }) {
   const scene = React.useMemo(() => buildIsoScene(layout), [layout]);
+  // id ของ <defs> ต้องไม่ชนกันเมื่อมีหลายฉากในหน้าเดียว (และไม่มี ":" ที่ใช้ใน url() ไม่ได้)
+  const uid = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
+  const ids = {
+    floor: `iso-floor-${uid}`,
+    wallW: `iso-wall-w-${uid}`,
+    wallN: `iso-wall-n-${uid}`,
+    soft: `iso-soft-${uid}`,
+    ao: `iso-ao-${uid}`,
+    clip: `iso-clip-${uid}`,
+    outline: `iso-outline-${uid}`,
+  };
   const boxRef = React.useRef<HTMLDivElement>(null);
   const warnedRef = React.useRef(false);
 
@@ -83,6 +163,17 @@ export function IsometricScene({
     }
     return new Set([target.id]);
   }, [layout, target]);
+
+  // แผ่นไฮไลต์บนพื้นครอบทั้งชุด (โต๊ะ + เก้าอี้ลูก) — เทียบกรอบ Selection ใน 2D
+  const selectionPad = React.useMemo(() => {
+    const rects = layout.objects.filter((o) => selectedMemberIds.has(o.id)).map(footprint);
+    if (rects.length === 0) return null;
+    const x = Math.min(...rects.map((r) => r.x));
+    const y = Math.min(...rects.map((r) => r.y));
+    const width = Math.max(...rects.map((r) => r.x + r.width)) - x;
+    const depth = Math.max(...rects.map((r) => r.y + r.depth)) - y;
+    return isoFloorRect({ x, y, width, depth }, scene.scale, 0.1);
+  }, [layout, selectedMemberIds, scene.scale]);
 
   // ── Keyboard handling in 3D ──────────────────────────────────────────────
   React.useEffect(() => {
@@ -180,32 +271,120 @@ export function IsometricScene({
           data-testid="iso-svg"
           onPointerDown={handlePointerDown}
         >
-          {scene.walls.map((points, i) => (
-            <polygon key={`wall-${i}`} points={points} fill={ISO_PALETTE.wall} stroke={ISO_PALETTE.wallStroke} strokeWidth={1.5} />
+          <defs>
+            <linearGradient id={ids.floor} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor={ISO_PALETTE.floorFar} />
+              <stop offset="1" stopColor={ISO_PALETTE.floor} />
+            </linearGradient>
+            {[ids.wallW, ids.wallN].map((id, i) => (
+              <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor={ISO_PALETTE.wallInner[i]![0]} />
+                <stop offset="1" stopColor={ISO_PALETTE.wallInner[i]![1]} />
+              </linearGradient>
+            ))}
+            <filter id={ids.soft} x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="2.5" />
+            </filter>
+            <filter id={ids.ao} x="-10%" y="-10%" width="120%" height="120%">
+              <feGaussianBlur stdDeviation="5" />
+            </filter>
+            {/* เส้นรอบเงารวมของชุดที่เลือก: ปิดช่องระหว่างขา (dilate 6 → erode 6) ให้เป็นก้อนเดียว
+                แล้วขยายอีก 1 หน่วย ตัดก้อนเดิมออก เหลือเส้นขอบนอกเส้นเดียว */}
+            <filter id={ids.outline} x="-10%" y="-10%" width="120%" height="120%">
+              <feMorphology in="SourceAlpha" operator="dilate" radius="6" result="fat" />
+              <feMorphology in="fat" operator="erode" radius="6" result="closed" />
+              <feMorphology in="fat" operator="erode" radius="5" result="grown" />
+              <feComposite in="grown" in2="closed" operator="out" result="ring" />
+              <feFlood floodColor={SELECTION_BLUE} />
+              <feComposite in2="ring" operator="in" />
+            </filter>
+            <clipPath id={ids.clip}>
+              <polygon points={scene.floor} />
+            </clipPath>
+          </defs>
+
+          {/* ฐานพื้น + ผนังหลังหนา (ห้องตัดแบบ cutaway) — ไม่มีเส้นขอบ: stroke สีเดียวกับหน้า 0.5px ปิดรอยต่อ */}
+          {scene.slab.map((points, i) => (
+            <polygon key={`slab-${i}`} points={points} fill={ISO_PALETTE.slab[i]} stroke={ISO_PALETTE.slab[i]} strokeWidth={0.5} />
           ))}
-          <polygon points={scene.floor} fill={ISO_PALETTE.floor} stroke={ISO_PALETTE.wallStroke} strokeWidth={2} />
+          {scene.walls.map((points, i) => (
+            <polygon
+              key={`wall-${i}`}
+              points={points}
+              fill={`url(#${i === 0 ? ids.wallW : ids.wallN})`}
+              stroke={`url(#${i === 0 ? ids.wallW : ids.wallN})`}
+              strokeWidth={0.5}
+            />
+          ))}
+          {scene.wallEnds.map((points, i) => (
+            <polygon key={`wall-end-${i}`} points={points} fill={ISO_PALETTE.wallEnd} stroke={ISO_PALETTE.wallEnd} strokeWidth={0.5} />
+          ))}
+          <polygon points={scene.wallTop} fill={ISO_PALETTE.wallTop} stroke={ISO_PALETTE.wallTop} strokeWidth={0.5} />
+          {scene.door && (
+            <polygon points={scene.door} fill={ISO_PALETTE.door} stroke={ISO_PALETTE.doorFrame} strokeWidth={2.5} />
+          )}
+
+          <polygon points={scene.floor} fill={`url(#${ids.floor})`} stroke={`url(#${ids.floor})`} strokeWidth={0.5} />
           {scene.grid.map((l, i) => (
             <line key={`grid-${i}`} {...l} stroke={ISO_PALETTE.grid} strokeWidth={1} />
           ))}
+          {/* เงามุมรอยต่อผนัง-พื้น (ambient occlusion) */}
+          <g clipPath={`url(#${ids.clip})`} pointerEvents="none">
+            <polyline
+              points={scene.seam}
+              fill="none"
+              stroke={ISO_PALETTE.shadow}
+              strokeOpacity={0.14}
+              strokeWidth={14}
+              strokeLinejoin="round"
+              filter={`url(#${ids.ao})`}
+            />
+          </g>
+          {scene.doormat && <polygon points={scene.doormat} fill={ISO_PALETTE.doormat} opacity={0.9} />}
+          {simulate && <IsoHeatmapLayer scale={scene.scale} clipPathId={ids.clip} />}
+          {selectionPad && (
+            <polygon
+              data-testid="iso-selection-pad"
+              points={selectionPad}
+              fill={SELECTION_BLUE}
+              fillOpacity={0.08}
+              stroke={SELECTION_BLUE}
+              strokeOpacity={0.7}
+              strokeWidth={1.2}
+              strokeDasharray="5 4"
+              strokeLinejoin="round"
+              pointerEvents="none"
+            />
+          )}
           {scene.polygons.map((poly, i) => {
-            const isMember = poly.objectId ? selectedMemberIds.has(poly.objectId) : false;
             return (
               <polygon
                 key={i}
                 points={poly.points}
                 fill={poly.fill}
-                stroke={isMember ? "#3b62f4" : poly.stroke}
-                strokeWidth={isMember ? Math.max((poly.strokeWidth || 1) * 2, 2) : poly.strokeWidth}
+                stroke={poly.stroke}
+                strokeWidth={poly.strokeWidth}
+                strokeLinejoin="round"
                 opacity={poly.opacity}
                 transform={poly.offsetY ? `translate(0 ${poly.offsetY})` : undefined}
+                filter={poly.kind === "shadow" ? `url(#${ids.soft})` : undefined}
                 data-object-id={poly.objectId ?? undefined}
                 className={poly.objectId && !isSim ? "cursor-pointer hover:opacity-90" : undefined}
               />
             );
           })}
+          {selectedMemberIds.size > 0 && (
+            <g data-testid="iso-selection-outline" filter={`url(#${ids.outline})`} pointerEvents="none">
+              {scene.polygons
+                .filter((poly) => poly.kind !== "shadow" && poly.objectId && selectedMemberIds.has(poly.objectId))
+                .map((poly, i) => (
+                  <polygon key={i} points={poly.points} fill="#000" />
+                ))}
+            </g>
+          )}
           {scene.entrance && (
             <g>
-              <circle cx={scene.entrance.x} cy={scene.entrance.y} r={6} fill={ISO_PALETTE.entrance} />
+              <circle cx={scene.entrance.x} cy={scene.entrance.y} r={5} fill={ISO_PALETTE.entrance} stroke="#fff" strokeWidth={2} />
               <text x={scene.entrance.x} y={scene.entrance.y - 12} textAnchor="middle" fontSize={12} fill="#5f7492" fontFamily="var(--font)">
                 ทางเข้า
               </text>
@@ -213,7 +392,9 @@ export function IsometricScene({
           )}
         </svg>
 
-        {!isSim && selected && (
+        {simulate && <IsoSimulationOverlay scene={scene} layout={layout} />}
+
+        {!isSim && selected && selected.type !== "table" && selected.type !== "chair" && (
           <SelectionToolbar
             boxRef={boxRef}
             room={room}

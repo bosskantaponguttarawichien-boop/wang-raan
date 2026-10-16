@@ -100,6 +100,46 @@ describe("Table Set Lifecycle ผ่าน Store", () => {
   });
 });
 
+describe("รูปลักษณ์และขนาดชุดโต๊ะผ่าน Store", () => {
+  it("setTableSetChairCount ปรับผ่านเก้าอี้ลูก, เลือกโต๊ะแม่ และย้อนกลับได้", () => {
+    const { store, tableId } = buildCafe();
+    const chair = store.getState().layout.objects.find((object): object is Chair => object.type === "chair" && object.tableId === tableId)!;
+    const before = store.getState().historyIndex;
+    expect(store.getState().setTableSetChairCount(chair.id, 6)).toBe(true);
+    expect(store.getState().selectedObjectId).toBe(tableId);
+    expect(store.getState().layout.objects.filter((object) => object.type === "chair" && object.tableId === tableId)).toHaveLength(6);
+    expect(store.getState().historyIndex).toBe(before + 1);
+    expect(checkTableSetIntegrity(store.getState().layout)).toEqual([]);
+    store.getState().undo();
+    expect(store.getState().layout.objects.filter((object) => object.type === "chair" && object.tableId === tableId)).toHaveLength(4);
+  });
+
+  it("setTableSetStyle / resizeTableSet = Undo ทีละขั้น และไม่มี orphan", () => {
+    const { store, tableId } = buildCafe();
+    const s = store.getState();
+    const before = store.getState().historyIndex;
+    s.setTableSetStyle(tableId, { table: { color: "oak" }, chair: { kind: "stool" } });
+    s.resizeTableSet(tableId, 1.6, 1.2);
+    expect(store.getState().historyIndex).toBe(before + 2);
+    expect(checkTableSetIntegrity(store.getState().layout)).toEqual([]);
+    store.getState().undo();
+    expect(store.getState().layout.objects.find((o) => o.id === tableId)).toMatchObject({ width: 1.2 });
+  });
+
+  it("ทำซ้ำชุดโต๊ะ → คงขนาดและสไตล์เดิม", () => {
+    const { store, tableId } = buildCafe();
+    const s = store.getState();
+    s.setTableSetStyle(tableId, { table: { color: "charcoal" }, chair: { color: "blue" } });
+    s.resizeTableSet(tableId, 1.4, 1);
+    const copyId = store.getState().duplicateObject(tableId)!;
+    const layout = store.getState().layout;
+    expect(layout.objects.find((o) => o.id === copyId)).toMatchObject({ width: 1.4, depth: 1, style: { color: "charcoal" } });
+    const chairs = layout.objects.filter((o): o is Chair => o.type === "chair" && o.tableId === copyId);
+    expect(chairs.length).toBe(4);
+    expect(chairs.every((c) => c.style?.color === "blue")).toBe(true);
+  });
+});
+
 describe("Room & Entrance", () => {
   it("ขนาดร้าน snap และบีบอยู่ในช่วง 2–30 ม. แล้วดึงทางเข้ากลับมาบนผนัง (id เดิม)", () => {
     const store = setup();

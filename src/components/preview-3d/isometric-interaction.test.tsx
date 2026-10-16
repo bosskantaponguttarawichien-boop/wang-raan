@@ -18,7 +18,7 @@ describe("feat-058: มุมมอง 3D — เลือกและขยั�
     simulationStore.setState({ status: "idle", message: null });
   });
 
-  it("คลิกเลือกวัตถุใน 3D → selectedObjectId อัปเดต, แสดงขอบไฮไลต์ และ toast แนะนำ", async () => {
+  it("คลิกเลือกวัตถุใน 3D → selectedObjectId อัปเดต, แสดงเส้นรอบเงารวม + แผ่นพื้น และ toast แนะนำ", async () => {
     const user = userEvent.setup();
     const onToast = vi.fn();
     render(<IsometricView onToast={onToast} />);
@@ -29,11 +29,16 @@ describe("feat-058: มุมมอง 3D — เลือกและขยั�
 
     await user.click(tablePoly!);
     expect(layoutStore.getState().selectedObjectId).toBe("table-01");
-    expect(tablePoly).toHaveAttribute("stroke", "#3b62f4");
+    // ไม่ทาเส้นน้ำเงินทุกหน้า — ใช้เส้นรอบเงารวมของทั้งชุด (โต๊ะ + เก้าอี้ลูก) และแผ่นพื้นแทน
+    expect(tablePoly).not.toHaveAttribute("stroke", "#3b62f4");
+    const outline = screen.getByTestId("iso-selection-outline");
+    const ownFaces = svg.querySelectorAll("polygon[data-object-id=\"table-01\"]:not([opacity])").length;
+    expect(outline.querySelectorAll("polygon").length).toBeGreaterThan(ownFaces);
+    expect(screen.getByTestId("iso-selection-pad")).toHaveAttribute("stroke-dasharray", "5 4");
     expect(onToast).toHaveBeenCalledWith("ใน 3D เลือกแล้วขยับด้วยปุ่มลูกศร · ลากได้ในมุมมอง 2D");
 
-    // แสดง Selection Toolbar สำหรับวัตถุที่เลือก
-    expect(screen.getByRole("toolbar")).toBeInTheDocument();
+    // ชุดโต๊ะใช้แผงแก้ไขทางซ้าย จึงไม่ซ้ำคำสั่งเป็น toolbar ลอยบนฉาก
+    expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
   it("ขยับด้วยปุ่มลูกศรใน 3D → พิกัดใน store อัปเดตตรงกัน (0.25 ม. และ Shift 1 ม.)", async () => {
@@ -92,5 +97,7 @@ describe("feat-058: มุมมอง 3D — เลือกและขยั�
 
     await user.click(floor!);
     expect(layoutStore.getState().selectedObjectId).toBeNull();
+    expect(screen.queryByTestId("iso-selection-outline")).toBeNull();
+    expect(screen.queryByTestId("iso-selection-pad")).toBeNull();
   });
 });

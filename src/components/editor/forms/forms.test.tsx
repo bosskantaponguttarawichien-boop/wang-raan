@@ -177,13 +177,14 @@ describe("ObjectInspector", () => {
     expect(state().historyIndex).toBe(before + 1);
   });
 
-  it("เลือกเก้าอี้ → แก้ที่โต๊ะแม่ ย้ายทั้งชุด (ไม่มีช่องขนาด)", async () => {
+  it("เลือกเก้าอี้ → แก้ที่โต๊ะแม่ ย้ายทั้งชุด (ช่องขนาดเป็นของโต๊ะ)", async () => {
     const user = userEvent.setup();
     const table = state().layout.objects.find((o) => o.type === "table")!;
     const chair = state().layout.objects.find((o) => o.type === "chair" && o.tableId === table.id)!;
     act(() => state().selectObject(chair.id));
     render(<ObjectInspector />);
     expect(screen.queryByLabelText("กว้าง (ม.)")).toBeNull();
+    expect(screen.getByLabelText("กว้างโต๊ะ (ม.)")).toHaveValue(table.width);
     expect(screen.getByLabelText("ตำแหน่ง x (ม.)")).toHaveValue(table.x);
     await user.clear(screen.getByLabelText("ตำแหน่ง x (ม.)"));
     await user.type(screen.getByLabelText("ตำแหน่ง x (ม.)"), `${table.x - 1}{Enter}`);
@@ -229,5 +230,35 @@ describe("ObjectInspector", () => {
     const remaining = objects.find((o) => o.id === table.id);
     expect(remaining?.type === "table" && remaining.chairIds).toEqual(otherChairs);
     expect(otherChairs.every((id) => objects.some((o) => o.id === id))).toBe(true);
+  });
+
+  it("ปรับขนาดโต๊ะจากช่องกรอก = Undo ขั้นเดียว เก้าอี้ตามทั้งชุด", async () => {
+    const user = userEvent.setup();
+    const table = state().layout.objects.find((o) => o.type === "table")!;
+    act(() => state().selectObject(table.id));
+    render(<ObjectInspector />);
+    const before = state().historyIndex;
+    await user.clear(screen.getByLabelText("กว้างโต๊ะ (ม.)"));
+    await user.type(screen.getByLabelText("กว้างโต๊ะ (ม.)"), "1.6{Enter}");
+    expect(state().layout.objects.find((o) => o.id === table.id)).toMatchObject({ width: 1.6 });
+    expect(state().historyIndex).toBe(before + 1);
+  });
+
+  it("เลือกทรงกลม/สตูล/สี ผ่าน radio ที่มีป้ายไทย แล้วผังเปลี่ยนทันที", async () => {
+    const user = userEvent.setup();
+    const table = state().layout.objects.find((o) => o.type === "table")!;
+    act(() => state().selectObject(table.id));
+    render(<ObjectInspector />);
+    await user.click(screen.getByRole("radio", { name: "กลม" }));
+    expect(screen.getByLabelText("เส้นผ่านศูนย์กลางโต๊ะ (ม.)")).toBeInTheDocument();
+    expect(screen.queryByLabelText("ลึกโต๊ะ (ม.)")).toBeNull();
+    await user.click(screen.getByRole("radio", { name: "สตูล" }));
+    await user.click(screen.getAllByRole("radio", { name: "ไม้โอ๊ก" })[0]!);
+    const objects = state().layout.objects;
+    const next = objects.find((o) => o.id === table.id)!;
+    expect(next.type === "table" && next.style).toMatchObject({ shape: "round", color: "oak" });
+    const chairs = objects.filter((o) => o.type === "chair" && o.tableId === table.id);
+    expect(chairs.every((c) => c.type === "chair" && c.style?.kind === "stool")).toBe(true);
+    expect(screen.getByRole("radio", { name: "สตูล" })).toBeChecked();
   });
 });

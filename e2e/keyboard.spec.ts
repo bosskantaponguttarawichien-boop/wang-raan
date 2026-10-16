@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { buildReadyCafe, openTab } from "./helpers";
+import { addItem, buildReadyCafe, openTab } from "./helpers";
 
 /** feat-023: ใช้งานด้วยคีย์บอร์ดล้วน + Focus Ring ชัดเจน + prefers-reduced-motion */
 
@@ -89,7 +89,7 @@ test.describe("Playground", () => {
 
   test("ทุกตัวควบคุมที่ Tab ถึงมี focus ring และชื่อที่อ่านได้", async ({ page }) => {
     await page.goto("/playground");
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 2 ที่นั่ง/ }).click();
+    await addItem(page, "โต๊ะ");
     await page.locator("body").click({ position: { x: 1, y: 1 } });
     for (let i = 0; i < 30; i++) {
       await page.keyboard.press("Tab");

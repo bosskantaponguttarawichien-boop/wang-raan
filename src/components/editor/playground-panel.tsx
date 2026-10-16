@@ -8,36 +8,27 @@ import {
   useLayoutStore,
 } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
+import type { Table, TableSetCreationOptions } from "@/core/layout";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { RoomSettingsForm } from "./forms/room-settings-form";
+import { TableSetCreatePanel } from "./forms/table-set-create-panel";
+import { TableSetEditPanel } from "./forms/table-set-edit-panel";
 import { SimulationPanel } from "@/components/simulation/simulation-panel";
 
 const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round" as const };
 
 const PALETTE = [
   {
-    key: "table-2",
-    name: "ชุดโต๊ะ 2 ที่นั่ง",
-    size: "โต๊ะ 0.8 × 0.8 ม. + เก้าอี้ 2",
+    key: "table",
+    name: "โต๊ะ",
+    size: "เพิ่มจำนวนเก้าอี้ · ปรับรูปแบบได้",
     icon: (
       <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
         <rect x="7" y="7" width="10" height="10" rx="3" />
         <path d="M9 3h6M9 21h6" />
       </svg>
     ),
-    add: () => actions().addTableSet("table-2-seats"),
-  },
-  {
-    key: "table-4",
-    name: "ชุดโต๊ะ 4 ที่นั่ง",
-    size: "โต๊ะ 1.2 × 1.2 ม. + เก้าอี้ 4",
-    icon: (
-      <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
-        <rect x="6" y="6" width="12" height="12" rx="3" />
-        <path d="M9 3h6M9 21h6M3 9v6M21 9v6" />
-      </svg>
-    ),
-    add: () => actions().addTableSet("table-4-seats"),
+    configuresTable: true,
   },
   {
     key: "counter",
@@ -85,11 +76,27 @@ export function PlaygroundPanel({
   const activeTab = useLayoutStore((s) => s.activeTab);
   const simStatus = useSimulationStore((s) => s.status);
   const metrics = useSimulationStore((s) => s.metrics);
+  const selectedTable = useLayoutStore((state): Table | null => {
+    const selected = state.layout.objects.find((object) => object.id === state.selectedObjectId);
+    if (selected?.type === "table") return selected;
+    if (selected?.type !== "chair") return null;
+    const table = state.layout.objects.find((object): object is Table => object.id === selected.tableId && object.type === "table");
+    return table ?? null;
+  });
   const isSim = simStatus === "running" || simStatus === "paused";
+  const [configuringTable, setConfiguringTable] = React.useState(false);
 
   const handleApplyTemplate = () => {
     actions().loadSampleLayout();
     onToast("ใส่ผังตัวอย่างแล้ว ลากปรับได้ตามร้านจริง");
+  };
+
+  const handleCreateTableSet = (options: TableSetCreationOptions) => {
+    const preset = (options.chairCount ?? 4) <= 2 ? "table-2-seats" : "table-4-seats";
+    actions().addTableSet(preset, undefined, options);
+    setConfiguringTable(false);
+    onToast(`เพิ่มโต๊ะพร้อมเก้าอี้ ${options.chairCount ?? 4} ตัวแล้ว ลากไปตำแหน่งที่ต้องการได้เลย`);
+    if (typeof window !== "undefined" && window.innerWidth < 768 && onToggleSheet) onToggleSheet();
   };
 
   return (
@@ -118,6 +125,12 @@ export function PlaygroundPanel({
           </p>
           <SimulationPanel live={live} onFocusIssue={onFocusIssue} onToast={onToast} />
         </div>
+      ) : activeTab === "add" && selectedTable ? (
+        <TableSetEditPanel
+          table={selectedTable}
+          onBack={() => actions().selectObject(null)}
+          onToast={onToast}
+        />
       ) : activeTab === "shop" ? (
         <div>
           <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">ขนาดร้านและทางเข้า</h2>
@@ -134,6 +147,8 @@ export function PlaygroundPanel({
           </p>
           <SimulationPanel live={live} onFocusIssue={onFocusIssue} onToast={onToast} />
         </div>
+      ) : configuringTable ? (
+        <TableSetCreatePanel onBack={() => setConfiguringTable(false)} onCreate={handleCreateTableSet} />
       ) : (
         /* Tab "add" */
         <div>
@@ -166,6 +181,10 @@ export function PlaygroundPanel({
                 icon={item.icon}
                 className="max-[767px]:min-w-[195px] max-[767px]:shrink-0 max-[767px]:snap-start"
                 onClick={() => {
+                  if ("configuresTable" in item) {
+                    setConfiguringTable(true);
+                    return;
+                  }
                   item.add();
                   onToast(`เพิ่ม${item.name}แล้ว ลากไปตำแหน่งที่ต้องการได้เลย`);
                   if (typeof window !== "undefined" && window.innerWidth < 768 && onToggleSheet) {
@@ -193,6 +212,7 @@ export function PlaygroundPanel({
           </p>
         </div>
       )}
+
     </aside>
   );
 }

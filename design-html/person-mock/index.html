@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>วางร้าน — Customer character mock</title>
+    <style>
+      :root {
+        --ink: #27364a;
+        --muted: #687a91;
+        --line: #dae3ef;
+        --paper: #f4f7fb;
+        --panel: #ffffff;
+        --orange: #f47d35;
+        --orange-dark: #d65d1b;
+        --blue: #356be5;
+        --mint: #28a88a;
+        --pink: #d44e75;
+        --focus: #a4b6ff;
+        font-family: "Noto Sans Thai", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--paper); color: var(--ink); }
+      button { font: inherit; }
+      button:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; }
+      .page { min-height: 100vh; padding: clamp(16px, 3vw, 42px); }
+      header { width: min(1200px, 100%); margin: 0 auto 18px; display: flex; gap: 18px; align-items: flex-end; justify-content: space-between; }
+      h1 { font-size: clamp(24px, 3vw, 38px); letter-spacing: -.04em; margin: 0 0 4px; }
+      .lead { margin: 0; color: var(--muted); font-size: 14px; }
+      .badge { display: inline-flex; align-items: center; gap: 6px; color: #256f5d; background: #e6f6f0; border-radius: 999px; padding: 6px 10px; white-space: nowrap; font-size: 12px; font-weight: 700; }
+      .badge i { width: 7px; height: 7px; background: var(--mint); border-radius: 50%; }
+      .shell { width: min(1200px, 100%); margin: auto; overflow: hidden; border: 1px solid var(--line); border-radius: 26px; background: var(--panel); box-shadow: 0 24px 65px rgba(43, 61, 87, .14); }
+      .toolbar { min-height: 68px; display: flex; align-items: center; gap: 14px; padding: 12px 18px; border-bottom: 1px solid var(--line); }
+      .brand { display: flex; align-items: center; gap: 9px; font-weight: 800; white-space: nowrap; }
+      .mark { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 9px; color: white; background: var(--orange); font-size: 16px; }
+      .divider { height: 26px; border-left: 1px solid var(--line); }
+      .toolbar small { color: var(--muted); }
+      .scenes { display: flex; gap: 7px; margin-left: auto; overflow: auto; padding: 3px; }
+      .scene { flex: none; border: 1px solid var(--line); border-radius: 999px; background: #fff; padding: 7px 11px; color: var(--muted); cursor: pointer; font-size: 12px; }
+      .scene:hover, .scene[aria-pressed="true"] { color: #183cbd; background: #edf2ff; border-color: #a9bcff; }
+      .content { display: grid; grid-template-columns: minmax(0, 1fr) 262px; min-height: 690px; }
+      .stage { position: relative; min-width: 0; overflow: hidden; display: grid; place-items: center; background: linear-gradient(145deg, #f8fbff, #edf2f8); padding: clamp(10px, 2vw, 28px); }
+      .stage::before { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 55% 70%, rgba(100,118,255,.16), transparent 28%), radial-gradient(circle at 36% 52%, rgba(255,145,92,.14), transparent 24%); pointer-events: none; }
+      svg { display: block; position: relative; width: min(100%, 850px); max-height: 650px; }
+      .side { padding: 22px 18px; border-left: 1px solid var(--line); background: #fff; }
+      h2 { margin: 0 0 5px; font-size: 16px; letter-spacing: -.02em; }
+      .side > p { margin: 0 0 17px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+      .legend { display: grid; gap: 8px; }
+      .legend-row { display: flex; align-items: center; gap: 9px; padding: 8px; border-radius: 10px; background: #f7f9fc; font-size: 12px; }
+      .legend-row b { display: block; font-size: 12px; }
+      .legend-row span { color: var(--muted); font-size: 11px; }
+      .swatch { position: relative; flex: none; width: 31px; height: 31px; border-radius: 11px; background: #fff; border: 1px solid var(--line); }
+      .swatch::before { content: ""; position: absolute; left: 10px; top: 5px; width: 10px; height: 10px; border-radius: 50%; background: var(--skin, #e9b98f); box-shadow: 0 10px 0 3px var(--shirt, var(--blue)); }
+      .quote { margin-top: 18px; padding: 12px; color: #315849; background: #eff9f5; border: 1px solid #ccebdd; border-radius: 12px; font-size: 12px; line-height: 1.55; }
+      .quote strong { display: block; margin-bottom: 3px; }
+      .key { margin-top: 14px; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+      .key kbd { padding: 2px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; color: var(--ink); background: white; }
+
+      /* SVG helpers */
+      .wall { filter: url(#soft-shadow); }
+      .floor-grid { stroke: #dde4ed; stroke-width: 1; }
+      .person { transform-box: fill-box; transform-origin: center bottom; }
+      .person .ground { fill: none; stroke: var(--ring, #2aa789); stroke-width: 4; opacity: .85; }
+      .person .shadow { fill: #8695aa; opacity: .18; }
+      .person .skin { fill: var(--skin); }
+      .person .hair { fill: var(--hair); }
+      .person .shirt { fill: var(--shirt); }
+      .person .pants { fill: var(--pants); }
+      .person .shoe { fill: #263449; }
+      .person .face-hi { fill: rgba(255,255,255,.4); }
+      .person .eye { fill: #33415a; }
+      .person .hand { fill: var(--skin); }
+      .person .line { fill: none; stroke: var(--hair); stroke-width: 2.3; stroke-linecap: round; }
+      .person .prop { fill: #fff; stroke: #d5deea; stroke-width: 1.3; }
+      .person .glass { fill: #65cbe1; stroke: #3194ad; stroke-width: 1; }
+      .person .bag { fill: #edbc5f; stroke: #bb8230; stroke-width: 1.3; }
+      .person.walk { animation: bob 750ms ease-in-out infinite alternate; }
+      .person.walk .leg-l { animation: stride .75s ease-in-out infinite alternate; transform-origin: 46px 95px; }
+      .person.walk .leg-r { animation: stride .75s ease-in-out infinite alternate-reverse; transform-origin: 54px 95px; }
+      .person.queue { animation: breathe 1.8s ease-in-out infinite alternate; }
+      .person.order .menu { animation: offer .9s ease-in-out infinite alternate; transform-origin: 63px 72px; }
+      .person.dine .drink { animation: sip 1.6s ease-in-out infinite; transform-origin: 65px 69px; }
+      .person.leave .bag { animation: swing .85s ease-in-out infinite alternate; transform-origin: 37px 79px; }
+      /* ใช้ individual transform properties เพื่อไม่ทับ transform ที่วางคนในฉาก SVG */
+      @keyframes bob { to { translate: 0 -3px; } }
+      @keyframes breathe { to { translate: 0 -1px; scale: 1.012 .988; } }
+      @keyframes stride { to { rotate: 9deg; } }
+      @keyframes offer { to { rotate: -9deg; translate: 2px -3px; } }
+      @keyframes sip { 50% { rotate: -20deg; translate: 2px -4px; } }
+      @keyframes swing { to { rotate: 12deg; } }
+      @media (prefers-reduced-motion: reduce) { .person, .person * { animation: none !important; } }
+      @media (max-width: 850px) { .content { grid-template-columns: 1fr; } .side { border-left: 0; border-top: 1px solid var(--line); } .legend { grid-template-columns: repeat(3, 1fr); } .quote, .key { display: none; } .stage { min-height: 500px; } }
+      @media (max-width: 570px) { .page { padding: 10px; } header { align-items: flex-start; } .badge { display: none; } .toolbar { align-items: flex-start; flex-wrap: wrap; } .scenes { order: 3; width: 100%; margin-left: 0; } .divider, .toolbar small { display: none; } .shell { border-radius: 18px; } .stage { min-height: 380px; padding: 6px; } .legend { grid-template-columns: 1fr 1fr; } }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <header>
+        <div><h1>Customer character direction</h1><p class="lead">Mock HTML: ตัวละครแบบ soft-toy 2.5D สำหรับร้านวางร้าน</p></div>
+        <span class="badge"><i></i>ทำด้วย SVG + CSS ได้จริง</span>
+      </header>
+
+      <section class="shell" aria-label="ตัวอย่างมุมมองร้านแบบ isometric">
+        <div class="toolbar">
+          <div class="brand"><span class="mark">W</span> วางร้าน</div><span class="divider"></span><small>3D · Sunny Day Café</small>
+          <div class="scenes" role="group" aria-label="เลือกเหตุการณ์จำลอง">
+            <button class="scene" type="button" data-scene="lunch" aria-pressed="true">🍜 ช่วงเที่ยง</button>
+            <button class="scene" type="button" data-scene="queue" aria-pressed="false">🧋 คิวหน้าร้าน</button>
+            <button class="scene" type="button" data-scene="quiet" aria-pressed="false">🌿 ช่วงเงียบ</button>
+          </div>
+        </div>
+
+        <div class="content">
+          <div class="stage">
+            <svg viewBox="0 0 900 650" role="img" aria-labelledby="scene-title scene-desc">
+              <title id="scene-title">ร้านคาเฟ่ isometric พร้อมลูกค้าสไตล์ soft-toy</title>
+              <desc id="scene-desc">ลูกค้านั่งกินอาหาร เดินไปเคาน์เตอร์ และต่อคิว โดยการ์ตูนแต่ละตัวมีหน้าตาและท่าทางต่างกัน</desc>
+              <defs>
+                <filter id="soft-shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="10" stdDeviation="11" flood-color="#64748b" flood-opacity=".21" /></filter>
+                <linearGradient id="floor" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff"/><stop offset="1" stop-color="#eef2f7"/></linearGradient>
+                <linearGradient id="orange" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ff954e"/><stop offset="1" stop-color="#d95e1a"/></linearGradient>
+                <linearGradient id="counter" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#f7b077"/><stop offset="1" stop-color="#e26d2b"/></linearGradient>
+                <!-- Master character palette: reusable as <use href="#character-mali"> -->
+                <filter id="mali-shadow" x="-35%" y="-25%" width="175%" height="175%"><feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#213550" flood-opacity=".22"/></filter>
+                <radialGradient id="mali-skin" cx="32%" cy="24%" r="80%"><stop stop-color="#ffe2c9"/><stop offset=".58" stop-color="#e8ad81"/><stop offset="1" stop-color="#cb825c"/></radialGradient>
+                <linearGradient id="mali-hair" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#664434"/><stop offset=".5" stop-color="#35241f"/><stop offset="1" stop-color="#211817"/></linearGradient>
+                <linearGradient id="mali-cardigan" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f18e77"/><stop offset=".48" stop-color="#d85167"/><stop offset="1" stop-color="#a93656"/></linearGradient>
+                <linearGradient id="mali-jeans" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#526783"/><stop offset="1" stop-color="#293a55"/></linearGradient>
+                <g id="character-mali" filter="url(#mali-shadow)">
+                  <!-- ground, seated legs and layered torso -->
+                  <ellipse cx="55" cy="133" rx="38" ry="10" fill="none" stroke="#2aa789" stroke-width="4" opacity=".9"/>
+                  <ellipse cx="55" cy="133" rx="28" ry="7" fill="#45546a" opacity=".16"/>
+                  <path d="M39 99h25v22H39z" fill="url(#mali-jeans)"/>
+                  <path d="M37 117h15v10H35q-3-4 2-10Zm16 0h16v10H52q-2-5 1-10Z" fill="#26344b"/>
+                  <path d="M27 68q27-16 55 1l-4 38H31Z" fill="url(#mali-cardigan)"/>
+                  <path d="M42 67q13-7 25 0l-3 33H45Z" fill="#fff8f0"/>
+                  <path d="m44 70 9 15 9-15" fill="none" stroke="#eab7a2" stroke-width="2" stroke-linecap="round"/>
+                  <!-- left arm holding a cup -->
+                  <path d="M32 73q-13 8-6 27 3 8 11 4l4-8-3-16Z" fill="#c84561"/>
+                  <path d="M26 99q4 8 11 2l3-6-9-3Z" fill="url(#mali-skin)"/>
+                  <path d="M14 92q11-5 19 1l-3 16q-8 4-15-1Z" fill="#f8fbff" stroke="#cbd8e6" stroke-width="1.4"/>
+                  <path d="M17 94q7-2 13 1" fill="none" stroke="#a8d9df" stroke-width="3" stroke-linecap="round"/>
+                  <path d="M17 91q6-9 13 0" fill="none" stroke="#cbd8e6" stroke-width="1.4"/>
+                  <!-- right arm rests casually on the table -->
+                  <path d="M77 73q13 9 6 24l-9-2-4-16Z" fill="#bc405c"/>
+                  <path d="M77 92q6 5 10-1l-2-7-9 2Z" fill="url(#mali-skin)"/>
+                  <!-- hair behind face, ears and head -->
+                  <path d="M27 46q-1-31 27-31 30 0 28 37l-6 23-11-5V39q-20 8-35-4v34l-8-13Z" fill="url(#mali-hair)"/>
+                  <ellipse cx="28" cy="51" rx="6" ry="8" fill="#d99870"/><ellipse cx="81" cy="51" rx="6" ry="8" fill="#d99870"/>
+                  <ellipse cx="54" cy="47" rx="27" ry="29" fill="url(#mali-skin)"/>
+                  <ellipse cx="44" cy="37" rx="9" ry="12" fill="#fff" opacity=".21"/>
+                  <!-- fringe, brows, eyes, nose, blush and smile -->
+                  <path d="M28 41q2-24 27-23 23 1 27 25-12-9-24-7-15 2-30 9Z" fill="url(#mali-hair)"/>
+                  <path d="M38 47q5-4 10 0m13 0q5-4 10 0" fill="none" stroke="#5e372d" stroke-width="2" stroke-linecap="round"/>
+                  <ellipse cx="43" cy="53" rx="4" ry="5" fill="#fff"/><ellipse cx="66" cy="53" rx="4" ry="5" fill="#fff"/>
+                  <circle cx="44" cy="54" r="2.4" fill="#26334b"/><circle cx="67" cy="54" r="2.4" fill="#26334b"/><circle cx="43.2" cy="52.9" r=".8" fill="#fff"/><circle cx="66.2" cy="52.9" r=".8" fill="#fff"/>
+                  <path d="M55 54v7l3 1" fill="none" stroke="#bd7756" stroke-width="1.5" stroke-linecap="round"/>
+                  <ellipse cx="38" cy="65" rx="5" ry="2.8" fill="#e98483" opacity=".48"/><ellipse cx="72" cy="65" rx="5" ry="2.8" fill="#e98483" opacity=".48"/>
+                  <path d="M48 68q7 7 14 0" fill="none" stroke="#a44d57" stroke-width="2.2" stroke-linecap="round"/>
+                  <!-- bun and small earring create an identifiable silhouette -->
+                  <path d="M41 19q2-15 14-14 13 1 13 15-13-6-27-1Z" fill="url(#mali-hair)"/>
+                  <circle cx="82" cy="61" r="3" fill="#f4c35f"/><circle cx="82" cy="61" r="1.2" fill="#fff4bf"/>
+                  <path d="M45 78h18" stroke="#f6c2b1" stroke-width="1.5" stroke-linecap="round" opacity=".75"/>
+                </g>
+              </defs>
+              <g class="wall">
+                <path fill="#f9fbfe" d="M105 81 447 20 850 206 850 520 450 640 105 453Z"/>
+                <path fill="#e8edf4" d="M105 81 447 20 447 175 105 332Z"/>
+                <path fill="#f4f7fb" d="M447 20 850 206 850 366 447 175Z"/>
+                <path fill="url(#floor)" d="M105 332 447 175 850 366 450 555Z"/>
+              </g>
+              <g class="floor-grid" opacity=".85">
+                <path d="M167 360 510 203M228 390 571 231M289 420 632 260M350 450 693 288M411 480 754 317M172 302 520 518M235 273 584 488M298 244 647 459M360 216 710 431M422 188 773 402"/>
+              </g>
+              <!-- windows + plants -->
+              <g opacity=".98"><path d="M548 88 707 160 707 238 548 166Z" fill="#bde4f5" stroke="#fdfefe" stroke-width="11"/><path d="M548 127 707 199M627 124 627 202" stroke="#fff" stroke-width="5" opacity=".9"/></g>
+              <g transform="translate(154 245)"><ellipse cx="34" cy="66" rx="35" ry="12" fill="#8091a7" opacity=".18"/><path d="M25 58h17l8 12H18Z" fill="#df8759"/><path d="M31 54C4 43 16 15 31 35 28 2 54 9 40 35 67 21 69 49 42 50Z" fill="#5a9d72"/></g>
+              <!-- counter -->
+              <g filter="url(#soft-shadow)"><path d="M633 302 781 374 781 474 633 405Z" fill="url(#counter)"/><path d="M595 321 733 246 781 271 643 350Z" fill="#fff"/><path d="M643 350 781 271 781 374 643 455Z" fill="#d95e1a"/><path d="M595 321 643 350 643 455 595 428Z" fill="#f57b36"/><ellipse cx="690" cy="299" rx="16" ry="8" fill="#3c4655"/><ellipse cx="742" cy="328" rx="16" ry="8" fill="#3c4655"/></g>
+              <!-- tables -->
+              <g filter="url(#soft-shadow)">
+                <g><path d="M334 259 418 220 484 253 400 295Z" fill="#fff"/><path d="M400 295 484 253 484 269 400 312Z" fill="#d9e0ea"/><path d="M334 259 400 295 400 312 334 276Z" fill="#f0f3f8"/><path d="M347 275v71l12 7v-72Zm112-8v70l12-7v-70Z" fill="#dc6b2c"/></g>
+                <g><path d="M445 353 529 312 595 346 511 388Z" fill="#fff"/><path d="M511 388 595 346 595 362 511 405Z" fill="#d9e0ea"/><path d="M445 353 511 388 511 405 445 370Z" fill="#f0f3f8"/><path d="M458 369v71l12 7v-72Zm112-8v70l12-7v-70Z" fill="#dc6b2c"/></g>
+              </g>
+              <!-- chairs -->
+              <g fill="#f47d35" filter="url(#soft-shadow)">
+                <path d="M274 267 316 246 343 260 301 282Z"/><path d="M274 267v61l27 14v-60Z" fill="#df671f"/><path d="M301 282 343 260v61l-42 21Z"/>
+                <path d="M431 212 473 191 500 205 458 227Z"/><path d="M431 212v61l27 14v-60Z" fill="#df671f"/><path d="M458 227 500 205v61l-42 21Z"/>
+                <path d="M387 332 429 311 456 325 414 347Z"/><path d="M387 332v61l27 14v-60Z" fill="#df671f"/><path d="M414 347 456 325v61l-42 21Z"/>
+                <path d="M572 339 614 318 641 332 599 354Z"/><path d="M572 339v61l27 14v-60Z" fill="#df671f"/><path d="M599 354 641 332v61l-42 21Z"/>
+              </g>
+              <!-- Every person shares the same layered anatomy; only colours, accessories, pose and motion vary. -->
+              <g data-people>
+                <!-- Raster 2.5D customer asset: placed at the same scale as the room, not a UI icon. -->
+                <image class="person dine lunch mali-render" href="assets/mali-seated-v1.png" x="252" y="187" width="142" height="213" preserveAspectRatio="xMidYMid meet"/>
+                <!-- dining, sitting top -->
+                <g class="person dine lunch" style="--skin:#f4cfac;--hair:#292c33;--shirt:#3f81d7;--pants:#26384f;--ring:#31a889" transform="translate(447 208) scale(.8)">
+                  <ellipse class="ground" cx="50" cy="103" rx="32" ry="11"/><ellipse class="shadow" cx="50" cy="104" rx="25" ry="8"/>
+                  <path class="pants" d="M37 87h27v13H37z"/><path class="shoe" d="M35 98h15v6H34zM55 98h15v6H54z"/><path class="shirt" d="M31 57q19-12 38 0l-3 33H34Z"/>
+                  <path class="hand" d="M66 64q8 12-2 18l-8-8 4-13Z"/><g class="drink"><path class="glass" d="M67 76h10l-2 12h-6Z"/><path d="M70 72h4v5h-4z" fill="#fff"/></g>
+                  <ellipse class="skin" cx="50" cy="40" rx="20" ry="22"/><ellipse class="face-hi" cx="43" cy="35" rx="7" ry="11"/><path class="hair" d="M30 39q3-24 22-21 18 3 18 20-9-6-18-6-13 0-22 7Z"/><circle class="eye" cx="44" cy="44" r="2.1"/><circle class="eye" cx="57" cy="44" r="2.1"/><path class="line" d="M47 52q4 3 8 0"/><circle cx="63" cy="47" r="3" fill="#f1b83d"/>
+                </g>
+                <!-- diner, long hair -->
+                <g class="person dine lunch" style="--skin:#c98759;--hair:#4c3026;--shirt:#d65352;--pants:#3f4654;--ring:#31a889" transform="translate(592 334) scale(.82)">
+                  <ellipse class="ground" cx="50" cy="103" rx="32" ry="11"/><ellipse class="shadow" cx="50" cy="104" rx="25" ry="8"/><path class="pants" d="M37 87h27v13H37z"/><path class="shoe" d="M35 98h15v6H34zM55 98h15v6H54z"/><path class="shirt" d="M31 57q19-12 38 0l-3 33H34Z"/>
+                  <path class="hand" d="M33 65q-8 12 2 18l8-8-4-13Z"/><g class="drink"><path class="glass" d="M24 76h10l-2 12h-6Z"/><path d="M27 72h4v5h-4z" fill="#fff"/></g><ellipse class="skin" cx="50" cy="40" rx="20" ry="22"/><ellipse class="face-hi" cx="43" cy="35" rx="7" ry="11"/><path class="hair" d="M29 42q0-24 21-23 22 1 20 28l-7 10V36q-14 4-31 0v22l-5-11Z"/><circle class="eye" cx="44" cy="44" r="2.1"/><circle class="eye" cx="57" cy="44" r="2.1"/><path class="line" d="M47 52q4 3 8 0"/>
+                </g>
+                <!-- ordering toward counter -->
+                <g class="person order lunch" style="--skin:#efbf96;--hair:#313740;--shirt:#e3b54c;--pants:#41516d;--ring:#3b72eb" transform="translate(631 391) scale(.92)">
+                  <ellipse class="ground" cx="50" cy="103" rx="32" ry="11"/><ellipse class="shadow" cx="50" cy="104" rx="25" ry="8"/><path class="pants leg-l" d="M37 84h12v17H37z"/><path class="pants leg-r" d="M52 84h12v17H52z"/><path class="shoe" d="M35 98h15v6H34zM55 98h15v6H54z"/><path class="shirt" d="M31 57q19-12 38 0l-3 32H34Z"/>
+                  <g class="menu"><path class="hand" d="M66 64q8 8 3 17l-9-5 1-13Z"/><rect class="prop" x="67" y="70" width="13" height="18" rx="2" transform="rotate(14 67 70)"/><path d="m71 76 6 2m-7 3 6 2" stroke="#98a5b6" stroke-width="1.5"/></g><ellipse class="skin" cx="50" cy="40" rx="20" ry="22"/><ellipse class="face-hi" cx="43" cy="35" rx="7" ry="11"/><path class="hair" d="M30 39q1-23 20-22 18 0 20 20-8-5-17-5-12 0-23 7Z"/><circle class="eye" cx="44" cy="44" r="2.1"/><circle class="eye" cx="57" cy="44" r="2.1"/><path class="line" d="M47 52q4 3 8 0"/>
+                </g>
+                <!-- walking / leaving -->
+                <g class="person walk leave lunch" style="--skin:#b7774e;--hair:#252b34;--shirt:#b14d68;--pants:#364258;--ring:#d44e75" transform="translate(520 452) scale(.88)">
+                  <ellipse class="ground" cx="50" cy="103" rx="32" ry="11"/><ellipse class="shadow" cx="50" cy="104" rx="25" ry="8"/><path class="pants leg-l" d="M37 84h12v17H37z"/><path class="pants leg-r" d="M52 84h12v17H52z"/><path class="shoe" d="M35 98h15v6H34zM55 98h15v6H54z"/><path class="shirt" d="M31 57q19-12 38 0l-3 32H34Z"/><g class="bag"><path d="M17 72q11-8 20 1v23H17Z"/><path d="M21 72q3-12 11 0" fill="none" stroke="#bb8230" stroke-width="2"/></g><ellipse class="skin" cx="50" cy="40" rx="20" ry="22"/><ellipse class="face-hi" cx="43" cy="35" rx="7" ry="11"/><path class="hair" d="M29 39q2-24 22-22 19 1 19 21-11-7-22-5Z"/><circle class="eye" cx="44" cy="44" r="2.1"/><circle class="eye" cx="57" cy="44" r="2.1"/><path class="line" d="M47 52q4 3 8 0"/>
+                </g>
+                <!-- queueing phone person -->
+                <g class="person queue queue-only" style="--skin:#f5cfad;--hair:#5b392a;--shirt:#f0efe9;--pants:#9b7657;--ring:#3b72eb" transform="translate(564 413) scale(.82)">
+                  <ellipse class="ground" cx="50" cy="103" rx="32" ry="11"/><ellipse class="shadow" cx="50" cy="104" rx="25" ry="8"/><path class="pants" d="M37 84h12v17H37zM52 84h12v17H52z"/><path class="shoe" d="M35 98h15v6H34zM55 98h15v6H54z"/><path class="shirt" d="M31 57q19-12 38 0l-3 32H34Z"/><path class="hand" d="M36 65q5 9 13 8l3-8-10-5Z"/><rect x="47" y="66" width="8" height="14" rx="2" fill="#29394e"/><ellipse class="skin" cx="50" cy="40" rx="20" ry="22"/><ellipse class="face-hi" cx="43" cy="35" rx="7" ry="11"/><path class="hair" d="M29 42q0-25 22-23 21 1 19 28l-7 10V35q-16 5-31 0v22l-4-11Z"/><circle class="eye" cx="44" cy="44" r="2.1"/><circle class="eye" cx="57" cy="44" r="2.1"/>
+                </g>
+              </g>
+              <g fill="#405069" font-family="system-ui, sans-serif" font-size="12" font-weight="700"><text x="129" y="475">ทางเข้า</text><text x="635" y="232">เคาน์เตอร์</text></g>
+              <path d="M133 460 213 497" stroke="#f47d35" stroke-width="8" stroke-linecap="round"/><circle cx="217" cy="499" r="9" fill="#356be5" stroke="#fff" stroke-width="4"/>
+            </svg>
+          </div>
+          <aside class="side">
+            <h2 id="side-title">ช่วงเที่ยง · 5 คน</h2><p id="side-copy"><b>Mali</b> ใช้ asset 2.5D โปร่งใสที่มีวัสดุ แสงเงา และมุมกล้องเดียวกับฉาก แทนการวาดเป็นไอคอน SVG</p>
+            <div class="legend">
+              <div class="legend-row"><i class="swatch" style="--skin:#e5ae84;--shirt:#d85167"></i><div><b>Mali · 2.5D asset</b><span>นั่ง + แก้ว + แสงเงาจริง</span></div></div>
+              <div class="legend-row"><i class="swatch" style="--skin:#efbf96;--shirt:#e3b54c"></i><div><b>กำลังสั่ง</b><span>ยกเมนูเข้าหาเคาน์เตอร์</span></div></div>
+              <div class="legend-row"><i class="swatch" style="--skin:#f5cfad;--shirt:#f0efe9"></i><div><b>ต่อคิว</b><span>ถือมือถือ รอแบบนิ่ง ๆ</span></div></div>
+              <div class="legend-row"><i class="swatch" style="--skin:#b7774e;--shirt:#b14d68"></i><div><b>เดินออก</b><span>ก้าวเท้า + กระเป๋าแกว่ง</span></div></div>
+            </div>
+            <div class="quote"><strong>หลักของ mock นี้</strong>อ่าน action ได้จาก silhouette และ prop แม้ซูมออก ไม่ต้องพึ่งสีวงใต้เท้าอย่างเดียว</div>
+            <div class="key"><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> เปลี่ยนเหตุการณ์ได้</div>
+          </aside>
+        </div>
+      </section>
+    </main>
+    <script>
+      const scenes = {
+        lunch: { title: "ช่วงเที่ยง · 5 คน", copy: "Mali ใช้ asset 2.5D โปร่งใสที่มีวัสดุ แสงเงา และมุมกล้องเดียวกับฉาก แทนการวาดเป็นไอคอน SVG", show: [".lunch", ".queue-only"], hide: [] },
+        queue: { title: "คิวหน้าร้าน · 3 คน", copy: "ท่ายืนจะนิ่งและมีมือถือหรือเมนู เพื่อสื่อว่า ‘รอ’ โดยไม่ดูเหมือนคนเดิน", show: [".queue-only", ".order", ".leave"], hide: [".dine"] },
+        quiet: { title: "ช่วงเงียบ · 2 คน", copy: "จำนวนคนน้อยลง แต่คาแรกเตอร์ยังอ่านง่ายผ่านท่านั่งและจังหวะยกแก้ว", show: [".dine"], hide: [".order", ".leave", ".queue-only"] }
+      };
+      const buttons = document.querySelectorAll(".scene");
+      const people = document.querySelectorAll("[data-people] > .person");
+      function setScene(name) {
+        const scene = scenes[name];
+        people.forEach(p => p.style.display = "none");
+        scene.show.forEach(selector => document.querySelectorAll(selector).forEach(p => p.style.display = ""));
+        scene.hide.forEach(selector => document.querySelectorAll(selector).forEach(p => p.style.display = "none"));
+        document.querySelector("#side-title").textContent = scene.title;
+        document.querySelector("#side-copy").textContent = scene.copy;
+        buttons.forEach((button, i) => button.setAttribute("aria-pressed", String(button.dataset.scene === name)));
+      }
+      buttons.forEach(button => button.addEventListener("click", () => setScene(button.dataset.scene)));
+      document.addEventListener("keydown", event => { const index = Number(event.key) - 1; if (index >= 0 && index < buttons.length) buttons[index].click(); });
+    </script>
+  </body>
+</html>

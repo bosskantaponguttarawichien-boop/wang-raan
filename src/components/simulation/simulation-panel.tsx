@@ -196,6 +196,7 @@ export function SimulationPanel({
               Heatmap ความหนาแน่นทางเดิน
             </li>
           </ul>
+
         </div>
       ) : (
         /* ── โหมดเตรียมการจัดร้าน & ตรวจผัง (Edit / Idle) ─────────── */

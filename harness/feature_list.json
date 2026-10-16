@@ -914,6 +914,133 @@
       "summary": "คำสั่งทั้งหมดของ Playground อยู่ในเมนูเดียว แถบหัวโล่งขึ้น",
       "sprint": 4,
       "evidence": "src/components/editor/playground-header.tsx: เมนูเดียว + helper MenuButton/MenuIcon/MenuText/MenuSection, ลบ #expBtn/#myProjectsLink, hint ใช้ text-secondary (เดิม text-muted ไม่ผ่าน AA); unit 'เมนูโปรเจกต์รวมทุกคำสั่ง' (playground-ux-flow.test.tsx); E2E editor-flow (ส่งออก SVG/PNG) และ playground-id-online (ไป /projects) ใช้เมนู; make test 805/805, make lint ผ่าน, make e2e 91/91; เบราว์เซอร์: เมนูอยู่ในจอ 320/375/480 (fixed inset 8px, เลื่อนได้) และ 768/1024/1440, page overflow 0; จัด header ใหม่: ปุ่ม 2D|3D ห่างจากกลางจอ 0px ที่ 768/1024/1440, ไม่มีกลุ่มทับกันที่ 320/375/480, เมนูอยู่ในจอทุกขนาด; make test 805/805, make lint, make e2e 91/91 รอบสอง"
+    },
+    {
+      "id": "feat-067",
+      "name": "ปรับมุมมอง 3D Isometric เป็นห้องตัด (cutaway) โทนขาว + ส้ม",
+      "description": "ตามภาพอ้างอิงห้อง isometric: ผนังหลัง 2 ด้านสูง (max(72, scale×2.6) px) หนา 0.20 ม. มีฝาบนตัว L และหน้าตัดปลายผนัง, พื้นมีฐานหนา 10px, พื้น/ผนังไล่สี, เงาวัตถุนุ่ม (Gaussian blur) + เงารอยต่อผนัง-พื้น (AO), เฟอร์นิเจอร์โทนขาว + ส้ม, ทางเข้าผนังเหนือ/ตะวันตกเป็นช่องประตู + พรม — ยังเป็น Pure SVG · เฟอร์นิเจอร์ไม่มีเส้นขอบ (stroke = fill 0.5px กันรอยต่อ anti-alias) · การเลือกใน 3D: เส้นรอบเงารวมทั้งชุด (SVG morphology filter) + แผ่นพื้นเส้นประ แทนการทาเส้นน้ำเงินทุกหน้า",
+      "dependencies": [
+        "feat-058"
+      ],
+      "gate": "Pure SVG (ไม่มี WebGL), เลือก/ขยับ/Toolbar ใน 3D ทำงานเหมือนเดิม, ไม่มี horizontal scroll, make test + make lint ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ฉาก 3D ดูเป็นห้องจริงแบบ cutaway โทนขาว-ส้ม",
+      "sprint": 4,
+      "evidence": "src/core/preview/isometric.ts: wallHeight/WALL_THICKNESS/SLAB_HEIGHT, IsoScene เพิ่ม wallTop/wallEnds/slab/seam/door/doormat, polygon เงามี kind='shadow', ISO_PALETTE ใหม่; src/components/preview-3d/isometric-view.tsx: <defs> gradient/blur/clipPath (id จาก useId); --shadow-iso ใหม่; design-system §2.4; unit isometric.test.ts +3 เคส (ห้องตัด, ประตูผนังเหนือ/ตะวันตก) — make test 808/808, make lint ผ่าน; เบราว์เซอร์ 1440 และ 320: overflow 0, console สะอาด; รอบ 2 ซิงก์โทเคน --iso-* ใน globals.css ตาม §2.4 (design-tokens.test) + เอาเส้นขอบเฟอร์นิเจอร์ออก + unit \"เฟอร์นิเจอร์ไม่มีเส้นขอบ\" — make test 809/809, make lint ผ่าน; รอบ 3 ไฮไลต์การเลือกใหม่: isoFloorRect (core), filter outline + iso-selection-pad (isometric-view.tsx), unit isometric-interaction อัปเดต — make test 809/809, make lint ผ่าน, เบราว์เซอร์เห็นเส้นขอบนอกเส้นเดียว; รอบ 4 ลดเส้นรอบเงาเหลือ 1 หน่วย viewBox (erode 5); รอบ 5 เอาเส้นขอบพื้น/ผนัง/ฝาผนัง/ปลายผนัง/ฐานออก (stroke = fill 0.5px), ลบ wallStroke/--iso-wall-stroke"
+    },
+    {
+      "id": "feat-068",
+      "name": "แสดงการจำลองลูกค้าในมุมมอง 3D",
+      "description": "เดิมจำลองแล้ว 3D นิ่ง (overlay มีแค่ใน Artboard 2D) → เพิ่ม IsoSimulationOverlay (canvas ทับ SVG: ตัวคนสีตามสถานะ เดิน/นั่ง interpolate 60 FPS, เรียงไกล→ใกล้, เคารพ reduced motion) และ IsoHeatmapLayer (<image> ใน SVG ด้วย matrix isometric, clip พื้น, ใต้เฟอร์นิเจอร์, จาง 0.35 เมื่อไม่ได้จำลอง, สร้างภาพใหม่ ≤4 ครั้ง/วินาที) · เฉพาะ Editor (prop simulate) หน้าแชร์ไม่มี · ตัวคนแบบ soft-toy chibi (iso-person.ts): หน้าตาคงที่ต่อ id (ผิว/เสื้อ/กางเกง/ผม-หมวก 6 แบบ + แว่น/ต่างหู/คอเสื้อ), หัน 4 ทิศตามทิศเดินบนจอ, รูปทรงหัว/เสื้อ/แขนขามี volume, แขนขาแกว่งตามระยะเดิน, ท่านั่งหันเข้าโต๊ะตามทิศเก้าอี้, วงสีสถานะใต้เท้า (ตาม legend) · ท่าทางสื่อพฤติกรรมเพิ่ม: เดิน, รอคิวดูโทรศัพท์, ยกเมนูสั่ง, นั่งทานกับแก้ว และเดินออกพร้อมกระเป๋า",
+      "dependencies": [
+        "feat-067"
+      ],
+      "gate": "ตัวโมเดล 3D ยังเป็น SVG ล้วน (canvas มีเฉพาะชั้นจำลอง 2D context), make test + make lint ผ่าน, เห็นลูกค้าเคลื่อนที่ในเบราว์เซอร์",
+      "status": "done",
+      "role": "frontend",
+      "summary": "กดจำลองแล้วสลับไป 3D เห็นลูกค้าเดิน/นั่งและ heatmap บนพื้น",
+      "sprint": 4,
+      "evidence": "src/components/simulation/iso-simulation-overlay.tsx (projectAgents, IsoSimulationOverlay, IsoHeatmapLayer); isometric-view.tsx prop simulate; unit iso-simulation-overlay.test.tsx 3 เคส; validation-ui.test 'Isometric view' แคบลงเป็น canvas ได้เฉพาะ iso-simulation-overlay (architecture §5.3.3 กำหนดให้การจำลองใช้ Canvas Overlay); architecture.md §5.3 ข้อ 3; make test 812/812, make lint ผ่าน; เบราว์เซอร์: จำลองใน 3D เห็นคนนั่ง (เขียว) ที่เก้าอี้ คนสั่งที่เคาน์เตอร์ และ heatmap บนพื้นใต้เฟอร์นิเจอร์; รอบ 2 ตัวคน chibi: iso-person.ts + iso-person.test.ts (look/facing), seatedFacing + เทสต์, deps ของ effect คงที่ [scene, active] (อ่านผังผ่าน ref — แก้ error useEffect deps เปลี่ยนขนาดตอน HMR); รอบ 3 behavior: iso-person.ts เพิ่ม behaviorFromState + prop โทรศัพท์/เมนู/แก้ว/กระเป๋า, unit เพิ่ม 1 เคส mapping state→behavior; รอบ 4 visual refresh: เปลี่ยน silhouette เป็น soft-toy มีหัวรูปไข่และแสงเงา, เสื้อและแขนขาแบบ rounded, hair/hat สเกลใหม่, accessory deterministic (แว่น/ต่างหู/คอเสื้อ) โดยไม่แตะ Worker contract; make test 820/820 + make lint ผ่าน; เปิด Playground 3D ตรวจตัวละครระหว่างจำลองแล้ว; รอบ 5 HTML visual mock: design-html/person-mock/index.html เป็น SVG 2.5D แบบ self-contained แสดง 5 คาแรกเตอร์ (ทาน/สั่ง/รอ/เดินออก) และสลับเหตุการณ์ ช่วงเที่ยง/คิว/ช่วงเงียบ; ตรวจ browser 320px ไม่มี horizontal overflow, interaction + console error 0; make test 822/822 + make lint ผ่าน; รอบ 6 master SVG character: เพิ่ม #character-mali ที่นำกลับมาใช้ด้วย <use> ใน mock — ผม/หน้า/ตา/แก้ม/เสื้อหลายชั้น/แขน/แก้ว/รองเท้าเป็น primitives + gradients + drop shadow ทั้งหมด; browser render + scene switching + console error 0; make test 822/822 + make lint ผ่าน; รอบ 7 2.5D asset proof: สร้างภาพโปร่งใส Mali ด้วย built-in image generation แล้วเก็บใน design-html/person-mock/assets/mali-seated-v1.png, แทนตัว SVG ในฉากด้วย <image>; ตรวจ alpha, browser render และ console error 0; make test 822/822 + make lint ผ่าน"
+    },
+    {
+      "id": "feat-069",
+      "name": "ปรับโมเดลโต๊ะและเก้าอี้ 3D ให้เรียวขึ้น",
+      "description": "โต๊ะ: ท็อปขาวหนา 3px คลุมทั้ง footprint (ยื่นคลุมขา) + ขาไม้เรียว ~0.05 ม. · เก้าอี้: ขาโลหะเรียว ~0.035 ม., เบาะบาง 3px, พนักพิงแผ่นบาง 0.06 ม. ยกบนเสา 2 ต้น (เว้นช่องระหว่างเบาะกับพนักพิง) · ขาไม่บางกว่า 1–1.2px บนจอ (ร้านใหญ่) · ระดับท็อปโต๊ะ (34) และระดับนั่ง (18) คงเดิม",
+      "dependencies": [
+        "feat-067"
+      ],
+      "gate": "Pure SVG, depth sort ถูก (พนักพิงอยู่ด้านหลังทุกทิศ), make test + make lint ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "โต๊ะเก้าอี้ 3D ดูบางเบาแบบเฟอร์นิเจอร์จริง",
+      "sprint": 4,
+      "evidence": "src/core/preview/isometric.ts (chairBackRect แผ่นบาง, backPosts, slim); isometric.test.ts +2 เคส (ท็อปคลุม footprint/ขา 4 ต้น/เสาพนักพิง, ขาไม่หายในร้าน 30×30); design-system §2.4; make test 822/822, make lint ผ่าน; เบราว์เซอร์ซูมดูชุดโต๊ะ 2 และ 4 ที่นั่ง"
+    },
+    {
+      "id": "feat-070",
+      "name": "Three.js Runtime — ลูกค้า GLB ในมุมมอง 3D",
+      "description": "แทนที่ runtime Pure SVG ของมุมมอง 3D ใน Playground ด้วย Three.js/WebGL ที่ lazy-load เมื่อเลือกแท็บ 3D; รักษา 2D editor, Core Validation, BFF และ P2 Worker ไว้เดิม. แสดงห้อง/เฟอร์นิเจอร์และตัวละคร GLB ที่ trusted, rig แล้ว, มี Idle/Walk; ผูกตำแหน่งและ state ของลูกค้ากับ output จาก simulation เดิม. ต้องมี SVG isometric fallback เมื่อ WebGL ใช้ไม่ได้หรือ prefers-reduced-motion, และห้าม runtime 3D อยู่ใน initial bundle ของมุมมอง 2D.",
+      "dependencies": [
+        "feat-068"
+      ],
+      "gate": "Three.js/WebGL ถูก lazy-load เฉพาะมุมมอง 3D; GLB local ที่มี Idle/Walk แสดงและสลับท่าได้; fallback SVG และ reduced motion ทำงาน; P2 Validation Gate/2D editor ไม่เปลี่ยน; make test, make lint และ E2E 6 breakpoints ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ยกระดับตัวละครจำลองเป็น 3D จริงแบบ soft-toy chibi ที่เดินได้",
+      "sprint": 4,
+      "implementation_note": "2026-10-16: ปรับกล้อง Orthographic ของ ThreeView เป็น isometric จริง โดยเยื้องจากจุดกลางเท่ากันทั้งแกน X/Y/Z (azimuth 45° และ elevation 35.264°); แกนพื้นจึงย่อเท่ากันบนหน้าจอ.",
+      "evidence": "ผู้ใช้อนุมัติเปลี่ยนข้อกำหนดเมื่อ 2026-10-15: อนุญาต Three.js/WebGL สำหรับมุมมอง 3D; PRD §9 ข้อ 22–25, architecture.md, design-system.md, AGENTS.md และ SKILL.md อัปเดตขอบเขตแล้ว. เพิ่ม public/assets/models/cafe-customer.glb (458 KB; rig + Idle 2 วินาที/Walk 0.8 วินาที) และ src/components/preview-3d/three-view.tsx; isometric-view.tsx lazy-load เฉพาะ 3D, เชื่อมตำแหน่ง/state จาก Simulation Controller และคง SVG fallback/reduced-motion ไว้. ตรวจในเบราว์เซอร์จริง: เริ่มจำลองแล้วมี chibi GLB 3 ตัวเดินในฉาก; 3D รับ Arrow/R เพื่อแก้ผังได้. ผู้ใช้ขอเอา Person ออกก่อนเมื่อ 2026-10-16: ถอด customer Idle ค่าเริ่มต้นออกแล้ว จึงเห็นเฉพาะห้องและเฟอร์นิเจอร์ก่อนเริ่มจำลอง; GLB จะเกิดจาก output ของ P2 ระหว่างจำลองเท่านั้น. QA ล่าสุด: npm test 62 files/822 tests, typecheck, lint ผ่าน และตรวจหน้า /playground ในเบราว์เซอร์จริงแล้ว."
+    },
+    {
+      "id": "feat-071",
+      "name": "รูปลักษณ์และขนาดชุดโต๊ะ (ทรง/ขา/สี/แบบเก้าอี้)",
+      "description": "ผู้ใช้ตั้งค่าชุดโต๊ะได้: ทรงโต๊ะ (สี่เหลี่ยม/กลม), ขนาดหน้าโต๊ะ 0.60–3.00 ม. (โต๊ะกลม = เส้นผ่านศูนย์กลาง), ขาโต๊ะ (สี่ขา/ขาเดี่ยว), สีโต๊ะ; เก้าอี้ทั้งชุด: มีพนักพิง/สตูล, ขา, สี. style เป็น optional enum (ผังเก่ายังอ่านได้) และไม่กระทบ validation นอกจาก width/depth; ปรับขนาดจัดเก้าอี้ใหม่โดยคง id และระยะสอด 0.10 ม. (ไม่เกิด orphan)",
+      "dependencies": [
+        "feat-070"
+      ],
+      "gate": "Table Set Lifecycle เดิมผ่าน; ไม่มี orphan chair หลังปรับขนาด/สลับที่นั่ง/ทำซ้ำ; make test และ make lint ผ่าน",
+      "status": "done",
+      "role": "fullstack",
+      "summary": "เลือกแบบโต๊ะ-เก้าอี้ได้ และสะท้อนใน 2D/3D",
+      "sprint": 4,
+      "evidence": "core: types.ts (TableStyle/ChairStyle/FurnitureColor), constants.ts (DEFAULT_*_STYLE, FURNITURE_COLOR_HEX, TABLE_SIZE_MIN/MAX), table-set.ts (resizeTableSet, setTableSetStyle, copyTableSetAppearance, tableStyleOf/chairStyleOf; toggleTablePreset คงสไตล์); layout.schema.ts + contracts/openapi.yaml (TableStyle/ChairStyle strict enum); store resizeTableSet/setTableSetStyle + duplicate คงขนาด/สไตล์. UI: ปุ่ม 'แบบ' ใน selection-toolbar เปิดแผง table-set-style-controls.tsx (radio group ป้ายไทย, คีย์บอร์ด, Escape คืนโฟกัส, ความสูงพอดีจอ); object-inspector มีช่องขนาดโต๊ะ. Render: artboard (กลม/สี/พนักพิง), isometric.ts (cylinder/pedestal/สตูล/สี), three-view.tsx (โต๊ะกลม/เหลี่ยม, ขาเดี่ยว, สตูล, สี; แก้พนักพิงเก้าอี้ที่เคยอยู่ด้านหน้าและใช้ objectCenter สำหรับวัตถุหมุน). QA: make test 62 files/838 tests, make lint ผ่าน; เบราว์เซอร์ /playground ตั้งโต๊ะกลมไม้โอ๊กขาเดี่ยว + สตูลเขียวเสจ, ปรับเส้นผ่านศูนย์กลาง 1.6 ม. แล้วเห็นผลทั้ง 2D และ 3D (Undo กลับผังเดิมแล้ว). ยังไม่ได้รัน make e2e"
+    },
+    {
+      "id": "feat-072",
+      "name": "ตั้งค่าชุดโต๊ะก่อนวางลงผัง",
+      "description": "เมื่อกดเพิ่มชุดโต๊ะ 2 หรือ 4 ที่นั่ง ให้เปิดหน้าต่างตั้งค่าก่อนสร้างจริง: จำนวนที่นั่ง, ขนาด, ทรง/ขา/สีโต๊ะ และแบบ/ขา/สีเก้าอี้ แล้วจึงสร้าง Table พร้อม Chair ลูกด้วยค่าเดียวกันใน Undo ขั้นเดียว",
+      "dependencies": [
+        "feat-071"
+      ],
+      "gate": "สร้างตามค่าที่เลือกได้จริง, ไม่มี orphan chair, ปิดหน้าต่างแล้วไม่แก้ผัง, make test และ make lint ผ่าน",
+      "status": "done",
+      "role": "fullstack",
+      "summary": "เลือกแบบชุดโต๊ะได้ครบก่อนวางลงผัง",
+      "sprint": 4,
+      "evidence": "เพิ่ม TableSetCreateDialog ก่อนสร้างจาก Palette: เลือก 2/4 ที่นั่ง, ขนาด, ทรง/ขา/สีโต๊ะ และแบบ/ขา/สีเก้าอี้; ยกเลิกแล้วไม่แก้ผัง. Core addTableSet รับ TableSetCreationOptions และจัดขนาด/สไตล์ผ่าน lifecycle เดิมใน commit เดียว จึงไม่มี orphan chair. ปรับ helper/E2E flow ตาม dialog. make test 62 files/838 tests, make lint ผ่าน และ Playwright playground-ux + keyboard 12/12 กับ editor-flow 10/10 ผ่าน."
+    },
+    {
+      "id": "feat-073",
+      "name": "รวมการเพิ่มโต๊ะเป็นหน้าตั้งค่าในแผงซ้าย",
+      "description": "รวมการ์ดชุดโต๊ะ 2/4 ที่นั่งเป็นการ์ด ‘โต๊ะ’ เดียวในแท็บเพิ่ม; กดแล้วเปลี่ยนแผงซ้ายเป็นหน้าตั้งค่าจำนวนที่นั่ง ขนาด และรูปแบบ พร้อมปุ่มกลับด้านบน แล้วจึงเพิ่มโต๊ะเมื่อยืนยัน",
+      "dependencies": [
+        "feat-072"
+      ],
+      "gate": "หน้าเพิ่มกลับได้โดยไม่แก้ผัง, สร้างทั้ง 2/4 ที่นั่งได้โดยไม่มี orphan chair, unit/type/lint/harness ผ่าน; เลื่อน E2E ตามคำขอผู้ใช้",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ตั้งค่าโต๊ะต่อเนื่องในแผงซ้ายแทนหน้าต่างลอย",
+      "sprint": 4,
+      "evidence": "playground-panel.tsx เหลือ PaletteItem ‘โต๊ะ’ รายการเดียว; กดแล้วแสดง table-set-create-panel.tsx ในแผงซ้าย ซึ่งเลือกระหว่าง 2/4 ที่นั่ง ขนาด และสไตล์ได้ พร้อมปุ่ม ‘กลับ’ ด้านบนโดยไม่แก้ผังจนกดยืนยัน. addTableSet lifecycle เดิมคง Table–Chair relation และ unit flow ตรวจทั้ง 2/4 ที่นั่งกับการกลับโดยไม่สร้างวัตถุ. QA: make test 62 files/838 tests, make lint และ make status ผ่าน; ไม่เขียนหรือรัน E2E ตามคำขอผู้ใช้."
+    },
+    {
+      "id": "feat-074",
+      "name": "กำหนดจำนวนเก้าอี้ตามความจุของโต๊ะ",
+      "description": "เปลี่ยนหน้าสร้างโต๊ะจากตัวเลือก preset 2/4 ที่นั่งเป็นตัวควบคุมเพิ่ม/ลดจำนวนเก้าอี้; คำนวณจำนวนสูงสุดที่ขนาดและทรงโต๊ะรองรับ และไม่อนุญาตสร้างเมื่อเกินความจุ โดยเก้าอี้ทุกตัวยังคงสังกัดโต๊ะแม่",
+      "dependencies": [
+        "feat-073"
+      ],
+      "gate": "จำนวนเก้าอี้ไม่เกินความจุเชิงเรขาคณิตของโต๊ะ, เก้าอี้ลูกครบตามจำนวนและไม่มี orphan, ขนาดที่ไม่พอปิดการเพิ่ม, unit/type/lint/harness ผ่าน; เลื่อน E2E ตามคำขอผู้ใช้",
+      "status": "done",
+      "role": "fullstack",
+      "summary": "เพิ่มเก้าอี้ตามจำนวนจริงและกันโต๊ะที่เล็กเกิน",
+      "sprint": 4,
+      "evidence": "Core เพิ่ม tableSeatCapacity และ chairCount ใน TableSetCreationOptions: คำนวณ slot รอบขอบโต๊ะจากเก้าอี้ 0.50 ม. + ช่องว่าง 0.10 ม., ปฏิเสธการสร้างที่เกินความจุ และไม่ยอมย่อโต๊ะให้เล็กกว่าจำนวนเก้าอี้เดิม. table-set-create-panel.tsx ใช้ปุ่มเพิ่ม/ลด พร้อมจำนวนสูงสุดและปิดปุ่มเพิ่มเมื่อเต็ม; addTableSet สร้าง Chair ลูกตามจำนวนจริง. Unit ครอบคลุมสร้าง 5 ตัวและปฏิเสธ 9 ตัวบนโต๊ะ 1.2 ม.; browser ยืนยัน 1.2×1.2 ม. เพิ่มได้ถึง 8 ตัวแล้วปุ่ม + ปิด. QA: make test 62 files/839 tests, make lint, make status ผ่าน; ไม่เขียนหรือรัน E2E ตามคำขอผู้ใช้."
+    },
+    {
+      "id": "feat-075",
+      "name": "แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย",
+      "description": "เมื่อเลือกโต๊ะหรือเก้าอี้ลูก ให้แทนแผงซ้ายด้วยหน้าแก้ไขของโต๊ะชุดนั้น รวมการปรับจำนวนเก้าอี้ ขนาด รูปแบบ พิกัด หมุน ทำซ้ำ และลบไว้ในแผงเดียว โดยไม่ให้เก้าอี้เกินความจุหรือหลุดจากโต๊ะแม่",
+      "dependencies": [
+        "feat-074"
+      ],
+      "gate": "เลือกโต๊ะหรือเก้าอี้แล้วเข้าสู่หน้าแก้ไขของโต๊ะเดียวกัน, ปรับจำนวนตามความจุโดยไม่มี orphan, คำสั่งชุดโต๊ะไม่ลอยบนผัง, unit/type/lint/harness ผ่าน; เลื่อน E2E ตามคำขอผู้ใช้",
+      "status": "done",
+      "role": "fullstack",
+      "summary": "รวมการแก้ไขชุดโต๊ะที่เลือกไว้ในแผงซ้าย",
+      "sprint": 4,
+      "evidence": "เพิ่ม TableSetEditPanel ที่แสดงทันทีเมื่อเลือกโต๊ะหรือ Chair ลูก โดยรวมจำนวนเก้าอี้ ขนาด/รูปแบบ ตำแหน่ง หมุน ทำซ้ำ และลบไว้ทางซ้าย; toolbar ลอยถูกซ่อนสำหรับ Table/Chair ทั้ง 2D และ SVG isometric. Core setTableSetChairCount คง id ของโต๊ะ/เก้าอี้เดิมเท่าที่ทำได้, เพิ่ม/ลบลูกอย่างปลอดภัย, ตรวจ capacity และไม่มี orphan; การทำซ้ำคงจำนวนเก้าอี้จริงด้วย. QA: make test 62 files/843 tests, make lint, make status ผ่าน; ตรวจ Chrome เลือกโต๊ะและเพิ่มจาก 2 เป็น 3 ตัวในแผงซ้ายแล้ว. ไม่เขียนหรือรัน E2E ตามคำขอผู้ใช้."
     }
   ]
 }

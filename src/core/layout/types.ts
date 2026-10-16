@@ -21,6 +21,23 @@ export type LayoutObjectType = "kitchen" | "counter" | "table" | "chair";
 
 export type TableSetPreset = "table-2-seats" | "table-4-seats";
 
+/** สีเฟอร์นิเจอร์ที่เลือกได้ในตัวแก้ไข (เก็บเป็นชื่อเพื่อให้ contract ปลอดภัย) */
+export type FurnitureColor = "white" | "oak" | "charcoal" | "blue" | "orange" | "sage";
+
+/** รูปลักษณ์โต๊ะ — ไม่กระทบ validation นอกจากขนาด footprint จริง */
+export interface TableStyle {
+  shape: "round" | "rectangle";
+  legStyle: "four-legs" | "pedestal";
+  color: FurnitureColor;
+}
+
+/** รูปลักษณ์เก้าอี้; stool = ไม่มีพนักพิง */
+export interface ChairStyle {
+  kind: "chair" | "stool";
+  legStyle: "four-legs" | "pedestal";
+  color: FurnitureColor;
+}
+
 export interface Point {
   x: Meters;
   y: Meters;
@@ -56,6 +73,8 @@ export interface Table extends BaseObject {
   type: "table";
   chairIds: string[];
   preset?: TableSetPreset;
+  /** optional เพื่ออ่านผังรุ่นก่อนหน้าได้ */
+  style?: TableStyle;
 }
 
 /**
@@ -65,6 +84,8 @@ export interface Table extends BaseObject {
 export interface Chair extends BaseObject {
   type: "chair";
   tableId: string;
+  /** optional เพื่ออ่านผังรุ่นก่อนหน้าได้ */
+  style?: ChairStyle;
 }
 
 export type LayoutObject = Kitchen | Counter | Table | Chair;

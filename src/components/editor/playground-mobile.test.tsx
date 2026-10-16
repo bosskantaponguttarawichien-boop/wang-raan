@@ -74,7 +74,7 @@ describe("feat-059: Playground มือถือ — Bottom Tab Bar + Bottom Sh
     const catList = container.querySelector(".cat-list");
     expect(catList).toHaveClass("max-[767px]:overflow-x-auto");
 
-    const item = screen.getByRole("button", { name: /ชุดโต๊ะ 2 ที่นั่ง/i });
+    const item = screen.getByRole("button", { name: /เพิ่มโต๊ะ/i });
     expect(item).toHaveClass("max-[767px]:shrink-0");
   });
 

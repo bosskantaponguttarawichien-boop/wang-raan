@@ -80,12 +80,15 @@ describe("Validation Status Bar", () => {
 });
 
 describe("Isometric view", () => {
-  it("เป็น SVG ล้วน มี role=img พร้อมคำอธิบายไทย และไม่มี <canvas>", () => {
+  it("เป็น SVG ล้วน มี role=img พร้อมคำอธิบายไทย — canvas มีได้เฉพาะชั้นจำลองลูกค้า (architecture §5.3.3)", () => {
     const { container } = render(<IsometricView />);
     const svg = screen.getByRole("img");
     expect(svg.getAttribute("aria-label")).toMatch(/ไอโซเมตริก ขนาด 8 × 6 เมตร มีโต๊ะ 2 ตัว เก้าอี้ 6 ตัว/);
     expect(svg.querySelectorAll("polygon").length).toBeGreaterThan(50);
-    expect(container.querySelector("canvas")).toBeNull();
+    // ตัวโมเดลเป็น SVG ล้วน: canvas เดียวคือ overlay ลูกค้าจำลอง (2D context ไม่ใช่ WebGL) อยู่นอก <svg>
+    const canvases = [...container.querySelectorAll("canvas")];
+    expect(canvases.map((c) => c.dataset.testid)).toEqual(["iso-simulation-overlay"]);
+    expect(svg.querySelector("canvas")).toBeNull();
     expect(screen.getByText("ทางเข้า")).toBeInTheDocument();
   });
 

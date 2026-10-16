@@ -36,6 +36,8 @@ description: ใช้เมื่อทำงานกับโปรเจก�
 8. **Dual-Tier Validation:** เขียนลอจิกการตรวจผังทั้ง 4 ด้านเป็น Pure TypeScript ใน `src/core/validation/` เพื่อให้สามารถรันบน Client (Instant Feedback 0ms) และรันซ้ำที่ BFF Route Handler ก่อนบันทึกลงฐานข้อมูลได้
 9. **Accessibility & Reduced Motion:** ทุกคอมโพเนนต์ต้องรองรับคีย์บอร์ด (Tab + Focus Ring), มี `aria-label` ภาษาไทย และปิดแอนิเมชันทั้งหมดเมื่อเปิด `prefers-reduced-motion` หรือสั่งพิมพ์ (`@media print`)
 
+> **ข้อยกเว้นมุมมอง 3D (feat-070):** ใช้ Three.js/WebGL ได้เฉพาะ Presentation Tier ของมุมมอง 3D เพื่อแสดง GLB ที่ trusted และ lazy-loaded เท่านั้น; 2D Artboard, `src/core/validation/`, BFF และ Web Worker ต้องไม่มี Three.js/WebGL/DOM. ต้องมี SVG fallback เมื่อ WebGL ใช้ไม่ได้และต้องหยุด animation เมื่อ reduced motion.
+
 ---
 
 ## 3. โครงสร้างไฟล์และโค้ด

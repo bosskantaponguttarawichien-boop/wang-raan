@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as React from "react";
@@ -144,31 +144,101 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     expect(toastFn).toHaveBeenCalledWith("เริ่มผังใหม่แล้ว");
   });
 
-  it("2. แท็บ 'เพิ่ม' → เพิ่มชุดโต๊ะ 4 ที่นั่งและ 2 ที่นั่ง → Table Set Lifecycle สมบูรณ์", async () => {
+  it("2. แท็บ 'เพิ่ม' → เพิ่มจำนวนเก้าอี้ตามความจุ แล้ว Table Set Lifecycle สมบูรณ์", async () => {
     const user = userEvent.setup();
     const live = mockLive(1, 0);
     render(<PlaygroundPanel live={live} />);
 
     // อยู่ที่แท็บ 'add' เริ่มต้น
-    const addTable4Btn = screen.getByRole("button", { name: /ชุดโต๊ะ 4 ที่นั่ง/ });
-    await user.click(addTable4Btn);
+    await user.click(screen.getByRole("button", { name: /^เพิ่มโต๊ะ/ }));
+
+    const panel = screen.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
+    expect(layoutStore.getState().layout.objects).toHaveLength(0);
+    await user.click(within(panel).getByRole("radio", { name: "กลม" }));
+    await user.clear(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"));
+    await user.type(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"), "1.6{Enter}");
+    await user.click(within(panel).getByRole("radio", { name: "สตูล" }));
+    await user.click(within(panel).getAllByRole("radio", { name: "ไม้โอ๊ก" })[0]!);
+    await user.click(within(panel).getAllByRole("radio", { name: "เขียวเสจ" })[1]!);
+    const increaseChairs = within(panel).getByRole("button", { name: "เพิ่มจำนวนเก้าอี้" });
+    await user.click(increaseChairs);
+    expect(within(panel).getByRole("status")).toHaveTextContent("5 ตัว");
+    await user.click(increaseChairs);
+    await user.click(increaseChairs);
+    await user.click(increaseChairs);
+    expect(within(panel).getByRole("status")).toHaveTextContent("8 ตัว");
+    expect(increaseChairs).toBeDisabled();
+    await user.clear(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"));
+    await user.type(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"), "0.6{Enter}");
+    expect(within(panel).getByText("โต๊ะขนาดนี้รองรับเก้าอี้ได้สูงสุด 4 ตัว", { exact: false })).toBeInTheDocument();
+    expect(within(panel).getByRole("button", { name: "เพิ่มโต๊ะพร้อมเก้าอี้ 8 ตัว ลงผัง" })).toBeDisabled();
+    await user.clear(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"));
+    await user.type(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"), "1.6{Enter}");
+    const decreaseChairs = within(panel).getByRole("button", { name: "ลดจำนวนเก้าอี้" });
+    await user.click(decreaseChairs);
+    await user.click(decreaseChairs);
+    await user.click(decreaseChairs);
+    await user.click(within(panel).getByRole("button", { name: "เพิ่มโต๊ะพร้อมเก้าอี้ 5 ตัว ลงผัง" }));
 
     let state = layoutStore.getState();
     const table4 = state.layout.objects.find((o) => o.type === "table");
     expect(table4).toBeDefined();
-    // โต๊ะ 4 ที่นั่งมีเก้าอี้ 4 ตัว
+    expect(table4).toMatchObject({ width: 1.6, depth: 1.6, style: { shape: "round", color: "oak" } });
+    // โต๊ะมีเก้าอี้ตามจำนวนที่เพิ่ม
     let chairs = state.layout.objects.filter((o) => o.type === "chair");
-    expect(chairs).toHaveLength(4);
+    expect(chairs).toHaveLength(5);
 
-    // เพิ่มชุดโต๊ะ 2 ที่นั่ง
-    const addTable2Btn = screen.getByRole("button", { name: /ชุดโต๊ะ 2 ที่นั่ง/ });
-    await user.click(addTable2Btn);
+    // กลับจากหน้าแก้ไขไปหน้าเพิ่ม แล้วเปิดหน้าตั้งค่าใหม่โดยไม่ยืนยัน → ผังไม่เปลี่ยน
+    await user.click(screen.getByRole("button", { name: "กลับ" }));
+    expect(layoutStore.getState().layout.objects.filter((o) => o.type === "table")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "เพิ่มลงผัง" })).toBeInTheDocument();
+
+    // ลดจำนวนเก้าอี้เหลือ 2 ตัวจากหน้าตั้งค่าเดียวกัน
+    await user.click(screen.getByRole("button", { name: /^เพิ่มโต๊ะ/ }));
+    const secondPanel = screen.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
+    await user.click(within(secondPanel).getByRole("button", { name: "ลดจำนวนเก้าอี้" }));
+    await user.click(within(secondPanel).getByRole("button", { name: "ลดจำนวนเก้าอี้" }));
+    await user.click(within(secondPanel).getByRole("button", { name: "เพิ่มโต๊ะพร้อมเก้าอี้ 2 ตัว ลงผัง" }));
 
     state = layoutStore.getState();
     const tables = state.layout.objects.filter((o) => o.type === "table");
     expect(tables).toHaveLength(2);
     chairs = state.layout.objects.filter((o) => o.type === "chair");
-    expect(chairs).toHaveLength(6);
+    expect(chairs).toHaveLength(7);
+    const styledChairs = chairs.filter((o) => o.tableId === table4!.id);
+    expect(styledChairs.every((chair) => chair.style?.kind === "stool" && chair.style?.color === "sage")).toBe(true);
+  });
+
+  it("2.1 เลือกโต๊ะหรือเก้าอี้ลูก → แผงซ้ายเป็นหน้าแก้ไขของโต๊ะชุดนั้น", async () => {
+    const user = userEvent.setup();
+    const toastFn = vi.fn();
+    const tableId = actions().addTableSet("table-4-seats", { x: 3, y: 3 });
+    const chair = layoutStore.getState().layout.objects.find((object) => object.type === "chair" && object.tableId === tableId)!;
+    actions().selectObject(chair.id);
+    render(<PlaygroundPanel live={mockLive()} onToast={toastFn} />);
+
+    const panel = screen.getByRole("region", { name: "แก้ไขโต๊ะ" });
+    expect(within(panel).getByRole("heading", { name: "แก้ไขโต๊ะ" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "เพิ่มลงผัง" })).toBeNull();
+    await user.click(within(panel).getByRole("button", { name: "เพิ่มจำนวนเก้าอี้" }));
+    expect(layoutStore.getState().layout.objects.filter((object) => object.type === "chair" && object.tableId === tableId)).toHaveLength(5);
+    expect(layoutStore.getState().selectedObjectId).toBe(tableId);
+
+    await user.click(within(panel).getByRole("button", { name: "หมุนโต๊ะ 90 องศา" }));
+    expect(layoutStore.getState().layout.objects.find((object) => object.id === tableId)).toMatchObject({ rotation: 90 });
+    await user.click(within(panel).getByRole("button", { name: "กลับ" }));
+    expect(layoutStore.getState().selectedObjectId).toBeNull();
+    expect(screen.getByRole("heading", { name: "เพิ่มลงผัง" })).toBeInTheDocument();
+  });
+
+  it("2.2 เมื่อสลับไปแท็บจำลอง แผงจำลองต้องไม่ถูกหน้าแก้ไขโต๊ะบัง", () => {
+    const tableId = actions().addTableSet("table-4-seats", { x: 3, y: 3 });
+    actions().selectObject(tableId);
+    layoutStore.setState({ activeTab: "check" });
+    render(<PlaygroundPanel live={mockLive()} />);
+
+    expect(screen.queryByRole("region", { name: "แก้ไขโต๊ะ" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "ตรวจผังและจำลอง" })).toBeInTheDocument();
   });
 
   it("3. Floating Selection Toolbar: สลับที่นั่ง 4↔2, หมุน, ปรับพิกัด, และ Cascade Delete", async () => {

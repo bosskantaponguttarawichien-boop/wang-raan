@@ -24,6 +24,16 @@ describe("Zod schemas — type-safe ตรงกับ Core types", () => {
     expect(ValidationResultSchema.parse(validateLayout(layout))).toBeTruthy();
   });
 
+  it("style ของโต๊ะ/เก้าอี้: รับเฉพาะ enum (ไม่รับ hex อิสระหรือ key แปลก)", () => {
+    const table = cafeLayout().objects.find((o) => o.type === "table")!;
+    const style = { shape: "round", legStyle: "pedestal", color: "oak" };
+    expect(LayoutObjectSchema.safeParse({ ...table, style }).success).toBe(true);
+    expect(LayoutObjectSchema.safeParse({ ...table, style: { ...style, color: "#ff0000" } }).success).toBe(false);
+    expect(LayoutObjectSchema.safeParse({ ...table, style: { ...style, extra: 1 } }).success).toBe(false);
+    const chair = cafeLayout().objects.find((o) => o.type === "chair")!;
+    expect(LayoutObjectSchema.safeParse({ ...chair, style: { kind: "stool", legStyle: "four-legs", color: "sage" } }).success).toBe(true);
+  });
+
   it("วัตถุนอกขอบร้านยังผ่าน schema (Non-blocking — ให้ Validation Engine รายงานแทน)", () => {
     const layout = cafeLayout();
     const outside = { ...layout, objects: layout.objects.map((o, i) => (i === 0 ? { ...o, x: -1 } : o)) };

@@ -18,6 +18,8 @@ import {
 } from "@/core/layout";
 import { layoutActions as actions } from "@/store/use-layout-store";
 import { objectLabel } from "./stage-math";
+import { cn } from "@/lib/cn";
+import { TableSetStyleControls } from "@/components/editor/forms/table-set-style-controls";
 
 export interface SelectionToolbarProps {
   /** กรอบผังร้าน (position: relative) ที่แถบนี้วางอยู่ข้างใน */
@@ -92,6 +94,10 @@ export function SelectionToolbar({
   const barRef = React.useRef<HTMLDivElement>(null);
   const [pos, setPos] = React.useState<{ x: number; y: number } | null>(null);
   const [popOpen, setPopOpen] = React.useState(false);
+  const [styleOpen, setStyleOpen] = React.useState(false);
+  /** เปิดแผงฝั่งที่มีที่ว่างมากกว่า และจำกัดความสูงให้พอดีจอ (ไม่ทับแถบสถานะ/หัวหน้า) */
+  const [stylePlacement, setStylePlacement] = React.useState<{ below: boolean; maxHeight: number }>({ below: true, maxHeight: 420 });
+  const styleButtonRef = React.useRef<HTMLButtonElement>(null);
 
   // วัตถุเป้าหมายหลัก: ถ้าเลือกเก้าอี้ให้หมุน/สลับที่โต๊ะแม่
   const table =
@@ -253,6 +259,61 @@ export function SelectionToolbar({
         </button>
       )}
 
+      {/* แบบโต๊ะ/เก้าอี้: ทรง ขนาด ขา สี (ทั้งชุด) */}
+      {table && (
+        <div className="relative">
+          <button
+            ref={styleButtonRef}
+            type="button"
+            aria-label="แบบโต๊ะและเก้าอี้"
+            title="ปรับทรง ขนาด ขา และสีของโต๊ะ/เก้าอี้ทั้งชุด"
+            aria-expanded={styleOpen}
+            aria-haspopup="dialog"
+            className={BUTTON_BASE}
+            onClick={() => {
+              setPopOpen(false);
+              const rect = styleButtonRef.current?.getBoundingClientRect();
+              if (rect && typeof window !== "undefined") {
+                // เผื่อหัวหน้า (~64px) และแถบสถานะด้านล่าง (~72px)
+                const below = window.innerHeight - rect.bottom - 80;
+                const above = rect.top - 72;
+                setStylePlacement({ below: below >= above, maxHeight: Math.max(200, Math.max(below, above)) });
+              }
+              setStyleOpen((prev) => !prev);
+            }}
+          >
+            <svg viewBox="0 0 24 24" className="size-4 text-[#4e627c]" aria-hidden="true" {...ICON}>
+              <circle cx="13.5" cy="6.5" r="1.5" />
+              <circle cx="17.5" cy="10.5" r="1.5" />
+              <circle cx="8.5" cy="7.5" r="1.5" />
+              <circle cx="6.5" cy="12.5" r="1.5" />
+              <path d="M12 2a10 10 0 0 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A5.7 5.7 0 0 0 22 9.7C22 5.4 17.5 2 12 2z" />
+            </svg>
+            <span>แบบ</span>
+          </button>
+          {styleOpen && (
+            <div
+              role="dialog"
+              aria-label="แบบโต๊ะและเก้าอี้"
+              className={cn(
+                "absolute left-1/2 z-50 w-[min(288px,calc(100vw-32px))] -translate-x-1/2 overflow-y-auto overscroll-contain whitespace-normal rounded-[12px] border border-line bg-white p-3 shadow-[0_8px_24px_rgba(30,43,64,0.16)]",
+                stylePlacement.below ? "top-full mt-2" : "bottom-full mb-2",
+              )}
+              style={{ maxHeight: stylePlacement.maxHeight }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setStyleOpen(false);
+                  styleButtonRef.current?.focus();
+                }
+              }}
+            >
+              <TableSetStyleControls table={table} showSize />
+            </div>
+          )}
+        </div>
+      )}
+
       <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-line" />
 
       {/* '⋯' Popover ปรับตำแหน่งละเอียด */}
@@ -263,7 +324,10 @@ export function SelectionToolbar({
           title="ปรับตำแหน่งพิกัด X/Y ละเอียด"
           aria-expanded={popOpen}
           className="grid size-[32px] place-items-center rounded-[8px] text-[#4e627c] hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus cursor-pointer"
-          onClick={() => setPopOpen((prev) => !prev)}
+          onClick={() => {
+            setStyleOpen(false);
+            setPopOpen((prev) => !prev);
+          }}
         >
           <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true" {...ICON}>
             <circle cx="12" cy="12" r="1" />

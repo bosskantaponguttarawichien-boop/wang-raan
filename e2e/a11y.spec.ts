@@ -96,7 +96,8 @@ for (const viewport of [
     test("Playground มุมมอง 3D", async ({ page }) => {
       await page.goto("/playground");
       await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();
-      await expect(page.getByRole("img", { name: /ไอโซเมตริก/ })).toBeVisible();
+      // Three.js renderer เป็น figure ที่มีคำบรรยายแทน SVG role="img" เดิม
+      await expect(page.getByTestId("three-view")).toBeVisible();
       expect(await audit(page)).toEqual([]);
     });
   });

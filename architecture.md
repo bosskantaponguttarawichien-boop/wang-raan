@@ -11,6 +11,8 @@
 
 เพื่อคงหัวใจสำคัญของผลิตภัณฑ์คือ **"จัดร้านง่าย โหลดเร็ว คมชัดทุกขนาดหน้าจอ และเข้าถึงได้ทุกคน (Accessibility)"** จึงเลือกใช้เทคโนโลยีที่เบา มีประสิทธิภาพสูง และไม่พึ่งพา Engine 3D ขนาดใหญ่โดยไม่จำเป็น
 
+> **Architecture amendment — 15 ตุลาคม 2026 (feat-070):** สำหรับมุมมอง 3D ของ Playground ให้ใช้ **Three.js/WebGL** เพื่อเรนเดอร์ห้อง เฟอร์นิเจอร์ และตัวละคร GLB ที่ rig/animate ได้ ข้อความก่อนหน้านี้ที่กำหนดให้ 3D Preview เป็น Pure SVG ให้ถือว่าถูกแทนที่เฉพาะในส่วน 3D runtime; 2D editor, Core Validation, BFF และ Web Worker ยังคงสถาปัตยกรรมเดิมทั้งหมด
+
 ---
 
 ## 2. สรุปชุดเทคโนโลยี (Tech Stack Specifications)
@@ -27,7 +29,7 @@
 | **Authentication** | **NextAuth.js (Auth.js v5)** | ดูแลระบบ Login, Session Cookie (HttpOnly) และ Token Relay ไปยัง Backend Services |
 | **Communication** | **REST API (JSON over HTTP)** | รูปแบบการรับส่งข้อมูลมาตรฐาน ปลอดภัย และเข้าใจง่าย ผ่าน Fetch API บน BFF Route Handlers |
 | **2D Canvas Editor** | **Hybrid DOM (% CSS) + SVG** | คมชัดทุกระดับความละเอียด (Retina/4K), ปรับขนาดตามจอได้ทันที, ได้ Tab/Focus/Screen Reader ฟรี |
-| **3D Preview** | **Pure SVG Isometric Projection** | แปลงพิกัด 2D เป็น Isometric 3D ด้วย SVG เบา ไม่เปลืองแรม ไม่ต้องโหลด WebGL/Three.js |
+| **3D Preview** | **Three.js + WebGL (lazy-loaded)** | แสดงห้อง เฟอร์นิเจอร์ และตัวละคร GLB ที่มี skeleton/animation; โหลดเมื่อเลือกมุมมอง 3D เท่านั้น และ fallback เป็น SVG isometric เมื่อ WebGL ใช้ไม่ได้หรือเปิด reduced motion |
 | **Validation Engine** | **Dual-Tier (Client + BFF)** | รันกฎ 4 ด้านบน Client ทันที (0ms) เพื่อแสดงสถานะ Ready/Warning/Blocked และ Re-validate ที่ BFF ก่อนบันทึก/ส่ง P2 |
 | **P2 Simulation Engine**| **Web Worker + Canvas Overlay** | รัน Pathfinding บน Thread แยก เมื่อผังผ่านเงื่อนไข Validation (Ready/Warning) เท่านั้น แล้ววาดจุดลูกค้า/Heatmap บน Canvas Layer |
 | **Unit / Integration Test** | **Vitest + React Testing Library** | รันเร็ว รองรับ ESM/TypeScript ทันที ใช้เทส Core Domain Logic, Validation Engine และ Hooks |
@@ -42,7 +44,7 @@ flowchart TB
     subgraph Browser ["Client Tier (Browser)"]
         subgraph UIComponents ["UI & Presentation"]
             RSC["Server Components (RSC)\n• Landing Page\n• Share Preview\n• SEO Meta / OG"]
-            RCC["Client Components (RCC)\n• 2D Editor Canvas\n• 3D Isometric SVG\n• Validation Status Bar\n• Control Panels"]
+            RCC["Client Components (RCC)\n• 2D Editor Canvas\n• 3D Three.js/WebGL + SVG fallback\n• Validation Status Bar\n• Control Panels"]
         end
 
         subgraph ClientState ["Client State & Engine"]
@@ -251,12 +253,14 @@ interface LayoutStoreState {
    - เส้นกริดวาดด้วย CSS `linear-gradient` แสดงผลได้แม่นยำแม้จอเล็ก
    - รองรับ Accessibility เต็มรูปแบบ: แต่ละชิ้นเฟอร์นิเจอร์เป็น `<button>` ที่มี `aria-label` ภาษาไทย และรองรับการเลื่อนด้วยปุ่มลูกศร (Arrow Keys)
    - ไฮไลต์ชิ้นงานที่มี Issue ด้วยวงแหวนสีตามระดับความรุนแรง (Blocked = แดง, Warning = ส้ม/เหลือง)
-2. **3D Isometric View**:
-   - ใช้การคำนวณเชิงเส้น (Isometric Matrix Projection) แปลงพิกัด `(x, y)` ไปเป็น SVG `<polygon>` และ `<path>`
-   - ให้ผลลัพธ์ที่สวยงาม ไม่กินสเปกเครื่องมือถือ และเรนเดอร์ได้ทันทีโดยไม่ต้องดาวน์โหลดโมเดล 3D หนักๆ
+2. **3D View (Three.js/WebGL)**:
+   - โหลด Three.js เฉพาะเมื่อผู้ใช้เลือกมุมมอง 3D แล้วแปลงข้อมูล `StoreLayout` เป็น scene ของห้องและเฟอร์นิเจอร์
+   - โหลด GLB ที่อยู่ใน `public/assets/models/` เท่านั้น; ใช้ animation clip `Idle`/`Walk` สำหรับลูกค้า และไม่รับ URL โมเดลจากผู้ใช้
+   - SVG Isometric เดิมยังคงอยู่เป็น static fallback สำหรับ reduced motion หรือเบราว์เซอร์ที่สร้าง WebGL context ไม่ได้
 3. **P2 Simulation Layer**:
    - ใช้งาน HTML5 `<canvas>` ซ้อนทับบน Artboard แบบ Transparent
    - ตัวเรนเดอร์ Canvas จะรับพิกัด Agent และ Heatmap Delta จาก Web Worker ผ่าน `requestAnimationFrame` เพื่อแสดงจุดแออัดโดยไม่ทำให้ DOM Re-render
+   - **ในมุมมอง 3D:** Three.js รับตำแหน่ง/สถานะลูกค้าจาก controller เดียวกับ P2 overlay 2D และเล่น animation GLB; `iso-simulation-overlay.tsx` และ heatmap SVG เดิมเป็นส่วนของ SVG fallback เท่านั้น
 
 ### 5.4 การจัดการฟอร์ม (Form Management ด้วย React Hook Form + Zod)
 
@@ -344,7 +348,7 @@ wang-raan/
 │   ├── components/
 │   │   ├── ui/                          ← Shadcn UI (button, dialog, slider, toast, badge)
 │   │   ├── editor-2d/                   ← 2D Artboard, Furniture (Kitchen, Counter, TableSet)
-│   │   ├── preview-3d/                  ← Isometric SVG Viewer (รวม Kitchen & Table Sets)
+│   │   ├── preview-3d/                  ← Three.js WebGL Viewer + SVG Isometric fallback
 │   │   ├── validation/                  ← ValidationStatusBar, IssueList, IssueMarker
 │   │   ├── simulation/                  ← SimControls, CustomerOverlay, Heatmap
 │   │   └── advice/                      ← AdviceList, RecommendationPanel

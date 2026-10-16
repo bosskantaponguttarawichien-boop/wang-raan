@@ -48,16 +48,30 @@ export async function cloud(page: Page) {
   return panel;
 }
 
-/** กดเพิ่มของจาก palette ในแท็บ "เพิ่ม" — ของที่เพิ่มถูกเลือกอยู่ และมี toolbar ลอยติด */
-export async function addItem(page: Page, name: "ครัว" | "เคาน์เตอร์" | "ชุดโต๊ะ 2 ที่นั่ง" | "ชุดโต๊ะ 4 ที่นั่ง") {
+/** กดเพิ่มของจาก palette ในแท็บ "เพิ่ม" — โต๊ะตั้งค่าบนแผงซ้ายก่อนสร้าง */
+export async function addItem(page: Page, name: "ครัว" | "เคาน์เตอร์" | "โต๊ะ") {
   await closeDialogs(page);
   await openTab(page, "add");
   await page.getByRole("button", { name: new RegExp(`^เพิ่ม\\s*${name}`) }).click();
+  if (name === "โต๊ะ") {
+    const panel = page.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
+    await expect(panel).toBeVisible();
+    await panel.getByRole("button", { name: "เพิ่มโต๊ะพร้อมเก้าอี้ 4 ตัว ลงผัง" }).click();
+    await expect(page.getByRole("region", { name: "แก้ไขโต๊ะ" })).toBeVisible();
+    return;
+  }
   await page.getByTestId("selection-toolbar").waitFor();
 }
 
-/** ย้ายวัตถุที่เลือกไปที่พิกัด (ม.) ผ่านป๊อปโอเวอร์ "ปรับละเอียด" ของ selection toolbar — เลือกเก้าอี้อยู่จะย้ายทั้งชุดโต๊ะ */
+/** ย้ายวัตถุที่เลือกไปที่พิกัด (ม.) ผ่านแผงซ้ายสำหรับโต๊ะ หรือป๊อปโอเวอร์สำหรับวัตถุอื่น */
 export async function placeSelected(page: Page, x: number, y: number) {
+  const tablePanel = page.getByRole("region", { name: "แก้ไขโต๊ะ" });
+  if (await tablePanel.isVisible()) {
+    await tablePanel.getByLabel("ซ้าย-ขวา (ม.)").fill(String(x));
+    await tablePanel.getByLabel("บน-ล่าง (ม.)").fill(String(y));
+    await tablePanel.getByLabel("บน-ล่าง (ม.)").press("Enter");
+    return;
+  }
   const toolbar = page.getByTestId("selection-toolbar");
   await toolbar.getByRole("button", { name: "ปรับละเอียด" }).click();
   await toolbar.getByLabel("ซ้าย-ขวา").fill(String(x));
@@ -65,13 +79,13 @@ export async function placeSelected(page: Page, x: number, y: number) {
   await toolbar.getByLabel("บน-ล่าง").press("Enter"); // Enter = นำไปใช้และปิดป๊อปโอเวอร์
 }
 
-/** สร้างผังคาเฟ่ 8 × 6 ม. ที่ผ่านทุกกฎผ่าน UI จริง (ครัว + เคาน์เตอร์ + ชุดโต๊ะ 4 ที่นั่ง) */
+/** สร้างผังคาเฟ่ 8 × 6 ม. ที่ผ่านทุกกฎผ่าน UI จริง (ครัว + เคาน์เตอร์ + โต๊ะ 4 ที่นั่ง) */
 export async function buildReadyCafe(page: Page) {
   await addItem(page, "ครัว");
   await placeSelected(page, 0.5, 0.5);
   await addItem(page, "เคาน์เตอร์");
   await placeSelected(page, 5, 0.5);
-  await addItem(page, "ชุดโต๊ะ 4 ที่นั่ง");
+  await addItem(page, "โต๊ะ");
   await placeSelected(page, 4, 3.25);
 }
 

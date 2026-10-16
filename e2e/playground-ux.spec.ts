@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
  *
  * Flow หลัก:
  * 1. ผังใหม่ → Onboarding Dialog
- * 2. วางชุดโต๊ะ 4 และ 2 ที่นั่ง → Floating Selection Toolbar (สลับที่นั่ง 4↔2, หมุน, Cascade Delete)
+ * 2. วางโต๊ะ → แผงแก้ไขด้านซ้าย (จำนวนเก้าอี้, หมุน, Cascade Delete)
  * 3. แท็บ 'ร้าน' → ปรับขนาดร้านและทางเข้า
  * 4. แท็บ 'จำลอง' → ตรวจผัง (Humanizer message) → เริ่มจำลอง
  * 5. โหมดจำลอง → ล็อก Header/Rail/Controls
@@ -33,6 +33,15 @@ async function auditA11y(page: Page) {
 const stage = (page: Page) => page.getByTestId("artboard-stage");
 const pieces = (page: Page, type: string) => stage(page).locator(`[data-type="${type}"]`);
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
+
+async function createTableSet(page: Page, seats: 2 | 4) {
+  await page.getByRole("button", { name: /^เพิ่ม\\s*โต๊ะ/ }).click();
+  const panel = page.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
+  await expect(panel).toBeVisible();
+  for (let count = 4; count > seats; count--) await panel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();
+  await panel.getByRole("button", { name: `เพิ่มโต๊ะพร้อมเก้าอี้ ${seats} ตัว ลงผัง` }).click();
+  await expect(page.getByRole("region", { name: "แก้ไขโต๊ะ" })).toBeVisible();
+}
 
 test.describe("Playground UX Revamp E2E Flow (feat-060)", () => {
   test.beforeEach(async ({ page }) => {
@@ -61,28 +70,30 @@ test.describe("Playground UX Revamp E2E Flow (feat-060)", () => {
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
   });
 
-  test("2. แผง 'เพิ่ม' และ Floating Selection Toolbar", async ({ page }) => {
+  test("2. แผง 'เพิ่ม' และแผงแก้ไขโต๊ะ", async ({ page }) => {
     await page.locator('[data-tab="add"]').click();
 
     // เพิ่มชุดโต๊ะ 4 ที่นั่ง
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 4 ที่นั่ง/ }).click();
+    await createTableSet(page, 4);
     await expect(pieces(page, "table")).toHaveCount(1);
     await expect(pieces(page, "chair")).toHaveCount(4);
 
-    // Floating toolbar ลอยบนโต๊ะที่เลือก
-    const toolbar = page.getByTestId("selection-toolbar");
-    await expect(toolbar).toBeVisible();
+    // คำสั่งของโต๊ะอยู่ในแผงซ้าย ไม่ลอยบนผัง
+    const editPanel = page.getByRole("region", { name: "แก้ไขโต๊ะ" });
+    await expect(editPanel).toBeVisible();
+    await expect(page.getByTestId("selection-toolbar")).toBeHidden();
 
     // หมุน 90 องศา
-    await toolbar.getByRole("button", { name: "หมุน 90 องศา" }).click();
+    await editPanel.getByRole("button", { name: "หมุนโต๊ะ 90 องศา" }).click();
     await expect(pieces(page, "table").first()).toHaveAttribute("aria-label", /หมุน 90/);
 
-    // สลับเป็น 2 ที่นั่ง
-    await toolbar.getByRole("button", { name: "เปลี่ยนจำนวนที่นั่ง" }).click();
+    // ลดเป็น 2 ที่นั่ง
+    await editPanel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();
+    await editPanel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();
     await expect(pieces(page, "chair")).toHaveCount(2);
 
     // ลบชุดโต๊ะ (Cascade Delete)
-    await toolbar.getByRole("button", { name: "ลบ" }).click();
+    await editPanel.getByRole("button", { name: "ลบโต๊ะ" }).click();
     await expect(pieces(page, "table")).toHaveCount(0);
     await expect(pieces(page, "chair")).toHaveCount(0);
   });
@@ -97,7 +108,7 @@ test.describe("Playground UX Revamp E2E Flow (feat-060)", () => {
     await form.getByLabel("ผนังทางเข้า").selectOption("north");
 
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 12 × 8 เมตร");
-    await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ทิศเหนือ/);
+    await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ด้านบน/);
   });
 
   test("4. แผง 'จำลอง', โหมดจำลองล็อกผัง, สรุปผลจบรอบ และ Heatmap", async ({ page }) => {
@@ -135,13 +146,14 @@ test.describe("Playground UX Revamp E2E Flow (feat-060)", () => {
 
   test("5. มุมมอง 3D: สลับด้วย ViewSwitch, เลือกและขยับวัตถุ", async ({ page }) => {
     await page.locator('[data-tab="add"]').click();
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 2 ที่นั่ง/ }).click();
+    await createTableSet(page, 2);
     await expect(pieces(page, "table")).toHaveCount(1);
 
     // สลับไป 3D
     await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();
-    const isoImg = page.getByRole("img", { name: /ไอโซเมตริก/ });
-    await expect(isoImg).toBeVisible();
+    // มุมมอง 3D ใช้ Three.js canvas โดยมี SVG fallback เฉพาะเมื่อ WebGL ใช้ไม่ได้
+    await expect(page.getByTestId("three-view")).toBeVisible();
+    await expect(page.getByTestId("three-canvas")).toBeVisible();
 
     // โฟกัสและขยับโต๊ะด้วยลูกศร
     await page.keyboard.press("ArrowRight");
@@ -158,9 +170,9 @@ test.describe("Playground UX Revamp E2E Flow (feat-060)", () => {
     // 6.1 ตรวจหน้า Playground ผังเปล่า
     expect(await auditA11y(page)).toEqual([]);
 
-    // 6.2 ตรวจเมื่อมีวัตถุและ Floating Toolbar
+    // 6.2 ตรวจเมื่อมีโต๊ะและแผงแก้ไข
     await page.locator('[data-tab="add"]').click();
-    await page.getByRole("button", { name: /^เพิ่ม\s*ชุดโต๊ะ 2 ที่นั่ง/ }).click();
+    await createTableSet(page, 2);
     expect(await auditA11y(page)).toEqual([]);
 
     // 6.3 ตรวจแท็บร้าน

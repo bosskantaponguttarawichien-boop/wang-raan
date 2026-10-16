@@ -22,6 +22,9 @@ import {
   moveObject as coreMoveObject,
   randomId,
   resizeObject as coreResizeObject,
+  resizeTableSet as coreResizeTableSet,
+  setTableSetChairCount as coreSetTableSetChairCount,
+  setTableSetStyle as coreSetTableSetStyle,
   rotateObject as coreRotateObject,
   toggleTablePreset as coreToggleTablePreset,
   type IdFactory,
@@ -29,8 +32,11 @@ import {
   type Meters,
   type Point,
   type StoreLayout,
+  type Chair,
   type Table,
+  type TableSetCreationOptions,
   type TableSetPreset,
+  type TableSetStylePatch,
   type ValidationResult,
   type Wall,
 } from "@/core/layout";
@@ -63,7 +69,7 @@ export interface LayoutStoreState {
   interactionBase: number | null;
 
   // Table Set Lifecycle & Objects — คืน id ของวัตถุที่สร้าง
-  addTableSet: (preset: TableSetPreset, position?: Point) => string;
+  addTableSet: (preset: TableSetPreset, position?: Point, options?: TableSetCreationOptions) => string;
   addKitchen: (position?: Point) => string;
   addCounter: (position?: Point) => string;
 
@@ -74,6 +80,12 @@ export interface LayoutStoreState {
   resizeObject: (id: string, width: number, depth: number) => void;
   /** สลับ preset โต๊ะ 2 ↔ 4 ที่นั่ง (เก้าอี้ตามทั้งชุด) */
   toggleTableSeats: (id: string) => boolean;
+  /** ปรับขนาดหน้าโต๊ะ (เลือกโต๊ะหรือเก้าอี้ลูก) — เก้าอี้ทั้งชุดจัดตำแหน่งใหม่ตาม */
+  resizeTableSet: (id: string, width: number, depth: number) => void;
+  /** ปรับจำนวนเก้าอี้ของชุดโต๊ะ โดยไม่เกินความจุของหน้าโต๊ะ */
+  setTableSetChairCount: (id: string, chairCount: number) => boolean;
+  /** เปลี่ยนทรง/ขา/สีของโต๊ะ และแบบ/ขา/สีของเก้าอี้ทั้งชุด */
+  setTableSetStyle: (id: string, patch: TableSetStylePatch) => void;
   /** ทำซ้ำวัตถุ (วางในที่ว่างใกล้สุดและเลือกวัตถุใหม่) */
   duplicateObject: (id: string) => string | null;
   /** เริ่ม/จบการลากต่อเนื่อง — การแก้ไขระหว่างนี้รวมเป็น Undo ขั้นเดียว */
@@ -193,10 +205,10 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       setActiveTab: (activeTab) => set({ activeTab }),
       interactionBase: null,
 
-      addTableSet: (preset, position) => {
+      addTableSet: (preset, position, options) => {
         const { layout } = get();
         const at = position ?? findAvailableSpot(layout, preset);
-        const result = coreAddTableSet(layout, preset, at, newId);
+        const result = coreAddTableSet(layout, preset, at, newId, options);
         commit(result.layout, result.tableSet.table.id);
         return result.tableSet.table.id;
       },
@@ -207,6 +219,18 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       rotateObject: (id, deltaDegrees = 90) => commit(coreRotateObject(get().layout, id, deltaDegrees)),
       deleteObject: (id) => commit(coreDeleteObject(get().layout, id)),
       resizeObject: (id, width, depth) => commit(coreResizeObject(get().layout, id, width, depth)),
+      resizeTableSet: (id, width, depth) => commit(coreResizeTableSet(get().layout, id, width, depth)),
+      setTableSetChairCount: (id, chairCount) => {
+        const { layout } = get();
+        const obj = layout.objects.find((object) => object.id === id);
+        const tableId = obj?.type === "table" ? obj.id : obj?.type === "chair" ? obj.tableId : null;
+        if (!tableId) return false;
+        const next = coreSetTableSetChairCount(layout, tableId, chairCount, newId);
+        if (next === layout) return false;
+        commit(next, tableId);
+        return true;
+      },
+      setTableSetStyle: (id, patch) => commit(coreSetTableSetStyle(get().layout, id, patch)),
       toggleTableSeats: (id) => {
         const { layout } = get();
         const obj = layout.objects.find((o) => o.id === id);
@@ -230,7 +254,13 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
           if (!table || table.type !== "table") return null;
           const preset = table.preset ?? "table-4-seats";
           const at = findAvailableSpot(layout, preset);
-          const res = coreAddTableSet(layout, preset, at, newId);
+          const sourceChair = layout.objects.find((o): o is Chair => o.type === "chair" && o.tableId === table.id);
+          const res = coreAddTableSet(layout, preset, at, newId, {
+            width: table.width,
+            depth: table.depth,
+            chairCount: table.chairIds.length,
+            style: { table: table.style, chair: sourceChair?.style },
+          });
           let newLayout = res.layout;
           if (table.rotation !== 0) {
             newLayout = coreRotateObject(newLayout, res.tableSet.table.id, table.rotation);

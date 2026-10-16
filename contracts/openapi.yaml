@@ -718,6 +718,28 @@ components:
         preset:
           type: string
           enum: [table-2-seats, table-4-seats]
+        style: { $ref: "#/components/schemas/TableStyle" }
+    FurnitureColor:
+      type: string
+      enum: [white, oak, charcoal, blue, orange, sage]
+    TableStyle:
+      description: รูปลักษณ์โต๊ะ (optional — ผังรุ่นก่อนไม่มี) ไม่กระทบการตรวจผังนอกจาก width/depth
+      type: object
+      additionalProperties: false
+      required: [shape, legStyle, color]
+      properties:
+        shape: { type: string, enum: [round, rectangle] }
+        legStyle: { type: string, enum: [four-legs, pedestal] }
+        color: { $ref: "#/components/schemas/FurnitureColor" }
+    ChairStyle:
+      description: รูปลักษณ์เก้าอี้ (stool = ไม่มีพนักพิง)
+      type: object
+      additionalProperties: false
+      required: [kind, legStyle, color]
+      properties:
+        kind: { type: string, enum: [chair, stool] }
+        legStyle: { type: string, enum: [four-legs, pedestal] }
+        color: { $ref: "#/components/schemas/FurnitureColor" }
     Chair:
       type: object
       additionalProperties: false
@@ -733,6 +755,7 @@ components:
           description: ทิศด้านหน้าของเก้าอี้ (0 = เหนือ, ตามเข็มนาฬิกา)
           $ref: "#/components/schemas/Rotation"
         tableId: { $ref: "#/components/schemas/Id" }
+        style: { $ref: "#/components/schemas/ChairStyle" }
     LayoutObject:
       oneOf:
         - $ref: "#/components/schemas/Kitchen"

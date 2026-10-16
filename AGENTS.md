@@ -61,7 +61,7 @@ flowchart LR
 | หลักการ | รายละเอียดที่ห้ามละเมิด |
 |---|---|
 | **Core Validation ต้องเป็น Pure TS** | โค้ดใน `src/core/validation/` ต้องเป็น Pure TypeScript 100% — **ห้าม import React, ReactDOM, Zustand, หรือ DOM APIs** เพื่อให้รันได้ทั้งบน Client, BFF และ Web Worker |
-| **ห้ามใช้ Three.js / WebGL** | 2D Canvas ใช้ **Hybrid DOM (% CSS) + SVG** และ 3D View ใช้ **Pure SVG Isometric Projection** เท่านั้นเพื่อความเร็วและเบา |
+| **ขอบเขต Three.js / WebGL ต้องชัดเจน** | 2D Canvas ใช้ **Hybrid DOM (% CSS) + SVG** เหมือนเดิม; มุมมอง 3D ของ Playground ใช้ **Three.js/WebGL** ได้เฉพาะใน Presentation Tier เพื่อแสดงผังและตัวละคร GLB ที่มี rig/animation เท่านั้น — ห้ามนำ Three.js, WebGL, React หรือ DOM API เข้า `src/core/validation/`, Worker หรือ BFF; ต้อง lazy-load เมื่อผู้ใช้เปิดมุมมอง 3D, มี SVG isometric เป็น fallback เมื่อ WebGL ใช้ไม่ได้ และเคารพ `prefers-reduced-motion` |
 | **Table Set Lifecycle ต้องสมบูรณ์** | เก้าอี้ลูกต้องสังกัดโต๊ะ (`tableId`), การย้าย/หมุนโต๊ะเก้าอี้ต้องไปตามกันทั้งชุด, การลบโต๊ะต้องทำ **Cascade Delete** เก้าอี้ลูกทั้งหมด (ห้ามเกิด Orphan Chair) |
 | **P2 Validation Gate ต้องเข้มงวด** | หากผังขึ้นสถานะ **Blocked** ต้อง **เริ่มจำลองไม่ได้ทุกช่องทาง** (ห้ามสร้าง payload ไป P2) — ปุ่ม "เริ่มจำลอง" ใช้ `aria-disabled="true"` และกดแล้วพาไปข้อที่ต้องแก้แทนการ disabled เงียบ ๆ (PRD §9 ข้อ 9) · เริ่มได้เมื่อผังเป็น **Ready** หรือ **Warning** เท่านั้น |
 | **Snap Grid 0.25 เมตร** | ทุกพิกัดเรขาคณิตต้อง Snap เข้า Grid ละ 0.25 ม. (ขนาดร้านรองรับ 2–30 ม.) |

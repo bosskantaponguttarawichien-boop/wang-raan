@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Object Inspector (architecture.md §5.4 ข้อ 2) — แก้ตำแหน่ง/การหมุน (ทุกชิ้น) และขนาด (ครัว/เคาน์เตอร์)
+ * Object Inspector (architecture.md §5.4 ข้อ 2) — แก้ตำแหน่ง/การหมุน (ทุกชิ้น) และขนาด (ครัว/เคาน์เตอร์/หน้าโต๊ะ)
+ * ชุดโต๊ะ: ปรับขนาดหน้าโต๊ะ (เก้าอี้จัดตำแหน่งใหม่ทั้งชุด) และรูปลักษณ์ผ่าน TableSetStyleControls
  * โต๊ะ/เก้าอี้ย้ายและหมุนทั้งชุดตาม Core; นำไปใช้ทันทีเมื่อออกจากฟอร์ม/กด Enter/เปลี่ยนการหมุน = Undo หนึ่งขั้น
  * ปุ่มหมุนด่วนอยู่ในแถบเครื่องมือลอยบนผัง (selection-toolbar.tsx)
  * ลบ (feat-034): เลือกเก้าอี้ = ลบเก้าอี้ตัวนั้น (เหมือนกด Delete บน Artboard), เลือกโต๊ะ = ลบทั้งชุด (Cascade Delete)
@@ -9,13 +10,24 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { OBJECT_MIN_SIZE, SIZE_STEP, footprint, snapToGrid, type LayoutObject, type Rotation } from "@/core/layout";
+import {
+  OBJECT_MIN_SIZE,
+  SIZE_STEP,
+  TABLE_SIZE_MAX,
+  TABLE_SIZE_MIN,
+  footprint,
+  snapToGrid,
+  tableStyleOf,
+  type LayoutObject,
+  type Rotation,
+} from "@/core/layout";
 import { Button } from "@/components/ui";
 import { objectLabel } from "@/components/editor-2d/stage-math";
 import { layoutActions as actions, selectSelectedObject, useLayoutStore } from "@/store/use-layout-store";
 import { autoApplyProps, useRestoreFocus } from "./auto-apply";
 import { Field, inputClass } from "./field";
 import { ObjectInspectorSchema, type ObjectInspectorValues } from "./schemas";
+import { TableSetStyleControls } from "./table-set-style-controls";
 
 export function ObjectInspector() {
   const picked = useLayoutStore(selectSelectedObject);
@@ -37,6 +49,8 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
   useRestoreFocus();
   const resizable = obj.type === "kitchen" || obj.type === "counter";
   const isSet = obj.type === "table" || obj.type === "chair";
+  const isTable = obj.type === "table";
+  const round = isTable && tableStyleOf(obj).shape === "round";
   const deletesChair = deleteTarget.type === "chair";
   const fp = footprint(obj);
   const form = useForm<ObjectInspectorValues>({
@@ -64,6 +78,9 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
     const rotation = Number(values.rotation) as Rotation;
     if (rotation !== obj.rotation) store.rotateObject(obj.id, rotation - obj.rotation);
     if (resizable && (dirty("width") || dirty("depth"))) store.resizeObject(obj.id, values.width, values.depth);
+    if (isTable && (dirty("width") || dirty("depth"))) {
+      store.resizeTableSet(obj.id, values.width, round ? values.width : values.depth);
+    }
     // ย้ายเฉพาะเมื่อผู้ใช้แก้ x/y — การหมุนอย่างเดียวต้องหมุนรอบจุดศูนย์กลางตาม Core ไม่ใช่กลับไปมุมเดิม
     if (dirty("x") || dirty("y")) {
       const now = store.layout.objects.find((o) => o.id === obj.id) ?? obj;
@@ -93,6 +110,42 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
           <Field id={`${formId}-y`} label="ตำแหน่ง y (ม.)" error={errors.y?.message}>
             {(aria) => <input {...aria} {...numberProps} step={0.25} {...register("y", { valueAsNumber: true })} />}
           </Field>
+          {isTable && (
+            <>
+              <Field
+                id={`${formId}-w`}
+                label={round ? "เส้นผ่านศูนย์กลางโต๊ะ (ม.)" : "กว้างโต๊ะ (ม.)"}
+                className={round ? "col-span-2" : undefined}
+                hint={`${TABLE_SIZE_MIN.toFixed(2)}–${TABLE_SIZE_MAX.toFixed(2)} ม.`}
+                error={errors.width?.message}
+              >
+                {(aria) => (
+                  <input
+                    {...aria}
+                    {...numberProps}
+                    step={0.05}
+                    min={TABLE_SIZE_MIN}
+                    max={TABLE_SIZE_MAX}
+                    {...register("width", { valueAsNumber: true })}
+                  />
+                )}
+              </Field>
+              {!round && (
+                <Field id={`${formId}-d`} label="ลึกโต๊ะ (ม.)" error={errors.depth?.message}>
+                  {(aria) => (
+                    <input
+                      {...aria}
+                      {...numberProps}
+                      step={0.05}
+                      min={TABLE_SIZE_MIN}
+                      max={TABLE_SIZE_MAX}
+                      {...register("depth", { valueAsNumber: true })}
+                    />
+                  )}
+                </Field>
+              )}
+            </>
+          )}
           {resizable && (
             <>
               <Field id={`${formId}-w`} label="กว้าง (ม.)" error={errors.width?.message}>
@@ -117,6 +170,7 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
         </div>
         <p className="mb-0 mt-2 text-[12px] leading-[1.75] text-secondary">ผังเปลี่ยนเมื่อกด Enter หรือออกจากช่องกรอก · ย้อนกลับได้ด้วย Ctrl+Z</p>
       </form>
+      {isTable && <TableSetStyleControls table={obj} />}
       <div className="mt-3 grid gap-2">
         <Button variant="danger" size="sm" onClick={() => actions().deleteObject(deleteTarget.id)}>
           × ลบ{deletesChair ? "เก้าอี้ตัวนี้" : isSet ? "ทั้งชุดโต๊ะ" : "ชิ้นงานนี้"}
@@ -126,7 +180,7 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
         <p className="mb-0 mt-3 text-[12px] leading-[1.75] text-secondary">
           {deletesChair
             ? "ย้ายและหมุนทำกับทั้งชุด · ปุ่มลบลบเฉพาะเก้าอี้ที่เลือก — เลือกโต๊ะเพื่อลบทั้งชุด"
-            : "ย้าย หมุน และลบ ทำกับโต๊ะและเก้าอี้ทั้งชุด · ขนาดโต๊ะใช้ตามชุดที่เลือก"}
+            : "ย้าย หมุน ปรับขนาด และลบ ทำกับโต๊ะและเก้าอี้ทั้งชุด · เก้าอี้จัดตำแหน่งใหม่รอบโต๊ะอัตโนมัติ"}
         </p>
       )}
     </div>

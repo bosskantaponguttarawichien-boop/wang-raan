@@ -8,7 +8,18 @@
  * - Non-blocking: วางทับหรือตกขอบได้ ผลตรวจแสดงเป็น Issue Rings
  */
 import * as React from "react";
-import { GRID_STEP, SIZE_STEP, footprint, type Entrance, type IssueSeverity, type LayoutObject, type Rect } from "@/core/layout";
+import {
+  FURNITURE_COLOR_HEX,
+  GRID_STEP,
+  SIZE_STEP,
+  chairStyleOf,
+  footprint,
+  tableStyleOf,
+  type Entrance,
+  type IssueSeverity,
+  type LayoutObject,
+  type Rect,
+} from "@/core/layout";
 import { cn } from "@/lib/cn";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
@@ -69,6 +80,27 @@ const CHAIR_FRONT_DOT: Record<number, string> = {
   270: "left-[12%] top-1/2 -translate-y-1/2",
 };
 
+/** พนักพิงอยู่ฝั่งตรงข้ามด้านหน้า (สตูลไม่มี) */
+const CHAIR_BACKREST: Record<number, string> = {
+  0: "inset-x-[14%] bottom-[6%] h-[16%]",
+  90: "inset-y-[14%] left-[6%] w-[16%]",
+  180: "inset-x-[14%] top-[6%] h-[16%]",
+  270: "inset-y-[14%] right-[6%] w-[16%]",
+};
+
+/** สี/ทรงที่ผู้ใช้เลือก — ผังที่ไม่มี style ใช้โทเคนเดิมของ design-system */
+function pieceAppearance(obj: LayoutObject): { className?: string; style?: React.CSSProperties } {
+  if (obj.type === "table") {
+    const round = tableStyleOf(obj).shape === "round";
+    return {
+      className: round ? "rounded-full" : undefined,
+      style: obj.style ? { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } : undefined,
+    };
+  }
+  if (obj.type === "chair" && obj.style) return { style: { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } };
+  return {};
+}
+
 function PieceDecoration({ obj }: { obj: LayoutObject }) {
   switch (obj.type) {
     case "kitchen":
@@ -82,7 +114,14 @@ function PieceDecoration({ obj }: { obj: LayoutObject }) {
     case "counter":
       return <span aria-hidden="true" className="absolute right-[10%] top-[25%] h-[28%] w-[18%] rounded-[2px] bg-[var(--plan-counter-pos)]" />;
     case "chair":
-      return <span aria-hidden="true" className={cn("absolute size-[22%] rounded-full bg-[var(--plan-chair-stroke)]", CHAIR_FRONT_DOT[obj.rotation])} />;
+      return (
+        <>
+          <span aria-hidden="true" className={cn("absolute size-[22%] rounded-full bg-[var(--plan-chair-stroke)]", CHAIR_FRONT_DOT[obj.rotation])} />
+          {chairStyleOf(obj).kind === "chair" && (
+            <span aria-hidden="true" data-testid="chair-backrest" className={cn("absolute rounded-full bg-[var(--plan-chair-stroke)]", CHAIR_BACKREST[obj.rotation])} />
+          )}
+        </>
+      );
     default:
       return null;
   }
@@ -292,13 +331,14 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
                   "transition-[box-shadow,border-color,opacity] duration-150 motion-reduce:transition-none",
                   "focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
                   PIECE_STYLE[obj.type],
+                  pieceAppearance(obj).className,
                   severity && RING[severity],
                   isSelected && !isSim && "z-[10] border-2 border-blue shadow-[0_0_0_5px_#3b62f422]",
                   isSelected && !isSim && severity === "blocked" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-blocked)]",
                   isSelected && !isSim && severity === "warning" && "shadow-[0_0_0_5px_#3b62f422,0_0_0_9px_var(--issue-ring-warning)]",
                   draggingId === obj.id && "cursor-grabbing opacity-80 transition-none",
                 )}
-                style={boxStyle(rect, room)}
+                style={{ ...boxStyle(rect, room), ...pieceAppearance(obj).style }}
                 onPointerDown={(e) => {
                   if (isSim) {
                     e.preventDefault();
@@ -331,7 +371,10 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
               >
                 <PieceDecoration obj={obj} />
                 {obj.type === "table" ? (
-                  <span className="relative px-1 font-semibold">{`โต๊ะ ${tableNumbers.get(obj.id) ?? ""}`}</span>
+                  <span
+                    // สีโต๊ะที่ผู้ใช้เลือกอาจเข้ม → รองพื้นขาวให้ป้ายยังผ่าน contrast 4.5:1
+                    className={cn("relative px-1 font-semibold", obj.style && "rounded-[4px] bg-white/90 text-[#3d4f66]")}
+                  >{`โต๊ะ ${tableNumbers.get(obj.id) ?? ""}`}</span>
                 ) : obj.type !== "chair" ? (
                   <span className="relative px-1">{objectLabel(obj)}</span>
                 ) : null}
@@ -391,7 +434,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
             />
           )}
         </div>
-        {!isSim && selected && !draggingId && (
+        {!isSim && selected && selected.type !== "table" && selected.type !== "chair" && !draggingId && (
           <SelectionToolbar
             boxRef={boxRef}
             room={room}

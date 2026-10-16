@@ -3,37 +3,36 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
-## 2026-10-15 ICT — feat-066 เมนูเดียวของ Playground
+## 2026-10-16 ICT — feat-075 แก้ไขชุดโต๊ะที่เลือกในแผงซ้าย (เสร็จแล้ว)
 
-- ผังของฉัน + ส่งออก/แชร์ อยู่ในเมนูโปรเจกต์ (หมวด) แล้ว — E2E ที่อ้างปุ่ม "ส่งออก" / `#myProjectsLink` เปลี่ยนเป็นผ่านเมนู
-- dev server: แก้คลาส Tailwind ใน `.tsx` แล้วต้อง `rm -rf .next` (cache ไม่ invalidate)
+- เลือกโต๊ะหรือเก้าอี้ลูกแล้ว แผงซ้ายจะเป็นหน้า “แก้ไขโต๊ะ” ของชุดโต๊ะแม่ทันที; กดกลับเพื่อเลิกเลือกและคืนหน้าเพิ่มลงผัง
+- คำสั่งของชุดโต๊ะย้ายมาไว้ในแผงซ้าย: ปรับจำนวนเก้าอี้ตาม capacity, ขนาด/สไตล์, พิกัด, หมุน, ทำซ้ำ และลบ; toolbar ลอยถูกซ่อนสำหรับ Table/Chair ทั้ง 2D/3D SVG
+- `setTableSetChairCount` ใน Pure Core คง id โต๊ะและเก้าอี้เดิมเท่าที่ทำได้, ไม่มี orphan และการทำซ้ำคงจำนวนเก้าอี้จริง
+- QA: `make test` 62 files / 843 tests, `make lint`, `make status` ผ่าน; Chrome ตรวจเลือกโต๊ะและเพิ่ม 2 → 3 ตัวในแผงซ้าย · ตามคำขอผู้ใช้ **ไม่ได้เขียนหรือรัน E2E**
 
-## 2026-10-15 ICT — feat-065 หน้า /login ใหม่ + ปุ่ม Google
+## 2026-10-16 ICT — feat-074 กำหนดจำนวนเก้าอี้ตามความจุของโต๊ะ (เสร็จแล้ว)
 
-- หน้า /login: โลโก้ถูกไฟล์แล้ว, layout 2 คอลัมน์/ซ้อนแนวตั้ง, ไม่มี h-scroll 6 breakpoints
-- **Google ยังไม่เปิดบน production** — ต้องสร้าง OAuth client (Web) ใน Google Cloud Console, redirect URI:
-  `https://wang-raan.boss-kantapong-uttarawichien.workers.dev/api/auth/callback/google` และ `http://localhost:3000/api/auth/callback/google`
-  แล้ว `npx wrangler secret put AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` (feat-041 เป็น in-progress รอขั้นนี้ + ทดสอบจริง)
-- **อัปเดต**: ผู้ใช้ตั้ง OAuth client แล้ว Google ผ่าน แต่ Backend จริงบน Railway ตอบ 500 ทุก endpoint ที่แตะตาราง (แม้ GET /v1/me) ขณะที่ /health 200 → น่าจะยังไม่ได้รัน migration บน DB ของ Railway (ดู feat-041 progress_note)
-- **แก้แล้ว**: รัน migration 001–003 บน DB ของ Railway (ผ่าน `railway ssh`) — backend ไม่ 500 แล้ว · pre-deploy ใน railway.json ไม่ถูกรันตอน deploy ต้องตามแก้ฝั่ง wang-raan-service
-- ⚠️ **Security (wang-raan-service)**: build log ของ Railway แสดง GitHub token (`NODE_AUTH_TOKEN`) เป็น plaintext ใน step `RUN` ของ Dockerfile — ต้อง revoke/สร้างใหม่ และแก้ Dockerfile ไม่ให้ token โผล่ใน log
-- E2E ตั้ง Google client ปลอมใน `playwright.config.ts` และดัก accounts.google.com — server ยัง fetch discovery ของ Google จึงต้องมีอินเทอร์เน็ตตอนรัน E2E
+- หน้าเพิ่มโต๊ะใช้ปุ่ม `− / +` เลือกจำนวนเก้าอี้ได้ แทน preset 2/4 ที่นั่ง และบอกความจุสูงสุดของขนาดโต๊ะปัจจุบัน
+- Pure Core ตรวจ capacity ก่อนสร้างและจัดเก้าอี้รอบโต๊ะโดยไม่ทับกัน; สร้างเกินความจุถูกปฏิเสธ และการย่อโต๊ะจนรองรับเก้าอี้เดิมไม่พอจะไม่เปลี่ยนผัง
+- QA: `make test` 62 files / 839 tests, `make lint`, `make status` ผ่าน; ตรวจ Chrome: โต๊ะ 1.2 × 1.2 ม. เพิ่มถึง 8 ตัวแล้วปุ่ม `+` ถูกปิด
+- ตามคำขอผู้ใช้ รอบนี้ **ไม่ได้เขียนหรือรัน E2E**
 
-## 2026-10-15 ICT — E2E กลับมาเขียวทั้งชุด (89/89)
+## 2026-10-16 ICT — feat-073 รวมการเพิ่มโต๊ะเป็นหน้าตั้งค่าในแผงซ้าย (เสร็จแล้ว)
 
-- spec ชุด UI เก่าปรับตาม Playground UX ใหม่แล้ว — ใช้ helper ใน `e2e/helpers.ts` (openTab / addItem / placeSelected / cloud) แทน selector เดิม
-- แก้บั๊กที่ E2E จับได้ 7 จุด (horizontal scroll มือถือ, พิมพ์เห็นเครื่องมือ, header 320px, ป๊อปโอเวอร์พิกัด, notes นำเข้า, contrast, ชื่อปุ่ม 3D) — ดู progress.md
-- ⚠️ แก้ `app/globals.css` แล้วต้อง `rm -rf .next` ก่อน build/E2E ในเครื่อง (cache ไม่ invalidate)
+- แท็บเพิ่มเหลือการ์ด “โต๊ะ” รายการเดียว; คลิกแล้วแทนเนื้อหาแผงซ้ายด้วย `table-set-create-panel.tsx` ซึ่งเลือกจำนวนที่นั่ง ขนาด และสไตล์ได้
+- ปุ่ม “กลับ” ด้านบนออกจากหน้าตั้งค่าโดยไม่แก้ผัง; ปุ่มยืนยันเท่านั้นที่เรียก `addTableSet` จึงคง Table–Chair lifecycle เดิม
+- QA: `make test` 62 files / 838 tests, `make lint`, `make status` ผ่าน
+- ตามคำขอผู้ใช้ รอบนี้ **ไม่ได้เขียนหรือรัน E2E**; selectors E2E ที่ยังอ้าง dialog เก่าควรปรับรวมในรอบ E2E ภายหลัง
+- 2026-10-16: หน้า `/playground` เคยค้างที่ dynamic loading เพราะ dev server พอร์ต 3000 ถือ `.next` cache คนละรุ่นกับโค้ด; ล้าง cache generated และรีสตาร์ต server เดียวบนพอร์ต 3000 แล้วตรวจใน Chrome ว่า editor แสดงครบและ console สะอาด
 
-## 2026-10-15 ICT — feat-061 ทำใหม่ตามสัญญา v1.3.0 (identities)
+## 2026-10-16 ICT — feat-072 ตั้งค่าชุดโต๊ะก่อนวาง (เสร็จแล้ว)
 
-- สัญญา v1.3.0 + mock + BFF + UI เสร็จบน `feat/login-projects` — **BE รีวิวสัญญาได้แล้ว** (ข้อที่ FE ตัดสินเองอยู่ใน `harness/handoff-fe-accounts.md` §7)
-- BFF ไม่สร้าง user id เองแล้ว; Google เปิดเมื่อตั้ง `AUTH_GOOGLE_ID` + `AUTH_GOOGLE_SECRET`
-- E2E ชุด UI เก่า 28 เคสล้มมาตั้งแต่ก่อนงานนี้ (selector ของ playground เดิม) — ควรแยกงานแก้ spec เหล่านี้
-- ยังเปิด: โดเมน/บริการส่งเมล (Resend หรือ SES), feat-041 รอ Backend จริงบน staging
+- Palette ชุดโต๊ะ 2/4 ที่นั่งเปิด `table-set-create-dialog.tsx` ก่อนเพิ่มจริง เลือกจำนวนที่นั่ง, ขนาด, ทรง/ขา/สีโต๊ะ และแบบ/ขา/สีเก้าอี้ได้ครบ; ยกเลิกแล้วไม่มีวัตถุใหม่บนผัง
+- `addTableSet(..., options)` ใน Core จัดขนาดและสไตล์ด้วย lifecycle เดิมใน state commit เดียว: เก้าอี้ลูกทุกตัวยังสัมพันธ์กับโต๊ะแม่และไม่มี orphan
+- QA ล่าสุด: `make test` 62 files / 838 tests, `make lint` ผ่าน, Playwright `playground-ux` + `keyboard` 12/12 และ `editor-flow` 10/10 ผ่าน
 
-## 2026-10-14 21:55 ICT — FE handoff: Identities + Email OTP
+## 2026-10-16 ICT — feat-071 แบบโต๊ะ/เก้าอี้ (เสร็จแล้ว)
 
-- ข้อตกลงกับ BE และลำดับงาน FE ทั้งหมดอยู่ที่ `harness/handoff-fe-accounts.md` — อ่านก่อนแตะ feat-061–064
-- งาน OTP / `/login` ใน working tree ยังไม่ commit และยังใช้แบบเดิม (BFF สร้าง user id เอง) — ต้องแก้ตาม handoff และคืน feat-061 เป็น `in-progress`
-- BE รอสัญญา v1.3.0 ที่ merge แล้วจึงเริ่ม endpoint
+- เลือกโต๊ะ → ปุ่ม "แบบ" ในแถบเครื่องมือ: ขนาด (0.60–3.00 ม.), ทรง, ขา, สีโต๊ะ และแบบ/ขา/สีเก้าอี้ทั้งชุด
+- ⚠️ **Backend (wang-raan-service)**: `contracts/openapi.yaml` เพิ่ม `style` ใน Table/Chair แล้ว — ถ้า backend ตรวจ `additionalProperties: false` ตามสัญญาเดิม การบันทึกออนไลน์ผังที่มี style จะถูกปฏิเสธจนกว่าจะอัปเดตฝั่ง service
+- โต๊ะกลมยังตรวจระยะด้วยกรอบจัตุรัส (เผื่อปลอดภัย) · ยังไม่ได้รัน `make e2e`

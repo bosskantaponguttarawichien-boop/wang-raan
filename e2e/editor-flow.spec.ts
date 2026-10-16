@@ -62,14 +62,14 @@ test.describe("จัดร้าน → ตรวจผัง → จำลอ�
 });
 
 test.describe("Table Set Lifecycle", () => {
-  test("เพิ่มชุดโต๊ะสร้างเก้าอี้ตาม preset และลบโต๊ะ = Cascade Delete เก้าอี้ลูกทั้งหมด", async ({ page }) => {
-    await addItem(page, "ชุดโต๊ะ 4 ที่นั่ง");
-    await addItem(page, "ชุดโต๊ะ 2 ที่นั่ง");
+  test("เพิ่มชุดโต๊ะสร้างเก้าอี้ตามจำนวนที่เลือก และลบโต๊ะ = Cascade Delete เก้าอี้ลูกทั้งหมด", async ({ page }) => {
+    await addItem(page, "โต๊ะ");
+    await addItem(page, "โต๊ะ");
     await expect(pieces(page, "table")).toHaveCount(2);
-    await expect(pieces(page, "chair")).toHaveCount(6);
+    await expect(pieces(page, "chair")).toHaveCount(8);
 
-    // ลบด้วยปุ่มใน selection toolbar (ชุด 2 ที่นั่งที่เพิ่งเพิ่มถูกเลือกอยู่) = ลบทั้งชุด
-    await page.getByTestId("selection-toolbar").getByRole("button", { name: "ลบ" }).click();
+    // ลบด้วยแผงแก้ไข (โต๊ะที่เพิ่งเพิ่มถูกเลือกอยู่) = ลบทั้งชุด
+    await page.getByRole("region", { name: "แก้ไขโต๊ะ" }).getByRole("button", { name: "ลบโต๊ะ" }).click();
     await expect(pieces(page, "table")).toHaveCount(1);
     await expect(pieces(page, "chair")).toHaveCount(4);
 
@@ -87,7 +87,11 @@ test.describe("Table Set Lifecycle", () => {
   });
 
   test("ย้าย/หมุนโต๊ะ เก้าอี้ไปทั้งชุด", async ({ page }) => {
-    await addItem(page, "ชุดโต๊ะ 2 ที่นั่ง");
+    await addItem(page, "โต๊ะ");
+    const editPanel = page.getByRole("region", { name: "แก้ไขโต๊ะ" });
+    await editPanel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();
+    await editPanel.getByRole("button", { name: "ลดจำนวนเก้าอี้" }).click();
+    await expect(pieces(page, "chair")).toHaveCount(2);
     const chairBoxes = async () => Promise.all((await pieces(page, "chair").all()).map((c) => c.boundingBox()));
     const before = await chairBoxes();
     await pieces(page, "table").first().focus();
@@ -115,9 +119,9 @@ test.describe("Inspector & Room Settings (feat-027)", () => {
     // ระหว่างพิมพ์และย้ายช่องในฟอร์ม ผังยังไม่เปลี่ยน
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 8 × 6 เมตร");
     // เปลี่ยนผนัง = นำทุกช่องที่แก้ไปใช้พร้อมกัน
-    await form.getByRole("group", { name: "เลือกผนัง" }).getByRole("button", { name: /ทิศตะวันตก/ }).click();
+    await form.getByRole("group", { name: "เลือกผนัง" }).getByRole("button", { name: /ด้านซ้าย/ }).click();
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
-    await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ทิศตะวันตก.*ตำแหน่ง 2\.00 ม\./);
+    await expect(page.getByTestId("entrance-marker")).toHaveAttribute("aria-label", /ด้านซ้าย.*ตำแหน่ง 2\.00 ม\./);
 
     await form.getByLabel("กว้าง (ม.)", { exact: true }).fill("31");
     await form.getByLabel("กว้าง (ม.)", { exact: true }).press("Enter");

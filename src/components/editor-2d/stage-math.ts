@@ -45,14 +45,14 @@ export function nearestWallPosition(
 }
 
 export const WALL_LABEL: Record<Wall, string> = {
-  north: "ทิศเหนือ (ด้านบน)",
-  south: "ทิศใต้ (ด้านล่าง)",
-  east: "ทิศตะวันออก (ด้านขวา)",
-  west: "ทิศตะวันตก (ด้านซ้าย)",
+  north: "ด้านบน",
+  south: "ด้านล่าง",
+  east: "ด้านขวา",
+  west: "ด้านซ้าย",
 };
 
 export function objectLabel(obj: LayoutObject): string {
-  if (obj.type === "table") return obj.preset === "table-2-seats" ? "โต๊ะ 2 ที่นั่ง" : obj.preset === "table-4-seats" ? "โต๊ะ 4 ที่นั่ง" : "โต๊ะ";
+  if (obj.type === "table") return obj.chairIds.length > 0 ? `โต๊ะ ${obj.chairIds.length} ที่นั่ง` : "โต๊ะ";
   return OBJECT_LABEL[obj.type];
 }
 
