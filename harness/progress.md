@@ -3,6 +3,14 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-17] หน้าข้อกำหนดการใช้งาน + นโยบายความเป็นส่วนตัว (ส่วนหนึ่งของ feat-042)
+
+- เพิ่ม `app/terms/page.tsx`, `app/privacy/page.tsx` + layout ร่วม `src/components/legal/legal-page.tsx` (ผู้ให้บริการ "วางร้าน", อีเมลติดต่อ, วันที่ปรับปรุง อยู่ที่เดียว)
+- เนื้อหาอิงพฤติกรรมจริง: Google/OTP (เก็บ hash), Guest, ลิงก์แชร์ไม่เปิดเผยเจ้าของ, cookie session 30 วัน, backup 30 วัน, ผู้ให้บริการภายนอก (Cloudflare, Railway SG, Google, Resend), ดาวน์โหลด/ลบบัญชีที่ "บัญชีของฉัน"
+- ลิงก์ในหน้าล็อกอินเปลี่ยนจาก `#terms`/`#privacy` เป็น `/terms`/`/privacy`; เพิ่มลิงก์ทั้งสองใน footer หน้าแรก
+- **QA**: typecheck, eslint ผ่าน · `npm test` 64 files / 852 tests ผ่าน · Playwright 390px: ไม่มี horizontal scroll, กดลิงก์จากหน้าล็อกอินไป `/privacy` ได้
+- ยังต้องทำ: ให้ผู้รู้กฎหมายตรวจเนื้อหาก่อนเปิดใช้จริง
+
 ## [2026-10-16] เกณฑ์เบราว์เซอร์ขั้นต่ำ + แจ้งเตือนเบราว์เซอร์เก่า
 
 - ตัดสินใจ (ทาง A): รองรับขั้นต่ำตาม baseline ของ Tailwind v4 — Chrome/Edge 111, Safari 16.4, Firefox 128; ถอน fallback รอบก่อน (`@csstools/postcss-media-minmax`, `useContainerUnits`) เพราะรีวิวพบว่าเบราว์เซอร์เก่ายังพังจาก `dvh`, `translate`, `safe center` อยู่ดี
