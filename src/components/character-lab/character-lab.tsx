@@ -73,7 +73,7 @@ export function CharacterLab() {
         </section>
 
         <aside className="grid gap-3 sm:grid-cols-3" aria-label="สถานะการทดลอง">
-          <StatusCard label="โมเดล" value="Cafe customer GLB" detail="โหลดแยกเฉพาะหน้านี้" />
+          <StatusCard label="โมเดล" value="Mannequin สีเทา" detail="หุ่นทรงเรียบสูงประมาณ 1.02 ม. สำหรับฉากร้าน" />
           <StatusCard
             label="ท่าปัจจุบัน"
             value={motion === "walking" ? "กำลังเดิน (Walk)" : "ยืน (Idle)"}
