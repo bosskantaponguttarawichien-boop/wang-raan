@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ContactEmail, LEGAL_OPERATOR, LegalLink, LegalPage, LegalSection } from "@/components/legal/legal-page";
+import { ContactEmail, LEGAL_OPERATOR, LegalItem, LegalLink, LegalList, LegalPage, LegalSection } from "@/components/legal/legal-page";
 
 export const metadata: Metadata = {
   title: "ข้อกำหนดการใช้งาน — วางร้าน",
@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage title="ข้อกำหนดการใช้งาน">
+    <LegalPage title="ข้อกำหนดการใช้งาน" current="terms">
       <p className="m-0">
         ข้อกำหนดนี้เป็นข้อตกลงระหว่างคุณกับ {LEGAL_OPERATOR} (&quot;เรา&quot;) ในการใช้เว็บไซต์และบริการวางร้าน
         การใช้งานหรือเข้าสู่ระบบถือว่าคุณยอมรับข้อกำหนดนี้และ <LegalLink href="/privacy">นโยบายความเป็นส่วนตัว</LegalLink>
@@ -30,30 +30,30 @@ export default function TermsPage() {
       </LegalSection>
 
       <LegalSection title="3. บัญชีของคุณ">
-        <ul>
-          <li>คุณเข้าสู่ระบบด้วย Google หรือรหัสทางอีเมล ต้องใช้อีเมลที่คุณเป็นเจ้าของ</li>
-          <li>ดูแลบัญชีอีเมลและอุปกรณ์ของคุณให้ปลอดภัย กิจกรรมที่เกิดจากบัญชีของคุณถือเป็นความรับผิดชอบของคุณ</li>
-          <li>คุณลบบัญชีได้ทุกเมื่อที่เมนู &quot;บัญชีของฉัน&quot;</li>
-        </ul>
+        <LegalList>
+          <LegalItem>คุณเข้าสู่ระบบด้วย Google หรือรหัสทางอีเมล ต้องใช้อีเมลที่คุณเป็นเจ้าของ</LegalItem>
+          <LegalItem>ดูแลบัญชีอีเมลและอุปกรณ์ของคุณให้ปลอดภัย กิจกรรมที่เกิดจากบัญชีของคุณถือเป็นความรับผิดชอบของคุณ</LegalItem>
+          <LegalItem>คุณลบบัญชีได้ทุกเมื่อที่เมนู &quot;บัญชีของฉัน&quot;</LegalItem>
+        </LegalList>
       </LegalSection>
 
       <LegalSection title="4. ผังและเนื้อหาของคุณ">
-        <ul>
-          <li>ผังที่คุณสร้างเป็นของคุณ เราใช้ผังเพื่อเก็บ แสดง และตรวจผังให้คุณเท่านั้น</li>
-          <li>
+        <LegalList>
+          <LegalItem>ผังที่คุณสร้างเป็นของคุณ เราใช้ผังเพื่อเก็บ แสดง และตรวจผังให้คุณเท่านั้น</LegalItem>
+          <LegalItem>
             เมื่อคุณสร้างลิงก์แชร์ ใครก็ตามที่มีลิงก์จะเปิดดูผังนั้นได้ คุณยกเลิกหรือตั้งวันหมดอายุของลิงก์ได้เอง
-          </li>
-          <li>อย่าใส่ข้อมูลส่วนบุคคลของผู้อื่นหรือข้อมูลลับลงในชื่อผังหรือเนื้อหาที่จะแชร์</li>
-        </ul>
+          </LegalItem>
+          <LegalItem>อย่าใส่ข้อมูลส่วนบุคคลของผู้อื่นหรือข้อมูลลับลงในชื่อผังหรือเนื้อหาที่จะแชร์</LegalItem>
+        </LegalList>
       </LegalSection>
 
       <LegalSection title="5. สิ่งที่ห้ามทำ">
-        <ul>
-          <li>ใช้บริการผิดกฎหมาย หรือละเมิดสิทธิ์ของผู้อื่น</li>
-          <li>พยายามเจาะระบบ เข้าถึงข้อมูลของผู้อื่น หรือหลบเลี่ยงการจำกัดการใช้งาน</li>
-          <li>ส่งคำขอจำนวนมากด้วยโปรแกรมอัตโนมัติจนกระทบผู้ใช้อื่น</li>
-          <li>ใช้แบบฟอร์มติดต่อหรือลิงก์แชร์เพื่อส่งสแปมหรือเนื้อหาไม่เหมาะสม</li>
-        </ul>
+        <LegalList>
+          <LegalItem>ใช้บริการผิดกฎหมาย หรือละเมิดสิทธิ์ของผู้อื่น</LegalItem>
+          <LegalItem>พยายามเจาะระบบ เข้าถึงข้อมูลของผู้อื่น หรือหลบเลี่ยงการจำกัดการใช้งาน</LegalItem>
+          <LegalItem>ส่งคำขอจำนวนมากด้วยโปรแกรมอัตโนมัติจนกระทบผู้ใช้อื่น</LegalItem>
+          <LegalItem>ใช้แบบฟอร์มติดต่อหรือลิงก์แชร์เพื่อส่งสแปมหรือเนื้อหาไม่เหมาะสม</LegalItem>
+        </LegalList>
         <p>ถ้าพบการกระทำเหล่านี้ เราอาจระงับลิงก์แชร์หรือบัญชีที่เกี่ยวข้อง</p>
       </LegalSection>
 
