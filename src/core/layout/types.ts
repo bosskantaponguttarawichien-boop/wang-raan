@@ -31,9 +31,13 @@ export interface TableStyle {
   color: FurnitureColor;
 }
 
+export type ChairShape = "square" | "round";
+
 /** รูปลักษณ์เก้าอี้; stool = ไม่มีพนักพิง */
 export interface ChairStyle {
   kind: "chair" | "stool";
+  /** ทรงเบาะ — ไม่ระบุ = ตามแบบ (สตูลกลม, มีพนักพิงเหลี่ยม) เพื่อให้ผังเก่าหน้าตาเหมือนเดิม; footprint เท่าเดิมทุกทรง */
+  shape?: ChairShape;
   legStyle: "four-legs" | "pedestal";
   color: FurnitureColor;
 }

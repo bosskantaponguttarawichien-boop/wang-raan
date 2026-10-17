@@ -97,7 +97,14 @@ function pieceAppearance(obj: LayoutObject): { className?: string; style?: React
       style: obj.style ? { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } : undefined,
     };
   }
-  if (obj.type === "chair" && obj.style) return { style: { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } };
+  if (obj.type === "chair") {
+    // ค่าเริ่มต้นของเก้าอี้คือ rounded-full — ทรงเหลี่ยมใช้มุมมนเล็กแทน
+    const square = chairStyleOf(obj).shape === "square";
+    return {
+      className: square ? "rounded-[22%]" : undefined,
+      style: obj.style ? { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } : undefined,
+    };
+  }
   return {};
 }
 

@@ -154,7 +154,7 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
 
     const panel = screen.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
     expect(layoutStore.getState().layout.objects).toHaveLength(0);
-    await user.click(within(panel).getByRole("radio", { name: "กลม" }));
+    await user.click(within(within(panel).getByRole("radiogroup", { name: "ทรงโต๊ะ" })).getByRole("radio", { name: "กลม" }));
     await user.clear(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"));
     await user.type(within(panel).getByLabelText("เส้นผ่านศูนย์กลาง (ม.)"), "1.6{Enter}");
     await user.click(within(panel).getByRole("radio", { name: "สตูล" }));

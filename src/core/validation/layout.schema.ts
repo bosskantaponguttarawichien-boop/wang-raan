@@ -51,7 +51,7 @@ export const ChairSchema = z.object({
   ...BaseObjectShape,
   type: z.literal("chair"),
   tableId: ID,
-  style: z.object({ kind: z.enum(["chair", "stool"]), legStyle: z.enum(["four-legs", "pedestal"]), color: z.enum(["white", "oak", "charcoal", "blue", "orange", "sage"]) }).strict().optional(),
+  style: z.object({ kind: z.enum(["chair", "stool"]), shape: z.enum(["square", "round"]).optional(), legStyle: z.enum(["four-legs", "pedestal"]), color: z.enum(["white", "oak", "charcoal", "blue", "orange", "sage"]) }).strict().optional(),
 }).strict();
 
 export const LayoutObjectSchema = z.discriminatedUnion("type", [KitchenSchema, CounterSchema, TableSchema, ChairSchema]);

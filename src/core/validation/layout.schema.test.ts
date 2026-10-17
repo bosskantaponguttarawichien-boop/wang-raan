@@ -32,6 +32,8 @@ describe("Zod schemas — type-safe ตรงกับ Core types", () => {
     expect(LayoutObjectSchema.safeParse({ ...table, style: { ...style, extra: 1 } }).success).toBe(false);
     const chair = cafeLayout().objects.find((o) => o.type === "chair")!;
     expect(LayoutObjectSchema.safeParse({ ...chair, style: { kind: "stool", legStyle: "four-legs", color: "sage" } }).success).toBe(true);
+    expect(LayoutObjectSchema.safeParse({ ...chair, style: { kind: "chair", shape: "round", legStyle: "four-legs", color: "sage" } }).success).toBe(true);
+    expect(LayoutObjectSchema.safeParse({ ...chair, style: { kind: "chair", shape: "oval", legStyle: "four-legs", color: "sage" } }).success).toBe(false);
   });
 
   it("วัตถุนอกขอบร้านยังผ่าน schema (Non-blocking — ให้ Validation Engine รายงานแทน)", () => {

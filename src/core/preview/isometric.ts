@@ -264,17 +264,15 @@ export function buildIsoScene(layout: StoreLayout): IsoScene {
         const leg = Math.min(slim(0.035, 1), r.width * 0.2, r.depth * 0.2);
         if (style.legStyle === "pedestal") pedestal(obj.id, r, leg * 1.6, 15, ISO_PALETTE.chairLeg, base - 0.06);
         else legs(obj.id, r, leg, 0.06, 15, ISO_PALETTE.chairLeg, base - 0.06);
-        // สตูล: เบาะกลม ไม่มีพนักพิง
-        if (style.kind === "stool") {
-          cylinder(obj.id, inset(r, 0.04), 15, 18, seatColors, base + 0.01);
-          break;
-        }
-        prism(obj.id, inset(r, 0.04), 15, 18, seatColors, base + 0.01);
+        if (style.shape === "round") cylinder(obj.id, inset(r, 0.04), 15, 18, seatColors, base + 0.01);
+        else prism(obj.id, inset(r, 0.04), 15, 18, seatColors, base + 0.01);
+        // สตูล: ไม่มีพนักพิง
+        if (style.kind === "stool") break;
         // พนักพิงฝั่งไกล (เหนือ/ตะวันตก) วาดก่อนเบาะ ฝั่งใกล้ (ใต้/ตะวันออก) วาดหลังเบาะ
         const f = directionVector(obj.rotation);
         const backIsNear = f.x < 0 || f.y < 0;
         const backDepth = base + (backIsNear ? 0.03 : -0.03);
-        const back = chairBackRect(obj, r);
+        const back = style.shape === "round" ? chairBackRect(obj, r, 0.06, Math.min(r.width, r.depth) * 0.22) : chairBackRect(obj, r);
         backPosts(back, leg).forEach((post, i) => prism(obj.id, post, 18, 22, ISO_PALETTE.chairLeg, backDepth - 0.002 + i * 0.001));
         prism(obj.id, back, 22, 38, backColors, backDepth);
         break;

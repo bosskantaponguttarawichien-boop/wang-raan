@@ -51,6 +51,7 @@ import type {
 } from "./types";
 
 type Side = "north" | "east" | "south" | "west";
+const SIDES: readonly Side[] = ["north", "east", "south", "west"];
 
 /** เก้าอี้แต่ละฝั่งหันหน้าเข้าหาโต๊ะ */
 const FACING_BY_SIDE: Record<Side, Rotation> = { north: 180, east: 270, south: 0, west: 90 };
@@ -316,7 +317,7 @@ export function rotateObject(layout: StoreLayout, id: string, deltaDegrees = 90)
 /**
  * ลบวัตถุ
  * Table → Cascade Delete เก้าอี้ลูกทั้งหมด (ทั้งที่อ้าง tableId และที่อยู่ใน chairIds)
- * Chair → ลบเฉพาะเก้าอี้ตัวนั้น และถอด id ออกจาก chairIds ของโต๊ะแม่
+ * Chair → ลบเฉพาะเก้าอี้ตัวนั้น ถอด id ออกจาก chairIds ของโต๊ะแม่ แล้วจัดระยะเก้าอี้ที่เหลือในฝั่งเดียวกันใหม่
  */
 export function deleteObject(layout: StoreLayout, id: string): StoreLayout {
   const obj = findObject(layout, id);
@@ -334,7 +335,14 @@ export function deleteObject(layout: StoreLayout, id: string): StoreLayout {
         ? { ...o, chairIds: o.chairIds.filter((c) => c !== id) }
         : o,
     );
-  return { ...layout, objects };
+  const next = { ...layout, objects };
+  if (obj.type !== "chair") return next;
+
+  // จัดระยะใหม่เฉพาะฝั่งที่ลบเก้าอี้ออก ฝั่งอื่นคงเดิม (ตัวสุดท้ายถูกลบ → ปล่อยให้ Validation รายงาน)
+  const parent = findObject(next, obj.tableId);
+  if (parent?.type !== "table") return next;
+  const remaining = orderedChairsOfTable(next, parent);
+  return remaining.length === 0 ? next : arrangeTableSet(next, parent, remaining, "keep-sides");
 }
 
 export type TableSetIntegrityIssue =
@@ -471,43 +479,107 @@ export function tableStyleOf(table: Table): TableStyle {
   return { ...DEFAULT_TABLE_STYLE, ...table.style };
 }
 
-export function chairStyleOf(chair: Chair): ChairStyle {
-  return { ...DEFAULT_CHAIR_STYLE, ...chair.style };
+/** เติมค่าที่ขาดให้ครบ — ทรงเบาะที่ไม่ระบุอิงตามแบบเก้าอี้ */
+export function resolveChairStyle(style?: Partial<ChairStyle>): Required<ChairStyle> {
+  const merged = { ...DEFAULT_CHAIR_STYLE, ...style };
+  return { ...merged, shape: merged.shape ?? (merged.kind === "stool" ? "round" : "square") };
 }
 
-const SIDE_BY_FACING: Record<Rotation, Side> = { 180: "north", 270: "east", 0: "south", 90: "west" };
+export function chairStyleOf(chair: Chair): Required<ChairStyle> {
+  return resolveChairStyle(chair.style);
+}
 
 function clampTableSize(v: Meters): Meters {
   if (!Number.isFinite(v)) return TABLE_SIZE_MIN;
   return Math.min(TABLE_SIZE_MAX, Math.max(TABLE_SIZE_MIN, snapToGrid(v, SIZE_STEP)));
 }
 
+const SIDE_BY_FACING: Record<Rotation, Side> = { 180: "north", 270: "east", 0: "south", 90: "west" };
+
+/** ฝั่งของเก้าอี้ในกรอบอ้างอิงของโต๊ะ (ก่อนหมุน) และตำแหน่งตามแนวขอบฝั่งนั้น */
+function chairSeat(chair: Chair, table: Table): { side: Side; along: Meters } {
+  const side = SIDE_BY_FACING[normalizeRotation(chair.rotation - table.rotation)];
+  const p = rotatePoint(objectCenter(chair), objectCenter(table), normalizeRotation(360 - table.rotation));
+  return { side, along: side === "north" || side === "south" ? p.x : p.y };
+}
+
 /**
- * จัดชุดโต๊ะใหม่ด้วยขนาดหน้าโต๊ะใหม่ โดยคง id/สไตล์/ฝั่งของเก้าอี้ และจุดศูนย์กลางโต๊ะ (snap 0.25 ม.)
- * เก้าอี้ถูกวางใหม่ให้สอดใต้โต๊ะ 0.10 ม. เท่าเดิม — ไม่มีเก้าอี้ถูกสร้างหรือลบ (ไม่เกิด Orphan Chair)
+ * จัดเก้าอี้ของชุดรอบโต๊ะขนาด width × depth
+ * - "keep-sides": เก้าอี้อยู่ฝั่งเดิม จัดระยะใหม่เฉพาะภายในฝั่ง (ลบเก้าอี้ฝั่งไหน ฝั่งอื่นไม่ขยับ)
+ *   ถ้าฝั่งใดเกินความจุของขนาดใหม่ → กระจายใหม่ทั้งชุดแทน
+ * - "redistribute": กระจายฝั่งแบบเดียวกับตอนสร้างชุด
+ * คง id/ขนาด/สไตล์ของเก้าอี้, คงจุดศูนย์กลางและมุมหมุนของโต๊ะ (snap 0.25 ม.)
+ * เก้าอี้ที่เกินความจุ (ผังเก่า) คงตำแหน่งเดิมไว้ให้ Validation รายงาน — ไม่ลบทิ้งเอง
  */
-function rebuildTableSet(layout: StoreLayout, table: Table, width: Meters, depth: Meters): StoreLayout {
-  const chairs = getChairsOfTable(layout, table);
+function arrangeTableSet(
+  layout: StoreLayout,
+  table: Table,
+  chairs: Chair[],
+  mode: "keep-sides" | "redistribute",
+  width: Meters = table.width,
+  depth: Meters = table.depth,
+): StoreLayout {
   const center = objectCenter(table);
   const { x, y } = snapPoint({ x: center.x - width / 2, y: center.y - depth / 2 });
+  const baseTable: Table = {
+    ...table,
+    x,
+    y,
+    width,
+    depth,
+    rotation: 0,
+    preset: chairs.length <= 2 ? "table-2-seats" : "table-4-seats",
+    chairIds: chairs.map((chair) => chair.id),
+  };
+  const emptyCount = (): Record<Side, number> => ({ north: 0, east: 0, south: 0, west: 0 });
 
-  // จัดกลุ่มเก้าอี้ตามฝั่งในกรอบอ้างอิงของโต๊ะ (ก่อนหมุน)
-  const bySide = new Map<Side, Chair[]>();
-  for (const chair of chairs) {
-    const side = SIDE_BY_FACING[normalizeRotation(chair.rotation - table.rotation)];
-    bySide.set(side, [...(bySide.get(side) ?? []), chair]);
+  // ฝั่งของเก้าอี้แต่ละตัว + ลำดับภายในฝั่ง
+  let sides: (Side | undefined)[] = [];
+  let slots: number[] = [];
+  const seats = mode === "keep-sides" ? chairs.map((chair) => chairSeat(chair, table)) : [];
+  const keepTotals = seats.reduce((totals, { side }) => ({ ...totals, [side]: totals[side] + 1 }), emptyCount());
+  const keepFits = mode === "keep-sides" && SIDES.every((side) => keepTotals[side] <= sideCapacity(side, width, depth));
+  if (keepFits) {
+    sides = seats.map((seat) => seat.side);
+    slots = seats.map((seat, i) =>
+      seats.filter((other, j) => other.side === seat.side && (other.along < seat.along || (other.along === seat.along && j < i))).length,
+    );
+  } else {
+    sides = sidesForChairCount(chairs.length, width, depth);
+    const counter = emptyCount();
+    slots = sides.map((side) => (side ? counter[side]++ : 0));
   }
+  const sideTotals = sides.reduce((totals, side) => (side ? { ...totals, [side]: totals[side] + 1 } : totals), emptyCount());
+  const placed = chairs.map((chair, index): Chair => {
+    const side = sides[index];
+    if (!side) return chair;
+    const rotation = FACING_BY_SIDE[side];
+    const origin = chairOriginForSide(baseTable, side, slots[index]!, sideTotals[side], { ...chair, rotation });
+    return { ...chair, tableId: table.id, rotation, x: roundMeters(origin.x), y: roundMeters(origin.y) };
+  });
 
-  const updates = new Map<string, LayoutObject>([[table.id, { ...table, x, y, width, depth, rotation: 0 }]]);
-  for (const [side, group] of bySide) {
-    group.forEach((chair, i) => {
-      const rotation = FACING_BY_SIDE[side];
-      const origin = chairOriginForSide({ x, y, width, depth }, side, i, group.length, { ...chair, rotation });
-      updates.set(chair.id, { ...chair, rotation, x: roundMeters(origin.x), y: roundMeters(origin.y) });
-    });
-  }
-  const flat = replaceObjects(layout, updates);
-  return table.rotation === 0 ? flat : rotateObject(flat, table.id, table.rotation);
+  const placedIds = new Set(placed.map((chair) => chair.id));
+  const others = layout.objects.filter((object) => !placedIds.has(object.id) || object.id === table.id);
+  let next: StoreLayout = {
+    ...layout,
+    objects: others.flatMap((object) => (object.id === table.id ? [baseTable, ...placed] : [object])),
+  };
+  if (table.rotation !== 0) next = rotateObject(next, table.id, table.rotation);
+  return next;
+}
+
+/** เก้าอี้ของโต๊ะเรียงตามลำดับใน chairIds (ตัวที่ไม่อยู่ใน chairIds ต่อท้าย) */
+function orderedChairsOfTable(layout: StoreLayout, table: Table): Chair[] {
+  const rank = (id: string) => {
+    const i = table.chairIds.indexOf(id);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  return getChairsOfTable(layout, table).sort((a, b) => rank(a.id) - rank(b.id));
+}
+
+/** จัดชุดโต๊ะใหม่ด้วยขนาดหน้าโต๊ะใหม่ — เก้าอี้คงฝั่งเดิมถ้าพอ ไม่มีเก้าอี้ถูกสร้างหรือลบ (ไม่เกิด Orphan Chair) */
+function rebuildTableSet(layout: StoreLayout, table: Table, width: Meters, depth: Meters): StoreLayout {
+  return arrangeTableSet(layout, table, orderedChairsOfTable(layout, table), "keep-sides", width, depth);
 }
 
 /**
@@ -541,63 +613,29 @@ export function setTableSetChairCount(
   const count = Math.trunc(chairCount);
   if (!table || count < 1 || count > tableSeatCapacity(table.width, table.depth)) return layout;
 
-  const existing = getChairsOfTable(layout, table).sort(
-    (a, b) => table.chairIds.indexOf(a.id) - table.chairIds.indexOf(b.id),
-  );
+  const existing = orderedChairsOfTable(layout, table);
   if (existing.length === count) return layout;
 
-  const center = objectCenter(table);
-  const { x, y } = snapPoint({ x: center.x - table.width / 2, y: center.y - table.depth / 2 });
-  const baseTable: Table = {
-    ...table,
-    x,
-    y,
-    rotation: 0,
-    preset: count <= 2 ? "table-2-seats" : "table-4-seats",
-    chairIds: [],
-  };
+  // เก้าอี้ที่เพิ่มรับขนาด/รูปลักษณ์จากเก้าอี้ตัวแรก
   const template = existing[0];
-  const baseChair = {
-    width: template?.width ?? DEFAULT_SIZES.chair.width,
-    depth: template?.depth ?? DEFAULT_SIZES.chair.depth,
-    ...(template?.style ? { style: template.style } : {}),
-  };
-  const sides = sidesForChairCount(count, table.width, table.depth);
-  const sideTotals = sides.reduce<Record<Side, number>>((totals, side) => ({ ...totals, [side]: totals[side] + 1 }), {
-    north: 0,
-    east: 0,
-    south: 0,
-    west: 0,
-  });
-  const sideIndexes: Record<Side, number> = { north: 0, east: 0, south: 0, west: 0 };
-  const chairs: Chair[] = sides.map((side, index) => {
+  const chairs: Chair[] = Array.from({ length: count }, (_, index) => {
     const previous = existing[index];
-    const rotation = FACING_BY_SIDE[side];
-    const origin = chairOriginForSide(baseTable, side, sideIndexes[side]++, sideTotals[side], {
-      ...baseChair,
-      rotation,
-    });
+    if (previous) return previous;
     return {
-      id: previous?.id ?? newId("chair"),
+      id: newId("chair"),
       type: "chair",
       tableId: table.id,
-      x: roundMeters(origin.x),
-      y: roundMeters(origin.y),
-      width: previous?.width ?? baseChair.width,
-      depth: previous?.depth ?? baseChair.depth,
-      rotation,
-      ...(previous?.style ? { style: previous.style } : baseChair.style ? { style: baseChair.style } : {}),
+      x: table.x,
+      y: table.y,
+      width: template?.width ?? DEFAULT_SIZES.chair.width,
+      depth: template?.depth ?? DEFAULT_SIZES.chair.depth,
+      rotation: 0,
+      ...(template?.style ? { style: template.style } : {}),
     };
   });
-  const nextTable = { ...baseTable, chairIds: chairs.map((chair) => chair.id) };
-  const oldChairIds = new Set(existing.map((chair) => chair.id));
-  const withoutOldChairs = layout.objects.filter((object) => !oldChairIds.has(object.id));
-  let next: StoreLayout = {
-    ...layout,
-    objects: withoutOldChairs.flatMap((object) => (object.id === table.id ? [nextTable, ...chairs] : [object])),
-  };
-  if (table.rotation !== 0) next = rotateObject(next, table.id, table.rotation);
-  return next;
+  const removed = new Set(existing.slice(count).map((chair) => chair.id));
+  const trimmed = { ...layout, objects: layout.objects.filter((object) => !removed.has(object.id)) };
+  return arrangeTableSet(trimmed, table, chairs, "redistribute");
 }
 
 export interface TableSetStylePatch {
@@ -620,10 +658,12 @@ export function setTableSetStyle(layout: StoreLayout, id: string, patch: TableSe
   if (tableChanged) updates.set(table.id, { ...table, style: tableStyle });
   if (patch.chair) {
     for (const chair of getChairsOfTable(layout, table)) {
+      // เก็บเฉพาะค่าที่ผู้ใช้ตั้ง — ทรงที่ไม่เคยเลือกยังอิงตามแบบ (เปลี่ยนเป็นสตูลแล้วเบาะกลมเหมือนเดิม)
+      const stored: ChairStyle = { ...DEFAULT_CHAIR_STYLE, ...chair.style, ...patch.chair };
       const current = chairStyleOf(chair);
-      const next = { ...current, ...patch.chair };
+      const next = resolveChairStyle(stored);
       if ((Object.keys(next) as (keyof ChairStyle)[]).some((k) => next[k] !== current[k])) {
-        updates.set(chair.id, { ...chair, style: next });
+        updates.set(chair.id, { ...chair, style: stored });
       }
     }
   }
