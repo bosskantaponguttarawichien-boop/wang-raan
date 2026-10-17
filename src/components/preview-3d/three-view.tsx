@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import {
   FURNITURE_COLOR_HEX,
   chairStyleOf,
@@ -460,7 +461,8 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
 
         let customer = customers.get(id);
         if (!customer) {
-          const model = modelTemplate.clone(true);
+          // SkinnedMesh ต้อง clone ผ่าน SkeletonUtils ให้แต่ละตัวมีโครงกระดูกของตัวเอง
+          const model = cloneSkinned(modelTemplate);
           model.position.set(x, 0, z);
           model.scale.setScalar(CUSTOMER_SCALE);
           scene.add(model);
