@@ -379,6 +379,8 @@ export default function HomePage() {
               <a href="#how-it-works">วิธีใช้งาน</a>
               <a href="#faq">คำถามที่พบบ่อย</a>
               <a href="#contact">ติดต่อเรา</a>
+              <Link href="/terms">ข้อกำหนดการใช้งาน</Link>
+              <Link href="/privacy">นโยบายความเป็นส่วนตัว</Link>
             </nav>
           </div>
           <div className="footer-bottom">
