@@ -738,6 +738,7 @@ components:
       required: [kind, legStyle, color]
       properties:
         kind: { type: string, enum: [chair, stool] }
+        shape: { type: string, enum: [square, round], description: "ไม่ระบุ = ตามแบบ (สตูลกลม, มีพนักพิงเหลี่ยม)" }
         legStyle: { type: string, enum: [four-legs, pedestal] }
         color: { $ref: "#/components/schemas/FurnitureColor" }
     Chair:

@@ -4,6 +4,7 @@
  * สีตาม design-system.md §2.3 (Plan palette) — ใส่ค่า hex ตรง ๆ เพราะไฟล์ SVG ที่ส่งออกไม่มี CSS Variables
  */
 import { footprint, objectCenter } from "../layout/geometry";
+import { chairStyleOf } from "../layout/table-set";
 import type { IssueSeverity, LayoutObject, StoreLayout, ValidationIssue, Wall } from "../layout/types";
 
 export const PLAN_COLORS = {
@@ -106,7 +107,8 @@ function renderObject(obj: LayoutObject, s: number, severity?: IssueSeverity): s
   const y = r.y * s;
   const w = r.width * s;
   const h = r.depth * s;
-  const radius = obj.type === "chair" ? Math.min(w, h) / 2 : RADIUS[obj.type] * s;
+  const roundChair = obj.type === "chair" && chairStyleOf(obj).shape === "round";
+  const radius = roundChair ? Math.min(w, h) / 2 : obj.type === "chair" ? Math.min(w, h) * 0.22 : RADIUS[obj.type] * s;
   const parts = [`<g data-id="${escapeXml(obj.id)}" data-type="${obj.type}">`];
   if (severity) {
     parts.push(

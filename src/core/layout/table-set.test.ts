@@ -56,6 +56,24 @@ function relativeCenters(layout: StoreLayout, tableId: string) {
   });
 }
 
+/** ตำแหน่ง/ทิศเก้าอี้ของชุดที่สร้างใหม่ด้วยจำนวนนี้ตั้งแต่แรก — ใช้เทียบกับผลการจัดใหม่ */
+function freshPlacement(table: Table, chairCount: number) {
+  const fresh = createTableSet("table-4-seats", { x: table.x, y: table.y }, createSequentialIds(), {
+    width: table.width,
+    depth: table.depth,
+    chairCount,
+  });
+  return fresh.chairs.map(({ x, y, rotation }) => ({ x, y, rotation }));
+}
+
+function placement(layout: StoreLayout, tableId: string) {
+  const table = tableOf(layout, tableId);
+  return table.chairIds.map((id) => {
+    const chair = findObject(layout, id)!;
+    return { x: chair.x, y: chair.y, rotation: chair.rotation };
+  });
+}
+
 function expectTucksWithinLimit(layout: StoreLayout, tableId: string) {
   const table = tableOf(layout, tableId);
   for (const chair of getChairsOfTable(layout, table)) {
@@ -279,6 +297,61 @@ describe("Cascade Delete", () => {
     expect(checkTableSetIntegrity(after)).toEqual([]);
   });
 
+  it("ลบเก้าอี้ฝั่งขวา → จัดระยะใหม่เฉพาะฝั่งขวา ฝั่งอื่นไม่ขยับ", () => {
+    const { layout, table, ids } = setup("table-4-seats");
+    const eight = setTableSetChairCount(layout, table.id, 8, ids);
+    const before = new Map(getChairsOfTable(eight, tableOf(eight, table.id)).map((c) => [c.id, c]));
+    const east = [...before.values()].filter((c) => c.rotation === 270);
+    expect(east).toHaveLength(2);
+
+    const after = deleteObject(eight, east[0]!.id);
+    const updated = tableOf(after, table.id);
+    const chairsAfter = getChairsOfTable(after, updated);
+    expect(chairsAfter).toHaveLength(7);
+    for (const chair of chairsAfter) {
+      if (chair.rotation !== 270) expect(chair).toEqual(before.get(chair.id));
+    }
+    // เก้าอี้ฝั่งขวาที่เหลือเลื่อนมากึ่งกลางขอบโต๊ะ
+    const remainingEast = chairsAfter.find((c) => c.rotation === 270)!;
+    expect(objectCenter(remainingEast).y).toBeCloseTo(objectCenter(updated).y, 9);
+    expect(checkTableSetIntegrity(after)).toEqual([]);
+    expectTucksWithinLimit(after, table.id);
+  });
+
+  it("ลบเก้าอี้ทีละตัวจนเหลือ 1 → เก้าอี้ไม่ย้ายฝั่ง id และสไตล์เดิมคงอยู่", () => {
+    const { layout, table, ids } = setup("table-4-seats");
+    const big = resizeTableSet(layout, table.id, 1.6, 1.6);
+    const styled = setTableSetStyle(big, table.id, { chair: { kind: "stool", color: "sage" } });
+    let next = setTableSetChairCount(styled, table.id, tableSeatCapacity(1.6, 1.6), ids);
+    const sideOf = new Map(getChairsOfTable(next, tableOf(next, table.id)).map((c) => [c.id, c.rotation]));
+    while (tableOf(next, table.id).chairIds.length > 1) {
+      next = deleteObject(next, tableOf(next, table.id).chairIds[0]!);
+      const updated = tableOf(next, table.id);
+      for (const chair of getChairsOfTable(next, updated)) {
+        expect(chair.rotation).toBe(sideOf.get(chair.id));
+        expect(chairStyleOf(chair)).toMatchObject({ kind: "stool", color: "sage" });
+      }
+      expect(checkTableSetIntegrity(next)).toEqual([]);
+      expectTucksWithinLimit(next, table.id);
+    }
+  });
+
+  it("ลบเก้าอี้ของโต๊ะที่หมุน 90° → ยังหมุนเดิม และเก้าอี้หันเข้าหาโต๊ะ", () => {
+    const { layout, table, chairs } = setup("table-4-seats");
+    const rotated = rotateObject(layout, table.id, 90);
+    const after = deleteObject(rotated, chairs[1]!.id);
+    expect(tableOf(after, table.id).rotation).toBe(90);
+    expect(getChairsOfTable(after, tableOf(after, table.id))).toHaveLength(3);
+    expectTucksWithinLimit(after, table.id);
+  });
+
+  it("ลบเก้าอี้ตัวสุดท้าย → โต๊ะเหลือเปล่า ให้ Validation รายงาน table-without-chairs", () => {
+    const { layout, table, chairs } = setup("table-2-seats");
+    const after = deleteObject(deleteObject(layout, chairs[0]!.id), chairs[1]!.id);
+    expect(tableOf(after, table.id).chairIds).toEqual([]);
+    expect(checkTableSetIntegrity(after)).toContainEqual({ kind: "table-without-chairs", tableId: table.id });
+  });
+
   it("ลบวัตถุที่ไม่มี คืนผังเดิม", () => {
     const { layout } = setup();
     expect(deleteObject(layout, "missing")).toBe(layout);
@@ -434,6 +507,21 @@ describe("resizeTableSet — ปรับขนาดหน้าโต๊ะ �
     expect(resizeTableSet(layout, table.id, 0.8, 0.8)).toBe(layout);
   });
 
+  it("ขยายโต๊ะ → เก้าอี้คงฝั่งเดิม จัดระยะใหม่ตามขอบโต๊ะ", () => {
+    const { layout, table, chairs } = setup("table-4-seats");
+    const next = resizeTableSet(layout, table.id, 1.6, 1.6);
+    expect(placement(next, table.id).map((p) => p.rotation)).toEqual(chairs.map((c) => c.rotation));
+    expectTucksWithinLimit(next, table.id);
+  });
+
+  it("หดโต๊ะจนฝั่งเดิมรับไม่ไหว → กระจายเก้าอี้ใหม่ทั้งชุดตามความจุแต่ละฝั่ง", () => {
+    const { layout, table, ids } = setup("table-4-seats");
+    const six = setTableSetChairCount(resizeTableSet(layout, table.id, 1.6, 1.6), table.id, 6, ids);
+    const narrow = resizeTableSet(six, table.id, 1.6, 0.8);
+    expect(placement(narrow, table.id)).toEqual(freshPlacement(tableOf(narrow, table.id), 6));
+    expectTucksWithinLimit(narrow, table.id);
+  });
+
   it("เก้าอี้ที่ถูกลบไปแล้วไม่ถูกสร้างคืน", () => {
     const { layout, table, chairs } = setup("table-4-seats");
     const fewer = deleteObject(layout, chairs[0]!.id);
@@ -469,7 +557,27 @@ describe("setTableSetStyle — รูปลักษณ์ชุดโต๊ะ"
   it("ผังเดิมไม่มี style → ใช้ค่าเริ่มต้น", () => {
     const { table, chairs } = setup();
     expect(tableStyleOf(table)).toEqual({ shape: "rectangle", legStyle: "four-legs", color: "white" });
-    expect(chairStyleOf(chairs[0]!)).toEqual({ kind: "chair", legStyle: "four-legs", color: "orange" });
+    expect(chairStyleOf(chairs[0]!)).toEqual({ kind: "chair", shape: "square", legStyle: "four-legs", color: "orange" });
+  });
+
+  it("ทรงเก้าอี้: ไม่ระบุ = ตามแบบ (สตูลกลม, มีพนักพิงเหลี่ยม) และเลือกเองได้อิสระจากแบบ", () => {
+    const { layout, table } = setup("table-4-seats");
+    const stools = setTableSetStyle(layout, table.id, { chair: { kind: "stool" } });
+    for (const chair of getChairsOfTable(stools, tableOf(stools, table.id))) {
+      expect(chairStyleOf(chair).shape).toBe("round");
+      expect(chair.style?.shape).toBeUndefined();
+    }
+    const roundBacked = setTableSetStyle(layout, table.id, { chair: { shape: "round" } });
+    for (const chair of getChairsOfTable(roundBacked, tableOf(roundBacked, table.id))) {
+      expect(chairStyleOf(chair)).toMatchObject({ kind: "chair", shape: "round" });
+    }
+    const squareStools = setTableSetStyle(roundBacked, table.id, { chair: { kind: "stool", shape: "square" } });
+    for (const chair of getChairsOfTable(squareStools, tableOf(squareStools, table.id))) {
+      expect(chairStyleOf(chair)).toMatchObject({ kind: "stool", shape: "square" });
+    }
+    // footprint ไม่เปลี่ยนตามทรง → ผลตรวจระยะเหมือนเดิม
+    const footprints = (l: typeof layout) => getChairsOfTable(l, tableOf(l, table.id)).map(footprint);
+    expect(footprints(squareStools)).toEqual(footprints(layout));
   });
 
   it("สไตล์เก้าอี้ใช้กับทุกตัวในชุด และไม่แตะชุดอื่น", () => {

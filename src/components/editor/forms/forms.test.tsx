@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { layoutStore } from "@/store/use-layout-store";
@@ -249,7 +249,7 @@ describe("ObjectInspector", () => {
     const table = state().layout.objects.find((o) => o.type === "table")!;
     act(() => state().selectObject(table.id));
     render(<ObjectInspector />);
-    await user.click(screen.getByRole("radio", { name: "กลม" }));
+    await user.click(within(screen.getByRole("radiogroup", { name: "ทรงโต๊ะ" })).getByRole("radio", { name: "กลม" }));
     expect(screen.getByLabelText("เส้นผ่านศูนย์กลางโต๊ะ (ม.)")).toBeInTheDocument();
     expect(screen.queryByLabelText("ลึกโต๊ะ (ม.)")).toBeNull();
     await user.click(screen.getByRole("radio", { name: "สตูล" }));
@@ -260,5 +260,11 @@ describe("ObjectInspector", () => {
     const chairs = objects.filter((o) => o.type === "chair" && o.tableId === table.id);
     expect(chairs.every((c) => c.type === "chair" && c.style?.kind === "stool")).toBe(true);
     expect(screen.getByRole("radio", { name: "สตูล" })).toBeChecked();
+    // สตูลที่ยังไม่เลือกทรง → เบาะกลม; เลือกเหลี่ยมเองได้
+    const chairShape = screen.getByRole("radiogroup", { name: "ทรงเก้าอี้" });
+    expect(within(chairShape).getByRole("radio", { name: "กลม" })).toBeChecked();
+    await user.click(within(chairShape).getByRole("radio", { name: "สี่เหลี่ยม" }));
+    const squareChairs = state().layout.objects.filter((o) => o.type === "chair" && o.tableId === table.id);
+    expect(squareChairs.every((c) => c.type === "chair" && c.style?.shape === "square")).toBe(true);
   });
 });

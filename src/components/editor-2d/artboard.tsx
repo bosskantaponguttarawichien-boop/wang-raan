@@ -97,7 +97,14 @@ function pieceAppearance(obj: LayoutObject): { className?: string; style?: React
       style: obj.style ? { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } : undefined,
     };
   }
-  if (obj.type === "chair" && obj.style) return { style: { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } };
+  if (obj.type === "chair") {
+    // ค่าเริ่มต้นของเก้าอี้คือ rounded-full — ทรงเหลี่ยมใช้มุมมนเล็กแทน
+    const square = chairStyleOf(obj).shape === "square";
+    return {
+      className: square ? "rounded-[22%]" : undefined,
+      style: obj.style ? { backgroundColor: FURNITURE_COLOR_HEX[obj.style.color] } : undefined,
+    };
+  }
   return {};
 }
 
@@ -277,7 +284,8 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   // ── Render ───────────────────────────────────────────────────────────────
   const ratio = layout.width / layout.depth;
   // พอดีพื้นที่ Canvas จริง (cqw/cqh จาก container ของ Stage) เผื่อความสูงให้ป้ายความกว้างและคำแนะนำ (--artboard-chrome)
-  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome)) * ${ratio})`;
+  // ค่า fallback 96px กัน width ทั้งก้อนเป็น invalid → auto (ผังหดเหลือแค่ขอบ) เมื่อ class ตั้งตัวแปรไม่ถูก generate
+  const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome, 96px)) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
 

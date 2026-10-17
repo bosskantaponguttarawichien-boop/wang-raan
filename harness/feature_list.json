@@ -1082,7 +1082,35 @@
       "role": "frontend",
       "summary": "ทดลองการเดินแบบกำหนดจุดหมายได้ใน Character Lab ก่อนทำ pathfinding จริง",
       "sprint": 4,
-      "evidence": "character-lab-scene.tsx เพิ่ม Raycaster/Plane, marker, walkTarget และ animation switch; character-lab.tsx แสดงคำแนะนำและสถานะ Idle/Walk. QA: make test 64 files/850 tests, npm run typecheck, npm run lint, npm run build และ make status ผ่าน."
+      "evidence": "character-lab-scene.tsx เพิ่ม Raycaster/Plane, marker และ walkTarget; character-lab.tsx แสดงคำแนะนำและสถานะ Idle/Walk. แก้อาการกระตุกที่ต้นเหตุ: ไฟล์ GLB มี track `Idle` ของ `Spine.position` ไม่ครบทั้ง 3 แกน จึงไม่รัน AnimationMixer/clip จากไฟล์เลย; ห่อโมเดลด้วย root เดียวสำหรับย้ายและหมุนทั้งตัว, สร้างการแกว่งแขนขาแบบ procedural จาก rest pose และ clamp delta ที่ 1/30 วินาที. ปรับทรงโมเดลให้ครบตัว: offset Spine 0.11 ม., ยกขาสองข้างขึ้น 0.045 ม., เพิ่มสะโพกทรงสี่เหลี่ยมมนวัสดุเดียวกับกางเกงเพื่อเชื่อมเสื้อและขา, และยกโมเดล 0.01 ม. ให้รองเท้าวางบนพื้น; ใช้สเกล 0.60 (สูงราว 1.7 ม.). QA: npm run typecheck และ git diff --check ผ่าน; Chrome เปิดหลังล้าง .next และตรวจหน้า/ข้าง/หลังแล้ว. ชุด test เต็มล่าสุดล้มที่ mock-backend/handler.test.ts เคสโควตา 200 ผัง (ไม่เกี่ยวกับ Character Lab) จึงไม่ได้แก้ข้ามขอบเขต."
+    },
+    {
+      "id": "feat-079",
+      "name": "Character Lab V1.3 — ปรับสัดส่วนและเครื่องแบบตัวละคร",
+      "description": "ยกระดับตัวละคร Cafe staff ใน Character Lab ให้สัดส่วนเป็นผู้ใหญ่มากขึ้น: ลดศีรษะแบบ chibi, เชื่อมคอ–ลำตัว–สะโพก, เติมปกเสื้อ แผงเสื้อ และป้ายชื่อ พร้อมจัดกล้องให้ตรวจรายละเอียดได้ชัด โดยคงการเดินและ WebGL fallback เดิม.",
+      "dependencies": [
+        "feat-078"
+      ],
+      "gate": "มองจากหน้า/ข้าง/หลังแล้วสัดส่วนและเครื่องแบบสมบูรณ์, คลิกพื้นแล้วเดินและกลับ Idle ได้, ไม่แตะ Simulator/Worker, make test และ make lint ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ตัวละครใน Character Lab ดูเป็นพนักงานผู้ใหญ่มากขึ้นและตรวจรายละเอียดได้ชัด",
+      "sprint": 4,
+      "evidence": "character-lab-scene.tsx ลด head เป็น 70–73%, ยกตำแหน่งหัว, เพิ่มคอ/แผงเสื้อ/ปกเสื้อ/ป้ายชื่อ และรักษาสะโพก rounded ที่เชื่อมขา; ปรับ scale ตัวละคร 0.72, camera 28° และพื้น/พื้นที่เดินให้กระชับ. Browser ตรวจหน้า/ข้าง/หลังแล้ว, คลิกพื้นเห็น Walk และกลับ Idle, console error 0. QA: make lint และ make test 64 files/858 tests ผ่าน."
+    },
+    {
+      "id": "feat-080",
+      "name": "Chibi mannequin low-poly สำหรับฉากร้าน 3D",
+      "description": "แทน GLB พนักงาน chibi เดิมด้วย mannequin chibi ขนาดเล็กสีเทาเดียวตามภาพอ้างอิง: หัวกลมใหญ่มีหู คอสั้น ลำตัวอวบ แขนป้อม และขาเรียบสองข้าง โดยไม่มีเครื่องแบบหรือรายละเอียดใบหน้า. ไฟล์เดียวต้องมีท่า Idle, Walk และ Sit เพื่อนำไปใช้ทั้ง Character Lab และลูกค้าระหว่างจำลองใน Three.js.",
+      "dependencies": [
+        "feat-079"
+      ],
+      "gate": "GLB local มี rig และคลิป Idle/Walk/Sit; Character Lab เดินได้; ลูกค้าใน Three.js ใช้ Sit เมื่ออยู่สถานะนั่ง; ไม่แตะ Core/Worker/BFF; typecheck/test/harness ผ่าน และตรวจ browser จริง",
+      "status": "done",
+      "role": "frontend",
+      "summary": "Chibi mannequin สีเทาหัวกลมใหญ่ ทรงนุ่มแบบภาพอ้างอิง นั่งเก้าอี้และเดินในฉากร้านได้จริง",
+      "sprint": 4,
+      "evidence": "scripts/create-cafe-customer-model.mjs สร้าง public/assets/models/cafe-customer.glb ด้วย material เดียว #9da4af พร้อม nodes Hips/Spine/Head/แขน/ต้นขา/ขาส่วนล่างและคลิป Idle/Walk/Sit; รูปทรงล่าสุดตามภาพอ้างอิงเป็น chibi แบบนุ่ม: หัวกลมใหญ่มีหู คอสั้น ลำตัวอวบทรงเดียว แขนป้อมยื่นจากไหล่ และขาเรียบสองข้างโดยไม่มีข้อปล้องที่เห็นชัด. เก็บรอยต่อเพิ่มด้วยคอ capsule โค้ง, ฝังหัวไหล่เข้าลำตัว และขยายน่องให้ทับต้นขาอย่างต่อเนื่อง จึงไม่เกิดวงคาดที่คอ ศอก หรือหัวเข่าขณะยืน. Animation ทุกคลิปใช้ quaternion-only จึงไม่เขียนทับท่าเริ่มต้น. three-view.tsx แสดงที่ scale 0.9 และสลับ state seated → Sit แบบ clamp pose; character-lab-scene.tsx ใช้ clip จริงของ GLB สำหรับการเดินและระบุว่าเป็น Mannequin สีเทา. ตรวจ GLB: 12 meshes, material เดียว, ไม่มี position animation tracks; clearance native Idle 0.010 ม., Walk 0.000 ม., Sit 0.010 ม. Browser: Character Lab แสดง chibi mannequin สีเทาครบส่วนและรอยต่อเนียนขึ้นในฉากจริง. npm run typecheck, ESLint เฉพาะไฟล์ที่เกี่ยวข้อง, make test และ validate_harness ผ่าน."
     }
   ]
 }
