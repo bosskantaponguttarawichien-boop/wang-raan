@@ -8,6 +8,7 @@ const MODEL_URL = "/assets/models/cafe-customer.glb";
 const CHARACTER_SCALE = 0.9;
 const MAX_ANIMATION_DELTA_SECONDS = 1 / 30;
 const WALK_SPEED_METERS_PER_SECOND = 1.15;
+const ANIMATION_FADE_SECONDS = 0.22;
 
 export type CharacterFacing = "front" | "right" | "back" | "left";
 export type CharacterMotion = "idle" | "walking";
@@ -130,8 +131,10 @@ export function CharacterLabScene({
       if (!mixer || activeAnimation === name) return;
       const clip = THREE.AnimationClip.findByName(clips, name);
       if (!clip) return;
-      mixer.stopAllAction();
-      mixer.clipAction(clip).reset().play();
+      const next = mixer.clipAction(clip).reset().setEffectiveWeight(1).play();
+      const previous = activeAnimation ? mixer.existingAction(THREE.AnimationClip.findByName(clips, activeAnimation)!) : null;
+      // ค่อย ๆ ผสมท่าเดิมกับท่าใหม่ ข้อต่อจึงไม่กระตุกตอนเริ่ม/หยุดเดิน
+      if (previous) next.crossFadeFrom(previous, ANIMATION_FADE_SECONDS, false);
       activeAnimation = name;
     };
     const chooseTarget = (event: PointerEvent) => {
