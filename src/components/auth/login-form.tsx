@@ -435,11 +435,11 @@ export function LoginForm({ initialNextUrl, hasGoogleProvider = true }: LoginFor
 
       <p className="text-center text-[12px] text-[#52637a] mt-[18px] mb-0 leading-[1.6]">
         การเข้าสู่ระบบถือว่ายอมรับ{" "}
-        <Link href="#terms" className="text-[#4e627c] underline hover:text-[#1e2b40]">
+        <Link href="/terms" className="text-[#4e627c] underline hover:text-[#1e2b40]">
           ข้อกำหนดการใช้งาน
         </Link>{" "}
         และ{" "}
-        <Link href="#privacy" className="text-[#4e627c] underline hover:text-[#1e2b40]">
+        <Link href="/privacy" className="text-[#4e627c] underline hover:text-[#1e2b40]">
           นโยบายความเป็นส่วนตัว
         </Link>
       </p>
