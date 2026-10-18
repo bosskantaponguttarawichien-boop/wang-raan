@@ -13,7 +13,7 @@ import {
 } from "./index";
 
 function emptyRoom(entrance: Entrance | null, width = 4, depth = 4): StoreLayout {
-  return { id: "l", version: 1, units: "m", width, depth, entrance, objects: [] };
+  return { id: "l", version: 1, units: "m", width, depth, entrance, kitchenDoor: null, objects: [] };
 }
 
 const south: Entrance = { id: "e", wall: "south", position: 1.4, width: 1.2 };

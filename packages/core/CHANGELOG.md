@@ -1,5 +1,16 @@
 # Changelog — @bosskantaponguttarawichien-boop/wang-raan-core
 
+## 2.0.0 — 2026-10-18
+
+Breaking change — ครัวเป็นห้องแยก (feat-081–090)
+
+- `StoreLayout` มีฟิลด์ใหม่ `kitchenDoor: KitchenDoor | null` (ประตูครัวบนผนัง `{ id, wall, position, width }`) แทนกล่องครัวบนพื้น — `FurnitureType` ไม่มี `"kitchen"` แล้ว
+- `StoreLayoutSchema` แปลงผังรุ่นก่อนให้อัตโนมัติ (Zod preprocess → `migrateLayoutData`): กล่องครัวกลายเป็นประตูครัวบนผนังที่ใกล้ที่สุด จึงยังรับ payload รุ่น 1.x ได้ — Backend ที่ใช้ 1.x ปฏิเสธผังที่มี `kitchenDoor` ด้วย 400 INVALID_LAYOUT_SCHEMA
+- ผังที่เก็บไว้ในฐานข้อมูลเป็นรูปแบบเดิมต้องผ่าน `migrateLayout` ก่อนเรียก `validateLayout`
+- Validation: Completeness (ไม่มีประตูครัว → Blocked), ประตูครัวทับทางเข้า/ไม่อยู่บนผนัง, เส้นทางพนักงานไปถึงประตูครัว (ทางเดินรอง 0.90 ม.)
+- `CounterSchema` รับ `style` (ไม่บังคับ): `variant` · `color`
+- เพิ่ม `core/layout/migrate` (`migrateLayoutData`, `migrateLayout`, `kitchenDoorFromLegacy`) และค่าคงที่ `KITCHEN_DOOR_DEFAULT_WIDTH`
+
 ## 1.1.0 — 2026-10-16
 
 เพิ่มเติม (ไม่มี breaking change)

@@ -12,6 +12,7 @@ import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
+import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController, type HeatmapFrame } from "./simulation-controller";
 import { behaviorFromState, drawPerson, facingFrom, personLook, type Facing, type PersonLook } from "./iso-person";
@@ -68,14 +69,29 @@ interface Walker {
   walking: boolean;
 }
 
-/** Canvas ทับฉาก 3D — ต้องอยู่ในกล่องเดียวกับ SVG (ขนาดเท่ากัน) */
-export function IsoSimulationOverlay({ scene, layout }: { scene: IsoScene; layout: StoreLayout }) {
+/**
+ * Canvas ทับฉาก 3D — ต้องอยู่ในกล่องเดียวกับ SVG (ขนาดเท่ากัน)
+ * มุมมองหมุน: `layout` คือผังที่หมุนแล้ว (ตรงกับฉาก) และ `planSize` คือขนาดผังจริงที่ใช้แปลงพิกัดลูกค้า
+ */
+export function IsoSimulationOverlay({
+  scene,
+  layout,
+  viewRotation = 0,
+  planSize,
+}: {
+  scene: IsoScene;
+  layout: StoreLayout;
+  viewRotation?: ViewRotation;
+  planSize?: { width: number; depth: number };
+}) {
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const status = useSimulationStore((s) => s.status);
   const active = status === "running" || status === "paused";
   // อ่านผังผ่าน ref — ไม่ใส่ใน deps ของ effect ข้างล่าง (ผังล็อกระหว่างจำลองอยู่แล้ว และไม่อยากเริ่ม loop/สถานะท่าเดินใหม่)
   const layoutRef = React.useRef(layout);
   layoutRef.current = layout;
+  const viewRef = React.useRef({ rotation: viewRotation, plan: planSize ?? layout });
+  viewRef.current = { rotation: viewRotation, plan: planSize ?? layout };
 
   React.useEffect(() => {
     const canvas = canvasRef.current;
@@ -120,7 +136,11 @@ export function IsoSimulationOverlay({ scene, layout }: { scene: IsoScene; layou
       const t = reduceMotion ? 1 : Math.min(1, (now - current.at) / TICK_MS);
       // interpolateAgents เรียงตาม current.agents จึงจับคู่ id ด้วยลำดับเดียวกัน
       const positions = interpolateAgents(previous, current, t);
-      const withIds = positions.map(([x, y, state], i) => [current.agents[i * AGENT_STRIDE]!, x, y, state] as [number, number, number, number]);
+      const { rotation, plan } = viewRef.current;
+      const withIds = positions.map(([x, y, state], i) => {
+        const p = rotation ? pointToView({ x, y }, plan, rotation) : { x, y };
+        return [current.agents[i * AGENT_STRIDE]!, p.x, p.y, state] as [number, number, number, number];
+      });
       const seen = new Set<number>();
       for (const sprite of projectAgents(withIds, scene.scale)) {
         seen.add(sprite.id);
@@ -181,7 +201,18 @@ export function IsoSimulationOverlay({ scene, layout }: { scene: IsoScene; layou
  * Heatmap บนพื้น 3D (ใช้ภายใน <svg> ของฉาก) — วาดหลังพื้น/กริด ก่อนเฟอร์นิเจอร์
  * matrix(s, 0.52s, −s, 0.52s, originX, originY) แปลงเมตร → viewBox ตรงกับ projectPoint ที่ z = 0
  */
-export function IsoHeatmapLayer({ scale, clipPathId }: { scale: number; clipPathId: string }) {
+export function IsoHeatmapLayer({
+  scale,
+  clipPathId,
+  viewRotation = 0,
+  planSize,
+}: {
+  scale: number;
+  clipPathId: string;
+  viewRotation?: ViewRotation;
+  /** ขนาดผังจริง — จำเป็นเมื่อมุมมองหมุน (heatmap อยู่ในพิกัดผังจริง) */
+  planSize?: { width: number; depth: number };
+}) {
   const imageRef = React.useRef<SVGImageElement>(null);
   const status = useSimulationStore((s) => s.status);
   const showHeatmap = useSimulationStore((s) => s.showHeatmap);
@@ -230,7 +261,10 @@ export function IsoHeatmapLayer({ scale, clipPathId }: { scale: number; clipPath
         visibility="hidden"
         preserveAspectRatio="none"
         opacity={active ? 0.9 : 0.35}
-        transform={`matrix(${scale} ${k} ${-scale} ${k} ${ISO_ORIGIN_X} ${ISO_ORIGIN_Y})`}
+        // ขวาสุดทำก่อน: หมุนพิกัดผังจริงเป็นพิกัดมุมมอง แล้วจึงฉาย isometric
+        transform={`matrix(${scale} ${k} ${-scale} ${k} ${ISO_ORIGIN_X} ${ISO_ORIGIN_Y})${
+          viewRotation && planSize ? ` matrix(${viewMatrix(planSize, viewRotation).join(" ")})` : ""
+        }`}
       />
     </g>
   );

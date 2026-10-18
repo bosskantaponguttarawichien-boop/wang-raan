@@ -6,7 +6,6 @@ import {
   checkTableSetIntegrity,
   createCounter,
   createEmptyLayout,
-  createKitchen,
   createSequentialIds,
   createTableSet,
   deleteObject,
@@ -34,10 +33,10 @@ import {
 function setup(preset: TableSetPreset = "table-4-seats", position = { x: 3, y: 3 }) {
   const ids: IdFactory = createSequentialIds();
   const base = createEmptyLayout({ width: 8, depth: 6 }, ids);
-  const kitchen = createKitchen({ position: { x: 0.5, y: 0.5 } }, ids);
-  const withKitchen: StoreLayout = { ...base, objects: [kitchen] };
-  const { layout, tableSet } = addTableSet(withKitchen, preset, position, ids);
-  return { layout, table: tableSet.table, chairs: tableSet.chairs, kitchen, ids };
+  const counter = createCounter({ position: { x: 0.5, y: 0.5 } }, ids);
+  const withCounter: StoreLayout = { ...base, objects: [counter] };
+  const { layout, tableSet } = addTableSet(withCounter, preset, position, ids);
+  return { layout, table: tableSet.table, chairs: tableSet.chairs, counter, ids };
 }
 
 function tableOf(layout: StoreLayout, id: string): Table {
@@ -135,7 +134,7 @@ describe("Creation — Table set presets", () => {
 
 describe("Group Move", () => {
   it("ย้ายโต๊ะ → เก้าอี้ลูกทุกตัวย้ายตามด้วย delta เดียวกัน", () => {
-    const { layout, table, chairs, kitchen } = setup();
+    const { layout, table, chairs, counter } = setup();
     const moved = moveObject(layout, table.id, { x: 5.1, y: 1.4 });
     const t = tableOf(moved, table.id);
     expect([t.x, t.y]).toEqual([5, 1.5]);
@@ -146,7 +145,7 @@ describe("Group Move", () => {
       expect(after.rotation).toBe(chair.rotation);
     }
     expect(relativeCenters(moved, table.id)).toEqual(relativeCenters(layout, table.id));
-    expect(findObject(moved, kitchen.id)).toBe(kitchen); // วัตถุอื่นไม่ถูกแตะ
+    expect(findObject(moved, counter.id)).toBe(counter); // วัตถุอื่นไม่ถูกแตะ
     expectTucksWithinLimit(moved, table.id);
   });
 
@@ -165,15 +164,15 @@ describe("Group Move", () => {
     expect(moveObject(layout, "missing", { x: 1, y: 1 })).toBe(layout);
   });
 
-  it("Non-blocking: ย้ายไปชนครัวหรือออกนอกร้านได้ (ให้ Validation รายงาน)", () => {
-    const { layout, table, kitchen } = setup();
-    const onKitchen = moveObject(layout, table.id, { x: kitchen.x, y: kitchen.y });
-    expect(tableOf(onKitchen, table.id)).toMatchObject({ x: 0.5, y: 0.5 });
+  it("Non-blocking: ย้ายไปชนเคาน์เตอร์หรือออกนอกร้านได้ (ให้ Validation รายงาน)", () => {
+    const { layout, table, counter } = setup();
+    const onCounter = moveObject(layout, table.id, { x: counter.x, y: counter.y });
+    expect(tableOf(onCounter, table.id)).toMatchObject({ x: 0.5, y: 0.5 });
     const outside = moveObject(layout, table.id, { x: 7.5, y: -1 });
     expect(tableOf(outside, table.id)).toMatchObject({ x: 7.5, y: -1 });
   });
 
-  it("ย้าย Kitchen / Counter เดี่ยว ๆ พร้อม snap", () => {
+  it("ย้าย Counter เดี่ยว ๆ พร้อม snap", () => {
     const ids = createSequentialIds();
     const counter = createCounter({ position: { x: 5, y: 0.5 } }, ids);
     const layout = { ...createEmptyLayout({ width: 8, depth: 6 }, ids), objects: [counter] };
@@ -249,13 +248,13 @@ describe("Group Rotate", () => {
     expect(relativeCenters(back, table.id)).toEqual(relativeCenters(wide, table.id));
   });
 
-  it("หมุน Kitchen รอบจุดศูนย์กลางแล้ว snap มุมซ้ายบน", () => {
+  it("หมุน Counter รอบจุดศูนย์กลางแล้ว snap มุมซ้ายบน", () => {
     const ids = createSequentialIds();
-    const kitchen = createKitchen({ position: { x: 1, y: 1 } }, ids); // 2 × 1.5
-    const layout = { ...createEmptyLayout({ width: 8, depth: 6 }, ids), objects: [kitchen] };
-    const rotated = findObject(rotateObject(layout, kitchen.id), kitchen.id)!;
+    const counter = createCounter({ position: { x: 1, y: 1 } }, ids); // 2.4 × 0.7
+    const layout = { ...createEmptyLayout({ width: 8, depth: 6 }, ids), objects: [counter] };
+    const rotated = findObject(rotateObject(layout, counter.id), counter.id)!;
     expect(rotated.rotation).toBe(90);
-    expect(footprint(rotated)).toMatchObject({ width: 1.5, depth: 2 });
+    expect(footprint(rotated)).toMatchObject({ width: 0.7, depth: 2.4 });
     expect(Number.isInteger(rotated.x * 4) && Number.isInteger(rotated.y * 4)).toBe(true);
   });
 
@@ -268,9 +267,9 @@ describe("Group Rotate", () => {
 
 describe("Cascade Delete", () => {
   it("ลบโต๊ะ → เก้าอี้ลูกถูกลบทั้งหมด ไม่เหลือ Orphan Chair", () => {
-    const { layout, table, kitchen } = setup();
+    const { layout, table, counter } = setup();
     const after = deleteObject(layout, table.id);
-    expect(after.objects).toEqual([kitchen]);
+    expect(after.objects).toEqual([counter]);
     expect(checkTableSetIntegrity(after)).toEqual([]);
   });
 
@@ -468,8 +467,8 @@ describe("toggleTablePreset — สลับ 2 ↔ 4 ที่นั่งอย
   });
 
   it("ส่ง id ที่ไม่ใช่โต๊ะ → คืน null", () => {
-    const { layout, kitchen, ids } = setup("table-2-seats");
-    expect(toggleTablePreset(layout, kitchen.id, ids)).toBeNull();
+    const { layout, counter, ids } = setup("table-2-seats");
+    expect(toggleTablePreset(layout, counter.id, ids)).toBeNull();
     expect(toggleTablePreset(layout, "non-existent", ids)).toBeNull();
   });
 });

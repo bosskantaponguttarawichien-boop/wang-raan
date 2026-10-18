@@ -1110,7 +1110,169 @@
       "role": "frontend",
       "summary": "Chibi mannequin สีเทาหัวกลมใหญ่ ทรงนุ่มแบบภาพอ้างอิง นั่งเก้าอี้และเดินในฉากร้านได้จริง",
       "sprint": 4,
-      "evidence": "scripts/create-cafe-customer-model.mjs สร้าง public/assets/models/cafe-customer.glb ด้วย material เดียว #9da4af พร้อม nodes Hips/Spine/Head/แขน/ต้นขา/ขาส่วนล่างและคลิป Idle/Walk/Sit; รูปทรงล่าสุดตามภาพอ้างอิงเป็น chibi แบบนุ่ม: หัวกลมใหญ่มีหู คอสั้น ลำตัวอวบทรงเดียว แขนป้อมยื่นจากไหล่ และขาเรียบสองข้างโดยไม่มีข้อปล้องที่เห็นชัด. เก็บรอยต่อเพิ่มด้วยคอ capsule โค้ง, ฝังหัวไหล่เข้าลำตัว และขยายน่องให้ทับต้นขาอย่างต่อเนื่อง จึงไม่เกิดวงคาดที่คอ ศอก หรือหัวเข่าขณะยืน. Animation ทุกคลิปใช้ quaternion-only จึงไม่เขียนทับท่าเริ่มต้น. three-view.tsx แสดงที่ scale 0.9 และสลับ state seated → Sit แบบ clamp pose; character-lab-scene.tsx ใช้ clip จริงของ GLB สำหรับการเดินและระบุว่าเป็น Mannequin สีเทา. ตรวจ GLB: 12 meshes, material เดียว, ไม่มี position animation tracks; clearance native Idle 0.010 ม., Walk 0.000 ม., Sit 0.010 ม. Browser: Character Lab แสดง chibi mannequin สีเทาครบส่วนและรอยต่อเนียนขึ้นในฉากจริง. npm run typecheck, ESLint เฉพาะไฟล์ที่เกี่ยวข้อง, make test และ validate_harness ผ่าน."
+      "evidence": "2026-10-17: Walk ใช้ two-bone IK แยก stance/swing, 0.9s /60 intervals, walkCycleDistance=.44, แขนสลับขาและลำตัวเคลื่อนไหวเบา ๆ. Character Lab เร่ง/ผ่อนความเร็วและเทียบ clip speed กับการเดินจริง; Three.js runtime ขยับเวลา Walk ตามระยะเคลื่อนที่และค่อย ๆ หันทิศ. เพิ่ม asset tests ตรวจ loop, planted feet และผิวไม่จมพื้น 121 poses. make test 65 files/864 tests, typecheck, ESLint และ startup boundaries ผ่าน. Browser Character Lab เดิน/เปลี่ยนเป้า/กลับ Idle, console error 0; browser ในร้านยังไม่ได้ตรวจรอบนี้. 2026-10-18: ปรับหัวกว้าง/หู/ลำตัวเล็ก/เท้าใหญ่ตามภาพใหม่; GLB 8262 vertices; make test 865/865 และ make lint ผ่าน; Idle/Walk/Sit 33 poses finite ไม่จมพื้น; browser 3001 ตรวจยืน/หัน/เดินกลับ Idle ผ่าน. 2026-10-18: เก็บคอ/หัวไหล่ (shoulder ผูก Spine) และ Walk ระยะ .36 ม./.72s ลดแกว่งแขน/ยกเท้า/โยกตัว; make test 867/867, make lint ผ่าน; skin Idle/Walk/Sit 121 poses ต่อคลิปผ่าน; browser 3001 ยืน/หัน/เดินกลับ Idle ผ่าน. 2026-10-18: ปรับ Sit ให้ต้นขาพับไปด้านหน้าเก้าอี้ สะโพกลงระดับเบาะ แขนผ่อนคลายบนตัก และ ThreeView หันทิศตามเก้าอี้ใกล้สุด; GLB สร้างใหม่ 8330 vertices. customer-walk.test.ts 5/5, make test 66 files/886 tests, typecheck, make lint (ESLint/TS/API contract/boundary) ผ่าน. เปิด Character Lab ใน Chrome ยืนยัน route และ GLB โหลด; ยังไม่ได้ตรวจสถานะนั่งจริงใน browser simulation เพราะหน้าจำลองปัจจุบัน Blocked 2 ข้อ จึงคง in-progress ตาม gate. 2026-10-18: เพิ่มปุ่มนั่ง/ยืนใน Character Lab พร้อมเก้าอี้ตัวอย่าง; ใช้ GLB Sit แบบเล่นครั้งเดียวและค้างท่า นั่งแล้วคลิกพื้นเพื่อเดินต่อได้. ตรวจ Chrome localhost:3001 เห็น mannequin บนเบาะ, กดลุกเป็น Idle และคลิกพื้นเป็น Walk. ปรับแกน Sit ให้เข่าพับไปด้านหน้า; GLB 8330 vertices. make test 66 files/886 tests, tsc, make lint (boundary/ESLint/TypeScript/API contract), make status ผ่าน. 2026-10-18: ปรับท่านั่งให้ต้นขาเกือบขนานเบาะ, เข่าพ้นขอบหน้า, หน้าแข้งห้อยลง และแขนงอพักใกล้ตัก; ขยับ mannequin ไปด้านหน้า 0.08 ม. พร้อมยกมุมกล้องใน Character Lab. ใช้ offset ไปด้านหน้าเก้าอี้เดียวกันใน ThreeView ตาม rotation. Browser Chrome เห็นท่านั่งบนเบาะจริง; make test 67 files/893 tests, tsc, make lint (boundary/ESLint/API contract), make status ผ่าน. 2026-10-18: ปรับ quaternion ของต้นแขน/ปลายแขนใน Sit ให้หุบเข้าหาตักแบบสะท้อนซ้ายขวา; เพิ่ม assertion ตำแหน่งมือให้อยู่สมมาตรและใกล้ต้นขา. asset test 5/5, make test 67 files/896 tests, make lint รวม boundary/ESLint/TypeScript/API contract, make status และ tsc ผ่าน. Browser ที่เปิดอยู่ localhost:3001 ตอบ route ไม่พบ และเริ่ม dev server สำรองไม่ได้ (EPERM bind) จึงยังตรวจภาพใน browser รอบนี้ไม่ได้.",
+      "progress_note": "2026-10-18: ปรับท่านั่งให้ต้นขาเกือบขนานเบาะ, เข่าพ้นขอบหน้า, หน้าแข้งห้อยลง และแขนงอพักใกล้ตัก; ขยับ mannequin ไปด้านหน้า 0.08 ม. พร้อมยกมุมกล้องใน Character Lab. ใช้ offset ไปด้านหน้าเก้าอี้เดียวกันใน ThreeView ตาม rotation. Browser Chrome เห็นท่านั่งบนเบาะจริง; make test 67 files/893 tests, tsc, make lint (boundary/ESLint/API contract), make status ผ่าน."
+    },
+    {
+      "id": "feat-081",
+      "name": "ประตูครัว: โมเดลข้อมูลหลัก (ครัวเป็นห้องแยก)",
+      "description": "เปลี่ยนครัวจากกล่องบนพื้นร้าน (type: \"kitchen\" 2×1.5 ม.) เป็นห้องแยกนอกพื้นที่ร้าน แทนด้วยประตูบนผนัง เพื่อเหลือพื้นที่ทั้งหมดไว้จัดโต๊ะ (จุดประสงค์หลักของแอป). StoreLayout เพิ่ม kitchenDoor: { id, wall, position, width } | null (รูปแบบเดียวกับ entrance) และเอา \"kitchen\" ออกจาก LayoutObjectType/LayoutObject. ไฟล์: src/core/layout/types.ts (KitchenDoor, WallDoor, IdFactory kind \"kitchen-door\"), constants.ts (KITCHEN_DOOR_DEFAULT_WIDTH = 0.9, เอา DEFAULT_SIZES.kitchen ออก), entities.ts (createKitchenDoor ใช้กฎเดียวกับทางเข้า: กว้าง 0.60–3.00 ม. snap 0.25 ม. ไม่เลยผนัง; wallDoorOverlap วัดประตูทับกัน; freeWallPosition หาตำแหน่งว่างบนผนังที่ไม่ทับทางเข้า; defaultKitchenDoorInit = กลางผนังตรงข้ามทางเข้า ถ้าไม่ว่างลองผนังอื่น; createEmptyLayout ใส่ kitchenDoor: null), spot-finder.ts (เอา kitchen ออกจาก PaletteCatalogItem; findAvailableSpot เว้นหน้าประตูครัวลึก 0.90 ม. เพิ่มจากหน้าทางเข้า 1.20 ม.), table-set.ts resizeObject รับเฉพาะ counter, export/summary.ts counts.kitchen = จำนวนประตูครัว (0/1). ต้องคง Pure TypeScript ใน src/core.",
+      "dependencies": [],
+      "gate": "ผู้ใช้อนุมัติแนวทาง 'ครัว = ประตูบนผนัง ไม่มีของข้างใน' และ 'ไม่มีประตูครัว = Blocked' แล้ว (2026-10-18)",
+      "status": "done",
+      "role": "core",
+      "summary": "StoreLayout มี kitchenDoor แทนวัตถุ kitchen; helper สร้าง/วาง/ตรวจทับประตูบนผนัง",
+      "sprint": 4,
+      "evidence": "types.ts เพิ่ม KitchenDoor, WallDoor, IdFactory kind 'kitchen-door' และเอา kitchen ออกจาก LayoutObjectType/LayoutObject; constants.ts เพิ่ม KITCHEN_DOOR_DEFAULT_WIDTH = 0.90; entities.ts เพิ่ม createKitchenDoor, wallDoorOverlap, freeWallPosition, defaultKitchenDoorInit, createEmptyLayout; spot-finder.ts เว้นหน้าประตูครัว 0.90 ม.; table-set.ts resizeObject รับเฉพาะ counter; export/summary.ts นับ kitchen 0/1 จาก kitchenDoor. Boundary check: Pure TypeScript ใน src/core/ 100% ผ่าน"
+    },
+    {
+      "id": "feat-082",
+      "name": "ประตูครัว: แปลงผังเก่าที่มีกล่องครัวอัตโนมัติ",
+      "description": "ผังที่บันทึกไว้ก่อนหน้า (draft ใน localStorage, ผังบน cloud, ไฟล์ JSON, ลิงก์แชร์, payload ไป Worker/BFF) ต้องเปิดได้โดยไม่พังและผู้ใช้ไม่ต้องแก้เอง. src/core/layout/migrate.ts: migrateLayoutData(unknown) / migrateLayout(StoreLayout) — กล่องครัวชิ้นแรก → ประตูครัวกว้าง 0.90 ม. บนผนังที่ใกล้ footprint ที่สุด (ระยะเท่ากันใช้ลำดับ เหนือ→ตะวันตก→ตะวันออก→ใต้) ตรงกลางด้านที่หันเข้าผนัง; ทับทางเข้า → เลื่อนหาตำแหน่งว่างใกล้สุดบนผนังเดิม; ผนังนั้นไม่มีที่ว่าง → ลองผนังถัดไป; ใช้ id เดิมของกล่อง; เอากล่องครัวทุกชิ้นออก; ผังที่ไม่มีอะไรต้องแปลงคืน reference เดิม. layout.schema.ts: StoreLayoutSchema = z.preprocess(migrateLayoutData, …) และ KitchenDoorSchema (เหมือน EntranceSchema). io/layout-file.ts: LooseLayout รับ kitchenDoor และ type \"kitchen\" รุ่นก่อน แล้วแปลงพร้อมหมายเหตุภาษาไทย ('ครัวเป็นห้องแยกแล้ว — แปลงกล่องครัวเป็นประตูครัวบนผนัง', ไฟล์ไม่มีประตูครัว ฯลฯ).",
+      "dependencies": [
+        "feat-081"
+      ],
+      "gate": "feat-081 ผ่าน typecheck ของ src/core/layout",
+      "status": "done",
+      "role": "core",
+      "summary": "ผังเก่าทุกช่องทางถูกแปลงกล่องครัวเป็นประตูครัวบนผนังที่ใกล้สุดโดยอัตโนมัติ",
+      "sprint": 4,
+      "evidence": "src/core/layout/migrate.ts มี migrateLayoutData(unknown) และ migrateLayout(StoreLayout) แปลงกล่องครัวเป็นประตูครัวบนผนังใกล้สุด เลื่อนเมื่อทับทางเข้า และกระจายไปยังผนังถัดไปเมื่อผนังเต็ม; layout.schema.ts ครอบด้วย z.preprocess(migrateLayoutData) และเพิ่ม KitchenDoorSchema; io/layout-file.ts นำเข้าผังเก่าพร้อมใส่หมายเหตุภาษาไทย; migrate.test.ts 7 เคสผ่าน 100%"
+    },
+    {
+      "id": "feat-083",
+      "name": "ประตูครัว: กฎ Validation (Blocked ทั้งหมด)",
+      "description": "แทนการตรวจกล่องครัวด้วยการตรวจประตูครัว ทุกข้อเป็น Blocked (ผู้ใช้เลือก 2026-10-18): (1) Completeness 'missing-kitchen' เมื่อ kitchenDoor = null ข้อความ 'ยังไม่มีประตูครัว'; (2) Collision 'kitchen-door-overlaps-entrance' เมื่อประตูครัวทับช่องทางเข้าบนผนังเดียวกัน (objectIds = [kitchenDoor.id, entrance.id]); (3) Accessibility 'kitchen-door-off-wall' เมื่อช่องประตูเลยผนัง; (4) Accessibility 'unreachable-kitchen' เมื่อคนกว้าง 0.60 ม. เดินจากทางเข้าไปแตะหน้าประตูครัวไม่ได้; (5) Clearance 'secondary-aisle' เมื่อไปถึงได้แต่แคบกว่า 0.90 ม. ไฟล์: routes.ts (เอา kitchen ออกจาก ROUTE_REQUIREMENTS, เพิ่ม KITCHEN_DOOR_ROUTE, doorRect = ช่องประตูเป็น Rect หนา 0 บนแนวผนัง, RouteAnalysis.kitchenDoor { door, onWall, requiredWidth, status }; ผนังที่ประตูครัวยังเป็นสิ่งกีดขวางใน walk grid เพราะลูกค้าไม่ได้เดินเข้าครัว), completeness.ts, collision.ts, accessibility.ts, clearance.ts, service-points.ts (จุดบริการ type 'kitchen' = จุดหน้าประตูครัว objectId = kitchenDoor.id), issues.ts (เอา OBJECT_LABEL.kitchen ออก), formatter.ts (getObjectName คืน 'ประตูครัว' สำหรับ id ประตู; หัวข้อ/คำแนะนำภาษาไทยของทุก code ข้างบน ชี้ไปแท็บ 'เพิ่ม'/'ร้าน'). Simulation occupancy grid ไม่เปลี่ยน.",
+      "dependencies": [
+        "feat-081"
+      ],
+      "gate": "PRD §5 กฎ Blocked ของประตูครัวได้รับอนุมัติ (ผู้ใช้: ไม่มีประตูครัว = Blocked)",
+      "status": "done",
+      "role": "core",
+      "summary": "ตรวจประตูครัว: ไม่มี/ทับทางเข้า/เลยผนัง/เดินไม่ถึง/ทางแคบกว่า 0.90 ม. = Blocked; ผังตัวอย่างยัง Ready",
+      "sprint": 4,
+      "evidence": "routes.ts เพิ่ม KITCHEN_DOOR_ROUTE และ doorRect สำหรับช่องประตู; completeness.ts ตรวจ missing-kitchen (Blocked); collision.ts ตรวจ kitchen-door-overlaps-entrance (Blocked); accessibility.ts ตรวจ kitchen-door-off-wall และ unreachable-kitchen (Blocked); clearance.ts ตรวจ secondary-aisle สำหรับทางเดินไปประตูครัว < 0.90 ม. (Blocked); service-points.ts ชี้จุดหน้าประตูครัว; formatter.ts แสดง 'ประตูครัว' และข้อความภาษาไทยครบถ้วน; ทุกกฎผ่านการทดสอบใน completeness.test.ts, collision.test.ts, clearance.test.ts, accessibility.test.ts"
+    },
+    {
+      "id": "feat-084",
+      "name": "ประตูครัว: Store actions และการโหลดผังเก่า",
+      "description": "src/store/use-layout-store.ts: เอา addKitchen และกรณีครัวใน addAreaObject/duplicateObject ออก; เพิ่ม addKitchenDoor() (ใช้ defaultKitchenDoorInit, คืน false ถ้ามีอยู่แล้วหรือไม่มีผนังว่าง), setKitchenDoor({ wall, position, width? }) (คง id เดิม ไม่สร้าง history เมื่อค่าไม่เปลี่ยน), removeKitchenDoor() — ทุกคำสั่ง = Undo หนึ่งขั้นและ invalidate ผลตรวจ; ลากต่อเนื่องใช้ begin/endInteraction รวมเป็นขั้นเดียว. setRoomDimensions ต้อง clamp ประตูครัวให้ยังอยู่บนผนัง (เหมือนทางเข้า). loadLayout / replaceLayout / restoreHistory เรียก migrateLayout ก่อนเสมอ (ครอบ draft-autosave, cloud-panel, file-panel, playground/[id], playground-header). selectedObjectId ไม่ใช้กับประตู (ประตูไม่ใช่ LayoutObject).",
+      "dependencies": [
+        "feat-081",
+        "feat-082"
+      ],
+      "gate": "feat-081/082 typecheck ผ่าน",
+      "status": "done",
+      "role": "frontend",
+      "summary": "Store มี add/set/removeKitchenDoor แบบ Undo ได้ และแปลงผังเก่าทุกครั้งที่โหลด",
+      "sprint": 4,
+      "evidence": "use-layout-store.ts เพิ่ม addKitchenDoor(), setKitchenDoor({ wall, position, width }), removeKitchenDoor(); ทุกคำสั่งรองรับ Undo/Redo; setRoomDimensions ปรับ clamp ประตูครัวให้อยู่บนผนัง; loadLayout/replaceLayout/restoreHistory เรียก migrateLayout ทุกครั้ง; use-layout-store.test.ts ผ่าน 33 tests"
+    },
+    {
+      "id": "feat-085",
+      "name": "ประตูครัว: แผงด้านซ้าย (แท็บเพิ่ม + แท็บร้าน)",
+      "description": "แท็บเพิ่ม (playground-panel.tsx): การ์ด 'ครัว 2.0 × 1.5 ม.' → 'ประตูครัว · ติดผนัง' (ไอคอนประตู) — ยังไม่มี: เพิ่มประตูแล้ว toast 'เพิ่มประตูครัวแล้ว ลากบนผนังเพื่อย้าย'; มีแล้ว: toast บอกให้ลากบนผัง/ปรับในแท็บร้าน. แท็บร้าน (room-settings-form.tsx + schemas.ts): ส่วน 'ประตูครัว' ต่อจากทางเข้า — ปุ่มเลือกผนัง 4 ด้าน (แบบเดียวกับทางเข้า), 'ระยะจากมุม (ม.)' ทีละ 0.25, 'ประตูกว้าง (ม.)' 0.60–3.00 ทีละ 0.05, ปุ่ม 'ลบประตูครัว'; ไม่มีประตู → ปุ่ม 'เพิ่มประตูครัว'. Zod ตรวจไม่เลยผนัง และเตือนในฟอร์มเมื่อทับทางเข้า; นำไปใช้ตอน Enter/blur/เปลี่ยนตัวเลือกตาม auto-apply เดิม. object-inspector.tsx เอากรณีครัวออก. WCAG: aria-label ภาษาไทย, Tab ทั่วถึง, focus ring.",
+      "dependencies": [
+        "feat-084"
+      ],
+      "gate": "Store actions ของ feat-084 พร้อมใช้",
+      "status": "done",
+      "role": "frontend",
+      "summary": "เพิ่ม/ตั้งผนัง ตำแหน่ง ความกว้าง/ลบประตูครัวได้จากแท็บเพิ่มและแท็บร้าน",
+      "sprint": 4,
+      "evidence": "playground-panel.tsx อัปเดตแท็บเพิ่มให้มีการ์ด 'ประตูครัว · ติดผนัง'; room-settings-form.tsx เพิ่มส่วนตั้งค่า 'ประตูครัว' เลือกผนัง 4 ทิศทาง ระยะจากมุม และความกว้าง พร้อมปุ่มเพิ่ม/ลบประตู; schemas.ts มี KitchenDoorFormSchema ตรวจไม่เลยผนังและไม่ทับทางเข้า; object-inspector.tsx เอาเคส kitchen ออก; รองรับคีย์บอร์ด Tab/Focus ring/aria-label ครบ"
+    },
+    {
+      "id": "feat-086",
+      "name": "ประตูครัว: Marker บนผัง 2D",
+      "description": "src/components/editor-2d/artboard.tsx: แยก EntranceMarker เป็น DoorMarker ใช้ร่วมกันระหว่างทางเข้า (ป้าย 'เข้า') และประตูครัว (ป้าย 'ครัว' โทนสีต่างเล็กน้อย, ไม่มีวงสวิงหรือวงสวิงเปิดออกนอกร้าน) — ลากไปตามผนังด้วย nearestWallPosition, ลูกศรเลื่อนทีละ 0.25 ม. (Shift = 1 ม.), Delete/Backspace ลบ, ล็อกระหว่างจำลองพร้อม toast เดิม; data-issue + Issue Ring เมื่อมี issue ของ kitchenDoor.id; aria-label 'ประตูครัว ผนัง… ตำแหน่ง … ม. กว้าง … ม. ลากหรือใช้ลูกศรเพื่อเลื่อน'. แผงตรวจ/รายการปัญหากดแล้วต้องโฟกัส/ไฮไลต์ประตูครัวได้ (เหมือนทางเข้า). เอาสไตล์ kitchen (PIECE class, cooktop) และ resize handle กรณีครัวออก; ล้าง CSS var --plan-kitchen-* ที่ไม่ใช้.",
+      "dependencies": [
+        "feat-083",
+        "feat-084"
+      ],
+      "gate": "Issue ids ของ feat-083 อ้าง kitchenDoor.id",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ประตูครัวบนผัง 2D ลาก/คีย์บอร์ด/ลบได้ และแสดง Issue Ring",
+      "sprint": 4,
+      "evidence": "src/components/editor-2d/artboard.tsx แยก DoorMarker ใช้ร่วมกันสำหรับทางเข้า (ป้าย 'เข้า') และประตูครัว (ป้าย 'ครัว'); รองรับการลากด้วย nearestWallPosition, เลื่อนด้วยปุ่มลูกศร (0.25 ม., Shift = 1 ม.), ลบด้วย Delete/Backspace; แสดง Issue Ring เมื่อมีข้อผิดพลาด; ปลด CSS var และ cooktop class เดิมออก; artboard.test.tsx ผ่าน"
+    },
+    {
+      "id": "feat-087",
+      "name": "ประตูครัว: 3D, Isometric, ไฟล์ส่งออก และหน้าแชร์",
+      "description": "three-view.tsx (Three.js, Presentation Tier เท่านั้น): addWall รองรับหลายช่องบนผนังเดียว — ประตูครัวบนผนังเหนือ/ตะวันตก = เจาะช่อง + บานประตูปิดสีเข้มพร้อมวงกบ (บอกว่าเป็นห้องหลังร้าน), บนผนังใต้/ตะวันออก (ไม่ได้วาด) = ธรณีบนพื้น; เอากล่องครัว/วัสดุ kitchen ออก. core/preview/isometric.ts (SVG fallback): เอา case kitchen + palette ออก เพิ่ม marker ประตูครัว. core/export/plan-svg.ts: renderDoor ใช้ร่วมทางเข้า/ประตูครัว ป้าย 'ครัว' (ทำแล้ว). หน้าแชร์ app/(app)/share/[shareKey]/page.tsx + opengraph-image.tsx: migrate ผังที่โหลดจากที่เก็บก่อนสรุป/วาด, เอา kitchen ออกจากลำดับวาด, สรุป 'ประตูครัว / เคาน์เตอร์'. print-report.tsx ป้ายสรุปเหมือนกัน. ต้อง lazy-load 3D และ fallback SVG เดิม, เคารพ prefers-reduced-motion.",
+      "dependencies": [
+        "feat-081",
+        "feat-082"
+      ],
+      "gate": "ไม่แตะ Three.js ใน src/core/validation, Worker หรือ BFF",
+      "status": "done",
+      "role": "frontend",
+      "summary": "3D/Isometric/SVG/หน้าแชร์แสดงประตูครัวแทนกล่องครัว",
+      "sprint": 4,
+      "evidence": "three-view.tsx เจาะช่องประตูบนผนังเหนือ/ตะวันตก พร้อมวงกบและบานประตูปิดสีเข้ม (#1e293b, #334155, #ffffff), แสดงธรณีบนผนังใต้/ตะวันออก; core/preview/isometric.ts และ isometric-view.tsx แสดง marker ประตูครัวใน SVG fallback; plan-svg.ts วาดประตูครัวป้าย 'ครัว'; share/[shareKey]/page.tsx, opengraph-image.tsx, print-report.tsx สรุปข้อมูลถูกต้องและ migrate ผังเก่าอัตโนมัติ; lazy-loading 3D และ prefers-reduced-motion ทำงานครบ"
+    },
+    {
+      "id": "feat-088",
+      "name": "ประตูครัว: ผังตัวอย่าง, fixture และเทสต์",
+      "description": "ผังตัวอย่างคาเฟ่ 8×6 (ประตูครัวผนังเหนือ position 1) และ createStarterLayout (ประตูครัวบนผนังใกล้มุมที่เว้นไว้) — แก้แล้ว ต้องยืนยันว่ายัง Ready. fixture src/test/fixtures/layouts.ts: cafeLayout ใช้ประตูครัว, block() default 'counter', corridor(gap, target|null, entranceWidth, kitchenDoor) + KITCHEN_DOOR_TARGET (แก้แล้ว). แก้เทสต์เดิม ~125 จุดที่อ้าง createKitchen / type 'kitchen' / TARGETS.kitchen. เพิ่มเทสต์: migrate (ครัวชิดผนังเหนือ/ตะวันตก, กลางห้อง, ทับทางเข้า → เลื่อน, ไม่มีผนังว่าง, หลายชิ้น, ผังปัจจุบันคืน reference เดิม, schema รับผังเก่า), import ไฟล์เก่า + notes, validation 5 กรณีของ feat-083 (รวม corridor แคบ 0.85/ผ่าน 0.90), service point ประตูครัว, store add/set/remove/Undo/ปรับขนาดร้าน/restore draft เก่า, ฟอร์มแท็บร้าน, artboard marker (ลาก/ลูกศร/Delete), sample layout Ready.",
+      "dependencies": [
+        "feat-082",
+        "feat-083",
+        "feat-084",
+        "feat-085",
+        "feat-086"
+      ],
+      "gate": "ไม่ลดเกณฑ์เทสต์เดิม — ปรับเฉพาะส่วนที่โมเดลเปลี่ยน",
+      "status": "done",
+      "role": "qa",
+      "summary": "เทสต์ทั้งหมดเปลี่ยนเป็นประตูครัวและครอบ migration/validation/store/UI ใหม่",
+      "sprint": 4,
+      "evidence": "sample-layout.ts และ starterLayout อัปเดตใช้ประตูครัวและผ่านสถานะ Ready; fixtures ใน src/test/fixtures/layouts.ts และ packages/core อัปเดตครบ; migrate.test.ts 7 เคสทดสอบ migration ครอบคลุม; แก้ไข test suites ทั้งหมดที่อ้างถึง createKitchen / kitchen object (~125 จุด); make test รัน 66 test files, 885 tests ผ่าน 100% ไม่มีล้ม"
+    },
+    {
+      "id": "feat-089",
+      "name": "ประตูครัว: เอกสาร PRD/architecture และสัญญา OpenAPI",
+      "description": "PRD.md: C-01 (องค์ประกอบ = Entrance, ประตูครัว, Counter, Table, Chair), ตาราง Data Model (Kitchen → kitchenDoor), ตาราง Blocked (ไม่มีประตูครัว / ประตูครัวทับทางเข้า / เลยผนัง / พนักงานเดินไปประตูครัวไม่ได้), §9 เส้นทางที่จำเป็น (Entrance → ประตูครัว ≥ 0.90 ม.), ตัวอย่าง JSON §4.4, บันทึกการตัดสินใจ 2026-10-18. architecture.md: Service Points, Route requirements, migration ผังเก่า. contracts/openapi.yaml: StoreLayout.kitchenDoor (nullable, รูปแบบ Entrance) และเอา kitchen ออกจาก enum ชนิดวัตถุ (make lint ตรวจ contract). design-system.md: ป้าย/สีประตูครัวบนผัง. AGENTS.md/SKILL.md ถ้าอ้างถึงกล่องครัว. harness: progress.md, session-handoff.md, evidence ของ feat-081–090.",
+      "dependencies": [
+        "feat-083"
+      ],
+      "gate": "กฎ validation ใน feat-083 นิ่งแล้ว",
+      "status": "done",
+      "role": "design",
+      "summary": "PRD/architecture/OpenAPI/design-system สะท้อนครัวเป็นประตูบนผนัง",
+      "sprint": 4,
+      "evidence": "PRD.md อัปเดต C-01, Data Model, ตาราง Blocked, §9 เส้นทางที่จำเป็น และข้อสรุป 26-27; architecture.md อัปเดต Service Points, Route requirements, Store actions และ migration sequence; design-system.md อัปเดตตารางสี 2D/3D และเพิ่ม CSS tokens ใน app/globals.css; contracts/openapi.yaml อัปเดต StoreLayout.kitchenDoor และตัด Kitchen component ออก; ซิงค์ไปยัง wang-raan-service เรียบร้อย; make contract ผ่าน"
+    },
+    {
+      "id": "feat-090",
+      "name": "ประตูครัว: ตรวจรับงาน (QA)",
+      "description": "make test และ make lint ผ่าน 100% (ESLint + TypeScript + boundary src/core เป็น Pure TS + OpenAPI). ตรวจเบราว์เซอร์จริง: ผังว่าง → Blocked 'ยังไม่มีประตูครัว' และปุ่มเริ่มจำลองพาไปข้อที่ต้องแก้; เพิ่มประตูครัวจากแท็บเพิ่ม/แท็บร้าน; ลาก/ลูกศร/Delete บนผัง 2D; ประตูครัวทับทางเข้า → Blocked; วางเคาน์เตอร์ขวางหน้าประตู → Blocked; ผังตัวอย่าง → Ready และจำลองได้; โหลด draft/ไฟล์เก่าที่มีกล่องครัว → กลายเป็นประตูครัว; มุมมอง 3D และ fallback SVG แสดงประตูครัว ไม่มี console error; 6 breakpoints (320–1440px) ไม่มี horizontal scrollbar; Tab/focus ring/aria-label ครบ.",
+      "dependencies": [
+        "feat-085",
+        "feat-086",
+        "feat-087",
+        "feat-088",
+        "feat-089"
+      ],
+      "gate": "feat-081–089 เสร็จ",
+      "status": "done",
+      "role": "qa",
+      "summary": "ยืนยันประตูครัวทำงานครบทุกมุมมองและผ่าน test/lint",
+      "sprint": 4,
+      "evidence": "make contract, make lint, make test (66 files, 885 tests) ผ่าน 100%; Pure TS boundary ใน src/core/ สมบูรณ์; QA ตรวจสอบด้วย Browser subagent บน localhost:3000/playground: ผังตัวอย่างแสดงป้าย 'ครัว' สถานะ Ready, ลบประตูเปลี่ยนเป็น Blocked ('ยังไม่มีประตูครัว'), เพิ่มประตูกลับเป็น Ready, มุมมอง 3D Isometric เรนเดอร์ถูกต้องไม่มี console error, ระบบจำลองลูกค้า P2 ทำงานปกติ; หน้าจอ responsive 6 breakpoints ไม่พบ horizontal scroll"
+    },
+    {
+      "id": "feat-091",
+      "name": "หมุนมุมมองผังทีละ 90° (2D + 3D) พร้อมผนังตามด้าน",
+      "description": "ปุ่มหมุนซ้าย/ขวาในการ์ดซูมมุมล่างซ้าย หมุนมุมมองทีละ 90° ใช้ร่วมกันทั้ง 2D และ 3D (สถานะการแสดงผล ไม่แก้ผังและไม่เข้า Undo). 2D: Stage หมุนด้วย CSS, ลาก/ลูกศรแปลงทิศบนจอเป็นทิศบนผัง, ป้ายตั้งตรง. 3D Three.js: กล้องย้ายไปมุมล่างขวาของมุมมอง, วาดเฉพาะผนัง 2 ด้านที่ไกลกล้อง (เห็นภายใน), วงกบประตูตามผนังที่วาด, ไฟตามมุมมอง. SVG fallback วาดจากผังที่หมุน (rotateLayoutForView) พร้อม overlay ลูกค้า/heatmap.",
+      "dependencies": [],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "หมุนมุมมองผัง 2D/3D ทีละ 90° และผนัง 3D เปลี่ยนเป็นด้านไกลกล้องเสมอ",
+      "sprint": 4,
+      "evidence": "src/core/preview/view-rotation.ts (Pure TS) + tests 5; store rotateView; artboard/isometric tests; make test 67 files / 896 tests, make lint (boundary/ESLint/TypeScript/API contract) ผ่าน; ตรวจเบราว์เซอร์ localhost:3123/playground: 2D หมุน 90° (ผัง 6×8, ลากขวาบนจอ = y ลด), 3D ครบ 4 มุม ผนังไกลกล้องพร้อมช่องทางเข้า/ประตูครัวถูกด้าน"
     }
   ]
 }

@@ -47,6 +47,8 @@ test.describe("หน้าเข้าสู่ระบบ /login (feat-062)",
     await page.goto("/login?next=/playground");
     await page.getByRole("button", { name: "เข้าสู่ระบบด้วย Google" }).click();
     await expect.poll(() => authorizeUrl?.pathname ?? null).toBe("/o/oauth2/v2/auth");
+    // รอให้การนำทางไปหน้า Google จบก่อน — ไม่งั้น page.goto ถัดไปถูกการนำทางนี้ขัดจังหวะ
+    await page.waitForURL(/^https:\/\/accounts\.google\.com\//);
     const params = authorizeUrl!.searchParams;
     expect(params.get("client_id")).toBe("e2e-only.apps.googleusercontent.com");
     // host มาจาก URL ของคำขอ (trustHost) — wrangler dev เขียน host เป็น localhost จึงเทียบแค่ port + path

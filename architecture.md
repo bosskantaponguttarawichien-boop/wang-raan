@@ -48,7 +48,7 @@ flowchart TB
         end
 
         subgraph ClientState ["Client State & Engine"]
-            Store["Zustand Editor Store\n• Table Set (2/4 Seats)\n• Kitchen, Counter, Entrance\n• Table-Chair Group Move/Rotate\n• Cascade Delete\n• undo/redo stack (40)"]
+            Store["Zustand Editor Store\n• Table Set (2/4 Seats)\n• Counter, Entrance, KitchenDoor\n• Table-Chair Group Move/Rotate\n• Cascade Delete\n• undo/redo stack (40)"]
             ClientVal["Client Validation Engine\n• Completeness, Collision\n• Clearance, Accessibility\n• Ready / Warning / Blocked"]
             TQ["TanStack Query Cache\n• layouts query\n• share layout cache"]
             Worker["Web Worker (P2 Simulation)\n• Occupancy Grid 0.25m\n• Flow-field Pathfinding\n• Heatmap Accumulator"]
@@ -101,8 +101,8 @@ BFF ทำหน้าที่เป็นเกราะป้องกัน�
 // src/core/validation/layout.schema.ts
 import { z } from 'zod';
 
-// C-01: องค์ประกอบหลักคือ kitchen, counter, table, chair (ไม่มี shelf)
-export const FurnitureTypeSchema = z.enum(['kitchen', 'counter', 'table', 'chair']);
+// C-01: องค์ประกอบหลักบนพื้นคือ counter, table, chair (ไม่มี shelf; ครัวเป็นห้องแยก → kitchenDoor บนผนัง)
+export const FurnitureTypeSchema = z.enum(['counter', 'table', 'chair']);
 
 export const BaseObjectSchema = z.object({
   id: z.string(),
@@ -111,10 +111,6 @@ export const BaseObjectSchema = z.object({
   width: z.number().positive(),
   depth: z.number().positive(),
   rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]),
-});
-
-export const KitchenSchema = BaseObjectSchema.extend({
-  type: z.literal('kitchen'),
 });
 
 export const CounterSchema = BaseObjectSchema.extend({
@@ -135,7 +131,6 @@ export const TableSchema = BaseObjectSchema.extend({
 });
 
 export const LayoutObjectSchema = z.discriminatedUnion('type', [
-  KitchenSchema,
   CounterSchema,
   TableSchema,
   ChairSchema,
@@ -147,6 +142,8 @@ export const EntranceSchema = z.object({
   position: z.number().min(0).max(30),
   width: z.number().min(0.6).max(3.0).default(1.2),
 });
+
+export const KitchenDoorSchema = EntranceSchema;
 
 export const ValidationIssueSchema = z.object({
   id: z.string(),
@@ -171,7 +168,8 @@ export const StoreLayoutPayloadSchema = z.object({
     units: z.literal('m'),
     width: z.number().min(2).max(30),
     depth: z.number().min(2).max(30),
-    entrance: EntranceSchema,
+    entrance: EntranceSchema.nullable(),
+    kitchenDoor: KitchenDoorSchema.nullable(),
     objects: z.array(LayoutObjectSchema),
   }),
   validation: ValidationResultSchema,
@@ -216,8 +214,10 @@ interface LayoutStoreState {
 
   // Actions — Table Set Lifecycle & Objects
   addTableSet: (preset: 'table-2-seats' | 'table-4-seats') => void;
-  addKitchen: () => void;
   addCounter: () => void;
+  addKitchenDoor: () => boolean;
+  setKitchenDoor: (input: { wall?: 'north' | 'south' | 'east' | 'west'; position?: number; width?: number }) => void;
+  removeKitchenDoor: () => void;
   
   // Drag & Transform (อนุญาตให้วางผิดกฎได้ชั่วคราว ไม่บล็อกการวาง เพื่อให้เห็นในผลตรวจ)
   updateObjectPosition: (id: string, x: number, y: number) => void; // ถ้าเป็น Table จะย้าย Chair ลูกทั้งหมดตาม
@@ -291,7 +291,7 @@ sequenceDiagram
     participant ValEngine as Validation Engine (Client/BFF)
     participant Worker as Simulation Web Worker (P2)
     
-    Note over UI, Store: ผู้ใช้จัดวาง/แก้ไขผัง (Kitchen, Counter, Table Set)
+    Note over UI, Store: ผู้ใช้จัดวาง/แก้ไขผัง (Counter, Table Set, Entrance, KitchenDoor)
     UI->>Store: แก้ไข geometry หรือตำแหน่ง
     Store->>Store: invalidateValidation() (ผลตรวจเดิมหมดอายุ)
     
@@ -347,7 +347,7 @@ wang-raan/
 ├── src/
 │   ├── components/
 │   │   ├── ui/                          ← Shadcn UI (button, dialog, slider, toast, badge)
-│   │   ├── editor-2d/                   ← 2D Artboard, Furniture (Kitchen, Counter, TableSet)
+│   │   ├── editor-2d/                   ← 2D Artboard, Furniture (Counter, TableSet, Door Markers)
 │   │   ├── preview-3d/                  ← Three.js WebGL Viewer + SVG Isometric fallback
 │   │   ├── validation/                  ← ValidationStatusBar, IssueList, IssueMarker
 │   │   ├── simulation/                  ← SimControls, CustomerOverlay, Heatmap
@@ -356,11 +356,11 @@ wang-raan/
 │   │   ├── layout/                      ← snap.ts, presets.ts, transform.ts, types.ts
 │   │   ├── validation/                  ← Dual-Tier Validation Logic
 │   │   │   ├── engine.ts                ← รันรวม 4 ด้านและสรุปผล Ready/Warning/Blocked
-│   │   │   ├── completeness.ts          ← ตรวจ Entrance, Kitchen, Counter, Table, Chair
+│   │   │   ├── completeness.ts          ← ตรวจ Entrance, KitchenDoor, Counter, Table, Chair
 │   │   │   ├── collision.ts             ← AABB + Tuck-in check (เก้าอี้สอดโต๊ะตนได้ <=0.10m)
 │   │   │   ├── clearance.ts             ← ทางเดินหลัก 1.2m, ทางเดินรอง 0.9m, เก้าอี้ 0.6m
 │   │   │   ├── accessibility.ts         ← Entrance -> Chairs & Staff -> Service Points
-│   │   │   ├── service-points.ts        ← คำนวณจุดบริการอัตโนมัติของ Table/Kitchen/Counter
+│   │   │   ├── service-points.ts        ← คำนวณจุดบริการอัตโนมัติของ Table/Counter/Entrance/KitchenDoor
 │   │   │   └── layout.schema.ts         ← Zod Schemas
 │   │   └── simulation/                  ← grid.ts, flow-field.ts, agent.ts, metrics.ts
 │   ├── store/                           ← Zustand Stores
@@ -393,8 +393,8 @@ wang-raan/
      - การหมุนและย้าย Table แล้ว Chair หมุน/ย้ายตามทั้งชุด (Group Transform)
      - Cascade Delete: ลบ Table แล้ว Chair ลูกถูกลบทั้งหมด
   2. **Validation Engine (Coverage > 95%):**
-     - ตรวจ Completeness (ขาด Kitchen, Counter, Table, Chair, Entrance) → Blocked
-     - ตรวจ Collision (เก้าอี้ทับเก้าอี้, เก้าอี้สอดโต๊ะเกิน 0.10 ม., ทับ Kitchen/Counter) → Blocked
+     - ตรวจ Completeness (ขาด KitchenDoor, Counter, Table, Chair, Entrance) → Blocked
+     - ตรวจ Collision (เก้าอี้ทับเก้าอี้, เก้าอี้สอดโต๊ะเกิน 0.10 ม., ทับทางเข้า/ประตูครัว) → Blocked
      - ตรวจ Clearance (ทางเดินหลัก < 1.20 ม., ทางเดินรอง < 0.90 ม., ทางเข้าเก้าอี้ < 0.60 ม.) → Blocked
      - ตรวจ Accessibility (ลูกค้าเดินไม่ถึงโต๊ะ, พนักงานเข้าไม่ถึงจุดบริการอัตโนมัติ) → Blocked
      - การ Invalidated เมื่อมีการแก้ไขผัง และการคืนค่า Ready / Warning
@@ -410,11 +410,11 @@ wang-raan/
      - ทดสอบบน Chromium, WebKit (Safari) และ Firefox
      - ทดสอบความกว้างหน้าจอตามเกณฑ์ [PRD.md](PRD.md): `320px`, `375px`, `480px`, `768px`, `1024px`, `1440px` โดยต้องไม่มี Scrollbar แนวนอนและข้อความไม่ทับกัน
   2. **Editor & Validation Flow Interactions:**
-     - ลากวาง Table Set, Kitchen, Counter ลงบน Canvas ได้อิสระ
+     - ลากวาง Table Set, Counter และปรับตำแหน่งทางเข้า/ประตูครัวได้อิสระ
      - กดปุ่ม "ตรวจผังร้าน" แล้วแถบสถานะแสดงผล Ready/Warning/Blocked อย่างถูกต้อง
      - ทดสอบว่าหากผังมีข้อผิดพลาด Blocked ปุ่มจำลอง P2 จะกดไม่ได้
      - ลบ Table ตัวหนึ่ง แล้วเก้าอี้ลูกหายไปทั้งหมดบนหน้าจอ
-     - สลับมุมมอง 2D ↔ 3D Isometric (รวมโมเดล Kitchen และ Table Sets)
+     - สลับมุมมอง 2D ↔ 3D Isometric (รวมโมเดลประตูครัว, เคาน์เตอร์ และ Table Sets)
   3. **Accessibility (a11y):**
      - ผสาน Playwright เข้ากับ `@axe-core/playwright` เพื่อตรวจจับข้อผิดพลาดเรื่อง Contrast และ ARIA Labels อัตโนมัติตามมาตรฐาน WCAG 2.1 AA
 
@@ -430,8 +430,8 @@ wang-raan/
    - พัฒนาระบบ Dual-tier Validation: Completeness, Collision, Clearance, Accessibility ใน `src/core/validation/`
    - เขียน Unit Test ด้วย Vitest (เน้นเคส Blocked, Warning, Ready ให้ครบถ้วนตาม PRD)
 3. **Step 3: Editor 2D & 3D Isometric**:
-   - พอร์ต Canvas และ Artboard ใน `src/components/editor-2d/` (รองรับ Kitchen, Counter, Table Set พร้อม Cascade Delete & Group Transform)
-   - พัฒนา Isometric SVG ใน `src/components/preview-3d/` ให้รองรับ Kitchen และ Table Set
+   - พอร์ต Canvas และ Artboard ใน `src/components/editor-2d/` (รองรับ Counter, Table Set, ทางเข้า และประตูครัว พร้อม Cascade Delete & Group Transform)
+   - พัฒนา Isometric SVG ใน `src/components/preview-3d/` ให้รองรับประตูครัวและ Table Set
    - สร้าง UI Validation Status Bar, รายการ Issue และจุดไฮไลต์บน Artboard
 4. **Step 4: Landing Page**:
    - พอร์ตเนื้อหาจาก Landing เดิมมาเป็น Next.js Server Components เพื่อคะแนน SEO สูงสุด

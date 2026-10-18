@@ -9,6 +9,7 @@ export interface LayoutSummary {
   /** ตร.ม. */
   area: number;
   entrance: { wall: string; position: number; width: number } | null;
+  /** kitchen = จำนวนประตูครัว (0/1) — ครัวเป็นห้องแยกนอกร้าน */
   counts: { kitchen: number; counter: number; table: number; chair: number };
   tables: { twoSeats: number; fourSeats: number; custom: number };
   /** เก้าอี้ที่ใช้งานได้ (สังกัดโต๊ะที่มีอยู่จริงและโต๊ะระบุเก้าอี้ตัวนั้น) */
@@ -20,7 +21,7 @@ export interface LayoutSummary {
 }
 
 export function summarizeLayout(layout: StoreLayout, validation: ValidationResult): LayoutSummary {
-  const counts = { kitchen: 0, counter: 0, table: 0, chair: 0 };
+  const counts = { kitchen: layout.kitchenDoor ? 1 : 0, counter: 0, table: 0, chair: 0 };
   const tables = { twoSeats: 0, fourSeats: 0, custom: 0 };
   const tableChairs = new Map<string, Set<string>>();
   for (const obj of layout.objects) {

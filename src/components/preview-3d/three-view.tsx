@@ -7,29 +7,36 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import {
   FURNITURE_COLOR_HEX,
   chairStyleOf,
+  counterStyleOf,
   objectCenter,
   tableStyleOf,
-  type Entrance,
+  type CounterStyle,
   type FurnitureColor,
   type StoreLayout,
+  type WallDoor,
 } from "@/core/layout";
 import { AGENT_STRIDE } from "@/core/simulation";
+import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
   layout: StoreLayout;
   zoom: number;
+  /** หมุนมุมมองทีละ 90° — กล้องย้ายไปมุมใหม่ และวาดผนังเฉพาะ 2 ด้านที่ไกลกล้อง */
+  viewRotation?: ViewRotation;
   isSim: boolean;
   onUnavailable: () => void;
 }
 
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
+const SEATED_FRONT_OFFSET = 0.055;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
   model: THREE.Object3D;
   target: THREE.Vector3;
   animation: CustomerAnimation;
+  targetRotation: number;
 };
 
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนแค่สร้าง `content` ใหม่ ไม่สร้าง WebGL context ใหม่ */
@@ -40,6 +47,7 @@ type Stage = {
   key: THREE.DirectionalLight;
   content: THREE.Group | null;
   layout: StoreLayout | null;
+  viewRotation: ViewRotation;
   invalidate: () => void;
   resize: () => void;
   clearCustomers: () => void;
@@ -110,7 +118,7 @@ function placeMesh(
   return mesh;
 }
 
-function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets) {
+function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets, viewRotation: ViewRotation) {
   const floor = placeMesh(
     assets.geometry(`plane:${layout.width}:${layout.depth}`, () => new THREE.PlaneGeometry(layout.width, layout.depth)),
     assets.material("floor", { color: "#f7f8fa", roughness: 0.94 }),
@@ -124,72 +132,120 @@ function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets
 
   const wallMaterial = assets.material("wall", { color: "#ffffff", roughness: 0.88 });
   const entrance = layout.entrance;
-  // ผนังเหนือ (z=0) / ตะวันตก (x=0) — ถ้ามีประตูบนผนังนั้น เจาะช่องเป็นผนังซ้าย/ขวา + ทับหลังเหนือประตู
-  const addWall = (wall: "north" | "west", length: number) => {
+  const kitchenDoor = layout.kitchenDoor;
+  // วาดเฉพาะผนัง 2 ด้านที่ไกลกล้องตามมุมมอง (ด้านใกล้จะบังภายในร้าน) — เจาะช่องสำหรับทางเข้าและ/หรือประตูครัว
+  // north (z=0) / south (z=depth) วางตามแกน x; west (x=0) / east (x=width) วางตามแกน z
+  const addWall = (wall: WallDoor["wall"], length: number) => {
+    const alongX = wall === "north" || wall === "south";
+    const offset = wall === "south" ? layout.depth : wall === "east" ? layout.width : 0;
     const piece = (from: number, to: number, y0: number, y1: number) => {
       const along = to - from;
       const height = y1 - y0;
       if (along <= 0.001 || height <= 0.001) return;
-      const geometry =
-        wall === "north" ? assets.box(along, height, WALL_THICKNESS) : assets.box(WALL_THICKNESS, height, along);
+      const geometry = alongX ? assets.box(along, height, WALL_THICKNESS) : assets.box(WALL_THICKNESS, height, along);
       const mid = (from + to) / 2;
       group.add(
-        placeMesh(geometry, wallMaterial, wall === "north" ? mid : 0, (y0 + y1) / 2, wall === "north" ? 0 : mid, {
+        placeMesh(geometry, wallMaterial, alongX ? mid : offset, (y0 + y1) / 2, alongX ? offset : mid, {
           cast: false,
           receive: true,
         }),
       );
     };
+
+    const intervals: Array<{ a: number; b: number }> = [];
     if (entrance?.wall === wall) {
-      const a = entrance.position;
-      const b = Math.min(length, entrance.position + entrance.width);
-      piece(0, a, 0, WALL_HEIGHT);
-      piece(b, length, 0, WALL_HEIGHT);
-      piece(a, b, DOOR_HEIGHT, WALL_HEIGHT);
-    } else {
-      piece(0, length, 0, WALL_HEIGHT);
+      intervals.push({ a: entrance.position, b: Math.min(length, entrance.position + entrance.width) });
     }
+    if (kitchenDoor?.wall === wall) {
+      intervals.push({ a: kitchenDoor.position, b: Math.min(length, kitchenDoor.position + kitchenDoor.width) });
+    }
+    intervals.sort((i1, i2) => i1.a - i2.a);
+
+    const merged: Array<{ a: number; b: number }> = [];
+    for (const cur of intervals) {
+      const last = merged[merged.length - 1];
+      if (!last) {
+        merged.push({ ...cur });
+      } else if (cur.a <= last.b) {
+        last.b = Math.max(last.b, cur.b);
+      } else {
+        merged.push({ ...cur });
+      }
+    }
+
+    let cursor = 0;
+    for (const { a, b } of merged) {
+      const clampA = Math.max(cursor, Math.min(length, a));
+      const clampB = Math.max(clampA, Math.min(length, b));
+      piece(cursor, clampA, 0, WALL_HEIGHT);
+      piece(clampA, clampB, DOOR_HEIGHT, WALL_HEIGHT);
+      cursor = clampB;
+    }
+    piece(cursor, length, 0, WALL_HEIGHT);
   };
-  addWall("north", layout.width);
-  addWall("west", layout.depth);
-  if (entrance) group.add(createDoor(layout, entrance, assets));
+  const visibleWalls = farWalls(viewRotation);
+  for (const wall of visibleWalls) addWall(wall, wall === "north" || wall === "south" ? layout.width : layout.depth);
+  if (entrance) group.add(createDoor(layout, entrance, assets, visibleWalls.includes(entrance.wall), false));
+  if (kitchenDoor) group.add(createDoor(layout, kitchenDoor, assets, visibleWalls.includes(kitchenDoor.wall), true));
 }
 
 /**
- * ประตูทางเข้าแบบมินิมอล: ช่องเปิดโล่ง มีแค่วงกบบางสีเทาเข้ม + ธรณีบาง ๆ (ไม่มีบานประตู)
- * ผนังใต้/ตะวันออกไม่ได้วาด (จะบังมุมกล้อง) จึงไม่มีวงกบ — แสดงแค่ธรณีบนพื้นให้รู้ตำแหน่งทางเข้า
+ * แยกทางเข้ากับประตูครัวด้วยสีเดียวกับผัง 2D: ทางเข้า = วงกบน้ำเงิน + ช่องเปิดโล่ง, ประตูครัว = วงกบเทาอมฟ้า + บานปิดสีเข้ม
+ * ทั้งสองมีพรมสีประจำประตูบนพื้นด้านในห้อง — ประตูบนผนังด้านใกล้กล้อง (ไม่วาดผนัง จึงไม่มีวงกบ) ยังเห็นได้จากพรมนี้
  */
-function createDoor(layout: StoreLayout, entrance: Entrance, assets: SceneAssets) {
-  const frameMaterial = assets.material("metal", { color: "#3f4650", roughness: 0.5, metalness: 0.35 });
+const DOOR_COLORS = {
+  entrance: { frame: "#3b62f4", mat: "#8ea6ff" },
+  kitchen: { frame: "#64748b", mat: "#a3afc0", panel: "#252e3b" },
+} as const;
+const DOOR_MAT_DEPTH = 0.45;
+
+function createDoor(layout: StoreLayout, doorInfo: WallDoor, assets: SceneAssets, onVisibleWall: boolean, isKitchen = false) {
+  const colors = isKitchen ? DOOR_COLORS.kitchen : DOOR_COLORS.entrance;
+  const kind = isKitchen ? "kitchen" : "entrance";
+  const frameMaterial = assets.material(`door-frame:${kind}`, { color: colors.frame, roughness: 0.5, metalness: 0.2 });
+  const matMaterial = assets.material(`door-mat:${kind}`, { color: colors.mat, roughness: 0.95 });
   const sillMaterial = assets.material("sill", { color: "#e3e7ee", roughness: 0.9 });
 
-  const wallLength = entrance.wall === "north" || entrance.wall === "south" ? layout.width : layout.depth;
-  const a = entrance.position;
-  const b = Math.min(wallLength, entrance.position + entrance.width);
+  const wallLength = doorInfo.wall === "north" || doorInfo.wall === "south" ? layout.width : layout.depth;
+  const a = doorInfo.position;
+  const b = Math.min(wallLength, doorInfo.position + doorInfo.width);
   const width = b - a;
 
   // สร้างในพิกัดท้องถิ่น: แกน x ตามแนวผนัง (0 → width), แกน z ชี้เข้าในห้อง แล้วค่อยหมุน/ย้ายไปวางบนผนังจริง
   const door = new THREE.Group();
-  const frameW = 0.04;
+  const frameW = 0.05;
   const frameD = WALL_THICKNESS + 0.02;
   const solid = { cast: true, receive: true };
-  door.add(placeMesh(assets.box(width, 0.01, frameD), sillMaterial, width / 2, 0.005, 0, solid));
-  if (entrance.wall === "north" || entrance.wall === "west") {
+  door.add(
+    placeMesh(assets.box(width, 0.01, frameD), sillMaterial, width / 2, 0.005, 0, solid),
+    // พรมหน้าประตูด้านในห้อง (บางมาก ไม่บังเฟอร์นิเจอร์)
+    placeMesh(assets.box(width, 0.012, DOOR_MAT_DEPTH), matMaterial, width / 2, 0.006, frameD / 2 + DOOR_MAT_DEPTH / 2, {
+      cast: false,
+      receive: true,
+    }),
+  );
+  if (onVisibleWall) {
     const post = assets.box(frameW, DOOR_HEIGHT, frameD);
     door.add(
       placeMesh(post, frameMaterial, frameW / 2, DOOR_HEIGHT / 2, 0, solid),
       placeMesh(post, frameMaterial, width - frameW / 2, DOOR_HEIGHT / 2, 0, solid),
       placeMesh(assets.box(width, frameW, frameD), frameMaterial, width / 2, DOOR_HEIGHT - frameW / 2, 0, solid),
     );
+    if (isKitchen) {
+      const panelMaterial = assets.material("kitchen-door-panel", { color: DOOR_COLORS.kitchen.panel, roughness: 0.7 });
+      const panelW = Math.max(0.01, width - frameW * 2);
+      const panelH = Math.max(0.01, DOOR_HEIGHT - frameW);
+      door.add(placeMesh(assets.box(panelW, panelH, 0.03), panelMaterial, width / 2, panelH / 2 + 0.005, 0, solid));
+    }
   }
 
   // วางบนผนัง: north (z=0, เข้า +z), south (z=depth, เข้า −z), west (x=0, เข้า +x), east (x=width, เข้า −x)
-  if (entrance.wall === "north") {
+  if (doorInfo.wall === "north") {
     door.position.set(a, 0, 0);
-  } else if (entrance.wall === "south") {
+  } else if (doorInfo.wall === "south") {
     door.position.set(b, 0, layout.depth);
     door.rotation.y = Math.PI;
-  } else if (entrance.wall === "west") {
+  } else if (doorInfo.wall === "west") {
     door.position.set(0, 0, b);
     door.rotation.y = Math.PI / 2;
   } else {
@@ -258,49 +314,254 @@ function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneA
           object.add(placeMesh(assets.box(seatW, 0.42, 0.05), furniture(style.color), 0, backTop + 0.21, seatD / 2 - 0.025));
         }
       }
-    } else {
-      const counter = item.type === "counter";
-      const height = counter ? 1.05 : 1.15;
-      const material = counter
-        ? assets.material("counter", { color: "#f28c45", roughness: 0.72 })
-        : assets.material("kitchen", { color: "#ffffff", roughness: 0.75 });
-      object.add(placeMesh(assets.box(item.width, height, item.depth), material, 0, height / 2, 0, { cast: true, receive: true }));
+    } else if (item.type === "counter") {
+      object.add(createCounter(item.width, item.depth, counterStyleOf(item), assets));
     }
     group.add(object);
   }
 }
 
 /**
- * พนักพิงโค้งของเก้าอี้เบาะกลม: แผ่นวงแหวนกว้าง 140° หนา 3.5 ซม. สูง 38 ซม. ชิดขอบเบาะฝั่ง +z
- * วาดรูปบนระนาบ XY แล้ว extrude ตามแกน Z → หมุน −90° รอบแกน X ให้ความสูงตั้งขึ้น (shape y → world −z)
+ * เคาน์เตอร์คาเฟ่ สูงท็อป 1.05 ม. — ส่วนร่วมทุกแบบ: ฐานเตะเท้าสีเข้มร่นเข้า, ตู้ตามสีที่เลือก, ท็อปหินครีมยื่นเลยตู้, จอ POS
+ * แบบ (`variant`):
+ * - fluted: หน้าตู้ระแนงโค้งทั้งสองด้านยาว + เครื่องเอสเปรสโซ
+ * - panel: ตู้บานเรียบแบ่งช่องเป็นบาน มีมือจับฝั่ง −z (ฝั่งพนักงาน) + เครื่องเอสเปรสโซ
+ * - bar: ฝั่ง +z (ฝั่งลูกค้า) มีขอบยกสูงเป็นที่วางของ + ราวพักเท้าโลหะ
+ * - display: ตู้กระจกโชว์ขนมบนท็อปด้านซ้าย มีขนมสองชั้น
+ * ที่ rotation 0 ฝั่งลูกค้าคือ +z (ใต้ — หันเข้าห้อง), ฝั่งพนักงานคือ −z
+ * จัดตามแกนยาวในพิกัดท้องถิ่น (x = ด้านยาว) แล้วหมุน 90° ถ้าผังวางเคาน์เตอร์ตามแนวลึก
+ */
+function createCounter(width: number, depth: number, style: CounterStyle, assets: SceneAssets) {
+  const counter = new THREE.Group();
+  const long = Math.max(width, depth);
+  const short = Math.min(width, depth);
+  if (depth > width) counter.rotation.y = Math.PI / 2;
+
+  const hex = FURNITURE_COLOR_HEX[style.color];
+  const body = assets.material(`counter:${style.color}`, { color: hex, roughness: 0.68 });
+  const accent = assets.material(`counter-accent:${style.color}`, {
+    color: new THREE.Color(hex).multiplyScalar(style.color === "charcoal" ? 1.25 : 0.88),
+    roughness: 0.6,
+  });
+  const plinth = assets.material("metal", { color: "#3f4650", roughness: 0.5, metalness: 0.35 });
+  const stone = assets.material("counter-top", { color: "#f5f1ea", roughness: 0.32 });
+  const solid = { cast: true, receive: true };
+
+  const kick = 0.08;
+  const topY = 1.005;
+  const slab = 0.045;
+  const bodyH = topY - kick;
+  const bodyD = short - 0.06;
+  const surface = topY + slab;
+
+  counter.add(placeMesh(assets.box(long - 0.1, kick, bodyD - 0.08), plinth, 0, kick / 2, 0, solid));
+  counter.add(placeMesh(assets.box(long - 0.04, bodyH, bodyD), body, 0, kick + bodyH / 2, 0, solid));
+  counter.add(placeMesh(assets.box(long + 0.02, slab, short), stone, 0, topY + slab / 2, 0, solid));
+
+  /** ตำแหน่ง x ของช่อง i จาก n ช่องเท่ากันตามแนวยาวของตู้ */
+  const bays = (n: number) => Array.from({ length: n }, (_, i) => (i - (n - 1) / 2) * ((long - 0.04) / n));
+
+  if (style.variant === "fluted") {
+    // ระแนงโค้งครึ่งวงกลมแปะหน้าตู้สองด้านยาว (ทรงกระบอกบีบแบนตามแกน z)
+    const slatH = bodyH - 0.06;
+    const pitch = 0.06;
+    const count = Math.max(1, Math.floor((long - 0.14) / pitch));
+    const slatGeo = assets.cylinder(0.022, 0.022, slatH, 12);
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < count; i += 1) {
+        const mesh = placeMesh(slatGeo, accent, (i - (count - 1) / 2) * pitch, kick + 0.03 + slatH / 2, side * (bodyD / 2), solid);
+        mesh.scale.z = 0.45;
+        counter.add(mesh);
+      }
+    }
+  } else if (style.variant === "panel") {
+    // บานตู้นูนเล็กน้อยสองด้าน + มือจับแนวนอนฝั่งพนักงาน
+    const n = Math.max(1, Math.round((long - 0.04) / 0.6));
+    const bayW = (long - 0.04) / n;
+    const panelH = bodyH - 0.08;
+    for (const side of [-1, 1]) {
+      for (const x of bays(n)) {
+        counter.add(placeMesh(assets.box(bayW - 0.03, panelH, 0.014), accent, x, kick + 0.04 + panelH / 2, side * (bodyD / 2 + 0.005), solid));
+        if (side === -1) counter.add(placeMesh(assets.box(Math.min(0.22, bayW * 0.5), 0.016, 0.02), plinth, x, topY - 0.09, -bodyD / 2 - 0.022));
+      }
+    }
+  } else if (style.variant === "bar") {
+    // ร่องแนวนอนสองเส้นบนหน้าตู้ฝั่งลูกค้า
+    for (const y of [kick + bodyH * 0.36, kick + bodyH * 0.68]) {
+      counter.add(placeMesh(assets.box(long - 0.06, 0.018, 0.012), accent, 0, y, bodyD / 2 + 0.004));
+    }
+    // ขอบยกฝั่ง +z: ผนังกั้นสูง 15 ซม. + แผ่นหินวางของยื่นออกไปฝั่งลูกค้า
+    const ledgeD = Math.min(0.26, short * 0.4);
+    const ledgeZ = short / 2 - ledgeD / 2 + 0.05;
+    counter.add(placeMesh(assets.box(long - 0.04, 0.15, 0.05), body, 0, surface + 0.075, short / 2 - 0.1, solid));
+    counter.add(placeMesh(assets.box(long + 0.02, 0.035, ledgeD), stone, 0, surface + 0.1675, ledgeZ, solid));
+    // ราวพักเท้าโลหะ + ขายึด
+    const railZ = bodyD / 2 + 0.1;
+    const rail = placeMesh(assets.cylinder(0.018, 0.018, long - 0.16, 16), plinth, 0, 0.22, railZ);
+    rail.rotation.z = Math.PI / 2;
+    counter.add(rail);
+    for (const x of bays(Math.max(2, Math.round(long / 0.9)))) {
+      counter.add(placeMesh(assets.box(0.02, 0.02, 0.1), plinth, x, 0.22, bodyD / 2 + 0.05));
+    }
+  } else {
+    // แถบสีเข้มแนวนอนใต้ท็อป
+    for (const side of [-1, 1]) counter.add(placeMesh(assets.box(long - 0.04, 0.05, 0.012), accent, 0, topY - 0.06, side * (bodyD / 2 + 0.004)));
+    addPastryCase(counter, assets, -long / 2 + Math.min(1.0, long * 0.45) / 2 + 0.06, Math.min(1.0, long * 0.45), short - 0.12, surface);
+  }
+
+  // จอ POS ด้านขวา: ฐาน + ก้าน + จอเอียง
+  const dark = assets.material("appliance-dark", { color: "#2b3038", roughness: 0.45, metalness: 0.2 });
+  const screen = assets.material("pos-screen", { color: "#3d8fd1", roughness: 0.2, emissive: "#1d5f99", emissiveIntensity: 0.35 });
+  const posX = long / 2 - Math.min(0.35, long * 0.2);
+  const posZ = style.variant === "bar" ? -0.1 : 0.02;
+  counter.add(placeMesh(assets.box(0.16, 0.02, 0.14), dark, posX, surface + 0.01, posZ));
+  counter.add(placeMesh(assets.box(0.03, 0.12, 0.03), dark, posX, surface + 0.08, posZ + 0.02));
+  const display = placeMesh(assets.box(0.28, 0.19, 0.018), dark, posX, surface + 0.2, posZ + 0.01);
+  display.rotation.x = -0.35;
+  display.add(placeMesh(assets.box(0.25, 0.16, 0.004), screen, 0, 0, -0.01, { cast: false }));
+  counter.add(display);
+
+  // เครื่องชงเอสเปรสโซด้านซ้าย (ไม่มีในแบบตู้โชว์ซึ่งใช้พื้นที่นั้นแล้ว)
+  if (style.variant !== "display" && long >= 1.3 && short >= 0.5) {
+    addEspressoMachine(counter, assets, -long / 2 + 0.38, style.variant === "bar" ? -0.09 : Math.min(0.06, short * 0.1), surface);
+  }
+  return counter;
+}
+
+function addEspressoMachine(target: THREE.Group, assets: SceneAssets, mx: number, mz: number, surface: number) {
+  const steel = assets.material("steel", { color: "#dfe3e8", roughness: 0.35, metalness: 0.25 });
+  const dark = assets.material("appliance-dark", { color: "#2b3038", roughness: 0.45, metalness: 0.2 });
+  const cup = assets.material("cup", { color: "#ffffff", roughness: 0.4 });
+  const solid = { cast: true, receive: true };
+  target.add(placeMesh(assets.box(0.5, 0.36, 0.4), steel, mx, surface + 0.18, mz, solid));
+  target.add(placeMesh(assets.box(0.52, 0.025, 0.42), steel, mx, surface + 0.372, mz));
+  target.add(placeMesh(assets.box(0.46, 0.05, 0.01), dark, mx, surface + 0.3, mz - 0.205));
+  target.add(placeMesh(assets.box(0.44, 0.02, 0.16), dark, mx, surface + 0.01, mz - 0.25));
+  for (const dx of [-0.12, 0.12]) {
+    target.add(placeMesh(assets.cylinder(0.035, 0.03, 0.05, 16), dark, mx + dx, surface + 0.2, mz - 0.22));
+    target.add(placeMesh(assets.cylinder(0.03, 0.025, 0.07, 16), cup, mx + dx, surface + 0.055, mz - 0.25));
+  }
+  for (const [dx, dz] of [[0.42, -0.12], [0.5, -0.04]] as const) {
+    target.add(placeMesh(assets.cylinder(0.032, 0.026, 0.09, 16), cup, mx + dx, surface + 0.045, mz + dz));
+  }
+}
+
+/** ตู้กระจกโชว์ขนมบนท็อป: กรอบโลหะ, กระจกใส, ชั้นกลาง และขนมวางสองชั้น */
+function addPastryCase(target: THREE.Group, assets: SceneAssets, cx: number, w: number, d: number, surface: number) {
+  const steel = assets.material("steel", { color: "#dfe3e8", roughness: 0.35, metalness: 0.25 });
+  const glass = assets.material("glass", { color: "#d9f0ff", roughness: 0.05, transparent: true, opacity: 0.28, depthWrite: false });
+  const pastries = [
+    assets.material("pastry-croissant", { color: "#d9984a", roughness: 0.7 }),
+    assets.material("pastry-cake", { color: "#f3d6c8", roughness: 0.8 }),
+    assets.material("pastry-choc", { color: "#6b3f2a", roughness: 0.7 }),
+  ];
+  const h = 0.34;
+  target.add(placeMesh(assets.box(w, 0.03, d), steel, cx, surface + 0.015, 0, { cast: true, receive: true }));
+  target.add(placeMesh(assets.box(w, 0.02, d), steel, cx, surface + h, 0));
+  const pane = placeMesh(assets.box(w - 0.02, h - 0.04, d - 0.02), glass, cx, surface + h / 2 + 0.01, 0, { cast: false });
+  pane.renderOrder = 1;
+  target.add(pane);
+  target.add(placeMesh(assets.box(w - 0.04, 0.008, d - 0.04), glass, cx, surface + 0.19, 0, { cast: false }));
+  const perRow = Math.max(2, Math.floor((w - 0.08) / 0.13));
+  for (const [row, y] of [[0, surface + 0.03], [1, surface + 0.194]] as const) {
+    for (let i = 0; i < perRow; i += 1) {
+      const x = cx + (i - (perRow - 1) / 2) * ((w - 0.1) / perRow);
+      const material = pastries[(i + row) % pastries.length]!;
+      const piece = placeMesh(assets.cylinder(0.045, 0.05, 0.05, 14), material, x, y + 0.025, 0);
+      piece.scale.z = row === 0 ? 0.7 : 1;
+      target.add(piece);
+    }
+  }
+}
+
+/**
+ * พนักพิงทรงเปลือกหอย (shell) ของเก้าอี้เบาะกลม แบบเก้าอี้คาเฟ่บุผ้า:
+ * โอบรอบขอบหลังเบาะ 200° — ตรงกลางสูงสุด 42 ซม. แล้วโค้งมนลาดลงมาจรดเบาะที่ด้านข้าง (ขอบบนเป็นวงรี)
+ * เอนไปด้านหลังเล็กน้อย ขอบบนมนเป็นครึ่งวงกลม และห่อขอบเบาะลงมา 5 ซม.
+ * สร้างเป็น mesh ปิดสนิท: กวาดหน้าตัด (นอก → ขอบบนมน → ใน) ไปตามมุม θ แล้วปิดหัวท้าย
+ * มุม θ = 0 คือแกน +z (ด้านหลังเก้าอี้), y = 0 คือผิวบนของเบาะ
  */
 function curvedBackrest(assets: SceneAssets, radius: number) {
-  return assets.geometry(`backrest:${radius}`, () => {
-    const thickness = 0.035;
-    const height = 0.38;
-    const span = THREE.MathUtils.degToRad(140);
-    const start = -Math.PI / 2 - span / 2;
-    const shape = new THREE.Shape();
-    shape.absarc(0, 0, radius, start, start + span, false);
-    shape.absarc(0, 0, radius - thickness, start + span, start, true);
-    const geometry = new THREE.ExtrudeGeometry(shape, {
-      depth: height,
-      curveSegments: 24,
-      bevelEnabled: true,
-      bevelThickness: 0.008,
-      bevelSize: 0.008,
-      bevelSegments: 2,
-    });
-    geometry.rotateX(-Math.PI / 2);
+  return assets.geometry(`backrest-shell:${radius}`, () => {
+    const thickness = 0.04;
+    const overlap = 0.05; // ห่อขอบเบาะลงมาใต้ผิวบน
+    const peak = 0.42; // ความสูงกลางพนักเหนือเบาะ
+    const sideHeight = 0.07; // ความสูงที่ปลายสองข้าง
+    const lean = 0.05; // เอนออกด้านหลังที่ระดับยอด
+    const halfSpan = THREE.MathUtils.degToRad(100);
+    const rOut = radius + 0.012;
+    const rIn = rOut - thickness;
+    const segments = 48;
+    const capSegments = 8;
+
+    const heightAt = (theta: number) => {
+      const k = Math.min(1, Math.abs(theta) / halfSpan);
+      return sideHeight + (peak - sideHeight) * Math.pow(1 - Math.pow(k, 2.4), 1 / 2.4);
+    };
+    // หน้าตัด (ระยะรัศมี, y): ขึ้นผิวนอก → ขอบบนครึ่งวงกลม → ลงผิวใน
+    const profile = (top: number): Array<[number, number]> => {
+      const capY = top - thickness / 2;
+      const leanAt = (y: number) => (lean * Math.max(0, y)) / peak;
+      const pts: Array<[number, number]> = [
+        [rOut + leanAt(-overlap), -overlap],
+        [rOut + leanAt(capY * 0.5), capY * 0.5],
+      ];
+      const mid = (rOut + rIn) / 2 + leanAt(capY);
+      for (let k = 0; k <= capSegments; k += 1) {
+        const phi = (Math.PI * k) / capSegments;
+        pts.push([mid + (thickness / 2) * Math.cos(phi), capY + (thickness / 2) * Math.sin(phi)]);
+      }
+      pts.push([rIn + leanAt(capY * 0.5), capY * 0.5], [rIn + leanAt(-overlap), -overlap]);
+      return pts;
+    };
+
+    const positions: number[] = [];
+    const indices: number[] = [];
+    const ring = (theta: number) =>
+      profile(heightAt(theta)).map(([r, y]): [number, number, number] => [r * Math.sin(theta), y, r * Math.cos(theta)]);
+    const rings = Array.from({ length: segments + 1 }, (_, i) => ring(-halfSpan + (2 * halfSpan * i) / segments));
+    const perRing = profile(peak).length;
+    for (const pts of rings) for (const p of pts) positions.push(...p);
+    // ผิวรอบตัว (ปิดวงหน้าตัดด้วยขอบล่าง j = perRing-1 → 0)
+    for (let i = 0; i < segments; i += 1) {
+      for (let j = 0; j < perRing; j += 1) {
+        const jn = (j + 1) % perRing;
+        const a = i * perRing + j;
+        const b = (i + 1) * perRing + j;
+        const c = i * perRing + jn;
+        const d = (i + 1) * perRing + jn;
+        indices.push(a, b, c, b, d, c);
+      }
+    }
+    // ฝาปิดหัวท้าย — ใช้ vertex แยกเพื่อให้ normal คมไม่ไปเกลี่ยกับผิวโค้ง
+    const addCap = (pts: Array<[number, number, number]>, flip: boolean) => {
+      const base = positions.length / 3;
+      const center = pts.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1], acc[2] + p[2]], [0, 0, 0]);
+      positions.push(center[0] / perRing, center[1] / perRing, center[2] / perRing);
+      for (const p of pts) positions.push(...p);
+      for (let j = 0; j < perRing; j += 1) {
+        const p = base + 1 + j;
+        const q = base + 1 + ((j + 1) % perRing);
+        if (flip) indices.push(base, q, p);
+        else indices.push(base, p, q);
+      }
+    };
+    addCap(ring(-halfSpan), false);
+    addCap(ring(halfSpan), true);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
     return geometry;
   });
 }
 
 /** ฉากทั้งหมดที่มาจากผัง (พื้น ผนัง ประตู เฟอร์นิเจอร์) — `dispose` คืน GPU memory ของทุกชิ้น */
-function buildLayoutContent(layout: StoreLayout) {
+function buildLayoutContent(layout: StoreLayout, viewRotation: ViewRotation) {
   const assets = new SceneAssets();
   const group = new THREE.Group();
-  createRoom(group, layout, assets);
+  createRoom(group, layout, assets, viewRotation);
   createFurniture(group, layout, assets);
   group.userData.dispose = () => assets.dispose();
   return group;
@@ -314,12 +575,14 @@ function disposeContent(group: THREE.Group | null) {
  * กล้องเงาค่าเริ่มต้นครอบแค่ ±5 ม. รอบ (0,0,0) = มุมร้าน → เงาวัตถุไกลมุมถูกตัดขาด
  * จึงเล็งไฟไปกลางร้าน และขยาย frustum ให้ครอบทั้งร้าน (2–30 ม.) ตามขนาดผัง
  */
-function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout) {
+function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout, viewRotation: ViewRotation) {
   const centerX = layout.width / 2;
   const centerZ = layout.depth / 2;
   const span = Math.hypot(layout.width, layout.depth) / 2 + 1;
   const reach = span / 5;
-  key.position.set(centerX - 4 * reach, 8 * reach, centerZ + 5 * reach);
+  // ไฟส่องจากซ้าย-หน้าของมุมมองเสมอ → เงาตกทิศเดิมบนจอไม่ว่าจะหมุนไปด้านไหน
+  const light = vectorFromView({ x: -4, y: 5 }, viewRotation);
+  key.position.set(centerX + light.x * reach, 8 * reach, centerZ + light.y * reach);
   key.target.position.set(centerX, 0, centerZ);
   key.target.updateMatrixWorld();
   const shadowCamera = key.shadow.camera;
@@ -335,13 +598,15 @@ function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout) {
 /**
  * Orthographic isometric: ระยะเยื้องแกน X/Y/Z ต้องเท่ากัน จึงได้ azimuth 45° และ elevation 35.264°
  * แล้วฉายมุมห้อง (พื้น + ยอดผนัง) ลงพิกัดกล้อง ขยายด้านที่ขาดให้ตรงสัดส่วนจอ — เต็มจอทั้งแนวตั้งและแนวนอน
+ * กล้องอยู่มุม "ล่างขวา" ของมุมมองเสมอ (rotation 0 = มุมตะวันออกเฉียงใต้) — หมุนมุมมองแล้วกล้องย้ายมุมตาม
  */
-function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, width: number, height: number) {
+function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, viewRotation: ViewRotation, width: number, height: number) {
   const aspect = width / height;
   const targetX = layout.width / 2;
   const targetZ = layout.depth / 2;
   const isoDistance = Math.max(layout.width, layout.depth) * 1.6 + 1;
-  camera.position.set(targetX + isoDistance, CAMERA_TARGET_Y + isoDistance, targetZ + isoDistance);
+  const toward = vectorFromView({ x: 1, y: 1 }, viewRotation);
+  camera.position.set(targetX + toward.x * isoDistance, CAMERA_TARGET_Y + isoDistance, targetZ + toward.y * isoDistance);
   camera.lookAt(targetX, CAMERA_TARGET_Y, targetZ);
   camera.updateMatrixWorld();
 
@@ -376,7 +641,7 @@ function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, width:
 const animationFor = (state: number): CustomerAnimation => (state === AGENT_STATE_SEATED ? "Sit" : "Walk");
 
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
-export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps) {
+export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable }: ThreeViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Stage | null>(null);
   // อ่านค่าล่าสุดใน render loop โดยไม่ต้องสร้าง renderer ใหม่เมื่อค่าเปลี่ยน
@@ -424,6 +689,7 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
     const controller = getSimulationController();
     let modelTemplate: THREE.Object3D | null = null;
     let clips: THREE.AnimationClip[] = [];
+    let walkSpeed = 0.44;
     let frame = 0;
     let disposed = false;
 
@@ -452,28 +718,44 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
       if (!modelTemplate || !current) return;
       const liveIds = new Set<number>();
       const { agents } = current;
+      const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
       for (let offset = 0; offset < agents.length; offset += AGENT_STRIDE) {
         const id = agents[offset]!;
         const x = agents[offset + 1]!;
         const z = agents[offset + 2]!;
-        const animation = animationFor(agents[offset + 3]!);
+        const state = agents[offset + 3]!;
+        const animation = animationFor(state);
+        const seatedChair = state === AGENT_STATE_SEATED
+          ? chairs.reduce<(typeof chairs)[number] | null>((nearest, chair) => {
+              const center = objectCenter(chair);
+              const currentDistance = (center.x - x) ** 2 + (center.y - z) ** 2;
+              if (!nearest) return chair;
+              const nearestCenter = objectCenter(nearest);
+              const nearestDistance = (nearestCenter.x - x) ** 2 + (nearestCenter.y - z) ** 2;
+              return currentDistance < nearestDistance ? chair : nearest;
+            }, null)
+          : null;
+        const chairRotation = seatedChair ? THREE.MathUtils.degToRad(seatedChair.rotation) : 0;
+        const targetX = x + (seatedChair ? Math.sin(chairRotation) * SEATED_FRONT_OFFSET : 0);
+        const targetZ = z - (seatedChair ? Math.cos(chairRotation) * SEATED_FRONT_OFFSET : 0);
         liveIds.add(id);
 
         let customer = customers.get(id);
         if (!customer) {
           // SkinnedMesh ต้อง clone ผ่าน SkeletonUtils ให้แต่ละตัวมีโครงกระดูกของตัวเอง
           const model = cloneSkinned(modelTemplate);
-          model.position.set(x, 0, z);
+          model.position.set(targetX, 0, targetZ);
           model.scale.setScalar(CUSTOMER_SCALE);
           scene.add(model);
-          customer = { mixer: new THREE.AnimationMixer(model), model, target: new THREE.Vector3(x, 0, z), animation };
+          customer = { mixer: new THREE.AnimationMixer(model), model, target: new THREE.Vector3(targetX, 0, targetZ), animation, targetRotation: 0 };
           playClip(customer, animation);
           customers.set(id, customer);
         }
-        const dx = x - customer.target.x;
-        const dz = z - customer.target.z;
-        if (dx * dx + dz * dz > 0.0001) customer.model.rotation.y = Math.atan2(dx, dz);
-        customer.target.set(x, 0, z);
+        const dx = targetX - customer.target.x;
+        const dz = targetZ - customer.target.z;
+        if (dx * dx + dz * dz > 0.0001) customer.targetRotation = Math.atan2(dx, dz);
+        if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
+        customer.target.set(targetX, 0, targetZ);
         if (animation !== customer.animation) {
           customer.mixer.stopAllAction();
           playClip(customer, animation);
@@ -494,8 +776,14 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
       for (const customer of customers.values()) {
-        customer.mixer.update(delta);
+        const beforeX = customer.model.position.x;
+        const beforeZ = customer.model.position.z;
         if (simulating) customer.model.position.lerp(customer.target, blend);
+        const distance = Math.hypot(customer.model.position.x - beforeX, customer.model.position.z - beforeZ);
+        const turn = customer.targetRotation - customer.model.rotation.y;
+        customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+        // Advance the walk by distance travelled, including simulation speed changes.
+        customer.mixer.update(customer.animation === "Walk" ? distance / walkSpeed : delta);
       }
       renderer.render(scene, camera);
       if (simulating || customers.size > 0) {
@@ -514,13 +802,13 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
       const width = Math.max(1, host.clientWidth);
       const height = Math.max(1, host.clientHeight);
       renderer.setSize(width, height, false);
-      if (stage.layout) fitCamera(camera, stage.layout, width, height);
+      if (stage.layout) fitCamera(camera, stage.layout, stage.viewRotation, width, height);
       camera.zoom = zoomRef.current;
       camera.updateProjectionMatrix();
       // วาดทันที (ไม่รอ rAF) เพื่อไม่ให้ canvas ว่างกระพริบหลังเปลี่ยนขนาด
       renderer.render(scene, camera);
     };
-    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, invalidate, resize, clearCustomers };
+    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers };
     stageRef.current = stage;
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -535,6 +823,9 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
         });
         modelTemplate = gltf.scene;
         clips = gltf.animations;
+        const walkClip = THREE.AnimationClip.findByName(clips, "Walk");
+        const stride = modelTemplate.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
+        if (walkClip && typeof stride === "number" && stride > 0) walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
         invalidate();
       },
       undefined,
@@ -562,25 +853,27 @@ export function ThreeView({ layout, zoom, isSim, onUnavailable }: ThreeViewProps
     };
   }, [onUnavailable]);
 
-  // ผังเปลี่ยน → สร้างเฉพาะเนื้อหาฉากใหม่ และคืน GPU memory ของชุดเดิม
+  // ผัง/มุมมองเปลี่ยน → สร้างเฉพาะเนื้อหาฉากใหม่ (ผนังตามด้านที่ไกลกล้อง) และคืน GPU memory ของชุดเดิม
   React.useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    const content = buildLayoutContent(layout);
+    const content = buildLayoutContent(layout, viewRotation);
     if (stage.content) {
       stage.scene.remove(stage.content);
       disposeContent(stage.content);
     }
     stage.scene.add(content);
     stage.content = content;
-    const sizeChanged = stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth;
+    const sizeChanged =
+      stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth || stage.viewRotation !== viewRotation;
     stage.layout = layout;
+    stage.viewRotation = viewRotation;
     if (sizeChanged) {
-      fitKeyLight(stage.key, layout);
+      fitKeyLight(stage.key, layout, viewRotation);
       stage.resize();
     }
     stage.invalidate();
-  }, [layout]);
+  }, [layout, viewRotation]);
 
   React.useEffect(() => {
     isSimRef.current = isSim;

@@ -137,7 +137,7 @@ describe("GET / PUT / DELETE /api/layouts/[id]", () => {
   it("PUT ผัง Blocked → 422 และข้อมูลเดิมไม่เปลี่ยน", async () => {
     const layout = cafeLayout();
     await handlers.create(post({ layout }));
-    const res = await handlers.update(put(layout.id, { layout: withoutType(layout, "kitchen") }), layout.id);
+    const res = await handlers.update(put(layout.id, { layout: { ...layout, kitchenDoor: null } }), layout.id);
     expect(res.status).toBe(422);
     expect((await (await handlers.get(get(layout.id), layout.id)).json()).layout).toEqual(layout);
   });

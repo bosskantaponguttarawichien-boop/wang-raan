@@ -81,7 +81,7 @@ describe("P2 Gate ใน SimulationController", () => {
   });
 
   it("ผัง Blocked → ไม่ส่งอะไรไป Worker เลย และแจ้งเหตุผล", async () => {
-    const { fake, sim, controller } = setup(withoutType(cafeLayout(), "kitchen"));
+    const { fake, sim, controller } = setup({ ...cafeLayout(), kitchenDoor: null });
     disposers.push(() => controller.dispose());
     const result = await controller.start();
     expect(result).toEqual({ ok: false, reason: "ผังยังไม่ผ่านกฎจำเป็น 1 ข้อ จึงเริ่มจำลองไม่ได้" });
@@ -155,8 +155,7 @@ describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () =
     render(<Panel />);
     const button = screen.getByTestId("start-simulation");
     expect(button).toHaveAttribute("aria-disabled", "false");
-    const kitchen = layoutStore.getState().layout.objects.find((o) => o.type === "kitchen")!;
-    act(() => layoutStore.getState().deleteObject(kitchen.id));
+    act(() => layoutStore.getState().removeKitchenDoor());
     expect(screen.getByTestId("start-simulation")).toHaveAttribute("aria-disabled", "true");
   });
 
@@ -171,7 +170,7 @@ describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () =
 
   it("Blocked แล้วคลิกหรือกด Enter ก็ไม่เริ่ม และเรียก toast เตือน (PRD §9 ข้อ 9)", async () => {
     const user = userEvent.setup();
-    layoutStore.getState().loadLayout(withoutType(cafeLayout(), "kitchen"));
+    layoutStore.getState().loadLayout({ ...cafeLayout(), kitchenDoor: null });
     const start = vi.spyOn(SimulationController.prototype, "start");
     const onToast = vi.fn();
     const onFocus = vi.fn();

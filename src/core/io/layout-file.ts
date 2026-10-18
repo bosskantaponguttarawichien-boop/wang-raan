@@ -10,15 +10,17 @@
  *   - เก้าอี้สังกัดโต๊ะตาม `tableId`; ถ้าไม่มี `tableId` แต่อยู่ใน `chairIds` ของโต๊ะเดียว → ใช้โต๊ะนั้น
  *   - `chairIds` ของโต๊ะคำนวณใหม่จากเก้าอี้ที่สังกัดจริง (ห้ามมีเก้าอี้หลายโต๊ะ / id ค้าง)
  *   - เก้าอี้ที่หาโต๊ะไม่ได้ถูกตัดทิ้ง (ห้ามเกิด Orphan Chair) และแจ้งในรายการหมายเหตุ
- *   - พิกัดลงกริด 0.25 ม. (เก้าอี้ขยับตามโต๊ะ), ขนาดครัว/เคาน์เตอร์ลงทีละ 0.05 ม.
+ *   - พิกัดลงกริด 0.25 ม. (เก้าอี้ขยับตามโต๊ะ), ขนาดเคาน์เตอร์ลงทีละ 0.05 ม.
+ *   - ไฟล์รุ่นก่อนที่มีกล่องครัว (`type: "kitchen"`) → แปลงเป็นประตูครัวบนผนังที่ใกล้ที่สุด
  *   - ได้ id ผังใหม่เสมอ (นำเข้า = เอกสารใหม่)
  *   - ผลตรวจในไฟล์ไม่ถูกเชื่อถือ — ผู้เรียกต้องตรวจผังใหม่เอง
  */
 import { z } from "zod";
-import { ENTRANCE_DEFAULT_WIDTH, OBJECT_MIN_SIZE, ROOM_MAX, ROOM_MIN, SIZE_STEP } from "../layout/constants";
-import { createEntrance } from "../layout/entities";
+import { ENTRANCE_DEFAULT_WIDTH, KITCHEN_DOOR_DEFAULT_WIDTH, OBJECT_MIN_SIZE, ROOM_MAX, ROOM_MIN, SIZE_STEP } from "../layout/constants";
+import { createEntrance, createKitchenDoor } from "../layout/entities";
+import { kitchenDoorFromLegacy } from "../layout/migrate";
 import { clampRoomDimension, normalizeRotation, roundMeters, snapToGrid } from "../layout/geometry";
-import type { IdFactory, LayoutObject, StoreLayout, ValidationResult } from "../layout/types";
+import type { IdFactory, LayoutObject, Meters, Rotation, StoreLayout, ValidationResult } from "../layout/types";
 import { OBJECT_LABEL } from "../validation/issues";
 import { StoreLayoutSchema, ValidationResultSchema } from "../validation/layout.schema";
 
@@ -52,8 +54,9 @@ export function layoutFileName(layout: Pick<StoreLayout, "width" | "depth">, at:
 const Num = z.number().finite();
 const LooseObject = z.object({
   id: z.string().min(1).max(128).optional(),
+  // "kitchen" = ไฟล์รุ่นก่อน (กล่องครัว) — แปลงเป็นประตูครัวตอนนำเข้า
   type: z.enum(["kitchen", "counter", "table", "chair"], {
-    errorMap: () => ({ message: "ชนิดวัตถุต้องเป็น kitchen, counter, table หรือ chair (V1 ไม่มี shelf)" }),
+    errorMap: () => ({ message: "ชนิดวัตถุต้องเป็น counter, table หรือ chair (V1 ไม่มี shelf; ครัวใช้ kitchenDoor)" }),
   }),
   x: Num,
   y: Num,
@@ -65,21 +68,24 @@ const LooseObject = z.object({
   tableId: z.string().optional(),
 });
 
+const LooseDoor = z
+  .object({
+    id: z.string().min(1).max(128).optional(),
+    wall: z.enum(["north", "south", "east", "west"]),
+    position: Num,
+    width: Num.optional(),
+  })
+  .nullable()
+  .optional();
+
 const LooseLayout = z.object({
   id: z.string().min(1).max(128).optional(),
   version: z.number().int().positive().optional(),
   units: z.literal("m", { errorMap: () => ({ message: "หน่วยต้องเป็นเมตร (\"m\")" }) }).optional(),
   width: Num.min(ROOM_MIN, `ขนาดร้านอย่างน้อย ${ROOM_MIN} ม.`).max(ROOM_MAX, `ขนาดร้านไม่เกิน ${ROOM_MAX} ม.`),
   depth: Num.min(ROOM_MIN, `ขนาดร้านอย่างน้อย ${ROOM_MIN} ม.`).max(ROOM_MAX, `ขนาดร้านไม่เกิน ${ROOM_MAX} ม.`),
-  entrance: z
-    .object({
-      id: z.string().min(1).max(128).optional(),
-      wall: z.enum(["north", "south", "east", "west"]),
-      position: Num,
-      width: Num.optional(),
-    })
-    .nullable()
-    .optional(),
+  entrance: LooseDoor,
+  kitchenDoor: LooseDoor,
   objects: z.array(LooseObject).max(1000, "วัตถุเกิน 1,000 ชิ้น"),
 });
 
@@ -136,7 +142,8 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
 
   const parsed = LooseLayout.safeParse(rawLayout);
   if (!parsed.success) return fail(...zodMessages(parsed.error, source === "contract" ? "layout" : ""));
-  const raw = parsed.data;
+  const legacyKitchens = parsed.data.objects.filter((o) => o.type === "kitchen");
+  const raw = { ...parsed.data, objects: parsed.data.objects.filter(isFloorObject) };
   const notes: string[] = [];
 
   // ── ขนาดร้าน ──
@@ -149,7 +156,7 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
 
   // ── id: ห้ามซ้ำ (ทำให้ความสัมพันธ์โต๊ะ-เก้าอี้กำกวม) ──
   const seen = new Set<string>();
-  for (const obj of raw.objects) {
+  for (const obj of [...raw.objects, ...legacyKitchens]) {
     if (!obj.id) continue;
     if (seen.has(obj.id)) return fail(`id ซ้ำ: ${obj.id} — ไม่สามารถสร้างความสัมพันธ์โต๊ะ-เก้าอี้ได้`);
     seen.add(obj.id);
@@ -196,8 +203,8 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
     tableShift.set(table.id, { dx: roundMeters(snapToGrid(table.x) - table.x), dy: roundMeters(snapToGrid(table.y) - table.y) });
   }
   const sizeOf = (obj: LooseObject, v: number) =>
-    // ครัว/เคาน์เตอร์ปรับขนาดทีละ 0.05 ม. เหมือนใน Editor; โต๊ะ/เก้าอี้คงขนาดตาม preset
-    obj.type === "kitchen" || obj.type === "counter" ? Math.min(ROOM_MAX, Math.max(OBJECT_MIN_SIZE, snapToGrid(v, SIZE_STEP))) : roundMeters(v);
+    // เคาน์เตอร์ปรับขนาดทีละ 0.05 ม. เหมือนใน Editor; โต๊ะ/เก้าอี้คงขนาดตาม preset
+    obj.type === "counter" ? Math.min(ROOM_MAX, Math.max(OBJECT_MIN_SIZE, snapToGrid(v, SIZE_STEP))) : roundMeters(v);
 
   let fixedChairIds = 0;
   let snapped = 0;
@@ -235,6 +242,33 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
     notes.push("ไฟล์ไม่มีทางเข้า — ต้องกำหนดทางเข้าก่อนจำลอง");
   }
 
+  // ── ประตูครัว (ครัวเป็นห้องแยก) ──
+  let kitchenDoor: StoreLayout["kitchenDoor"] = null;
+  if (raw.kitchenDoor) {
+    const k = raw.kitchenDoor;
+    const doorId = k.id ?? newId("kitchen-door");
+    kitchenDoor = createKitchenDoor(room, { wall: k.wall, position: k.position, width: k.width ?? KITCHEN_DOOR_DEFAULT_WIDTH }, () => doorId);
+    if (kitchenDoor.position !== k.position || kitchenDoor.width !== (k.width ?? KITCHEN_DOOR_DEFAULT_WIDTH)) {
+      notes.push("ปรับตำแหน่ง/ความกว้างประตูครัวให้อยู่บนผนังและลงกริด");
+    }
+  } else if (legacyKitchens[0]) {
+    const k = legacyKitchens[0];
+    kitchenDoor = kitchenDoorFromLegacy(
+      room,
+      { id: k.id ?? newId("kitchen-door"), x: k.x, y: k.y, width: k.width, depth: k.depth, rotation: normalizeRotation(k.rotation ?? 0) },
+      entrance,
+    );
+  } else {
+    notes.push("ไฟล์ไม่มีประตูครัว — ต้องเพิ่มประตูครัวก่อนจำลอง");
+  }
+  if (legacyKitchens.length > 0) {
+    notes.push(
+      kitchenDoor
+        ? `ครัวเป็นห้องแยกแล้ว — แปลงกล่องครัวเป็นประตูครัวบนผนัง${legacyKitchens.length > 1 ? ` (ใช้ชิ้นแรกจาก ${legacyKitchens.length} ชิ้น)` : ""}`
+        : "ครัวเป็นห้องแยกแล้ว — เอากล่องครัวออก แต่ไม่มีผนังว่างพอวางประตูครัว",
+    );
+  }
+
   const layout: StoreLayout = {
     // ผังที่นำเข้าเป็นเอกสารใหม่เสมอ: id ใหม่ → ไม่ชนกับผังเดิม (ของตนเองหรือของคนที่ส่งไฟล์มา) ตอนบันทึก
     id: newId("layout"),
@@ -243,6 +277,7 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
     width,
     depth,
     entrance,
+    kitchenDoor,
     objects,
   };
   const check = StoreLayoutSchema.safeParse(layout);
@@ -250,9 +285,15 @@ export function importLayoutFile(text: string, newId: IdFactory): LayoutImportRe
   return { ok: true, layout, source, notes, fileValidation };
 }
 
+type FloorObject = LooseObject & { type: LayoutObject["type"] };
+
+function isFloorObject(obj: LooseObject): obj is FloorObject {
+  return obj.type !== "kitchen";
+}
+
 function buildObject(
-  obj: LooseObject & { id: string },
-  base: Omit<LayoutObject, "type" | "chairIds" | "tableId" | "preset">,
+  obj: FloorObject & { id: string },
+  base: { id: string; x: Meters; y: Meters; width: Meters; depth: Meters; rotation: Rotation },
   chairsOf: (tableId: string, given: string[] | undefined) => string[],
   ownerOf: Map<string, string>,
   onFixed: () => void,
@@ -266,7 +307,7 @@ function buildObject(
     }
     case "chair":
       return { ...base, type: "chair", tableId: ownerOf.get(obj.id)! };
-    default:
-      return { ...base, type: obj.type };
+    case "counter":
+      return { ...base, type: "counter" };
   }
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { validateLayout } from "@/core/validation";
-import { block, cafeLayout, withoutType } from "@/test/fixtures/layouts";
+import { block, cafeLayout } from "@/test/fixtures/layouts";
 import { CELL_BLOCKED, CELL_FREE, buildOccupancyGrid, handleWorkerMessage } from "./index";
 
 describe("Occupancy Grid 0.25 ม.", () => {
@@ -78,7 +78,7 @@ describe("Worker runtime (postMessage protocol)", () => {
   });
 
   it("ผัง Blocked → BLOCKED (แม้ UI จะส่งผลตรวจปลอมว่า ready)", () => {
-    const broken = withoutType(layout, "kitchen");
+    const broken = { ...layout, kitchenDoor: null };
     const honest = validateLayout(broken);
     const forged = { ...honest, status: "ready" as const, issues: [] };
     for (const v of [honest, forged]) {

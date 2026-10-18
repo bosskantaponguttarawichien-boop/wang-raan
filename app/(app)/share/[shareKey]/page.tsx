@@ -65,7 +65,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (isNotice(shared)) return { title: NOTICE[shared].title, robots: { index: false, follow: false } };
   const s = summarizeLayout(shared.layout, shared.validation);
   const title = `ผังร้าน ${s.width} × ${s.depth} เมตร · ${s.seats} ที่นั่ง`;
-  const description = `ผังร้านที่จัดด้วยวางร้าน — ครัว ${s.counts.kitchen} · เคาน์เตอร์ ${s.counts.counter} · ชุดโต๊ะ ${s.counts.table}`;
+  const kitchenPart = s.counts.kitchen ? "มีประตูครัว" : "ไม่มีประตูครัว";
+  const description = `ผังร้านที่จัดด้วยวางร้าน — ${kitchenPart} · เคาน์เตอร์ ${s.counts.counter} · ชุดโต๊ะ ${s.counts.table}`;
   return {
     metadataBase: await siteOrigin(),
     title,
@@ -124,7 +125,7 @@ export default async function SharePage({ params }: Props) {
     ["ขนาดร้าน", `${fmt(summary.width)} × ${fmt(summary.depth)} ม. (${fmt(summary.area)} ตร.ม.)`],
     ["ที่นั่ง", `${summary.seats} ที่นั่ง`],
     ["ชุดโต๊ะ", `${summary.counts.table} ชุด`],
-    ["ครัว / เคาน์เตอร์", `${summary.counts.kitchen} / ${summary.counts.counter}`],
+    ["ประตูครัว / เคาน์เตอร์", `${summary.counts.kitchen ? "มี" : "ไม่มี"} / ${summary.counts.counter} ตัว`],
     ["พื้นที่ต่อที่นั่ง", summary.areaPerSeat === null ? "—" : `${fmt(summary.areaPerSeat)} ตร.ม.`],
   ];
 

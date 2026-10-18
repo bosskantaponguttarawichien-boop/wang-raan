@@ -26,13 +26,13 @@ export default async function OpengraphImage({ params }: { params: Promise<{ sha
       size,
     );
   }
-  const { layout, validation } = shared;
-  const s = summarizeLayout(layout, validation);
+  const layout = shared.layout;
+  const s = summarizeLayout(layout, shared.validation);
   // พื้นที่วาดผัง 620 × 520 px รักษาสัดส่วนจริง
   const scale = Math.min(620 / layout.width, 520 / layout.depth);
   const planW = layout.width * scale;
   const planH = layout.depth * scale;
-  const order = { kitchen: 0, counter: 1, table: 2, chair: 3 } as const;
+  const order = { counter: 0, table: 1, chair: 2 } as const;
   const objects = [...layout.objects].sort((a, b) => order[a.type] - order[b.type]);
 
   return new ImageResponse(

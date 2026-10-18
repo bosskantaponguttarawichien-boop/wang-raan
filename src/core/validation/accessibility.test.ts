@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { footprint, type StoreLayout } from "@/core/layout";
-import { TARGETS, block, cafeLayout, corridor, withObjects } from "@/test/fixtures/layouts";
-import { analyzeRoutes, checkAccessibility, computeServicePoints, issueCode, pointToRectDistance } from "./index";
+import { KITCHEN_DOOR_TARGET, TARGETS, block, cafeLayout, corridor, withObjects } from "@/test/fixtures/layouts";
+import { analyzeRoutes, checkAccessibility, computeServicePoints, doorRect, issueCode, pointToRectDistance } from "./index";
 
 const codes = (layout: StoreLayout) => checkAccessibility(layout).map(issueCode);
 
@@ -13,7 +13,6 @@ describe("Accessibility (PRD §5.6)", () => {
   it.each([
     ["chair", "ลูกค้าเดินจากทางเข้าไปถึงเก้าอี้ตัวนี้ไม่ได้"],
     ["table", "พนักงานเข้าถึงจุดบริการของโต๊ะนี้ไม่ได้"],
-    ["kitchen", "พนักงานเข้าถึงครัวไม่ได้"],
     ["counter", "พนักงานเข้าถึงเคาน์เตอร์ไม่ได้"],
   ] as const)("ทางเดินตัน (ช่อง 0.50 ม.) → %s เข้าไม่ถึง Blocked", (type, message) => {
     expect(checkAccessibility(corridor(0.5, TARGETS[type]))).toEqual([
@@ -27,8 +26,24 @@ describe("Accessibility (PRD §5.6)", () => {
     ]);
   });
 
-  it.each(["chair", "table", "kitchen", "counter"] as const)("ช่อง 0.60 ม. → %s ยังเข้าถึงได้", (type) => {
+  it("ทางเดินตัน (ช่อง 0.50 ม.) → ประตูครัว เข้าไม่ถึง Blocked", () => {
+    expect(checkAccessibility(corridor(0.5, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual([
+      {
+        id: "accessibility/unreachable-kitchen/target",
+        category: "accessibility",
+        severity: "blocked",
+        objectIds: ["target"],
+        message: "พนักงานเดินจากทางเข้าไปประตูครัวไม่ได้",
+      },
+    ]);
+  });
+
+  it.each(["chair", "table", "counter"] as const)("ช่อง 0.60 ม. → %s ยังเข้าถึงได้", (type) => {
     expect(codes(corridor(0.6, TARGETS[type]))).toEqual([]);
+  });
+
+  it("ช่อง 0.60 ม. → ประตูครัว ยังเข้าถึงได้", () => {
+    expect(codes(corridor(0.6, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual([]);
   });
 
   it("ทางเดินปิดสนิท (ไม่มีช่อง) → เข้าไม่ถึง", () => {
@@ -46,6 +61,11 @@ describe("Accessibility (PRD §5.6)", () => {
     const base = corridor(2, TARGETS.counter);
     const layout = { ...base, entrance: { ...base.entrance!, position: 3.5 } };
     expect(codes(layout)).toEqual(["entrance-off-wall"]);
+  });
+
+  it("ประตูครัวยื่นเลยแนวผนัง → Blocked", () => {
+    const base = corridor(2, null, 1.2, { id: "target", wall: "east", position: 3.5, width: 0.9 });
+    expect(codes(base)).toEqual(["kitchen-door-off-wall"]);
   });
 
   it("เก้าอี้ที่ถูกล้อมด้วยโต๊ะและครัว → ลูกค้าเข้าไม่ถึง (ใช้มุมหมุนจริง)", () => {
@@ -73,10 +93,14 @@ describe("Service Points", () => {
     const points = computeServicePoints(layout);
     expect(points.map((p) => p.type).sort()).toEqual(["counter", "kitchen", "table", "table"]);
     for (const sp of points) {
-      const obj = layout.objects.find((o) => o.id === sp.objectId)!;
       expect(sp.point).not.toBeNull();
       expect(sp.candidates).toBeGreaterThan(0);
-      expect(pointToRectDistance(sp.point!, footprint(obj))).toBeLessThanOrEqual(0.35 + 1e-9);
+      const rect =
+        sp.type === "kitchen"
+          ? doorRect(layout, layout.kitchenDoor!)
+          : footprint(layout.objects.find((o) => o.id === sp.objectId)!);
+      expect(rect).not.toBeNull();
+      expect(pointToRectDistance(sp.point!, rect!)).toBeLessThanOrEqual(0.35 + 1e-9);
     }
   });
 

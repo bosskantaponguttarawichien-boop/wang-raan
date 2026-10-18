@@ -47,6 +47,7 @@ export function getObjectName(
   const obj = typeof objOrId === "string" ? layout?.objects.find((o) => o.id === objOrId) : objOrId;
   if (!obj) {
     if (typeof objOrId === "string" && layout?.entrance?.id === objOrId) return "ทางเข้าร้าน";
+    if (typeof objOrId === "string" && layout?.kitchenDoor?.id === objOrId) return "ประตูครัว";
     return "ชิ้นงาน";
   }
 
@@ -62,8 +63,6 @@ export function getObjectName(
     }
     case "counter":
       return "เคาน์เตอร์";
-    case "kitchen":
-      return "ครัว";
     default:
       return "ชิ้นงาน";
   }
@@ -105,9 +104,9 @@ export function formatIssueHuman(
       };
     case "missing-kitchen":
       return {
-        title: "ยังไม่มีครัว",
-        hint: "เพิ่มครัวจากแท็บ 'เพิ่ม' เพื่อใช้จัดเตรียมอาหาร",
-        targetLabel: "ครัว",
+        title: "ยังไม่มีประตูครัว",
+        hint: "เพิ่มประตูครัวจากแท็บ 'เพิ่ม' หรือแท็บ 'ร้าน' แล้วเลือกผนังที่ต่อกับห้องครัว",
+        targetLabel: "ประตูครัว",
       };
     case "missing-counter":
       return {
@@ -237,9 +236,21 @@ export function formatIssueHuman(
       };
     case "unreachable-kitchen":
       return {
-        title: "เดินไปไม่ถึงครัว",
-        hint: "พนักงานเดินเข้าครัวไม่ได้ มีสิ่งกีดขวางทางเดิน",
-        targetLabel: "ครัว",
+        title: "เดินไปไม่ถึงประตูครัว",
+        hint: "พนักงานเดินจากทางเข้าไปหน้าประตูครัวไม่ได้ ย้ายของที่ขวางหน้าประตู หรือย้ายประตูครัว",
+        targetLabel: "ประตูครัว",
+      };
+    case "kitchen-door-off-wall":
+      return {
+        title: "ประตูครัวเลยแนวผนัง",
+        hint: "ปรับตำแหน่งหรือความกว้างประตูครัวในแท็บ 'ร้าน' ให้อยู่บนผนัง",
+        targetLabel: "ประตูครัว",
+      };
+    case "kitchen-door-overlaps-entrance":
+      return {
+        title: "ประตูครัวทับทางเข้าร้าน",
+        hint: "ลากประตูครัวไปตำแหน่งอื่นบนผนัง หรือย้ายไปผนังอื่น",
+        targetLabel: "ประตูครัว",
       };
     case "unreachable-counter":
       return {

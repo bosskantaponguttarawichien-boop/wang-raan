@@ -8,7 +8,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { ENTRANCE_DEFAULT_WIDTH, type Wall } from "@/core/layout";
+import { ENTRANCE_DEFAULT_WIDTH, KITCHEN_DOOR_DEFAULT_WIDTH, type Wall } from "@/core/layout";
 import { WALL_LABEL } from "@/components/editor-2d/stage-math";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
 import { cn } from "@/lib/cn";
@@ -24,13 +24,18 @@ function currentValues(): RoomSettingsValues {
     entranceWall: layout.entrance?.wall ?? "south",
     entrancePosition: layout.entrance?.position ?? 0,
     entranceWidth: layout.entrance?.width ?? ENTRANCE_DEFAULT_WIDTH,
+    hasKitchenDoor: layout.kitchenDoor !== null,
+    kitchenDoorWall: layout.kitchenDoor?.wall ?? "north",
+    kitchenDoorPosition: layout.kitchenDoor?.position ?? 0,
+    kitchenDoorWidth: layout.kitchenDoor?.width ?? KITCHEN_DOOR_DEFAULT_WIDTH,
   };
 }
 
-/** สร้างฟอร์มใหม่เมื่อค่าใน store เปลี่ยนจากที่อื่น (ลากทางเข้า, Undo) เพื่อให้ค่าเริ่มต้นตรงกับผังจริง */
+/** สร้างฟอร์มใหม่เมื่อค่าใน store เปลี่ยนจากที่อื่น (ลากทางเข้า, ประตูครัว, Undo) เพื่อให้ค่าเริ่มต้นตรงกับผังจริง */
 export function RoomSettingsForm() {
   const signature = useLayoutStore(
-    (s) => `${s.layout.width}|${s.layout.depth}|${s.layout.entrance?.wall}|${s.layout.entrance?.position}|${s.layout.entrance?.width}`,
+    (s) =>
+      `${s.layout.width}|${s.layout.depth}|${s.layout.entrance?.wall}|${s.layout.entrance?.position}|${s.layout.entrance?.width}|${s.layout.kitchenDoor?.wall}|${s.layout.kitchenDoor?.position}|${s.layout.kitchenDoor?.width}`,
   );
   return <RoomSettingsFormInner key={signature} />;
 }
@@ -55,22 +60,41 @@ function RoomSettingsFormInner() {
   const dirty = (name: keyof RoomSettingsValues) => form.getFieldState(name).isDirty;
   const onSubmit = (values: RoomSettingsValues) => {
     const store = layoutStore.getState();
-    // ขนาดร้าน + ทางเข้า = Undo ขั้นเดียว
+    // ขนาดร้าน + ทางเข้า + ประตูครัว = Undo ขั้นเดียว
     store.beginInteraction();
     store.setRoomDimensions(values.width, values.depth);
     // แตะทางเข้าเฉพาะเมื่อผู้ใช้แก้ช่องทางเข้า — ผังที่ยังไม่มีทางเข้าต้องไม่ได้ทางเข้าโผล่มาเองตอนปรับขนาดร้าน
     if (dirty("entranceWall") || dirty("entrancePosition") || dirty("entranceWidth")) {
       store.setEntrance({ wall: values.entranceWall, position: values.entrancePosition, width: values.entranceWidth });
     }
+    if (values.hasKitchenDoor && (dirty("kitchenDoorWall") || dirty("kitchenDoorPosition") || dirty("kitchenDoorWidth"))) {
+      store.setKitchenDoor({
+        wall: values.kitchenDoorWall,
+        position: values.kitchenDoorPosition,
+        width: values.kitchenDoorWidth,
+      });
+    }
     store.endInteraction();
   };
 
   const numberProps = { type: "number", inputMode: "decimal" as const, step: 0.25, className: inputClass };
+  const hasKitchen = form.watch("hasKitchenDoor");
 
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      {...autoApplyProps(handleSubmit(onSubmit), () => (["width", "depth", "entranceWall", "entrancePosition", "entranceWidth"] as const).some(dirty))}
+      {...autoApplyProps(handleSubmit(onSubmit), () =>
+        ([
+          "width",
+          "depth",
+          "entranceWall",
+          "entrancePosition",
+          "entranceWidth",
+          "kitchenDoorWall",
+          "kitchenDoorPosition",
+          "kitchenDoorWidth",
+        ] as const).some(dirty),
+      )}
       noValidate
       aria-label="ขนาดร้านและทางเข้า"
       data-testid="room-settings-form"
@@ -135,9 +159,89 @@ function RoomSettingsFormInner() {
         <Field id={`${formId}-ew`} label="ประตูกว้าง (ม.)" error={errors.entranceWidth?.message}>
           {(aria) => <input {...aria} {...numberProps} min={0.6} max={3} step={0.05} {...register("entranceWidth", { valueAsNumber: true })} />}
         </Field>
+
+        {/* ประตูครัว (feat-085) */}
+        <div className="col-span-2 mt-2 border-t border-line pt-3">
+          <div className="mb-2 flex items-center justify-between">
+            <h3 className="m-0 text-[13px] font-semibold text-ink">ประตูครัว</h3>
+            {hasKitchen ? (
+              <button
+                type="button"
+                onClick={() => {
+                  layoutStore.getState().removeKitchenDoor();
+                }}
+                className="text-[12px] font-medium text-red hover:underline focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+              >
+                ลบประตูครัว
+              </button>
+            ) : null}
+          </div>
+
+          {!hasKitchen ? (
+            <button
+              type="button"
+              onClick={() => {
+                layoutStore.getState().addKitchenDoor();
+              }}
+              className="flex w-full items-center justify-center gap-1.5 rounded-[8px] border border-dashed border-[#8ba3c7] py-2 text-[12.5px] font-medium text-blue hover:bg-surface focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus"
+            >
+              + เพิ่มประตูครัว
+            </button>
+          ) : (
+            <div className="grid grid-cols-2 gap-x-2 gap-y-3">
+              <Field id={`${formId}-kwall`} label="ผนังประตูครัว" className="col-span-2" error={errors.kitchenDoorWall?.message}>
+                {(aria) => {
+                  const currentWall = form.watch("kitchenDoorWall");
+                  return (
+                    <div>
+                      <select {...aria} className="sr-only" {...register("kitchenDoorWall")}>
+                        {(Object.keys(WALL_LABEL) as Wall[]).map((wall) => (
+                          <option key={wall} value={wall}>
+                            {WALL_LABEL[wall]}
+                          </option>
+                        ))}
+                      </select>
+                      <div role="group" aria-label="เลือกผนังประตูครัว" className="grid grid-cols-4 gap-1 rounded-[8px] bg-surface p-1">
+                        {(Object.keys(WALL_LABEL) as Wall[]).map((w) => {
+                          const active = currentWall === w;
+                          return (
+                            <button
+                              key={w}
+                              type="button"
+                              aria-pressed={active}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                form.setValue("kitchenDoorWall", w, { shouldDirty: true, shouldValidate: true });
+                                onSubmit(form.getValues());
+                              }}
+                              className={cn(
+                                "rounded-[6px] py-1.5 text-center text-[12.5px] font-medium transition-colors",
+                                active
+                                  ? "bg-white text-blue shadow-[0_1px_3px_rgba(30,43,64,0.08)]"
+                                  : "text-[#41536b] hover:text-ink",
+                              )}
+                            >
+                              {WALL_LABEL[w]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }}
+              </Field>
+              <Field id={`${formId}-kpos`} label="ระยะจากมุมประตูครัว (ม.)" error={errors.kitchenDoorPosition?.message}>
+                {(aria) => <input {...aria} {...numberProps} min={0} {...register("kitchenDoorPosition", { valueAsNumber: true })} />}
+              </Field>
+              <Field id={`${formId}-kew`} label="ความกว้างประตูครัว (ม.)" error={errors.kitchenDoorWidth?.message}>
+                {(aria) => <input {...aria} {...numberProps} min={0.6} max={3} step={0.05} {...register("kitchenDoorWidth", { valueAsNumber: true })} />}
+              </Field>
+            </div>
+          )}
+        </div>
       </div>
       <p className="mb-0 mt-3 text-[11.5px] leading-[1.6] text-secondary max-[767px]:hidden">
-        ทางลัด: กดที่ป้าย &ldquo;เข้า&rdquo; บนผังเพื่อมาหน้านี้ · ร้าน 2–30 ม. ปรับทีละ 25 ซม.
+        ทางลัด: กดที่ป้าย &ldquo;เข้า&rdquo; หรือ &ldquo;ครัว&rdquo; บนผังเพื่อมาหน้านี้ · ร้าน 2–30 ม. ปรับทีละ 25 ซม.
       </p>
     </form>
   );

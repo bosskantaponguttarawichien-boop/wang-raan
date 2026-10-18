@@ -165,7 +165,7 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
   it("sync ผัง Blocked หลังจาก sync ผังดีไปแล้ว → START ไม่ได้", () => {
     const rt = new SimulationWorkerRuntime();
     rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } });
-    const blocked = { ...layout, objects: layout.objects.filter((o) => o.type !== "kitchen") };
+    const blocked = { ...layout, kitchenDoor: null };
     rt.handle({ type: "SYNC_LAYOUT", requestId: 2, payload: { layout: blocked, validation: validateLayout(blocked) } });
     expect(rt.handle({ type: "START", requestId: 3, layoutRevision: validation.layoutRevision, config: { customersPerHour: 40, speed: 30 } }).response).toMatchObject({ code: "NOT_SYNCED" });
   });

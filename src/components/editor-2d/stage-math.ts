@@ -1,26 +1,35 @@
 import type { LayoutObject, Meters, Point, StoreLayout, Wall } from "@/core/layout";
+import { pointFromView, vectorFromView, viewSize, type ViewRotation } from "@/core/preview/view-rotation";
 import { OBJECT_LABEL } from "@/core/validation";
 
-/** แปลงตำแหน่ง pointer (px) เป็นเมตรบนผัง — rect ได้จาก getBoundingClientRect (รวม zoom แล้ว) */
+/**
+ * แปลงตำแหน่ง pointer (px) เป็นเมตรบนผัง — rect ได้จาก getBoundingClientRect (รวม zoom และการหมุนมุมมองแล้ว
+ * = กรอบของผังตามที่เห็นบนจอ) จึงคิดเป็นพิกัดมุมมองก่อน แล้วหมุนกลับเป็นพิกัดผังจริง
+ */
 export function clientToMeters(
   client: { x: number; y: number },
   rect: { left: number; top: number; width: number; height: number },
   layout: Pick<StoreLayout, "width" | "depth">,
+  rotation: ViewRotation = 0,
 ): Point {
-  return {
-    x: ((client.x - rect.left) / rect.width) * layout.width,
-    y: ((client.y - rect.top) / rect.height) * layout.depth,
+  const view = viewSize(layout, rotation);
+  const point = {
+    x: ((client.x - rect.left) / rect.width) * view.width,
+    y: ((client.y - rect.top) / rect.height) * view.depth,
   };
+  return pointFromView(point, layout, rotation);
 }
 
-/** ระยะลาก (px) → เมตร */
+/** ระยะลาก (px บนจอ) → เวกเตอร์เมตรบนผังจริง */
 export function deltaToMeters(
   dx: number,
   dy: number,
   rect: { width: number; height: number },
   layout: Pick<StoreLayout, "width" | "depth">,
+  rotation: ViewRotation = 0,
 ): Point {
-  return { x: (dx / rect.width) * layout.width, y: (dy / rect.height) * layout.depth };
+  const view = viewSize(layout, rotation);
+  return vectorFromView({ x: (dx / rect.width) * view.width, y: (dy / rect.height) * view.depth }, rotation);
 }
 
 export function percent(value: Meters, total: Meters): string {

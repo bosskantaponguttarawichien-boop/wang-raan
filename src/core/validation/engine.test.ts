@@ -4,7 +4,7 @@ import {
   createCounter,
   createEmptyLayout,
   createEntrance,
-  createKitchen,
+  createKitchenDoor,
   createSequentialIds,
   deleteObject,
   moveObject,
@@ -12,7 +12,7 @@ import {
   type StoreLayout,
   type Table,
 } from "@/core/layout";
-import { cafeLayout, withObjects, withoutType } from "@/test/fixtures/layouts";
+import { cafeLayout, withObjects } from "@/test/fixtures/layouts";
 import {
   canStartSimulation,
   collectIssues,
@@ -57,8 +57,8 @@ describe("validateLayout", () => {
     expect(canStartSimulation(result, layout)).toBe(true);
   });
 
-  it("ขาด Kitchen → Blocked และเริ่มจำลองไม่ได้", () => {
-    const layout = withoutType(cafeLayout(), "kitchen");
+  it("ขาด ประตูครัว → Blocked และเริ่มจำลองไม่ได้", () => {
+    const layout = { ...cafeLayout(), kitchenDoor: null };
     const result = validateLayout(layout);
     expect(result.status).toBe("blocked");
     expect(canStartSimulation(result, layout)).toBe(false);
@@ -67,15 +67,18 @@ describe("validateLayout", () => {
   it("issues เรียงตามหมวด completeness → collision → clearance → accessibility และ Blocked ก่อน Warning", () => {
     const base = cafeLayout();
     const table = base.objects.find((o) => o.type === "table")!;
-    const kitchen = base.objects.find((o) => o.type === "kitchen")!;
+    const counter = base.objects.find((o) => o.type === "counter")!;
     const emptyTable: Table = { id: "table-empty", type: "table", x: 6, y: 5, width: 0.8, depth: 0.8, rotation: 0, chairIds: [] };
-    // ย้ายโต๊ะไปทับครัว + ลบเคาน์เตอร์ + โต๊ะเปล่า
-    const layout = withObjects(withoutType(moveObject(base, table.id, { x: kitchen.x, y: kitchen.y }), "counter"), emptyTable);
+    // ย้ายโต๊ะไปทับเคาน์เตอร์ + เอาประตูครัวออก + โต๊ะเปล่า
+    const layout: StoreLayout = {
+      ...withObjects(moveObject(base, table.id, { x: counter.x, y: counter.y }), emptyTable),
+      kitchenDoor: null,
+    };
     const issues = collectIssues(layout);
     const order = ["completeness", "collision", "clearance", "accessibility"];
     const ranks = issues.map((i) => order.indexOf(i.category));
     expect(ranks).toEqual([...ranks].sort((a, b) => a - b));
-    expect(issues[0]!.id).toBe("completeness/missing-counter");
+    expect(issues[0]!.id).toBe("completeness/missing-kitchen");
     expect(issues.find((i) => i.severity === "warning")!.id).toBe("completeness/table-without-chairs/table-empty");
     expect(issues.some((i) => i.category === "collision")).toBe(true);
   });
@@ -128,7 +131,8 @@ describe("ประสิทธิภาพ", () => {
     layout = {
       ...layout,
       entrance: createEntrance(layout, { wall: "south", position: 14 }, ids),
-      objects: [createKitchen({ position: { x: 1, y: 1 } }, ids), createCounter({ position: { x: 26, y: 1 } }, ids)],
+      kitchenDoor: createKitchenDoor(layout, { wall: "north", position: 1 }, ids),
+      objects: [createCounter({ position: { x: 26, y: 1 } }, ids)],
     };
     for (let row = 0; row < 6; row++) {
       for (let col = 0; col < 10; col++) {

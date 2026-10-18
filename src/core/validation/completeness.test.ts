@@ -23,12 +23,16 @@ describe("Completeness Gate (PRD §5.3)", () => {
     ]);
   });
 
-  it.each([
-    ["kitchen", "missing-kitchen"],
-    ["counter", "missing-counter"],
-  ] as const)("ไม่มี %s → Blocked", (type, code) => {
-    const issues = checkCompleteness(withoutType(cafeLayout(), type));
-    expect(codes(issues)).toEqual([code]);
+  it("ไม่มี ประตูครัว → Blocked", () => {
+    const issues = checkCompleteness({ ...cafeLayout(), kitchenDoor: null });
+    expect(codes(issues)).toEqual(["missing-kitchen"]);
+    expect(issues[0]!.severity).toBe("blocked");
+    expect(issues[0]!.message).toBe("ยังไม่มีประตูครัว");
+  });
+
+  it("ไม่มี Counter → Blocked", () => {
+    const issues = checkCompleteness(withoutType(cafeLayout(), "counter"));
+    expect(codes(issues)).toEqual(["missing-counter"]);
     expect(issues[0]!.severity).toBe("blocked");
   });
 
@@ -52,7 +56,7 @@ describe("Completeness Gate (PRD §5.3)", () => {
   });
 
   it("ผังเปล่า → Blocked ครบทั้ง 5 รายการ", () => {
-    const layout = { ...cafeLayout(), entrance: null, objects: [] };
+    const layout = { ...cafeLayout(), entrance: null, kitchenDoor: null, objects: [] };
     expect(codes(checkCompleteness(layout))).toEqual([
       "missing-entrance",
       "missing-kitchen",

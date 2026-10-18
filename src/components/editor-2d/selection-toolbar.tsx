@@ -16,6 +16,7 @@ import {
   type Rect,
   type Table,
 } from "@/core/layout";
+import { rectToView, viewSize, type ViewRotation } from "@/core/preview/view-rotation";
 import { layoutActions as actions } from "@/store/use-layout-store";
 import { objectLabel } from "./stage-math";
 import { cn } from "@/lib/cn";
@@ -29,6 +30,8 @@ export interface SelectionToolbarProps {
   selected: LayoutObject;
   /** กรอบรวมของชุดโต๊ะ (ถ้าเลือกโต๊ะหรือเก้าอี้) */
   groupRect: Rect | null;
+  /** มุมมองที่หมุนอยู่ — กรอบ boxRef มีขนาดตามมุมมอง ส่วนแถบเองไม่หมุน */
+  viewRotation?: ViewRotation;
   onToast?: (message: string) => void;
 }
 
@@ -89,6 +92,7 @@ export function SelectionToolbar({
   objects,
   selected,
   groupRect,
+  viewRotation = 0,
   onToast = () => {},
 }: SelectionToolbarProps) {
   const barRef = React.useRef<HTMLDivElement>(null);
@@ -124,8 +128,11 @@ export function SelectionToolbar({
     const bar = barRef.current;
     if (!box || !bar) return;
     const update = () => {
-      const scale = box.clientWidth / room.width;
-      const toPx = (r: Rect): Box => ({ x: r.x * scale, y: r.y * scale, w: r.width * scale, h: r.depth * scale });
+      const scale = box.clientWidth / viewSize({ width: room.width, depth: room.depth }, viewRotation).width;
+      const toPx = (plan: Rect): Box => {
+        const r = rectToView(plan, { width: room.width, depth: room.depth }, viewRotation);
+        return { x: r.x * scale, y: r.y * scale, w: r.width * scale, h: r.depth * scale };
+      };
       const others = objects
         .filter(
           (o) =>
@@ -147,7 +154,7 @@ export function SelectionToolbar({
     const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
     observer?.observe(box);
     return () => observer?.disconnect();
-  }, [boxRef, room.width, objects, selected, groupRect, table?.id]);
+  }, [boxRef, room.width, room.depth, viewRotation, objects, selected, groupRect, table?.id]);
 
   const handleRotate = () => {
     actions().rotateObject(target.id, 90);

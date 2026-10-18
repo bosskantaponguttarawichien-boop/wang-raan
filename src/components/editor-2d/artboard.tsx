@@ -6,6 +6,8 @@
  * - ลาก: Pointer Events + setPointerCapture; หนึ่งการลาก = Undo หนึ่งขั้น (begin/endInteraction)
  * - คีย์บอร์ด: ลูกศร = ย้าย 0.25 ม. (Shift = 1 ม.), R = หมุน 90° (Shift+R = −90°), Delete = ลบ, Esc = ยกเลิกการเลือก
  * - Non-blocking: วางทับหรือตกขอบได้ ผลตรวจแสดงเป็น Issue Rings
+ * - หมุนมุมมอง: Stage (พิกัดผังจริง) หมุนด้วย CSS ทั้งชิ้นในกรอบขนาดมุมมอง; ลาก/ลูกศรแปลงทิศบนจอกลับเป็นทิศบนผัง
+ *   และป้ายข้อความหมุนสวนกลับให้อ่านได้เสมอ
  */
 import * as React from "react";
 import {
@@ -15,11 +17,12 @@ import {
   chairStyleOf,
   footprint,
   tableStyleOf,
-  type Entrance,
   type IssueSeverity,
   type LayoutObject,
   type Rect,
+  type WallDoor,
 } from "@/core/layout";
+import { arrowKeyToPlan, viewSize } from "@/core/preview/view-rotation";
 import { cn } from "@/lib/cn";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
@@ -41,7 +44,8 @@ import {
 type DragState =
   | { mode: "move"; id: string; pointerId: number; start: { x: number; y: number }; origin: { x: number; y: number } }
   | { mode: "resize"; id: string; pointerId: number; start: { x: number; y: number }; size: { width: number; depth: number } }
-  | { mode: "entrance"; pointerId: number };
+  | { mode: "entrance"; pointerId: number }
+  | { mode: "kitchenDoor"; pointerId: number };
 
 function boxStyle(rect: Rect, room: { width: number; depth: number }): React.CSSProperties {
   return {
@@ -66,7 +70,6 @@ const RING: Record<IssueSeverity, string> = {
 };
 
 const PIECE_STYLE: Record<LayoutObject["type"], string> = {
-  kitchen: "z-[1] rounded-[4px] border-2 border-[var(--plan-kitchen-stroke)] bg-[var(--plan-kitchen-fill)]",
   counter: "z-[1] rounded-[4px] border-[1.5px] border-[var(--plan-counter-stroke)] bg-[var(--plan-counter-fill)]",
   table: "z-[2] rounded-[8px] border-[1.5px] border-[var(--plan-table-stroke)] bg-[var(--plan-table-fill)]",
   chair: "z-[3] rounded-full border-[1.5px] border-[var(--plan-chair-stroke)] bg-[var(--plan-chair-fill)]",
@@ -87,6 +90,9 @@ const CHAIR_BACKREST: Record<number, string> = {
   180: "inset-x-[14%] top-[6%] h-[16%]",
   270: "inset-y-[14%] right-[6%] w-[16%]",
 };
+
+/** ป้ายข้อความในผังหมุนสวนการหมุนมุมมอง (ค่าตั้งบน Stage) ให้ตั้งตรงบนจอเสมอ */
+const UPRIGHT: React.CSSProperties = { rotate: "var(--view-upright, 0deg)" };
 
 /** สี/ทรงที่ผู้ใช้เลือก — ผังที่ไม่มี style ใช้โทเคนเดิมของ design-system */
 function pieceAppearance(obj: LayoutObject): { className?: string; style?: React.CSSProperties } {
@@ -110,14 +116,6 @@ function pieceAppearance(obj: LayoutObject): { className?: string; style?: React
 
 function PieceDecoration({ obj }: { obj: LayoutObject }) {
   switch (obj.type) {
-    case "kitchen":
-      return (
-        <span aria-hidden="true" className="absolute left-[12%] top-[18%] grid grid-cols-2 gap-[3px]">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="block size-[clamp(4px,0.9vw,8px)] rounded-[2px] bg-[var(--plan-kitchen-cooktop)]" />
-          ))}
-        </span>
-      );
     case "counter":
       return <span aria-hidden="true" className="absolute right-[10%] top-[25%] h-[28%] w-[18%] rounded-[2px] bg-[var(--plan-counter-pos)]" />;
     case "chair":
@@ -143,6 +141,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const layout = useLayoutStore((s) => s.layout);
   const selectedId = useLayoutStore((s) => s.selectedObjectId);
   const zoom = useLayoutStore((s) => s.zoom);
+  const viewRotation = useLayoutStore((s) => s.viewRotation);
   const simStatus = useSimulationStore((s) => s.status);
   const isSim = simStatus === "running" || simStatus === "paused";
   const stageRef = React.useRef<HTMLDivElement>(null);
@@ -175,7 +174,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     event.currentTarget.focus({ preventScroll: true });
     drag.current = state;
     actions().beginInteraction();
-    setDraggingId(state.mode === "entrance" ? "entrance" : state.id);
+    setDraggingId(state.mode === "entrance" ? "entrance" : state.mode === "kitchenDoor" ? "kitchen-door" : state.id);
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLElement>) => {
@@ -184,12 +183,18 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     if (!state || !stage || state.pointerId !== event.pointerId) return;
     const rect = stage.getBoundingClientRect();
     const current = actions().layout;
+    const rotation = actions().viewRotation;
     if (state.mode === "entrance") {
       const width = current.entrance?.width ?? 1.2;
-      actions().setEntrance(nearestWallPosition(clientToMeters({ x: event.clientX, y: event.clientY }, rect, current), current, width));
+      actions().setEntrance(nearestWallPosition(clientToMeters({ x: event.clientX, y: event.clientY }, rect, current, rotation), current, width));
       return;
     }
-    const d = deltaToMeters(event.clientX - state.start.x, event.clientY - state.start.y, rect, current);
+    if (state.mode === "kitchenDoor") {
+      const width = current.kitchenDoor?.width ?? 0.9;
+      actions().setKitchenDoor(nearestWallPosition(clientToMeters({ x: event.clientX, y: event.clientY }, rect, current, rotation), current, width));
+      return;
+    }
+    const d = deltaToMeters(event.clientX - state.start.x, event.clientY - state.start.y, rect, current, rotation);
     if (state.mode === "move") {
       actions().updateObjectPosition(state.id, state.origin.x + d.x, state.origin.y + d.y);
     } else {
@@ -227,18 +232,11 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
 
   // ── Keyboard ─────────────────────────────────────────────────────────────
   const onPieceKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, obj: LayoutObject) => {
-    const step = event.shiftKey ? 1 : GRID_STEP;
-    const moves: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
-    };
-    const move = moves[event.key];
+    const move = arrowKeyToPlan(event.key, event.shiftKey ? 1 : GRID_STEP, viewRotation);
     if (move) {
       event.preventDefault();
       actions().selectObject(obj.id);
-      actions().updateObjectPosition(obj.id, obj.x + move[0], obj.y + move[1]);
+      actions().updateObjectPosition(obj.id, obj.x + move.x, obj.y + move.y);
     } else if (event.key === "r" || event.key === "R") {
       event.preventDefault();
       actions().rotateObject(obj.id, event.shiftKey ? -90 : 90);
@@ -252,19 +250,12 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   };
 
   const onResizeKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>, obj: LayoutObject) => {
-    const step = event.shiftKey ? GRID_STEP : SIZE_STEP;
     const fp = footprint(obj);
-    const deltas: Record<string, [number, number]> = {
-      ArrowLeft: [-step, 0],
-      ArrowRight: [step, 0],
-      ArrowUp: [0, -step],
-      ArrowDown: [0, step],
-    };
-    const d = deltas[event.key];
+    const d = arrowKeyToPlan(event.key, event.shiftKey ? GRID_STEP : SIZE_STEP, viewRotation);
     if (!d) return;
     event.preventDefault();
-    const w = fp.width + d[0];
-    const h = fp.depth + d[1];
+    const w = fp.width + d.x;
+    const h = fp.depth + d.y;
     if (obj.rotation % 180 === 0) actions().resizeObject(obj.id, w, h);
     else actions().resizeObject(obj.id, h, w);
   };
@@ -273,27 +264,59 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
     const entrance = layout.entrance;
     if (!entrance) return;
     const horizontal = entrance.wall === "north" || entrance.wall === "south";
-    const step = event.shiftKey ? 1 : GRID_STEP;
-    const forward = horizontal ? "ArrowRight" : "ArrowDown";
-    const backward = horizontal ? "ArrowLeft" : "ArrowUp";
-    if (event.key !== forward && event.key !== backward) return;
+    const move = arrowKeyToPlan(event.key, event.shiftKey ? 1 : GRID_STEP, viewRotation);
+    const along = move ? (horizontal ? move.x : move.y) : 0;
+    if (!along) return;
     event.preventDefault();
-    actions().setEntrance({ wall: entrance.wall, position: entrance.position + (event.key === forward ? step : -step) });
+    actions().setEntrance({ wall: entrance.wall, position: entrance.position + along });
+  };
+
+  const onKitchenDoorKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    const door = layout.kitchenDoor;
+    if (!door) return;
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      actions().removeKitchenDoor();
+      return;
+    }
+    const horizontal = door.wall === "north" || door.wall === "south";
+    const move = arrowKeyToPlan(event.key, event.shiftKey ? 1 : GRID_STEP, viewRotation);
+    const along = move ? (horizontal ? move.x : move.y) : 0;
+    if (!along) return;
+    event.preventDefault();
+    actions().setKitchenDoor({ wall: door.wall, position: door.position + along });
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
-  const ratio = layout.width / layout.depth;
+  const view = viewSize(layout, viewRotation);
+  const ratio = view.width / view.depth;
+  // Stage วางในพิกัดผังจริง: หมุนรอบจุดกลางกรอบ — ขนาดเป็น % ของกรอบมุมมอง (90°/270° สลับกว้าง-ลึก)
+  const stageStyle: React.CSSProperties =
+    viewRotation === 0
+      ? {}
+      : ({
+          left: "50%",
+          top: "50%",
+          right: "auto",
+          bottom: "auto",
+          width: percent(layout.width, view.width),
+          height: percent(layout.depth, view.depth),
+          transform: `translate(-50%, -50%) rotate(${viewRotation}deg)`,
+          "--view-upright": `${-viewRotation}deg`,
+        } as React.CSSProperties);
   // พอดีพื้นที่ Canvas จริง (cqw/cqh จาก container ของ Stage) เผื่อความสูงให้ป้ายความกว้างและคำแนะนำ (--artboard-chrome)
   // ค่า fallback 96px กัน width ทั้งก้อนเป็น invalid → auto (ผังหดเหลือแค่ขอบ) เมื่อ class ตั้งตัวแปรไม่ถูก generate
   const fitWidth = `min(100cqw, max(140px, 100cqh - var(--artboard-chrome, 96px)) * ${ratio})`;
   const entrance = layout.entrance;
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
+  const kitchenDoor = layout.kitchenDoor;
+  const kitchenDoorSeverity = kitchenDoor ? live.severityById.get(kitchenDoor.id) : undefined;
 
   return (
     <div className="flex w-full min-w-0 flex-col items-center [--artboard-chrome:96px] max-[767px]:[--artboard-chrome:32px]">
       <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong max-[767px]:mb-1.5" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: "100%" }} aria-hidden="true">
         <span className="h-px flex-1 bg-[#ccd6e4]" />
-        {layout.width} เมตร
+        {view.width} เมตร
         <span className="h-px flex-1 bg-[#ccd6e4]" />
       </div>
       <div
@@ -301,32 +324,21 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
         className="relative rounded-[2px] border-4 border-[var(--plan-wall)] bg-white"
         style={{
           width: `calc(${fitWidth} * ${zoom})`,
-          aspectRatio: `${layout.width} / ${layout.depth}`,
+          aspectRatio: `${view.width} / ${view.depth}`,
           touchAction: "none",
         }}
       >
         <div
           ref={stageRef}
           role="application"
-          aria-label={`ผังร้านขนาด ${layout.width} × ${layout.depth} เมตร`}
+          aria-label={`ผังร้านขนาด ${layout.width} × ${layout.depth} เมตร${viewRotation ? ` (มุมมองหมุน ${viewRotation} องศา)` : ""}`}
           aria-describedby={hintId}
           className="absolute inset-0"
+          style={stageStyle}
           data-testid="artboard-stage"
+          data-view-rotation={viewRotation}
         >
           <GridOverlay width={layout.width} depth={layout.depth} />
-
-          {isSim && (
-            <div
-              data-testid="chip-lock"
-              className="pointer-events-none absolute right-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-[#1e2b40]/85 px-3 py-1 text-[12px] font-medium text-white shadow-[0_4px_12px_rgba(0,0,0,0.18)] backdrop-blur-sm select-none"
-            >
-              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              </svg>
-              <span>ผังล็อกระหว่างจำลอง</span>
-            </div>
-          )}
 
           {groupRect && (
             <div
@@ -399,15 +411,16 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
                   <span
                     // สีโต๊ะที่ผู้ใช้เลือกอาจเข้ม → รองพื้นขาวให้ป้ายยังผ่าน contrast 4.5:1
                     className={cn("relative px-1 font-semibold", obj.style && "rounded-[4px] bg-white/90 text-[#3d4f66]")}
+                    style={UPRIGHT}
                   >{`โต๊ะ ${tableNumbers.get(obj.id) ?? ""}`}</span>
                 ) : obj.type !== "chair" ? (
-                  <span className="relative px-1">{objectLabel(obj)}</span>
+                  <span className="relative px-1" style={UPRIGHT}>{objectLabel(obj)}</span>
                 ) : null}
               </button>
             );
           })}
 
-          {!isSim && selected && (selected.type === "kitchen" || selected.type === "counter") && (
+          {!isSim && selected && selected.type === "counter" && (
             <button
               type="button"
               aria-label={`ปรับขนาด${objectLabel(selected)} (ลูกศรเพื่อปรับทีละ 0.05 ม.)`}
@@ -432,8 +445,9 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
           <SimulationOverlay width={layout.width} depth={layout.depth} />
 
           {entrance && (
-            <EntranceMarker
-              entrance={entrance}
+            <DoorMarker
+              kind="entrance"
+              door={entrance}
               room={room}
               severity={entranceSeverity}
               message={live.messageById.get(entrance.id)}
@@ -456,9 +470,52 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
                 }
                 onEntranceKeyDown(e);
               }}
+              onClick={() => actions().setActiveTab("shop")}
+            />
+          )}
+
+          {kitchenDoor && (
+            <DoorMarker
+              kind="kitchen"
+              door={kitchenDoor}
+              room={room}
+              severity={kitchenDoorSeverity}
+              message={live.messageById.get(kitchenDoor.id)}
+              dragging={draggingId === "kitchen-door"}
+              onPointerDown={(e) => {
+                if (isSim) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onToast('ผังล็อกระหว่างจำลอง — กด "จบรอบ" ก่อนแก้ไข');
+                  return;
+                }
+                startDrag(e, { mode: "kitchenDoor", pointerId: e.pointerId });
+              }}
+              onPointerMove={isSim ? () => {} : onPointerMove}
+              onPointerUp={isSim ? () => {} : endDrag}
+              onKeyDown={(e) => {
+                if (isSim) {
+                  e.preventDefault();
+                  return;
+                }
+                onKitchenDoorKeyDown(e);
+              }}
+              onClick={() => actions().setActiveTab("shop")}
             />
           )}
         </div>
+        {isSim && (
+          <div
+            data-testid="chip-lock"
+            className="pointer-events-none absolute right-3 top-3 z-30 flex items-center gap-1.5 rounded-full bg-[#1e2b40]/85 px-3 py-1 text-[12px] font-medium text-white shadow-[0_4px_12px_rgba(0,0,0,0.18)] backdrop-blur-sm select-none"
+          >
+            <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>ผังล็อกระหว่างจำลอง</span>
+          </div>
+        )}
         {!isSim && selected && selected.type !== "table" && selected.type !== "chair" && !draggingId && (
           <SelectionToolbar
             boxRef={boxRef}
@@ -466,6 +523,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
             objects={layout.objects}
             selected={selected}
             groupRect={groupRect}
+            viewRotation={viewRotation}
             onToast={onToast}
           />
         )}
@@ -477,8 +535,9 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   );
 }
 
-interface EntranceMarkerProps {
-  entrance: Entrance;
+interface DoorMarkerProps {
+  kind: "entrance" | "kitchen";
+  door: WallDoor;
   room: { width: number; depth: number };
   severity?: IssueSeverity;
   message?: string;
@@ -487,50 +546,64 @@ interface EntranceMarkerProps {
   onPointerMove: (e: React.PointerEvent<HTMLButtonElement>) => void;
   onPointerUp: (e: React.PointerEvent<HTMLButtonElement>) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLButtonElement>) => void;
+  onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }
 
-/** ทางเข้า: ช่องเปิดบนผนัง + เส้นโค้งวงสวิงประตู (design-system §7.2.3) */
-function EntranceMarker({ entrance, room, severity, message, dragging, ...handlers }: EntranceMarkerProps) {
-  const horizontal = entrance.wall === "north" || entrance.wall === "south";
+/** ทางเข้า / ประตูครัว: ช่องเปิดบนผนัง (design-system §7.2.3) */
+function DoorMarker({ kind, door, room, severity, message, dragging, onClick, ...handlers }: DoorMarkerProps) {
+  const horizontal = door.wall === "north" || door.wall === "south";
   const span = horizontal
-    ? { left: percent(entrance.position, room.width), width: percent(entrance.width, room.width) }
-    : { top: percent(entrance.position, room.depth), height: percent(entrance.width, room.depth) };
+    ? { left: percent(door.position, room.width), width: percent(door.width, room.width) }
+    : { top: percent(door.position, room.depth), height: percent(door.width, room.depth) };
   const edge: React.CSSProperties =
-    entrance.wall === "north"
+    door.wall === "north"
       ? { top: -6, height: 8 }
-      : entrance.wall === "south"
+      : door.wall === "south"
         ? { bottom: -6, height: 8 }
-        : entrance.wall === "west"
+        : door.wall === "west"
           ? { left: -6, width: 8 }
           : { right: -6, width: 8 };
-  // วงสวิงกว้างเท่าช่องประตู หมุนให้เปิดเข้าในร้าน
+
+  const isEntrance = kind === "entrance";
   const swing: React.CSSProperties = horizontal
-    ? { ...span, height: percent(entrance.width, room.depth), [entrance.wall === "north" ? "top" : "bottom"]: 0 }
-    : { ...span, width: percent(entrance.width, room.width), [entrance.wall === "west" ? "left" : "right"]: 0 };
-  const arc = { north: "M0 0V1A1 1 0 0 0 1 0", south: "M0 1V0A1 1 0 0 1 1 1", west: "M0 0H1A1 1 0 0 1 0 1", east: "M1 0H0A1 1 0 0 0 1 1" }[entrance.wall];
+    ? { ...span, height: percent(door.width, room.depth), [door.wall === "north" ? "top" : "bottom"]: 0 }
+    : { ...span, width: percent(door.width, room.width), [door.wall === "west" ? "left" : "right"]: 0 };
+  const arc = { north: "M0 0V1A1 1 0 0 0 1 0", south: "M0 1V0A1 1 0 0 1 1 1", west: "M0 0H1A1 1 0 0 1 0 1", east: "M1 0H0A1 1 0 0 0 1 1" }[door.wall];
+
+  const labelPrefix = isEntrance ? "ทางเข้า" : "ประตูครัว";
+  const badgeText = isEntrance ? "เข้า" : "ครัว";
+  const testId = isEntrance ? "entrance-marker" : "kitchen-door-marker";
 
   return (
     <>
-      <svg aria-hidden="true" className="pointer-events-none absolute z-[4] overflow-visible" style={swing} viewBox="0 0 1 1" preserveAspectRatio="none">
-        <path d={arc} fill="none" stroke="var(--plan-entrance-stroke)" strokeWidth={1.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
-      </svg>
+      {isEntrance && (
+        <svg aria-hidden="true" className="pointer-events-none absolute z-[4] overflow-visible" style={swing} viewBox="0 0 1 1" preserveAspectRatio="none">
+          <path d={arc} fill="none" stroke="var(--plan-entrance-stroke)" strokeWidth={1.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
       <button
         type="button"
-        aria-label={`ทางเข้า ผนัง${WALL_LABEL[entrance.wall]} ตำแหน่ง ${entrance.position.toFixed(2)} ม. กว้าง ${entrance.width.toFixed(2)} ม. ลากหรือใช้ลูกศรเพื่อเลื่อน${message ? ` — ${message}` : ""}`}
+        id={door.id}
+        data-id={door.id}
+        aria-label={`${labelPrefix} ผนัง${WALL_LABEL[door.wall]} ตำแหน่ง ${door.position.toFixed(2)} ม. กว้าง ${door.width.toFixed(2)} ม. ลากหรือใช้ลูกศรเพื่อเลื่อน${message ? ` — ${message}` : ""}`}
         data-issue={severity ?? undefined}
-        data-testid="entrance-marker"
+        data-testid={testId}
         className={cn(
-          "absolute z-[5] flex cursor-grab items-center justify-center rounded-[3px] border-[1.5px] border-[var(--plan-entrance-stroke)] bg-[var(--plan-entrance-fill)] text-[10px] font-medium leading-none text-[#5a75a0] touch-none",
-          "hover:text-blue focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
+          "absolute z-[5] flex cursor-grab items-center justify-center rounded-[3px] border-[1.5px] text-[10px] font-medium leading-none touch-none",
+          isEntrance
+            ? "border-[var(--plan-entrance-stroke)] bg-[var(--plan-entrance-fill)] text-[#5a75a0] hover:text-blue"
+            : "border-[#64748b] bg-[#f1f5f9] text-[#475569] hover:text-[#0f172a]",
+          "focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus focus-visible:outline-offset-2",
           severity && RING[severity],
-          dragging && "cursor-grabbing text-blue shadow-[0_3px_3px_#3b62f42b]",
+          dragging && (isEntrance ? "cursor-grabbing text-blue shadow-[0_3px_3px_#3b62f42b]" : "cursor-grabbing text-[#0f172a] shadow-[0_3px_3px_rgba(0,0,0,0.15)]"),
         )}
         style={{ ...span, ...edge }}
+        onClick={onClick}
         {...handlers}
         onPointerCancel={handlers.onPointerUp}
       >
-        <span className={cn("rounded-[3px] bg-white px-1 py-0.5", horizontal ? (entrance.wall === "north" ? "translate-y-3" : "-translate-y-3") : entrance.wall === "west" ? "translate-x-4" : "-translate-x-4")}>
-          เข้า
+        <span style={UPRIGHT} className={cn("rounded-[3px] bg-white px-1 py-0.5", horizontal ? (door.wall === "north" ? "translate-y-3" : "-translate-y-3") : door.wall === "west" ? "translate-x-4" : "-translate-x-4")}>
+          {badgeText}
         </span>
       </button>
     </>

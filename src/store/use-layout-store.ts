@@ -15,7 +15,9 @@ import {
   createCounter,
   createEmptyLayout,
   createEntrance,
-  createKitchen,
+  createKitchenDoor,
+  defaultKitchenDoorInit,
+  migrateLayout,
   createSampleCafeLayout,
   deleteObject as coreDeleteObject,
   findAvailableSpot,
@@ -25,6 +27,7 @@ import {
   resizeTableSet as coreResizeTableSet,
   setTableSetChairCount as coreSetTableSetChairCount,
   setTableSetStyle as coreSetTableSetStyle,
+  setCounterStyle as coreSetCounterStyle,
   rotateObject as coreRotateObject,
   toggleTablePreset as coreToggleTablePreset,
   type IdFactory,
@@ -37,10 +40,12 @@ import {
   type TableSetCreationOptions,
   type TableSetPreset,
   type TableSetStylePatch,
+  type CounterStyle,
   type ValidationResult,
   type Wall,
 } from "@/core/layout";
 import { canStartSimulation, computeLayoutRevision, validateLayout } from "@/core/validation";
+import { rotateViewBy, type ViewRotation } from "@/core/preview/view-rotation";
 
 /** จำนวนขั้น Undo สูงสุด */
 export const HISTORY_LIMIT = 40;
@@ -50,6 +55,12 @@ export const ZOOM_MAX = 3;
 export type PlaygroundTab = "add" | "shop" | "check";
 
 export interface EntranceInput {
+  wall: Wall;
+  position: Meters;
+  width?: Meters;
+}
+
+export interface KitchenDoorInput {
   wall: Wall;
   position: Meters;
   width?: Meters;
@@ -65,12 +76,13 @@ export interface LayoutStoreState {
   historyIndex: number;
   zoom: number;
   is3DView: boolean;
+  /** มุมมองหมุนทีละ 90° (ใช้ร่วมกันทั้ง 2D และ 3D) — สถานะการแสดงผล ไม่แก้ผังและไม่เข้า Undo */
+  viewRotation: ViewRotation;
   /** historyIndex ตอนเริ่มการลาก/ปรับต่อเนื่อง (null = ไม่ได้อยู่ระหว่าง interaction) */
   interactionBase: number | null;
 
   // Table Set Lifecycle & Objects — คืน id ของวัตถุที่สร้าง
   addTableSet: (preset: TableSetPreset, position?: Point, options?: TableSetCreationOptions) => string;
-  addKitchen: (position?: Point) => string;
   addCounter: (position?: Point) => string;
 
   // Drag & Transform
@@ -86,6 +98,8 @@ export interface LayoutStoreState {
   setTableSetChairCount: (id: string, chairCount: number) => boolean;
   /** เปลี่ยนทรง/ขา/สีของโต๊ะ และแบบ/ขา/สีของเก้าอี้ทั้งชุด */
   setTableSetStyle: (id: string, patch: TableSetStylePatch) => void;
+  /** เปลี่ยนแบบ/สีเคาน์เตอร์ = Undo หนึ่งขั้น */
+  setCounterStyle: (id: string, patch: Partial<CounterStyle>) => void;
   /** ทำซ้ำวัตถุ (วางในที่ว่างใกล้สุดและเลือกวัตถุใหม่) */
   duplicateObject: (id: string) => string | null;
   /** เริ่ม/จบการลากต่อเนื่อง — การแก้ไขระหว่างนี้รวมเป็น Undo ขั้นเดียว */
@@ -95,11 +109,19 @@ export interface LayoutStoreState {
   // Room & Entrance
   setRoomDimensions: (width: number, depth: number) => void;
   setEntrance: (entrance: EntranceInput) => void;
+  /** เพิ่มประตูครัวบนผนังว่าง (คืน false ถ้ามีอยู่แล้วหรือไม่มีผนังว่างพอ) */
+  addKitchenDoor: () => boolean;
+  /** ย้าย/ปรับขนาดประตูครัว (คง id เดิม ไม่สร้าง history เมื่อค่าไม่เปลี่ยน) */
+  setKitchenDoor: (door: KitchenDoorInput) => void;
+  /** ลบประตูครัว */
+  removeKitchenDoor: () => void;
 
   // Selection & View
   selectObject: (id: string | null) => void;
   setZoom: (zoom: number) => void;
   set3DView: (is3D: boolean) => void;
+  /** หมุนมุมมอง +90° (ตามเข็ม) หรือ −90° (ทวนเข็ม) */
+  rotateView: (direction: 1 | -1) => void;
   activeTab: PlaygroundTab;
   setActiveTab: (tab: PlaygroundTab) => void;
 
@@ -183,15 +205,6 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       });
     };
 
-    const addAreaObject = (type: "kitchen" | "counter", position?: Point) => {
-      const { layout } = get();
-      const at = position ?? findAvailableSpot(layout, type);
-      const create = type === "kitchen" ? createKitchen : createCounter;
-      const obj: LayoutObject = create({ position: at }, newId);
-      commit({ ...layout, objects: [...layout.objects, obj] }, obj.id);
-      return obj.id;
-    };
-
     return {
       layout: initial,
       layoutRevision: computeLayoutRevision(initial),
@@ -201,6 +214,7 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       historyIndex: 0,
       zoom: 1,
       is3DView: false,
+      viewRotation: 0,
       activeTab: "add",
       setActiveTab: (activeTab) => set({ activeTab }),
       interactionBase: null,
@@ -212,8 +226,13 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
         commit(result.layout, result.tableSet.table.id);
         return result.tableSet.table.id;
       },
-      addKitchen: (position) => addAreaObject("kitchen", position),
-      addCounter: (position) => addAreaObject("counter", position),
+      addCounter: (position) => {
+        const { layout } = get();
+        const at = position ?? findAvailableSpot(layout, "counter");
+        const obj: LayoutObject = createCounter({ position: at }, newId);
+        commit({ ...layout, objects: [...layout.objects, obj] }, obj.id);
+        return obj.id;
+      },
 
       updateObjectPosition: (id, x, y) => commit(coreMoveObject(get().layout, id, { x, y })),
       rotateObject: (id, deltaDegrees = 90) => commit(coreRotateObject(get().layout, id, deltaDegrees)),
@@ -231,6 +250,11 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
         return true;
       },
       setTableSetStyle: (id, patch) => commit(coreSetTableSetStyle(get().layout, id, patch)),
+      setCounterStyle: (id, patch) => {
+        const { layout } = get();
+        const next = coreSetCounterStyle(layout, id, patch);
+        if (next !== layout) commit(next, id);
+      },
       toggleTableSeats: (id) => {
         const { layout } = get();
         const obj = layout.objects.find((o) => o.id === id);
@@ -269,11 +293,10 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
           return res.tableSet.table.id;
         }
 
-        if (obj.type === "counter" || obj.type === "kitchen") {
-          const at = findAvailableSpot(layout, obj.type);
-          const create = obj.type === "kitchen" ? createKitchen : createCounter;
-          const newObj = create(
-            { position: at, width: obj.width, depth: obj.depth, rotation: obj.rotation },
+        if (obj.type === "counter") {
+          const at = findAvailableSpot(layout, "counter");
+          const newObj = createCounter(
+            { position: at, width: obj.width, depth: obj.depth, rotation: obj.rotation, style: obj.style },
             newId,
           );
           commit({ ...layout, objects: [...layout.objects, newObj] }, newObj.id);
@@ -291,11 +314,14 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
         const d = clampRoomDimension(depth);
         if (w === layout.width && d === layout.depth) return;
         const resized = { ...layout, width: w, depth: d };
-        // ทางเข้าต้องยังอยู่บนผนังหลังปรับขนาด (คง id เดิม)
+        // ทางเข้าและประตูครัวต้องยังอยู่บนผนังหลังปรับขนาด (คง id เดิม)
         const entrance = layout.entrance
           ? createEntrance(resized, layout.entrance, () => layout.entrance!.id)
           : null;
-        commit({ ...resized, entrance });
+        const kitchenDoor = layout.kitchenDoor
+          ? createKitchenDoor(resized, layout.kitchenDoor, () => layout.kitchenDoor!.id)
+          : null;
+        commit({ ...resized, entrance, kitchenDoor });
       },
 
       setEntrance: (input) => {
@@ -318,9 +344,46 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
         commit({ ...layout, entrance });
       },
 
+      addKitchenDoor: () => {
+        const { layout } = get();
+        if (layout.kitchenDoor) return false;
+        const init = defaultKitchenDoorInit(layout);
+        if (!init) return false;
+        const kitchenDoor = createKitchenDoor(layout, init, newId);
+        commit({ ...layout, kitchenDoor });
+        return true;
+      },
+
+      setKitchenDoor: (input) => {
+        const { layout } = get();
+        const id = layout.kitchenDoor?.id;
+        const kitchenDoor = createKitchenDoor(
+          layout,
+          { width: layout.kitchenDoor?.width, ...input },
+          id ? () => id : newId,
+        );
+        const prev = layout.kitchenDoor;
+        if (
+          prev &&
+          prev.wall === kitchenDoor.wall &&
+          prev.position === kitchenDoor.position &&
+          prev.width === kitchenDoor.width
+        ) {
+          return;
+        }
+        commit({ ...layout, kitchenDoor });
+      },
+
+      removeKitchenDoor: () => {
+        const { layout } = get();
+        if (!layout.kitchenDoor) return;
+        commit({ ...layout, kitchenDoor: null });
+      },
+
       selectObject: (id) => set({ selectedObjectId: selectionAfter(get().layout, id) }),
       setZoom: (zoom) => set({ zoom: Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number.isFinite(zoom) ? zoom : 1)) }),
       set3DView: (is3DView) => set({ is3DView }),
+      rotateView: (direction) => set({ viewRotation: rotateViewBy(get().viewRotation, direction) }),
 
       runValidation: () => {
         const validation = validateLayout(get().layout, { now: options.now });
@@ -340,7 +403,8 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
       },
       redo: () => travel(get().historyIndex + 1),
 
-      loadLayout: (layout, name, id) =>
+      loadLayout: (rawLayout, name, id) => {
+        const layout = migrateLayout(rawLayout);
         set((prev) => ({
           layout,
           layoutName: name ?? prev.layoutName,
@@ -351,15 +415,17 @@ export function createLayoutStore(options: LayoutStoreOptions = {}): StoreApi<La
           history: [layout],
           historyIndex: 0,
           interactionBase: null,
-        })),
+        }));
+      },
 
-      replaceLayout: (layout) => commit(layout, null),
+      replaceLayout: (rawLayout) => commit(migrateLayout(rawLayout), null),
       loadSampleLayout: () => commit(createSampleCafeLayout(newId), null),
 
       restoreHistory: (history, historyIndex, name) => {
         if (history.length === 0) return;
-        const start = Math.max(0, history.length - (HISTORY_LIMIT + 1));
-        const kept = history.slice(start);
+        const migrated = history.map(migrateLayout);
+        const start = Math.max(0, migrated.length - (HISTORY_LIMIT + 1));
+        const kept = migrated.slice(start);
         const index = Math.min(kept.length - 1, Math.max(0, historyIndex - start));
         const layout = kept[index]!;
         set((prev) => ({

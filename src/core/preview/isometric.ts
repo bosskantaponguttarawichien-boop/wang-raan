@@ -10,6 +10,7 @@
  */
 import { FURNITURE_COLOR_HEX } from "../layout/constants";
 import { directionVector, footprint } from "../layout/geometry";
+import { counterStyleOf } from "../layout/entities";
 import { chairStyleOf, tableStyleOf } from "../layout/table-set";
 import type { Chair, FurnitureColor, LayoutObject, Meters, Rect, StoreLayout } from "../layout/types";
 
@@ -31,12 +32,10 @@ export const ISO_PALETTE = {
   chairSeat: ["#ff9b52", "#dc6428", "#f07b38"],
   chairLeg: ["#dde0e5", "#aeb3bc", "#c5c9d0"],
   chairBack: ["#ff8d42", "#d45d23", "#ea7232"],
-  kitchenTop: ["#ffffff", "#dcdfe5", "#eaecf0"],
-  kitchenBody: ["#f3f4f6", "#cfd3da", "#e1e4e9"],
-  kitchenCooktop: ["#41464f", "#2b2f36", "#363a42"],
   counterTop: ["#ffffff", "#dee1e7", "#eceef2"],
   counterBody: ["#f8a466", "#d4672c", "#ea8041"],
   counterPos: ["#63c9f2", "#2c8bc0", "#41a5d9"],
+  counterGlass: ["#eef8ff", "#c9e3f3", "#dcedf8"],
   floor: "#fafbfc",
   floorFar: "#f1f3f6",
   grid: "#e6e9ee",
@@ -107,6 +106,7 @@ export interface IsoScene {
   /** เรียงตามลำดับการวาดแล้ว (ไกล → ใกล้) */
   polygons: IsoPolygon[];
   entrance: { x: number; y: number } | null;
+  kitchenDoor: { x: number; y: number } | null;
 }
 
 const round = (v: number) => Math.round(v * 10) / 10;
@@ -277,19 +277,21 @@ export function buildIsoScene(layout: StoreLayout): IsoScene {
         prism(obj.id, back, 22, 38, backColors, backDepth);
         break;
       }
-      case "kitchen": {
-        prism(obj.id, inset(r, 0.04), 0, 45, ISO_PALETTE.kitchenBody, base + 0.01);
-        prism(obj.id, r, 45, 50, ISO_PALETTE.kitchenTop, base + 0.08);
-        // เตา 2 หัวบนท็อปครัว
-        const size = Math.min(0.35, r.width * 0.3, r.depth * 0.4);
-        const cy = r.y + (r.depth - size) / 2;
-        prism(obj.id, { x: r.x + r.width * 0.2, y: cy, width: size, depth: size }, 50, 52, ISO_PALETTE.kitchenCooktop, base + 0.12);
-        prism(obj.id, { x: r.x + r.width * 0.8 - size, y: cy, width: size, depth: size }, 50, 52, ISO_PALETTE.kitchenCooktop, base + 0.13);
-        break;
-      }
+
       case "counter": {
-        prism(obj.id, inset(r, 0.04), 0, 37, ISO_PALETTE.counterBody, base + 0.01);
+        // ผังเก่า (ไม่มี style) คงจานสีเดิม; เลือกสีแล้วใช้สีนั้นกับตัวตู้
+        const style = counterStyleOf(obj);
+        prism(obj.id, inset(r, 0.04), 0, 37, obj.style ? furnitureTriple(style.color) : ISO_PALETTE.counterBody, base + 0.01);
         prism(obj.id, r, 37, 42, ISO_PALETTE.counterTop, base + 0.08);
+        if (style.variant === "display") {
+          // ตู้กระจกโชว์ขนมบนท็อปฝั่งต้นแกนยาว
+          const alongX = r.width >= r.depth;
+          const len = (alongX ? r.width : r.depth) * 0.42;
+          const glass = alongX
+            ? { x: r.x + 0.06, y: r.y + 0.06, width: len, depth: r.depth - 0.12 }
+            : { x: r.x + 0.06, y: r.y + 0.06, width: r.width - 0.12, depth: len };
+          prism(obj.id, glass, 42, 56, ISO_PALETTE.counterGlass, base + 0.14);
+        }
         prism(
           obj.id,
           { x: r.x + r.width * 0.68, y: r.y + r.depth * 0.2, width: r.width * 0.16, depth: r.depth * 0.23 },
@@ -359,6 +361,15 @@ export function buildIsoScene(layout: StoreLayout): IsoScene {
     }
   }
 
+  let kitchenDoor: IsoScene["kitchenDoor"] = null;
+  if (layout.kitchenDoor) {
+    const k = layout.kitchenDoor;
+    const mid = (k.position + k.position + k.width) / 2;
+    const [kx, ky] =
+      k.wall === "north" ? p(mid, 0) : k.wall === "south" ? p(mid, D) : k.wall === "west" ? p(0, mid) : p(W, mid);
+    kitchenDoor = { x: round(kx), y: round(ky) };
+  }
+
   // viewBox ครอบทั้งพื้น ฐาน ผนัง และวัตถุที่สูงที่สุด (+ ป้ายทางเข้า)
   const top = Math.max(H, 60);
   const corners = [
@@ -390,6 +401,7 @@ export function buildIsoScene(layout: StoreLayout): IsoScene {
     grid,
     polygons,
     entrance,
+    kitchenDoor,
   };
 }
 

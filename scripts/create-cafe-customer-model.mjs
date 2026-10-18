@@ -5,7 +5,7 @@
  * (ข้อต่อมีส่วนโค้งเชื่อมแทนรอยตัดระหว่างชิ้น) แล้วผูกน้ำหนักกับกระดูกแบบไล่ระดับ
  * ทำให้หัวไหล่ สะโพก และหัวเข่างอได้โดยผิวยืดต่อเนื่อง ไม่แยกเป็นก้อน
  *
- * ตัวละครมีความสูง native 1.13 ม. (แสดงผลที่ scale 0.9 = ราว 1.02 ม.)
+ * ตัวละครมีความสูง native 1.20 ม. (แสดงผลที่ scale 0.9 = ราว 1.08 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: node scripts/create-cafe-customer-model.mjs
  */
@@ -31,7 +31,7 @@ const mannequin = new THREE.MeshStandardMaterial({ color: "#9da4af", roughness: 
 
 const GRID_STEP = 0.009;
 const KEEP_VERTEX_RATIO = 0.38;
-const WEIGHT_REACH = 0.07;
+const WEIGHT_REACH = 0.045;
 
 function bone(name, position) {
   const part = new THREE.Bone();
@@ -43,22 +43,27 @@ function bone(name, position) {
 const model = new THREE.Group();
 model.name = "CafeMannequin";
 
-// โครง 14 ข้อต่อ: สะโพก ลำตัว คอ หัว ไหล่ ศอก โคนขา เข่า ข้อเท้า
-// ชื่อกระดูกเดิม (Hips/Spine/Head/แขน/ขา/LowerLeg) คงไว้ให้ฉากร้านใช้คลิปเดิมได้.
-const hips = bone("Hips", [0, 0.56, 0]);
-const spine = bone("Spine", [0, 0.08, 0]);
-const neck = bone("Neck", [0, 0.12, 0]);
-const head = bone("Head", [0, 0.05, 0]);
-const leftArm = bone("LeftArm", [-0.15, 0.07, 0]);
-const rightArm = bone("RightArm", [0.15, 0.07, 0]);
-const leftForeArm = bone("LeftForeArm", [-0.05, -0.16, 0]);
-const rightForeArm = bone("RightForeArm", [0.05, -0.16, 0]);
-const leftLeg = bone("LeftLeg", [-0.075, -0.03, 0]);
-const rightLeg = bone("RightLeg", [0.075, -0.03, 0]);
-const leftLowerLeg = bone("LeftLowerLeg", [0, -0.24, 0]);
-const rightLowerLeg = bone("RightLowerLeg", [0, -0.24, 0]);
-const leftFoot = bone("LeftFoot", [0, -0.22, 0]);
-const rightFoot = bone("RightFoot", [0, -0.22, 0]);
+// Reference: three head units tall (1.125 m); shoulder → elbow → wrist,
+// hip → knee → ankle. Bone pivots and surface endpoints share these landmarks.
+const HIPS_Y = 0.46;
+const hips = bone("Hips", [0, HIPS_Y, 0]);
+const spine = bone("Spine", [0, 0.15, 0]);
+const neck = bone("Neck", [0, 0.13, 0]);
+const head = bone("Head", [0, 0.085, 0]);
+const leftArm = bone("LeftArm", [-0.148, 0.04, 0]);
+const rightArm = bone("RightArm", [0.148, 0.04, 0]);
+const leftForeArm = bone("LeftForeArm", [-0.027, -0.11, 0]);
+const rightForeArm = bone("RightForeArm", [0.027, -0.11, 0]);
+// Lower the shoulder pivot to follow the rounded shoulder surface; keep elbow/wrist landmarks.
+// Avoid a lateral elbow kink: relaxation is in the sagittal animation plane.
+const leftHand = bone("LeftHand", [-0.02, -0.155, 0]);
+const rightHand = bone("RightHand", [0.02, -0.155, 0]);
+const leftLeg = bone("LeftLeg", [-0.07, -0.03, 0]);
+const rightLeg = bone("RightLeg", [0.07, -0.03, 0]);
+const leftLowerLeg = bone("LeftLowerLeg", [0, -0.20, 0]);
+const rightLowerLeg = bone("RightLowerLeg", [0, -0.20, 0]);
+const leftFoot = bone("LeftFoot", [0, -0.175, 0]);
+const rightFoot = bone("RightFoot", [0, -0.175, 0]);
 
 model.add(hips);
 hips.add(spine, leftLeg, rightLeg);
@@ -66,6 +71,8 @@ spine.add(neck, leftArm, rightArm);
 neck.add(head);
 leftArm.add(leftForeArm);
 rightArm.add(rightForeArm);
+leftForeArm.add(leftHand);
+rightForeArm.add(rightHand);
 leftLeg.add(leftLowerLeg);
 rightLeg.add(rightLowerLeg);
 leftLowerLeg.add(leftFoot);
@@ -74,28 +81,10 @@ model.updateMatrixWorld(true);
 
 const bones = [
   hips, spine, neck, head,
-  leftArm, rightArm, leftForeArm, rightForeArm,
+  leftArm, rightArm, leftForeArm, rightForeArm, leftHand, rightHand,
   leftLeg, rightLeg, leftLowerLeg, rightLowerLeg, leftFoot, rightFoot,
 ];
 const boneIndex = new Map(bones.map((part, index) => [part, index]));
-
-// กระดูกที่ผิวไล่น้ำหนักหากันได้ — แขน/ขาคนละข้างไม่ดึงกัน และหัวไม่ถูกแขนดึง.
-const blendsWith = new Map([
-  [hips, [spine, leftLeg, rightLeg]],
-  [spine, [hips, neck, leftArm, rightArm, leftLeg, rightLeg]],
-  [neck, [spine, head]],
-  [head, [neck]],
-  [leftArm, [spine, leftForeArm]],
-  [rightArm, [spine, rightForeArm]],
-  [leftForeArm, [leftArm]],
-  [rightForeArm, [rightArm]],
-  [leftLeg, [hips, spine, leftLowerLeg]],
-  [rightLeg, [hips, spine, rightLowerLeg]],
-  [leftLowerLeg, [leftLeg, leftFoot]],
-  [rightLowerLeg, [rightLeg, rightFoot]],
-  [leftFoot, [leftLowerLeg]],
-  [rightFoot, [rightLowerLeg]],
-]);
 
 // ---- รูปทรงพื้นฐาน (พิกัดท่ายืน หน่วยเมตร) ----
 const v3 = (x, y, z = 0) => new THREE.Vector3(x, y, z);
@@ -164,62 +153,69 @@ function smoothMin(a, b, k) {
   return Math.min(a, b) - h * h * k * 0.25;
 }
 
-// Chibi ตามภาพอ้างอิง: หัวกลมใหญ่ คอสั้น ลำตัวอวบ และแขนขาเป็นก้อนนุ่ม.
-// ลำตัวแคบกว่าหัวเล็กน้อย เพื่อให้แขนห้อยลงข้างตัวได้โดยไม่ติดสีข้าง.
-// หุ่น 3D man: หัวกลมใหญ่ คอเล็ก ลำตัวยาว ขายาว มือถุงมือมีนิ้วโป้ง และรองเท้าก้อนมน.
-const torso = capsule(spine, v3(0, 0.6), v3(0, 0.69), 0.15, [0.9, 1, 0.62]);
-const pelvis = ellipsoid(hips, v3(0, 0.555), v3(0.13, 0.075, 0.09));
-const neckPart = capsule(neck, v3(0, 0.75), v3(0, 0.82), 0.045);
-const skull = ellipsoid(head, v3(0, 0.965), v3(0.16, 0.16, 0.155));
-// แขนห้อยลงข้างตัว: หัวไหล่มน → ต้นแขนเรียว → ข้อศอก → ปลายแขน → มือ (ข้อต่อไม่มีรอยหัก).
+// Reference silhouette: oversized broad head, visible ears, a small straight torso,
+// relaxed slender arms and wide feet. Keep leg landmarks for the planted-foot IK.
+const torso = capsule(spine, v3(0, 0.535), v3(0, 0.625), 0.105, [1.08, 1, 0.72]);
+const pelvis = ellipsoid(hips, v3(0, 0.455, -0.008), v3(0.125, 0.085, 0.085));
+const neckPart = capsule(neck, v3(0, 0.713), v3(0, 0.825), 0.029);
+const skull = ellipsoid(head, v3(0, 0.99), v3(0.22, 0.21, 0.185));
+const ears = [-1, 1].map((side) =>
+  ellipsoid(head, v3(side * 0.202, 0.873, 0), v3(0.043, 0.047, 0.026)),
+);
 const arms = [
-  [leftArm, leftForeArm, -1],
-  [rightArm, rightForeArm, 1],
-].map(([upper, fore, side]) => ({
-  shoulder: ellipsoid(upper, v3(side * 0.145, 0.71), v3(0.052, 0.046, 0.046)),
-  upper: roundCone(upper, v3(side * 0.15, 0.71), v3(side * 0.2, 0.55), 0.046, 0.039),
-  fore: roundCone(fore, v3(side * 0.2, 0.55), v3(side * 0.215, 0.425), 0.039, 0.034),
-  hand: ellipsoid(fore, v3(side * 0.218, 0.395), v3(0.038, 0.05, 0.036)),
+  [leftArm, leftForeArm, leftHand, -1],
+  [rightArm, rightForeArm, rightHand, 1],
+].map(([upper, fore, hand, side]) => ({
+  // End the clavicle above/inboard of the upper-arm pivot. The old arm cap
+  // stood above this slope, producing a second hump at the shoulder tip.
+  shoulder: capsule(spine, v3(side * 0.038, 0.709), v3(side * 0.128, 0.675), 0.025, [1, 0.85, 1]),
+  upper: roundCone(upper, v3(side * 0.148, 0.65), v3(side * 0.175, 0.54), 0.032, 0.030),
+  fore: roundCone(fore, v3(side * 0.175, 0.54), v3(side * 0.195, 0.385), 0.030, 0.024),
+  hand: ellipsoid(hand, v3(side * 0.198, 0.36), v3(0.026, 0.03, 0.025)),
 }));
-// นิ้วโป้งชี้ไปด้านหน้าจากมือแบบถุงมือ.
 const thumbs = arms.map((_, i) => {
   const side = i === 0 ? -1 : 1;
-  return capsule(i === 0 ? leftForeArm : rightForeArm, v3(side * 0.214, 0.41, 0.02), v3(side * 0.212, 0.425, 0.05), 0.014);
+  return capsule(i === 0 ? leftHand : rightHand, v3(side * 0.194, 0.371, 0.016), v3(side * 0.19, 0.385, 0.038), 0.012);
 });
 const legs = [
   [leftLeg, leftLowerLeg, leftFoot, -1],
   [rightLeg, rightLowerLeg, rightFoot, 1],
 ].map(([upper, lower, foot, side]) => {
-  const x = side * 0.075;
+  const x = side * 0.07;
   return {
-    thigh: roundCone(upper, v3(x, 0.53), v3(x, 0.29), 0.066, 0.052),
-    shin: roundCone(lower, v3(x, 0.29), v3(x, 0.08), 0.052, 0.042),
-    // รองเท้าก้อนมน ยาวไปด้านหน้า.
-    foot: capsule(foot, v3(x, 0.045, -0.02), v3(x, 0.045, 0.1), 0.045, [1.1, 0.95, 1]),
+    thigh: roundCone(upper, v3(x, 0.43), v3(x, 0.23), 0.064, 0.052),
+    shin: roundCone(lower, v3(x, 0.23), v3(x, 0.055), 0.052, 0.038),
+    foot: capsule(foot, v3(x, 0.037, -0.018), v3(x + side * 0.012, 0.037, 0.102), 0.036, [1.62, 0.95, 1]),
   };
 });
 const primitives = [
   torso, pelvis, neckPart, skull, ...thumbs,
   ...arms.flatMap((arm) => [arm.shoulder, arm.upper, arm.fore, arm.hand]),
   ...legs.flatMap((leg) => [leg.thigh, leg.shin, leg.foot]),
+  ...ears,
 ];
 
 const distances = new Float64Array(primitives.length);
 function bodyDistance(p) {
   for (let i = 0; i < primitives.length; i += 1) distances[i] = primitives[i].distance(p);
   const [dTorso, dPelvis, dNeck, dSkull, dThumbL, dThumbR, ...limbs] = distances;
-  const [dShoulderL, dUpperL, dForeL, dHandL, dShoulderR, dUpperR, dForeR, dHandR, dThighL, dShinL, dFootL, dThighR, dShinR, dFootR] = limbs;
+  const [dShoulderL, dUpperL, dForeL, dHandL, dShoulderR, dUpperR, dForeR, dHandR, dThighL, dShinL, dFootL, dThighR, dShinR, dFootR, dEarL, dEarR] = limbs;
   let body = smoothMin(dTorso, dPelvis, 0.06);
-  body = smoothMin(body, dNeck, 0.03);
-  body = smoothMin(body, dSkull, 0.03);
-  // แขนผสานกับลำตัวเฉพาะต้นแขน (หัวไหล่); ปลายแขนและมือแยกจากลำตัว เวลาแกว่งจึงไม่ลากผิวตัวตาม.
-  const armL = smoothMin(smoothMin(smoothMin(dShoulderL, dUpperL, 0.04), dForeL, 0.012), smoothMin(dHandL, dThumbL, 0.012), 0.02);
-  const armR = smoothMin(smoothMin(smoothMin(dShoulderR, dUpperR, 0.04), dForeR, 0.012), smoothMin(dHandR, dThumbR, 0.012), 0.02);
-  const shoulders = smoothMin(smoothMin(body, smoothMin(dShoulderL, dUpperL, 0.04), 0.05), smoothMin(dShoulderR, dUpperR, 0.04), 0.05);
-  // ขาสองข้างผสานกับลำตัวแยกกัน จึงไม่มีพังผืดเชื่อมระหว่างต้นขาซ้าย-ขวา.
-  const left = smoothMin(body, smoothMin(smoothMin(dThighL, dShinL, 0.04), dFootL, 0.03), 0.04);
-  const right = smoothMin(body, smoothMin(smoothMin(dThighR, dShinR, 0.04), dFootR, 0.03), 0.04);
-  return Math.min(shoulders, armL, armR, left, right);
+  body = smoothMin(body, dNeck, 0.032);
+  const headShape = smoothMin(smoothMin(dSkull, dEarL, 0.012), dEarR, 0.012);
+  body = smoothMin(body, headShape, 0.015);
+  // Merge each limb once. Taking a hard minimum of overlapping body/shoulder
+  // branches leaves a crease at the shoulder even though the mesh is connected.
+  const armL = smoothMin(smoothMin(smoothMin(dShoulderL, dUpperL, 0.026), dForeL, 0.022), smoothMin(dHandL, dThumbL, 0.01), 0.012);
+  const armR = smoothMin(smoothMin(smoothMin(dShoulderR, dUpperR, 0.026), dForeR, 0.022), smoothMin(dHandR, dThumbR, 0.01), 0.012);
+  // Broad blend at the shoulder, negligible below the armpit to preserve air gaps.
+  const shoulderBlend = THREE.MathUtils.lerp(0.002, 0.045, THREE.MathUtils.smoothstep(p.y, 0.61, 0.70));
+  body = smoothMin(smoothMin(body, armL, shoulderBlend), armR, shoulderBlend);
+  // A small knee blend avoids adding a ball-shaped bulge to matching radii.
+  const legL = smoothMin(smoothMin(dThighL, dShinL, 0.012), dFootL, 0.014);
+  const legR = smoothMin(smoothMin(dThighR, dShinR, 0.012), dFootR, 0.014);
+  const hipBlend = THREE.MathUtils.lerp(0.002, 0.035, THREE.MathUtils.smoothstep(p.y, 0.34, 0.43));
+  return smoothMin(smoothMin(body, legL, hipBlend), legR, hipBlend);
 }
 
 const EPSILON = 1e-4;
@@ -238,8 +234,8 @@ function projectToSurface(p) {
 
 // ---- Surface nets: สุ่ม SDF บนกริดแล้วต่อเป็น mesh ปิดชิ้นเดียว ----
 function buildSurface() {
-  const min = v3(-0.3, -0.02, -0.2);
-  const max = v3(0.3, 1.16, 0.2);
+  const min = v3(-0.36, -0.02, -0.21);
+  const max = v3(0.36, 1.23, 0.21);
   const nx = Math.ceil((max.x - min.x) / GRID_STEP) + 1;
   const ny = Math.ceil((max.y - min.y) / GRID_STEP) + 1;
   const nz = Math.ceil((max.z - min.z) / GRID_STEP) + 1;
@@ -328,11 +324,10 @@ function skinFor(p) {
   for (let i = 0; i < primitives.length; i += 1) distances[i] = primitives[i].distance(p);
   let nearest = 0;
   for (let i = 1; i < primitives.length; i += 1) if (distances[i] < distances[nearest]) nearest = i;
-  const owner = primitives[nearest].owner;
-  const allowed = new Set([owner, ...blendsWith.get(owner)]);
+  // Every nearby influence fades continuously. Switching an allowed-bone list
+  // at the nearest primitive boundary caused jagged deformation at the armpit.
   const weights = new Map();
   primitives.forEach((primitive, i) => {
-    if (!allowed.has(primitive.owner)) return;
     const reach = 1 - THREE.MathUtils.clamp((distances[i] - distances[nearest]) / WEIGHT_REACH, 0, 1);
     const weight = reach * reach * (3 - 2 * reach);
     if (weight > (weights.get(primitive.owner) ?? 0)) weights.set(primitive.owner, weight);
@@ -384,6 +379,8 @@ body.bind(new THREE.Skeleton(bones));
 // ---- Animation: keyframe ถี่จากคลื่น sine เพื่อให้ข้อต่อเคลื่อนแบบนุ่ม ไม่หักมุมที่ปลายวงสวิง ----
 const quaternionFrames = (angles) =>
   angles.flatMap((angle) => new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, 0)).toArray());
+const armPoseFrames = (x, z) =>
+  [0, 1].flatMap(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, 0, z)).toArray());
 
 function sampled(duration, frames) {
   const times = Array.from({ length: frames + 1 }, (_, i) => (duration * i) / frames);
@@ -404,48 +401,64 @@ const idle = new THREE.AnimationClip("Idle", 2.4, [
   new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", idleCycle.times, idleWave(0.03, -0.6, -0.08)),
 ]);
 
-const walkCycle = sampled(0.8, 16);
-const swingAngles = (offset) => walkCycle.phases.map((phase) => 0.32 * Math.cos(phase + offset));
-// งอเข่าช่วงที่ขาเหวี่ยงจากหลังมาหน้า (sin² ทำให้เริ่ม/จบการงออย่างนุ่ม).
-const kneeAngles = (offset) => walkCycle.phases.map((phase) => 0.42 * Math.max(0, Math.sin(phase + offset)) ** 2);
-// ข้อเท้าหักล้างมุมขา+เข่าเกือบทั้งหมด ฝ่าเท้าจึงขนานพื้นตลอดก้าว.
-const ankleAngles = (offset) => swingAngles(offset).map((angle, i) => -(angle + kneeAngles(offset)[i]) * 0.85);
-const armAngles = (offset) => swingAngles(offset).map((angle) => angle * 0.8);
-// ข้อศอกงอค้างเล็กน้อย และงอเพิ่มตอนแขนแกว่งมาด้านหน้า.
-const elbowAngles = (offset) => armAngles(offset).map((angle) => -0.22 + angle * 0.4);
-const walk = new THREE.AnimationClip("Walk", 0.8, [
-  new THREE.QuaternionKeyframeTrack("LeftLeg.quaternion", walkCycle.times, quaternionFrames(swingAngles(0))),
-  new THREE.QuaternionKeyframeTrack("RightLeg.quaternion", walkCycle.times, quaternionFrames(swingAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("LeftLowerLeg.quaternion", walkCycle.times, quaternionFrames(kneeAngles(0))),
-  new THREE.QuaternionKeyframeTrack("RightLowerLeg.quaternion", walkCycle.times, quaternionFrames(kneeAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("LeftFoot.quaternion", walkCycle.times, quaternionFrames(ankleAngles(0))),
-  new THREE.QuaternionKeyframeTrack("RightFoot.quaternion", walkCycle.times, quaternionFrames(ankleAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", walkCycle.times, quaternionFrames(armAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", walkCycle.times, quaternionFrames(armAngles(0))),
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", walkCycle.times, quaternionFrames(elbowAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", walkCycle.times, quaternionFrames(elbowAngles(0))),
-  new THREE.VectorKeyframeTrack(
-    "Hips.position",
-    walkCycle.times,
-    walkCycle.phases.flatMap((phase) => [0, 0.56 + 0.008 * Math.cos(phase * 2), 0]),
-  ),
+// Solve a two-bone leg toward a planted/swinging ankle instead of swinging
+// every joint independently. Shorter, quicker steps keep the gait compact.
+const WALK_DURATION = 0.72;
+const WALK_DISTANCE = 0.36;
+const walkCycle = sampled(WALK_DURATION, 60);
+model.userData.walkCycleDistance = WALK_DISTANCE;
+const hipHeights = walkCycle.phases.map((phase) => 0.4464 + 0.002 * (1 - Math.cos(phase * 2)));
+function legPose(phase, hipY) {
+  const t = ((phase / (Math.PI * 2)) % 1 + 1) % 1;
+  const swing = Math.max(0, (t - 0.5) * 2);
+  const z = t <= 0.5
+    ? WALK_DISTANCE / 4 - WALK_DISTANCE * t
+    : -WALK_DISTANCE / 4 + WALK_DISTANCE / 2 * (swing * swing * (3 - 2 * swing));
+  const ankleY = 0.055 + 0.028 * Math.sin(Math.PI * swing) ** 2;
+  const down = hipY - 0.03 - ankleY;
+  const thigh = 0.20;
+  const shin = 0.175;
+  const knee = Math.acos(THREE.MathUtils.clamp((down * down + z * z - thigh * thigh - shin * shin) / (2 * thigh * shin), -1, 1));
+  const hip = Math.atan2(-z, down) - Math.atan2(shin * Math.sin(knee), thigh + shin * Math.cos(knee));
+  return { hip, knee, ankle: -hip - knee };
+}
+const legsAt = (offset) => walkCycle.phases.map((phase, i) => legPose(phase + offset, hipHeights[i]));
+const leftPoses = legsAt(0);
+const rightPoses = legsAt(Math.PI);
+const jointTrack = (name, poses, key) => new THREE.QuaternionKeyframeTrack(name + ".quaternion", walkCycle.times, quaternionFrames(poses.map((pose) => pose[key])));
+const armAngles = (offset) => walkCycle.phases.map((phase) => 0.12 * Math.cos(phase + offset));
+const upperBodyFrames = (sign) => walkCycle.phases.flatMap((phase) => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, sign * 0.012 * Math.sin(phase), sign * 0.006 * Math.cos(phase))).toArray());
+const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
+  jointTrack("LeftLeg", leftPoses, "hip"), jointTrack("RightLeg", rightPoses, "hip"),
+  jointTrack("LeftLowerLeg", leftPoses, "knee"), jointTrack("RightLowerLeg", rightPoses, "knee"),
+  jointTrack("LeftFoot", leftPoses, "ankle"), jointTrack("RightFoot", rightPoses, "ankle"),
+  // Left leg forward → left arm back, right arm forward.
+  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", walkCycle.times, quaternionFrames(armAngles(0))),
+  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", walkCycle.times, quaternionFrames(armAngles(Math.PI))),
+  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", walkCycle.times, quaternionFrames(armAngles(0).map((a) => -0.12 + a * 0.25))),
+  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", walkCycle.times, quaternionFrames(armAngles(Math.PI).map((a) => -0.12 + a * 0.25))),
+  new THREE.QuaternionKeyframeTrack("Spine.quaternion", walkCycle.times, upperBodyFrames(1)),
+  new THREE.QuaternionKeyframeTrack("Head.quaternion", walkCycle.times, upperBodyFrames(-0.6)),
+  new THREE.VectorKeyframeTrack("Hips.position", walkCycle.times, hipHeights.flatMap((y) => [0, y, 0])),
 ]);
 
 // ยกสะโพกให้ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ scale 0.9 ≈ 0.533 หน่วยโมเดล).
-const SIT_HIPS_Y = 0.533 + 0.03 + 0.066;
+const SIT_HIPS_Y = 0.533 + 0.03 + 0.064;
 const sit = new THREE.AnimationClip("Sit", 1, [
-  new THREE.VectorKeyframeTrack("Hips.position", [0, 1], [0, 0.56, 0, 0, SIT_HIPS_Y, 0]),
-  new THREE.QuaternionKeyframeTrack("LeftLeg.quaternion", [0, 1], quaternionFrames([0, -1.32])),
-  new THREE.QuaternionKeyframeTrack("RightLeg.quaternion", [0, 1], quaternionFrames([0, -1.32])),
-  new THREE.QuaternionKeyframeTrack("LeftLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.24])),
-  new THREE.QuaternionKeyframeTrack("RightLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.24])),
-  new THREE.QuaternionKeyframeTrack("LeftFoot.quaternion", [0, 1], quaternionFrames([0, 0.08])),
-  new THREE.QuaternionKeyframeTrack("RightFoot.quaternion", [0, 1], quaternionFrames([0, 0.08])),
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", [0, 1], quaternionFrames([0, -0.36])),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", [0, 1], quaternionFrames([0, -0.36])),
+  new THREE.VectorKeyframeTrack("Hips.position", [0, 1], [0, HIPS_Y, 0, 0, SIT_HIPS_Y, 0]),
+  // GLB faces +Z. Rotate the character toward the chair front so thighs and
+  // forearms move forward (+Z) while the knees fold down.
+  new THREE.QuaternionKeyframeTrack("LeftLeg.quaternion", [0, 1], quaternionFrames([0, -1.5])),
+  new THREE.QuaternionKeyframeTrack("RightLeg.quaternion", [0, 1], quaternionFrames([0, -1.5])),
+  new THREE.QuaternionKeyframeTrack("LeftLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.4])),
+  new THREE.QuaternionKeyframeTrack("RightLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.4])),
+  new THREE.QuaternionKeyframeTrack("LeftFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
+  new THREE.QuaternionKeyframeTrack("RightFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
+  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", [0, 1], armPoseFrames(-0.75, 0.22)),
+  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", [0, 1], armPoseFrames(-0.75, -0.22)),
   // วางปลายแขนไว้บนตัก.
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", [0, 1], quaternionFrames([0, -0.75])),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", [0, 1], quaternionFrames([0, -0.75])),
+  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", [0, 1], armPoseFrames(0.75, 0.16)),
+  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", [0, 1], armPoseFrames(0.75, -0.16)),
 ]);
 
 const exporter = new GLTFExporter();

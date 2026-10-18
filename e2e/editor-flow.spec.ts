@@ -8,6 +8,7 @@ import { addItem, buildReadyCafe, openAllSections, openTab, placeSelected } from
  */
 const stage = (page: Page) => page.getByTestId("artboard-stage");
 const pieces = (page: Page, type: string) => stage(page).locator(`[data-type="${type}"]`);
+const kitchenDoor = (page: Page) => stage(page).getByTestId("kitchen-door-marker");
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
 const toast = (page: Page) => page.getByTestId("toast");
 const undoButton = (page: Page) => page.getByRole("button", { name: /^ย้อนกลับ/ });
@@ -42,11 +43,11 @@ test.describe("จัดร้าน → ตรวจผัง → จำลอ�
     await page.getByTestId("stop-simulation").click();
     await expect(page.getByTestId("simulation-status")).not.toContainText("กำลังจำลอง");
 
-    // Non-blocking placement: ลากโต๊ะไปทับครัวได้ แต่ผังกลายเป็น Blocked และปุ่มจำลองถูกปิดทันที
+    // Non-blocking placement: ลากโต๊ะไปทับเคาน์เตอร์ได้ แต่ผังกลายเป็น Blocked และปุ่มจำลองถูกปิดทันที
     const table = pieces(page, "table").first();
-    const kitchen = pieces(page, "kitchen").first();
+    const counter = pieces(page, "counter").first();
     const from = (await table.boundingBox())!;
-    const to = (await kitchen.boundingBox())!;
+    const to = (await counter.boundingBox())!;
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
     await page.mouse.down();
     await page.mouse.move(to.x + to.width / 2, to.y + to.height / 2, { steps: 8 });
@@ -129,16 +130,16 @@ test.describe("Inspector & Room Settings (feat-027)", () => {
     await expect(stage(page)).toHaveAttribute("aria-label", "ผังร้านขนาด 10 × 7.5 เมตร");
   });
 
-  test("ปรับตำแหน่งครัวละเอียดด้วยป๊อปโอเวอร์ X/Y ของ selection toolbar (snap 0.25 ม.)", async ({ page }) => {
-    await addItem(page, "ครัว");
+  test("ปรับตำแหน่งเคาน์เตอร์ละเอียดด้วยป๊อปโอเวอร์ X/Y ของ selection toolbar (snap 0.25 ม.)", async ({ page }) => {
+    await addItem(page, "เคาน์เตอร์");
     await placeSelected(page, 0.5, 0.5);
-    await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
+    await expect(pieces(page, "counter").first()).toHaveAttribute("aria-label", /เคาน์เตอร์ ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
     // ค่าที่ไม่ลงกริด → snap 0.25 ม.
     await placeSelected(page, 1.1, 0.9);
-    await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 1\.00 ม\. y 1\.00 ม\./);
+    await expect(pieces(page, "counter").first()).toHaveAttribute("aria-label", /เคาน์เตอร์ ตำแหน่ง x 1\.00 ม\. y 1\.00 ม\./);
     // Undo หนึ่งครั้ง = ย้อนการปรับหนึ่งครั้ง
     await undoButton(page).click();
-    await expect(pieces(page, "kitchen").first()).toHaveAttribute("aria-label", /ครัว ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
+    await expect(pieces(page, "counter").first()).toHaveAttribute("aria-label", /เคาน์เตอร์ ตำแหน่ง x 0\.50 ม\. y 0\.50 ม\./);
   });
 });
 
@@ -150,7 +151,7 @@ test.describe("Auto-save Draft (feat-028)", () => {
 
     await page.reload();
     await expect(stage(page)).toBeVisible();
-    await expect(pieces(page, "kitchen")).toHaveCount(1);
+    await expect(kitchenDoor(page)).toHaveCount(1);
     await expect(pieces(page, "counter")).toHaveCount(1);
     await expect(pieces(page, "chair")).toHaveCount(4);
     await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
@@ -159,9 +160,9 @@ test.describe("Auto-save Draft (feat-028)", () => {
     const undo = undoButton(page);
     await expect(undo).toBeEnabled();
     while (await undo.isEnabled()) await undo.click();
-    await expect(pieces(page, "kitchen")).toHaveCount(0);
+    await expect(kitchenDoor(page)).toHaveCount(0);
     await redoButton(page).click();
-    await expect(pieces(page, "kitchen")).toHaveCount(1);
+    await expect(kitchenDoor(page)).toHaveCount(1);
 
     // ผังใหม่ (เมนูโปรเจกต์ → เลือกขนาด) → ล้างร่าง และรีเฟรชแล้วยังว่าง
     await page.getByRole("button", { name: "เมนูโปรเจกต์" }).click();
@@ -169,10 +170,10 @@ test.describe("Auto-save Draft (feat-028)", () => {
     const onboarding = page.getByTestId("onboarding-dialog");
     await onboarding.getByRole("button", { name: "เริ่มจัดร้าน" }).click();
     await expect(onboarding).toBeHidden();
-    await expect(pieces(page, "kitchen")).toHaveCount(0);
+    await expect(kitchenDoor(page)).toHaveCount(0);
     await page.reload();
     await expect(stage(page)).toBeVisible();
-    await expect(pieces(page, "kitchen")).toHaveCount(0);
+    await expect(kitchenDoor(page)).toHaveCount(0);
   });
 
   test("ร่างเสียใน localStorage ไม่ทำให้ Editor พัง", async ({ page }) => {
@@ -191,7 +192,8 @@ test.describe("ไฟล์ JSON (feat-029) และส่งออกภาพ
     expect(download.suggestedFilename()).toMatch(/^wang-raan-8x6m-\d{8}-\d{4}\.json$/);
     const file = JSON.parse(await readFile((await download.path())!, "utf8"));
     expect(file).toMatchObject({ contractVersion: "p1-layout-v1", validation: { status: "ready" } });
-    expect(file.layout.objects).toHaveLength(7);
+    expect(file.layout.objects).toHaveLength(6);
+    expect(file.layout.kitchenDoor).toMatchObject({ wall: "north" });
 
     const sample = {
       contractVersion: "p1-layout-v1",

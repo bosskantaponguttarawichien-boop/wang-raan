@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEntrance, type StoreLayout, type Wall } from "@/core/layout";
 import { validateLayout } from "@/core/validation";
-import { cafeLayout, withoutType } from "@/test/fixtures/layouts";
+import { cafeLayout } from "@/test/fixtures/layouts";
 import { escapeXml, renderPlanSvg } from "./plan-svg";
 import { summarizeLayout } from "./summary";
 
@@ -26,7 +26,7 @@ describe("summarizeLayout", () => {
   });
 
   it("เก้าอี้กำพร้าไม่นับเป็นที่นั่ง, โต๊ะไม่มี preset นับเป็น custom, นับ issue ตามหมวด", () => {
-    const base = withoutType(cafeLayout(), "kitchen");
+    const base = { ...cafeLayout(), kitchenDoor: null };
     const table = base.objects.find((o) => o.type === "table")!;
     const layout: StoreLayout = {
       ...base,
@@ -60,10 +60,9 @@ describe("renderPlanSvg (feat-025 gate: สัดส่วนตรงตาม�
     expect(svg).toMatch(/^<svg xmlns="http:\/\/www\.w3\.org\/2000\/svg" width="472" height="372" viewBox="0 0 472 372"/);
     expect(count(svg, /data-type="table"/g)).toBe(2);
     expect(count(svg, /data-type="chair"/g)).toBe(6);
-    expect(count(svg, /data-type="kitchen"/g)).toBe(1);
+    expect(count(svg, /data-type="kitchen-door"/g)).toBe(1);
     expect(count(svg, /data-type="counter"/g)).toBe(1);
-    // ครัว (0.5, 0.5) 2 × 1.5 ม. → (25, 25) 100 × 75 px
-    expect(svg).toContain('<rect x="25" y="25" width="100" height="75"');
+    expect(svg).toContain('data-type="kitchen-door" data-wall="north"');
     expect(svg).toContain("<title>ผังร้านขนาด 8 × 6 เมตร</title>");
     expect(svg).toContain(">8 ม.</text>");
     expect(svg.endsWith("</svg>")).toBe(true);
@@ -82,15 +81,15 @@ describe("renderPlanSvg (feat-025 gate: สัดส่วนตรงตาม�
 
   it("Issue Rings ตามระดับปัญหา + escape ข้อความ", () => {
     const layout = cafeLayout();
-    const kitchen = layout.objects.find((o) => o.type === "kitchen")!;
     const svg = renderPlanSvg(layout, {
       severityById: new Map([
-        [kitchen.id, "blocked"],
+        [layout.kitchenDoor!.id, "blocked"],
         [layout.entrance!.id, "warning"],
       ]),
       title: 'ร้าน "A&B" <1>',
     });
     expect(count(svg, /data-issue="blocked"/g)).toBe(1);
+    expect(svg).toContain('data-type="kitchen-door" data-wall="north" data-issue="blocked"');
     expect(svg).toContain('data-type="entrance" data-wall="south" data-issue="warning"');
     expect(svg).toContain("<title>ร้าน &quot;A&amp;B&quot; &lt;1&gt;</title>");
     expect(escapeXml("'")).toBe("&apos;");

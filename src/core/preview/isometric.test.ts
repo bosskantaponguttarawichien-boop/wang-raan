@@ -66,8 +66,8 @@ describe("Isometric projection (design-system §7.3)", () => {
 
   it("ใช้จานสีตาม design-system §2.4", () => {
     const fills = new Set(buildIsoScene(cafeLayout()).polygons.map((p) => p.fill));
-    // ท็อปโต๊ะ/ครัว/เคาน์เตอร์สีขาว, เบาะเก้าอี้ส้ม, ตัวเคาน์เตอร์ส้ม, จอ POS ฟ้า
-    for (const color of ["#ffffff", "#ff9b52", "#f8a466", "#63c9f2", "#41464f"]) expect(fills.has(color)).toBe(true);
+    // ท็อปโต๊ะ/เคาน์เตอร์สีขาว, เบาะเก้าอี้ส้ม, ตัวเคาน์เตอร์ส้ม, จอ POS ฟ้า
+    for (const color of ["#ffffff", "#ff9b52", "#f8a466", "#63c9f2"]) expect(fills.has(color)).toBe(true);
   });
 
   it("เฟอร์นิเจอร์ไม่มีเส้นขอบ (stroke สีเดียวกับหน้า)", () => {

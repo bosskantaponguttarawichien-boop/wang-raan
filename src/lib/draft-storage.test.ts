@@ -99,7 +99,7 @@ describe("draft-autosave (feat-028 gate: รีเฟรชแล้วผัง
     const status = statusStore();
     const store = createLayoutStore({ newId: createSequentialIds() });
     const autosave = startAutosave(store, storage, { delayMs: 300, status, now: () => new Date(savedAt) });
-    store.getState().addKitchen();
+    store.getState().addKitchenDoor();
     store.getState().addCounter();
     store.getState().addTableSet("table-4-seats");
     store.getState().undo();
@@ -133,7 +133,7 @@ describe("draft-autosave (feat-028 gate: รีเฟรชแล้วผัง
     const autosave = startAutosave(store, storage, { status: statusStore() });
     autosave.flush();
     expect(storage.getItem(DRAFT_KEY)).toBeNull();
-    store.getState().addKitchen();
+    store.getState().addKitchenDoor();
     autosave.flush();
     expect(loadDraft(storage)!.history).toHaveLength(2);
     store.getState().addCounter();
@@ -145,7 +145,7 @@ describe("draft-autosave (feat-028 gate: รีเฟรชแล้วผัง
     const status = statusStore();
     const store = createLayoutStore({ newId: createSequentialIds() });
     const autosave = startAutosave(store, null, { status });
-    store.getState().addKitchen();
+    store.getState().addKitchenDoor();
     autosave.flush();
     expect(status.getState().status).toBe("error");
     autosave.dispose();
@@ -156,7 +156,7 @@ describe("draft-autosave (feat-028 gate: รีเฟรชแล้วผัง
     const status = statusStore();
     status.setState({ restoredAt: savedAt });
     const store = createLayoutStore({ newId: createSequentialIds() });
-    store.getState().addKitchen();
+    store.getState().addKitchenDoor();
     saveDraft(storage, { savedAt, history: store.getState().history, historyIndex: 1 });
     const autosave = startAutosave(store, storage, { status });
     startNewLayout(store, storage, status);

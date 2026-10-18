@@ -17,7 +17,7 @@ const ROTATIONS: Rotation[] = [0, 90, 180, 270];
 const codes = (layout: StoreLayout) => checkCollisions(layout).map(issueCode);
 
 function room(...objects: LayoutObject[]): StoreLayout {
-  return { id: "l", version: 1, units: "m", width: 8, depth: 6, entrance: null, objects };
+  return { id: "l", version: 1, units: "m", width: 8, depth: 6, entrance: null, kitchenDoor: null, objects };
 }
 
 describe("Collision (PRD §5.4)", () => {
@@ -30,14 +30,30 @@ describe("Collision (PRD §5.4)", () => {
   });
 
   it.each([
-    ["kitchen", "counter", "ครัวทับเคาน์เตอร์"],
-    ["kitchen", "kitchen", "ครัวทับครัวตัวอื่น"],
+    ["counter", "table", "เคาน์เตอร์ทับโต๊ะ"],
     ["counter", "counter", "เคาน์เตอร์ทับเคาน์เตอร์ตัวอื่น"],
   ] as const)("%s ทับ %s → Blocked", (a, b, message) => {
-    const issues = checkCollisions(room(block("a", 1, 1, 2, 1, a), block("b", 2.5, 1.5, 2, 1, b)));
+    const objB = b === "table" ? { id: "b", type: "table" as const, x: 2.5, y: 1.5, width: 0.8, depth: 0.8, rotation: 0 as const, chairIds: [] } : block("b", 2.5, 1.5, 2, 1, b);
+    const issues = checkCollisions(room(block("a", 1, 1, 2, 1, a), objB));
     expect(issues).toEqual([
       { id: "collision/overlap/a+b", category: "collision", severity: "blocked", objectIds: ["a", "b"], message },
     ]);
+  });
+
+  it("ประตูครัวทับทางเข้าร้านบนผนังเดียวกัน → Blocked", () => {
+    const layout: StoreLayout = {
+      ...cafeLayout(),
+      entrance: { id: "entrance-01", wall: "south", position: 1, width: 1.2 },
+      kitchenDoor: { id: "kitchen-door-01", wall: "south", position: 1.5, width: 0.9 },
+    };
+    const issues = checkCollisions(layout);
+    expect(issues).toContainEqual(
+      expect.objectContaining({
+        id: "collision/kitchen-door-overlaps-entrance/kitchen-door-01+entrance-01",
+        severity: "blocked",
+        message: "ประตูครัวทับทางเข้าร้าน",
+      }),
+    );
   });
 
   describe("ตรวจได้แม่นยำทุกมุมหมุน", () => {
@@ -107,11 +123,11 @@ describe("Collision (PRD §5.4)", () => {
       expect(issues).toContainEqual(expect.objectContaining({ message: "เก้าอี้ทับโต๊ะตัวอื่น" }));
     });
 
-    it("ย้ายชุดโต๊ะไปทับครัว → Blocked ทั้งโต๊ะและเก้าอี้ที่ทับ", () => {
-      const kitchen = base.objects.find((o) => o.type === "kitchen")!;
-      const issues = checkCollisions(moveObject(base, table.id, { x: kitchen.x, y: kitchen.y }));
-      expect(issues.some((i) => i.message === "โต๊ะทับครัว" || i.message === "ครัวทับโต๊ะ")).toBe(true);
-      expect(issues.some((i) => /เก้าอี้ทับครัว|ครัวทับเก้าอี้/.test(i.message))).toBe(true);
+    it("ย้ายชุดโต๊ะไปทับเคาน์เตอร์ → Blocked ทั้งโต๊ะและเก้าอี้ที่ทับ", () => {
+      const counter = base.objects.find((o) => o.type === "counter")!;
+      const issues = checkCollisions(moveObject(base, table.id, { x: counter.x, y: counter.y }));
+      expect(issues.some((i) => i.message === "โต๊ะทับเคาน์เตอร์" || i.message === "เคาน์เตอร์ทับโต๊ะ")).toBe(true);
+      expect(issues.some((i) => /เก้าอี้ทับเคาน์เตอร์|เคาน์เตอร์ทับเก้าอี้/.test(i.message))).toBe(true);
     });
   });
 

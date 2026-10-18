@@ -6,7 +6,7 @@ import { SelectionToolbar } from "./selection-toolbar";
 import {
   createEmptyLayout,
   addTableSet,
-  createKitchen,
+  createCounter,
   type StoreLayout,
   type Table,
 } from "@/core/layout";
@@ -179,14 +179,14 @@ describe("SelectionToolbar Component", () => {
     expect(layoutStore.getState().layout.objects.find((o) => o.id === table.id)).toBeUndefined();
   });
 
-  it("วัตถุที่ไม่ใช่โต๊ะ (เช่น ครัว) ไม่มีปุ่มเปลี่ยนจำนวนที่นั่ง", () => {
-    const kitchen = createKitchen({ position: { x: 1, y: 1 } });
+  it("วัตถุที่ไม่ใช่โต๊ะ (เช่น เคาน์เตอร์) ไม่มีปุ่มเปลี่ยนจำนวนที่นั่ง", () => {
+    const counter = createCounter({ position: { x: 1, y: 1 } });
     render(
       <SelectionToolbar
         boxRef={boxRef}
         room={{ width: 8, depth: 6 }}
-        objects={[kitchen]}
-        selected={kitchen}
+        objects={[counter]}
+        selected={counter}
         groupRect={null}
       />,
     );

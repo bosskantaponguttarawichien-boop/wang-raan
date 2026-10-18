@@ -1,6 +1,7 @@
 export * from "./constants";
 export * from "./entities";
 export * from "./geometry";
+export * from "./migrate";
 export * from "./sample-layout";
 export * from "./spot-finder";
 export * from "./table-set";

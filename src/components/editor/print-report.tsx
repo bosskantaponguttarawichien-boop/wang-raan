@@ -70,7 +70,13 @@ function PrintReportContent({ live }: { live: LiveValidation }) {
       `${summary.counts.table} ชุด (2 ที่นั่ง ${summary.tables.twoSeats} · 4 ที่นั่ง ${summary.tables.fourSeats}${summary.tables.custom ? ` · อื่น ๆ ${summary.tables.custom}` : ""})`,
     ],
     ["พื้นที่ต่อที่นั่ง", summary.areaPerSeat === null ? "—" : `${fmt(summary.areaPerSeat)} ตร.ม.`],
-    ["ครัว / เคาน์เตอร์", `${summary.counts.kitchen} / ${summary.counts.counter}`],
+    [
+      "ประตูครัว",
+      layout.kitchenDoor
+        ? `${WALL_LABEL[layout.kitchenDoor.wall as keyof typeof WALL_LABEL]} · กว้าง ${fmt(layout.kitchenDoor.width)} ม.`
+        : "ไม่มี (ต้องเพิ่มก่อนจำลอง)",
+    ],
+    ["เคาน์เตอร์", `${summary.counts.counter} ตัว`],
   ];
 
   return (

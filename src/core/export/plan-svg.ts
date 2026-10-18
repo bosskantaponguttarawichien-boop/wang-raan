@@ -5,7 +5,7 @@
  */
 import { footprint, objectCenter } from "../layout/geometry";
 import { chairStyleOf } from "../layout/table-set";
-import type { IssueSeverity, LayoutObject, StoreLayout, ValidationIssue, Wall } from "../layout/types";
+import type { IssueSeverity, LayoutObject, StoreLayout, ValidationIssue, Wall, WallDoor } from "../layout/types";
 
 export const PLAN_COLORS = {
   background: "#ffffff",
@@ -18,14 +18,13 @@ export const PLAN_COLORS = {
   entranceLabel: "#6680a9",
   blocked: "#e4685d",
   warning: "#e5b762",
-  kitchen: { fill: "#e8edf5", stroke: "#9bb0c9", detail: "#c4d3e5" },
   counter: { fill: "#e1e8f3", stroke: "#aebed3", detail: "#bdcce0" },
   table: { fill: "#edf1ff", stroke: "#8da6ef", detail: "#8da6ef" },
   chair: { fill: "#f8f0e5", stroke: "#d9ad7d", detail: "#d9ad7d" },
 } as const;
 
-const LABEL: Record<LayoutObject["type"], string> = { kitchen: "ครัว", counter: "เคาน์เตอร์", table: "โต๊ะ", chair: "เก้าอี้" };
-const RADIUS: Record<LayoutObject["type"], number> = { kitchen: 0.06, counter: 0.06, table: 0.12, chair: 0.25 };
+const LABEL: Record<LayoutObject["type"], string> = { counter: "เคาน์เตอร์", table: "โต๊ะ", chair: "เก้าอี้" };
+const RADIUS: Record<LayoutObject["type"], number> = { counter: 0.06, table: 0.12, chair: 0.25 };
 
 export interface PlanSvgOptions {
   /** พิกเซลต่อเมตร (ค่าเริ่มต้น 60) */
@@ -89,13 +88,16 @@ export function renderPlanSvg(layout: StoreLayout, options: PlanSvgOptions = {})
     out.push(`<g stroke-width="1" data-layer="grid">${lines.join("")}</g>`);
   }
 
-  // วาดเรียงชั้น: ครัว/เคาน์เตอร์ → โต๊ะ → เก้าอี้ (เหมือน z-index บน Artboard)
-  const order: LayoutObject["type"][] = ["kitchen", "counter", "table", "chair"];
+  // วาดเรียงชั้น: เคาน์เตอร์ → โต๊ะ → เก้าอี้ (เหมือน z-index บน Artboard)
+  const order: LayoutObject["type"][] = ["counter", "table", "chair"];
   const objects = [...layout.objects].sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   for (const obj of objects) out.push(renderObject(obj, s, options.severityById?.get(obj.id)));
 
   out.push(`<rect x="-2" y="-2" width="${n(w + 4)}" height="${n(h + 4)}" fill="none" stroke="${PLAN_COLORS.wall}" stroke-width="4"/>`);
-  if (layout.entrance) out.push(renderEntrance(layout, s, options.severityById?.get(layout.entrance.id)));
+  if (layout.entrance) out.push(renderDoor(layout, layout.entrance, "entrance", s, options.severityById?.get(layout.entrance.id)));
+  if (layout.kitchenDoor) {
+    out.push(renderDoor(layout, layout.kitchenDoor, "kitchen-door", s, options.severityById?.get(layout.kitchenDoor.id)));
+  }
   out.push(`</g></svg>`);
   return out.join("");
 }
@@ -132,8 +134,8 @@ function renderObject(obj: LayoutObject, s: number, severity?: IssueSeverity): s
   return parts.join("");
 }
 
-function renderEntrance(layout: StoreLayout, s: number, severity?: IssueSeverity): string {
-  const e = layout.entrance!;
+/** ช่องประตูบนผนัง: ทางเข้า ("เข้า") หรือประตูครัว ("ครัว") */
+function renderDoor(layout: StoreLayout, e: WallDoor, type: "entrance" | "kitchen-door", s: number, severity?: IssueSeverity): string {
   const W = layout.width * s;
   const H = layout.depth * s;
   const a = e.position * s;
@@ -162,10 +164,10 @@ function renderEntrance(layout: StoreLayout, s: number, severity?: IssueSeverity
   const [lx, ly] = labelPos[e.wall];
   const stroke = severity ? PLAN_COLORS[severity] : PLAN_COLORS.entranceStroke;
   return [
-    `<g data-type="entrance" data-wall="${e.wall}"${severity ? ` data-issue="${severity}"` : ""}>`,
+    `<g data-type="${type}" data-wall="${e.wall}"${severity ? ` data-issue="${severity}"` : ""}>`,
     `<rect x="${n(gx)}" y="${n(gy)}" width="${n(gw)}" height="${n(gh)}" fill="${PLAN_COLORS.background}" stroke="${stroke}" stroke-width="1.5"/>`,
     `<path d="${arc[e.wall]}" fill="none" stroke="${PLAN_COLORS.entranceStroke}" stroke-width="1.5" stroke-dasharray="4 3"/>`,
-    `<text x="${n(lx)}" y="${n(ly)}" font-size="11" fill="${PLAN_COLORS.entranceLabel}" text-anchor="middle" dominant-baseline="central">เข้า</text>`,
+    `<text x="${n(lx)}" y="${n(ly)}" font-size="11" fill="${PLAN_COLORS.entranceLabel}" text-anchor="middle" dominant-baseline="central">${type === "entrance" ? "เข้า" : "ครัว"}</text>`,
     `</g>`,
   ].join("");
 }

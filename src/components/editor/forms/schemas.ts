@@ -41,6 +41,13 @@ export const RoomSettingsSchema = z
       .min(ENTRANCE_MIN_WIDTH, `ทางเข้ากว้างอย่างน้อย ${ENTRANCE_MIN_WIDTH} ม.`)
       .max(ENTRANCE_MAX_WIDTH, `ทางเข้ากว้างไม่เกิน ${ENTRANCE_MAX_WIDTH} ม.`)
       .refine(isMultipleOf(SIZE_STEP), { message: `ความกว้างทางเข้าปรับทีละ ${SIZE_STEP} ม.` }),
+    hasKitchenDoor: z.boolean(),
+    kitchenDoorWall: z.enum(["north", "south", "east", "west"]),
+    kitchenDoorPosition: gridMeters("ตำแหน่งประตูครัว").pipe(z.number().min(0, "ตำแหน่งประตูครัวต้องไม่ติดลบ")),
+    kitchenDoorWidth: num("ความกว้างประตูครัว")
+      .min(ENTRANCE_MIN_WIDTH, `ประตูครัวกว้างอย่างน้อย ${ENTRANCE_MIN_WIDTH} ม.`)
+      .max(ENTRANCE_MAX_WIDTH, `ประตูครัวกว้างไม่เกิน ${ENTRANCE_MAX_WIDTH} ม.`)
+      .refine(isMultipleOf(SIZE_STEP), { message: `ความกว้างประตูครัวปรับทีละ ${SIZE_STEP} ม.` }),
   })
   .superRefine((v, ctx) => {
     if (!Number.isFinite(v.width) || !Number.isFinite(v.depth)) return;
@@ -53,6 +60,31 @@ export const RoomSettingsSchema = z
         path: ["entrancePosition"],
         message: `ทางเข้าเลยผนัง — ตำแหน่งได้สูงสุด ${(wall - v.entranceWidth).toFixed(2)} ม.`,
       });
+    }
+
+    if (v.hasKitchenDoor) {
+      const kwall = wallLength(v, v.kitchenDoorWall);
+      if (v.kitchenDoorWidth > kwall) {
+        ctx.addIssue({ code: "custom", path: ["kitchenDoorWidth"], message: `ประตูครัวกว้างเกินผนัง (${kwall} ม.)` });
+      } else if (v.kitchenDoorPosition + v.kitchenDoorWidth > kwall + 1e-9) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["kitchenDoorPosition"],
+          message: `ประตูครัวเลยผนัง — ตำแหน่งได้สูงสุด ${(kwall - v.kitchenDoorWidth).toFixed(2)} ม.`,
+        });
+      }
+      if (v.kitchenDoorWall === v.entranceWall) {
+        const overlap =
+          Math.min(v.entrancePosition + v.entranceWidth, v.kitchenDoorPosition + v.kitchenDoorWidth) -
+          Math.max(v.entrancePosition, v.kitchenDoorPosition);
+        if (overlap > 1e-6) {
+          ctx.addIssue({
+            code: "custom",
+            path: ["kitchenDoorPosition"],
+            message: "ประตูครัวทับช่องทางเข้าร้าน",
+          });
+        }
+      }
     }
   });
 

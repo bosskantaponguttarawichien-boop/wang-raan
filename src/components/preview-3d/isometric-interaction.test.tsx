@@ -41,23 +41,38 @@ describe("feat-058: มุมมอง 3D — เลือกและขยั�
     expect(screen.queryByRole("toolbar")).toBeNull();
   });
 
+  it("หมุนมุมมอง 180°: ฉากวาดจากผังที่หมุน (ทางเข้าผนังใต้กลายเป็นผนังหลังมีช่องประตู) และลูกศรขวา = ทิศตะวันตกของผัง", async () => {
+    const user = userEvent.setup();
+    layoutStore.setState({ viewRotation: 180 });
+    try {
+      render(<IsometricView />);
+      // ผัง cafe: ทางเข้าอยู่ผนังใต้ → มุมมองปกติไม่มีช่องประตูบนผนังหลัง แต่หมุน 180° แล้วผนังใต้เป็นผนังหลัง
+      expect(screen.getByTestId("iso-svg").querySelector("polygon[stroke-width='2.5']")).not.toBeNull();
+      actions().selectObject("counter-01");
+      await user.keyboard("{ArrowRight}");
+      expect(layoutStore.getState().layout.objects.find((o) => o.id === "counter-01")).toMatchObject({ x: 4.75, y: 0.5 });
+    } finally {
+      layoutStore.setState({ viewRotation: 0 });
+    }
+  });
+
   it("ขยับด้วยปุ่มลูกศรใน 3D → พิกัดใน store อัปเดตตรงกัน (0.25 ม. และ Shift 1 ม.)", async () => {
     const user = userEvent.setup();
     render(<IsometricView />);
 
-    // เลือก kitchen-01 (x: 0.5, y: 0.5)
-    actions().selectObject("kitchen-01");
-    const kitchen = () => layoutStore.getState().layout.objects.find((o) => o.id === "kitchen-01")!;
-    expect(kitchen().x).toBe(0.5);
-    expect(kitchen().y).toBe(0.5);
+    // เลือก counter-01 (x: 5, y: 0.5)
+    actions().selectObject("counter-01");
+    const counter = () => layoutStore.getState().layout.objects.find((o) => o.id === "counter-01")!;
+    expect(counter().x).toBe(5);
+    expect(counter().y).toBe(0.5);
 
     // กด ArrowRight → ขยับทีละ 0.25 ม.
     await user.keyboard("{ArrowRight}");
-    expect(kitchen().x).toBe(0.75);
+    expect(counter().x).toBe(5.25);
 
     // กด Shift+ArrowDown → ขยับทีละ 1 ม.
     await user.keyboard("{Shift>}{ArrowDown}{/Shift}");
-    expect(kitchen().y).toBe(1.5);
+    expect(counter().y).toBe(1.5);
   });
 
   it("คีย์ลัด R หมุน, Delete ลบ, และ Esc ยกเลิกการเลือกใน 3D", async () => {
