@@ -11,16 +11,13 @@
       "position": 1.25,
       "width": 1.2
     },
+    "kitchenDoor": {
+      "id": "kitchen-door-01",
+      "wall": "north",
+      "position": 1,
+      "width": 0.9
+    },
     "objects": [
-      {
-        "id": "kitchen-01",
-        "type": "kitchen",
-        "x": 0.5,
-        "y": 0.5,
-        "width": 2,
-        "depth": 1.5,
-        "rotation": 0
-      },
       {
         "id": "counter-01",
         "type": "counter",
@@ -134,16 +131,13 @@
       "position": 1.25,
       "width": 1.2
     },
+    "kitchenDoor": {
+      "id": "kitchen-door-01",
+      "wall": "north",
+      "position": 1,
+      "width": 0.9
+    },
     "objects": [
-      {
-        "id": "kitchen-01",
-        "type": "kitchen",
-        "x": 0.5,
-        "y": 0.5,
-        "width": 2,
-        "depth": 1.5,
-        "rotation": 0
-      },
       {
         "id": "counter-01",
         "type": "counter",
@@ -207,16 +201,13 @@
     "width": 8,
     "depth": 6,
     "entrance": null,
+    "kitchenDoor": {
+      "id": "kitchen-door-01",
+      "wall": "north",
+      "position": 1,
+      "width": 0.9
+    },
     "objects": [
-      {
-        "id": "kitchen-01",
-        "type": "kitchen",
-        "x": 0.5,
-        "y": 0.5,
-        "width": 2,
-        "depth": 1.5,
-        "rotation": 0
-      },
       {
         "id": "counter-01",
         "type": "counter",

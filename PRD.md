@@ -31,7 +31,7 @@ P1 รับผิดชอบความถูกต้องเชิงโ�
 
 | รหัส | ข้อกำหนด |
 |---|---|
-| C-01 | P1 V1 มีองค์ประกอบหลักคือ Entrance, Kitchen, Counter, Table และ Chair |
+| C-01 | P1 V1 มีองค์ประกอบหลักคือ Entrance, KitchenDoor (ประตูครัวบนผนัง), Counter, Table และ Chair |
 | C-02 | การเพิ่มโต๊ะต้องสร้าง **โต๊ะพร้อมเก้าอี้โดยอัตโนมัติ** ไม่ปฏิบัติต่อเก้าอี้เป็นเฟอร์นิเจอร์อิสระจากโต๊ะที่สังกัด |
 | C-03 | ผู้ใช้แก้ไขผังได้ (เพิ่ม ย้าย หมุน ปรับขนาด หรือลบวัตถุ) และผังมีการบันทึกอัตโนมัติจากแนวทาง POC เดิม |
 | C-04 | P1 ตรวจผังใน 4 ด้าน: completeness, collision, clearance และ accessibility |
@@ -57,9 +57,9 @@ P1 รับผิดชอบความถูกต้องเชิงโ�
 ```text
 เปิด P1 / กู้คืน Draft ที่บันทึกไว้
         ↓
-กำหนดหรือแก้ไขขนาดร้านและตำแหน่ง Entrance
+กำหนดหรือแก้ไขขนาดร้านและตำแหน่ง Entrance / KitchenDoor
         ↓
-เพิ่ม Kitchen, Counter และ Table set (โต๊ะพร้อม Chair ที่สังกัด)
+เพิ่ม Counter และ Table set (โต๊ะพร้อม Chair ที่สังกัด)
         ↓
 จัดวาง/ย้าย/หมุน/ปรับขนาด/ลบ  →  บันทึกอัตโนมัติ  →  ผลตรวจเดิมหมดอายุ
         ↓
@@ -80,7 +80,7 @@ P1 รับผิดชอบความถูกต้องเชิงโ�
 1. Draft ต้องเก็บผังล่าสุดโดยอัตโนมัติ เพื่อให้ผู้ใช้กลับมาทำต่อได้
 2. การเพิ่ม Table set ต้องสร้างความสัมพันธ์ของ Chair กับ Table ตั้งแต่ต้น ไม่ใช่ให้ผู้ใช้จับคู่ภายหลัง
 3. ผู้ใช้สามารถจัดวางผังที่ยังผิดกฎได้เพื่อทดลองแนวคิด แต่จะเห็นผลเมื่อมีการตรวจผัง และส่งต่อไม่ได้หากเป็น Blocked
-4. ทุกการเปลี่ยนที่มีผลต่อ geometry, ความสัมพันธ์ของเก้าอี้-โต๊ะ, Entrance หรือขนาดร้าน ทำให้ผล Validation เดิมใช้ไม่ได้
+4. ทุกการเปลี่ยนที่มีผลต่อ geometry, ความสัมพันธ์ของเก้าอี้-โต๊ะ, Entrance, KitchenDoor หรือขนาดร้าน ทำให้ผล Validation เดิมใช้ไม่ได้
 5. ปุ่ม/คำสั่งเริ่ม simulation ต้องบังคับตรวจผังล่าสุดอีกครั้งก่อนสร้าง payload ไป P2 เสมอ
 
 ## 4. Data Model
@@ -90,18 +90,18 @@ P1 รับผิดชอบความถูกต้องเชิงโ�
 - พิกัด ขนาด และระยะ clearance ใช้หน่วย **เมตร**
 - วัตถุที่มีพื้นที่บนผังเก็บตำแหน่ง `x`, `y`, ขนาด `width`, `depth` และ `rotation` เพื่อใช้คำนวณขอบเขตจริง
 - Table เป็นเจ้าของความสัมพันธ์กับ Chair; Chair ต้องอ้างอิง Table เดียว และห้ามเป็นสมาชิกของหลายโต๊ะ
-- Kitchen และ Counter เป็นวัตถุพื้นที่ ไม่ใช่ Table set
-- Entrance เป็นช่องเชื่อมระหว่างภายนอกกับโครงข่ายทางเดินภายใน
+- ครัวเป็นห้องแยกภายนอก เชื่อมต่อผ่าน `KitchenDoor` บนผนังร้าน (ไม่ใช่กล่องบนพื้น); Counter เป็นวัตถุพื้นที่บนพื้น
+- Entrance และ KitchenDoor เป็นช่องเชื่อมระหว่างภายนอก/ห้องครัวกับโครงข่ายทางเดินภายใน
 
 ### 4.2 แบบจำลองระดับแนวคิด
 
 | เอนทิตี | ฟิลด์หลักที่ต้องมี | ความสัมพันธ์/ข้อจำกัด |
 |---|---|---|
-| `StoreLayout` | `id`, `version`, `width`, `depth`, `entrance`, `objects`, `validation` | เป็น root ของผังหนึ่งฉบับ |
+| `StoreLayout` | `id`, `version`, `width`, `depth`, `entrance`, `kitchenDoor`, `objects`, `validation` | เป็น root ของผังหนึ่งฉบับ |
 | `Entrance` | `id`, `wall/edge`, `position`, `width` | ต้องมีอย่างน้อย 1 จุด และเชื่อมพื้นที่เดินภายใน |
+| `KitchenDoor` | `id`, `wall/edge`, `position`, `width` | ประตูเชื่อมห้องครัวบนผนัง ต้องมีอย่างน้อย 1 จุด |
 | `Table` | `id`, `x`, `y`, `width`, `depth`, `rotation`, `chairIds` | ต้องมี Chair ที่ใช้งานได้อย่างน้อยหนึ่งตัวในระดับผัง |
 | `Chair` | `id`, `tableId`, `x`, `y`, `width`, `depth`, `rotation` | สังกัด Table เดียว; การสอดใต้โต๊ะพิจารณาเฉพาะ `tableId` เดียวกัน |
-| `Kitchen` | `id`, `x`, `y`, `width`, `depth`, `rotation` | ต้องมีอย่างน้อย 1 จุด และพนักงานเข้าถึงได้ |
 | `Counter` | `id`, `x`, `y`, `width`, `depth`, `rotation` | ต้องมีอย่างน้อย 1 จุด และพนักงานเข้าถึงได้ |
 | `ValidationResult` | `layoutRevision`, `status`, `issues`, `validatedAt` | ใช้ได้เฉพาะเมื่อ `layoutRevision` ตรงกับผังล่าสุด |
 | `ValidationIssue` | `id`, `category`, `severity`, `objectIds`, `message` | ระบุปัญหาที่แก้ไขได้และวัตถุที่เกี่ยวข้อง |
@@ -134,9 +134,9 @@ StoreLayout
     "units": "m",
     "width": 8,
     "depth": 6,
-    "entrance": { "id": "entrance-01", "wall": "south", "position": 1.2 },
+    "entrance": { "id": "entrance-01", "wall": "south", "position": 1.25, "width": 1.2 },
+    "kitchenDoor": { "id": "kitchen-door-01", "wall": "north", "position": 1, "width": 0.9 },
     "objects": [
-      { "id": "kitchen-01", "type": "kitchen", "x": 0.5, "y": 0.5, "width": 2, "depth": 1.5, "rotation": 0 },
       { "id": "counter-01", "type": "counter", "x": 5, "y": 0.5, "width": 2.4, "depth": 0.7, "rotation": 0 },
       { "id": "table-01", "type": "table", "x": 3, "y": 3, "width": 1.2, "depth": 1.2, "rotation": 0, "chairIds": ["chair-01"] },
       { "id": "chair-01", "type": "chair", "tableId": "table-01", "x": 3.3, "y": 2.3, "width": 0.6, "depth": 0.6, "rotation": 0 }
@@ -180,7 +180,7 @@ Warning ไม่ใช่คำตัดสินว่าผังไม่ม
 | ตรวจพบ | ผล |
 |---|---|
 | ไม่มี Entrance | Blocked |
-| ไม่มี Kitchen | Blocked |
+| ไม่มี KitchenDoor (ประตูครัว) | Blocked |
 | ไม่มี Counter | Blocked |
 | ไม่มี Table | Blocked |
 | ไม่มี Chair ที่ใช้งานได้ | Blocked |
@@ -191,9 +191,9 @@ Warning ไม่ใช่คำตัดสินว่าผังไม่ม
 |---|---|
 | Table ทับ Table | Blocked |
 | Chair ทับ Chair | Blocked |
-| Table หรือ Chair ทับ Kitchen | Blocked |
 | Table หรือ Chair ทับ Counter | Blocked |
-| Kitchen ทับ Counter | Blocked |
+| วัตถุทับ Entrance หรือ KitchenDoor | Blocked |
+| Entrance ทับ KitchenDoor บนผนังเดียวกัน | Blocked |
 | วัตถุออกนอกขอบร้าน | Blocked |
 | Chair ทับ Table อื่น | Blocked |
 | Chair สอดใต้ Table ของตนเกิน 0.10 ม. หรือไม่ใช่ด้านหน้าของ Chair | Blocked |
@@ -216,9 +216,9 @@ Warning ไม่ใช่คำตัดสินว่าผังไม่ม
 |---|---|
 | ลูกค้าเดินจาก Entrance ไปถึง Chair บางตัวไม่ได้ | Blocked |
 | พนักงานเข้าถึงจุดบริการของ Table บางตัวไม่ได้ | Blocked |
-| พนักงานเข้าถึง Kitchen ไม่ได้ | Blocked |
+| พนักงานเดินไปถึง KitchenDoor (ประตูครัว) ไม่ได้ | Blocked |
 | พนักงานเข้าถึง Counter ไม่ได้ | Blocked |
-| Entrance ไม่เชื่อมกับพื้นที่เดินภายใน | Blocked |
+| Entrance หรือ KitchenDoor ไม่เชื่อมกับพื้นที่เดินภายใน | Blocked |
 
 การตรวจต้องใช้ทิศทางและมุมหมุนจริงของ Chair และ Table ที่ Chair สังกัด โดยเฉพาะการประเมินด้านหลัง/ด้านข้างที่ใช้เข้าถึงเก้าอี้
 
@@ -288,3 +288,8 @@ POC เดิมเป็นแหล่งอ้างอิงพฤติก�
 > 23. **ตัวละครลูกค้าเป็นไฟล์ GLB ที่ rig แล้ว:** ตัวละครต้องเป็นสไตล์ 3D นุ่มนวลหัวโตตามภาพอ้างอิง, มีอย่างน้อยท่า Idle และ Walk; ข้อมูลตำแหน่ง/สถานะยังมาจาก P2 Worker เดิม และเป็นเพียงการแสดงผล จึงไม่มีผลต่อ Validation หรือ P1→P2 contract
 > 24. **ความต่อเนื่องและการเข้าถึง:** หาก WebGL ไม่พร้อมหรือผู้ใช้เปิด `prefers-reduced-motion` ระบบต้องแสดงมุมมอง SVG isometric แบบนิ่งแทน; การเลือกและการแก้ไขผังยังเข้าถึงได้จาก 2D editor และแผงควบคุมด้วยคีย์บอร์ดทุกกรณี
 > 25. **ขอบเขตความปลอดภัยและประสิทธิภาพ:** ใช้เฉพาะ GLB ที่ตรวจสอบแล้วและอยู่ใน asset ของแอป, ไม่โหลดโมเดลจาก URL ที่ผู้ใช้ป้อน; ห้ามให้ Three.js เข้า Core Validation, Web Worker หรือ BFF และเส้นทาง 2D ต้องไม่ดาวน์โหลด runtime 3D
+
+> **บันทึกข้อสรุปโมเดลห้องครัว (18 ตุลาคม 2026, feat-081–090):**
+> 26. **ครัวเป็นห้องแยกภายนอก (KitchenDoor):** เปลี่ยนจากกล่องครัวบนพื้น (`type: "kitchen"`) เป็นประตูครัวบนผนัง (`kitchenDoor: { id, wall, position, width } | null`) ช่วยให้พื้นที่ใช้สอยในร้านสมจริงและไม่กินพื้นที่บนพื้น
+> 27. **Backward Compatibility & Migration:** ผังรุ่นก่อนหน้าที่มีกล่องครัวบนพื้นจะถูกแปลงเป็นประตูครัวบนผนังที่ใกล้ที่สุดโดยอัตโนมัติ (`migrateLayoutData`) และตัดกล่องครัวออกจากพื้นร้าน ทำให้สามารถเปิดไฟล์ผังเก่าได้อย่างราบรื่น 100%
+

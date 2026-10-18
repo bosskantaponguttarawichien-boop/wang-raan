@@ -1,9 +1,10 @@
 import { DEFAULT_SIZES } from "./constants";
+import { kitchenDoorFromLegacy } from "./migrate";
 import {
   createCounter,
   createEmptyLayout,
   createEntrance,
-  createKitchen,
+  createKitchenDoor,
   randomId,
   wallLength,
 } from "./entities";
@@ -20,7 +21,7 @@ export interface StarterLayoutParams {
 
 /**
  * สร้างผังเริ่มต้นตามขนาดและตำแหน่งประตูที่ระบุ
- * พร้อมจัดวาง Kitchen, Counter และ Table 2 ที่นั่งในจุดที่เหมาะสมโดยอัตโนมัติ
+ * พร้อมประตูครัว, Counter และ Table 2 ที่นั่งในจุดที่เหมาะสมโดยอัตโนมัติ
  * เพื่อให้ผังผ่าน Completeness Gate และบันทึกลงระบบได้โดยไม่ติดสถานะ Blocked
  */
 export function createStarterLayout(
@@ -39,12 +40,13 @@ export function createStarterLayout(
     objects: [],
   };
 
-  const kw = DEFAULT_SIZES.kitchen.width;
-  const kd = DEFAULT_SIZES.kitchen.depth;
+  // มุมที่เว้นไว้สำหรับครัว (ประตูครัวอยู่บนผนังที่ใกล้มุมนี้ที่สุด)
+  const kw = 2;
+  const kd = 1.5;
   const cw = DEFAULT_SIZES.counter.width;
   const cd = DEFAULT_SIZES.counter.depth;
 
-  // กำหนดตำแหน่งวางครัว และเคาน์เตอร์ ให้สอดคล้องกับผนังทางเข้าเพื่อเว้นทางเดินหลัก
+  // กำหนดมุมครัว และเคาน์เตอร์ ให้สอดคล้องกับผนังทางเข้าเพื่อเว้นทางเดินหลัก
   let kPos = { x: 0.5, y: 0.5 };
   let cPos = { x: snapToGrid(Math.max(0.5, width - cw - 0.5)), y: 0.5 };
 
@@ -59,12 +61,15 @@ export function createStarterLayout(
     cPos = { x: snapToGrid(Math.max(0.5, width - cw - 0.5)), y: snapToGrid(Math.max(0.5, depth - cd - 0.5)) };
   }
 
+  const kitchenId = newId("kitchen-door");
   layout = {
     ...layout,
-    objects: [
-      createKitchen({ position: kPos }, newId),
-      createCounter({ position: cPos }, newId),
-    ],
+    kitchenDoor: kitchenDoorFromLegacy(
+      layout,
+      { id: kitchenId, x: kPos.x, y: kPos.y, width: kw, depth: kd, rotation: 0 },
+      layout.entrance,
+    ),
+    objects: [createCounter({ position: cPos }, newId)],
   };
 
   // วางโต๊ะ 2 ที่นั่งไว้กลางห้อง (ห่างจากผนังและวัตถุอื่นเพื่อรองรับ Clearance & Accessibility)
@@ -86,10 +91,8 @@ export function createSampleCafeLayout(newId: IdFactory = randomId): StoreLayout
   layout = {
     ...layout,
     entrance: createEntrance(layout, { wall: "south", position: 1.25 }, newId),
-    objects: [
-      createKitchen({ position: { x: 0.5, y: 0.5 } }, newId),
-      createCounter({ position: { x: 5, y: 0.5 } }, newId),
-    ],
+    kitchenDoor: createKitchenDoor(layout, { wall: "north", position: 1 }, newId),
+    objects: [createCounter({ position: { x: 5, y: 0.5 } }, newId)],
   };
   layout = addTableSet(layout, "table-4-seats", { x: 3, y: 3 }, newId).layout;
   layout = addTableSet(layout, "table-2-seats", { x: 6, y: 3.5 }, newId).layout;

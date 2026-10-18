@@ -16,8 +16,11 @@ export type Rotation = 0 | 90 | 180 | 270;
 
 export type Wall = "north" | "south" | "east" | "west";
 
-/** C-01: องค์ประกอบหลักของ V1 — ไม่มี Shelf */
-export type LayoutObjectType = "kitchen" | "counter" | "table" | "chair";
+/**
+ * C-01: วัตถุที่วางบนพื้นร้าน — ไม่มี Shelf
+ * ครัวเป็นห้องแยกนอกพื้นที่ร้าน แทนด้วย `StoreLayout.kitchenDoor` (ประตูบนผนัง) ไม่ใช่วัตถุบนพื้น
+ */
+export type LayoutObjectType = "counter" | "table" | "chair";
 
 export type TableSetPreset = "table-2-seats" | "table-4-seats";
 
@@ -39,6 +42,15 @@ export interface ChairStyle {
   /** ทรงเบาะ — ไม่ระบุ = ตามแบบ (สตูลกลม, มีพนักพิงเหลี่ยม) เพื่อให้ผังเก่าหน้าตาเหมือนเดิม; footprint เท่าเดิมทุกทรง */
   shape?: ChairShape;
   legStyle: "four-legs" | "pedestal";
+  color: FurnitureColor;
+}
+
+/** แบบเคาน์เตอร์: ระแนงโค้ง, ตู้บานเรียบ, บาร์มีที่พักเท้า, ตู้กระจกโชว์ขนม */
+export type CounterVariant = "fluted" | "panel" | "bar" | "display";
+
+/** รูปลักษณ์เคาน์เตอร์ — ไม่กระทบ validation (footprint = width × depth เหมือนเดิมทุกแบบ) */
+export interface CounterStyle {
+  variant: CounterVariant;
   color: FurnitureColor;
 }
 
@@ -64,12 +76,10 @@ interface BaseObject {
   rotation: Rotation;
 }
 
-export interface Kitchen extends BaseObject {
-  type: "kitchen";
-}
-
 export interface Counter extends BaseObject {
   type: "counter";
+  /** optional เพื่ออ่านผังรุ่นก่อนหน้าได้ — ไม่ระบุ = DEFAULT_COUNTER_STYLE */
+  style?: CounterStyle;
 }
 
 /** Table เป็นเจ้าของความสัมพันธ์กับ Chair (PRD §4.1) */
@@ -92,7 +102,7 @@ export interface Chair extends BaseObject {
   style?: ChairStyle;
 }
 
-export type LayoutObject = Kitchen | Counter | Table | Chair;
+export type LayoutObject = Counter | Table | Chair;
 
 /**
  * ทางเข้าบนผนังด้านหนึ่ง
@@ -106,6 +116,20 @@ export interface Entrance {
   width: Meters;
 }
 
+/**
+ * ประตูเข้าห้องครัว (ห้องแยกนอกร้าน) — รูปแบบเดียวกับทางเข้า: ช่องบนผนังด้านหนึ่ง
+ * พนักงานต้องเดินจากทางเข้าไปถึงหน้าประตูนี้ได้ (ทางเดินรอง ≥ 0.90 ม.)
+ */
+export interface KitchenDoor {
+  id: string;
+  wall: Wall;
+  position: Meters;
+  width: Meters;
+}
+
+/** ช่องประตูบนผนัง (ทางเข้า / ประตูครัว) */
+export type WallDoor = Entrance | KitchenDoor;
+
 /** Root ของผังหนึ่งฉบับ (PRD §4.2) — ผลตรวจแยกเป็น ValidationResult ผูกด้วย layoutRevision */
 export interface StoreLayout {
   id: string;
@@ -115,6 +139,8 @@ export interface StoreLayout {
   depth: Meters;
   /** null = ยังไม่ได้กำหนดทางเข้า (Completeness จะรายงานเป็น Blocked) */
   entrance: Entrance | null;
+  /** null = ยังไม่มีประตูครัว (Completeness จะรายงานเป็น Blocked) */
+  kitchenDoor: KitchenDoor | null;
   objects: LayoutObject[];
 }
 
@@ -146,4 +172,4 @@ export interface P1LayoutContract {
 }
 
 /** ตัวสร้าง id ที่ inject ได้ เพื่อให้เทสต์ deterministic */
-export type IdFactory = (kind: LayoutObjectType | "entrance" | "layout") => string;
+export type IdFactory = (kind: LayoutObjectType | "entrance" | "kitchen-door" | "layout") => string;

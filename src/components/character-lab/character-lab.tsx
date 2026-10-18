@@ -17,10 +17,11 @@ const CharacterLabScene = dynamic(
   },
 );
 
-/** V1 ของ Character Lab: ตรวจโมเดล ท่ายืน แสง และสัดส่วน โดยไม่แตะ Simulator หลัก */
+/** พื้นที่ตรวจสัดส่วนและท่ายืน/นั่ง/เดินของ mannequin โดยไม่แตะ Simulator หลัก */
 export function CharacterLab() {
   const [facing, setFacing] = React.useState<CharacterFacing>("front");
   const [motion, setMotion] = React.useState<CharacterMotion>("idle");
+  const [seated, setSeated] = React.useState(false);
 
   return (
     <main data-surface="playground" className="min-h-dvh bg-surface px-4 py-5 text-ink sm:px-6 lg:px-10 lg:py-8">
@@ -43,7 +44,37 @@ export function CharacterLab() {
 
         <section className="overflow-hidden rounded-[24px] border border-line bg-white p-3 shadow-[0_12px_36px_rgba(29,45,72,0.09)] sm:p-4" aria-labelledby="scene-title">
           <h2 id="scene-title" className="sr-only">ฉากทดลองตัวละคร</h2>
-          <CharacterLabScene facing={facing} onMotionChange={setMotion} />
+          <CharacterLabScene facing={facing} seated={seated} onMotionChange={(next) => {
+            setMotion(next);
+            setSeated(next === "seated");
+          }} />
+        </section>
+
+        <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="pose-title">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="pose-title" className="m-0 text-sm font-semibold text-ink">ท่าทาง</h2>
+              <p className="m-0 mt-1 text-xs text-secondary">ทดลองนั่งบนเก้าอี้หรือกลับมายืน</p>
+            </div>
+            <div className="flex gap-2" role="group" aria-label="เลือกท่าทางตัวละคร">
+              <button
+                type="button"
+                aria-pressed={seated}
+                onClick={() => setSeated(true)}
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${seated ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
+              >
+                นั่งบนเก้าอี้
+              </button>
+              <button
+                type="button"
+                aria-pressed={!seated}
+                onClick={() => setSeated(false)}
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${!seated ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
+              >
+                ยืนขึ้น
+              </button>
+            </div>
+          </div>
         </section>
 
         <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="facing-title">
@@ -73,11 +104,11 @@ export function CharacterLab() {
         </section>
 
         <aside className="grid gap-3 sm:grid-cols-3" aria-label="สถานะการทดลอง">
-          <StatusCard label="โมเดล" value="Mannequin สีเทา" detail="หุ่นทรงเรียบสูงประมาณ 1.02 ม. สำหรับฉากร้าน" />
+          <StatusCard label="โมเดล" value="Mannequin สีเทา" detail="หุ่นทรงเรียบสูงประมาณ 1.08 ม. สำหรับฉากร้าน" />
           <StatusCard
             label="ท่าปัจจุบัน"
-            value={motion === "walking" ? "กำลังเดิน (Walk)" : "ยืน (Idle)"}
-            detail={motion === "walking" ? "กำลังไปยังจุดที่เลือกบนพื้น" : "คลิกบนพื้นเพื่อเริ่มเดิน หรือใช้ปุ่มเพื่อตรวจทิศตัวละคร"}
+            value={motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}
+            detail={motion === "walking" ? "กำลังไปยังจุดที่เลือกบนพื้น" : motion === "seated" ? "ตัวละครนั่งอยู่บนเก้าอี้ตัวอย่าง" : "คลิกบนพื้นเพื่อเริ่มเดิน หรือใช้ปุ่มเพื่อตรวจทิศตัวละคร"}
           />
           <StatusCard label="รอบถัดไป" value="หลบสิ่งกีดขวาง" detail="เพิ่มหลังการเดินหาจุดหมายทำงาน" />
         </aside>

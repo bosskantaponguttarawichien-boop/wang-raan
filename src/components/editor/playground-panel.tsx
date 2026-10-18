@@ -8,10 +8,11 @@ import {
   useLayoutStore,
 } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
-import type { Table, TableSetCreationOptions } from "@/core/layout";
+import type { Counter, Table, TableSetCreationOptions } from "@/core/layout";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 import { RoomSettingsForm } from "./forms/room-settings-form";
 import { TableSetCreatePanel } from "./forms/table-set-create-panel";
+import { CounterEditPanel } from "./forms/counter-style-controls";
 import { TableSetEditPanel } from "./forms/table-set-edit-panel";
 import { SimulationPanel } from "@/components/simulation/simulation-panel";
 
@@ -43,18 +44,16 @@ const PALETTE = [
     add: () => actions().addCounter(),
   },
   {
-    key: "kitchen",
-    name: "ครัว",
-    size: "2.0 × 1.5 ม.",
+    key: "kitchen-door",
+    name: "ประตูครัว",
+    size: "ติดผนัง",
     icon: (
       <svg viewBox="0 0 24 24" className="size-[21px]" {...ICON_STROKE}>
-        <rect x="3" y="5" width="18" height="14" rx="2" />
-        <circle cx="8.5" cy="10" r="2" />
-        <circle cx="15.5" cy="10" r="2" />
-        <path d="M6 15h12" />
+        <rect x="5" y="3" width="14" height="18" rx="1.5" />
+        <circle cx="15.5" cy="12" r="1" fill="currentColor" />
       </svg>
     ),
-    add: () => actions().addKitchen(),
+    isKitchenDoor: true,
   },
 ] as const;
 
@@ -83,6 +82,10 @@ export function PlaygroundPanel({
     const table = state.layout.objects.find((object): object is Table => object.id === selected.tableId && object.type === "table");
     return table ?? null;
   });
+  const selectedCounter = useLayoutStore(
+    (state): Counter | null =>
+      state.layout.objects.find((object): object is Counter => object.id === state.selectedObjectId && object.type === "counter") ?? null,
+  );
   const isSim = simStatus === "running" || simStatus === "paused";
   const [configuringTable, setConfiguringTable] = React.useState(false);
 
@@ -133,6 +136,8 @@ export function PlaygroundPanel({
           onBack={() => actions().selectObject(null)}
           onToast={onToast}
         />
+      ) : activeTab === "add" && selectedCounter ? (
+        <CounterEditPanel counter={selectedCounter} onBack={() => actions().selectObject(null)} onToast={onToast} />
       ) : activeTab === "shop" ? (
         <div>
           <h2 className="m-0 mb-1 text-[15px] font-semibold text-ink">ขนาดร้านและทางเข้า</h2>
@@ -186,6 +191,23 @@ export function PlaygroundPanel({
                 onClick={() => {
                   if ("configuresTable" in item) {
                     setConfiguringTable(true);
+                    return;
+                  }
+                  if ("isKitchenDoor" in item) {
+                    const { kitchenDoor } = actions().layout;
+                    if (kitchenDoor) {
+                      onToast("มีประตูครัวแล้ว — ลากบนผังหรือปรับในแท็บร้าน");
+                    } else {
+                      const ok = actions().addKitchenDoor();
+                      if (ok) {
+                        onToast("เพิ่มประตูครัวแล้ว ลากบนผนังเพื่อย้าย");
+                      } else {
+                        onToast("ไม่มีผนังว่างพอสำหรับวางประตูครัว");
+                      }
+                    }
+                    if (typeof window !== "undefined" && window.innerWidth < 768 && onToggleSheet) {
+                      onToggleSheet();
+                    }
                     return;
                   }
                   item.add();

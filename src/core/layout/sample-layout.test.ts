@@ -21,7 +21,7 @@ describe("sample-layout", () => {
     for (const c of cases) {
       const layout = createStarterLayout(c);
       expect(layout.entrance).toBeDefined();
-      expect(layout.objects.some((o) => o.type === "kitchen")).toBe(true);
+      expect(layout.kitchenDoor).not.toBeNull();
       expect(layout.objects.some((o) => o.type === "counter")).toBe(true);
       expect(layout.objects.some((o) => o.type === "table")).toBe(true);
       expect(layout.objects.some((o) => o.type === "chair")).toBe(true);

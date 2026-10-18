@@ -6,7 +6,7 @@ import {
   createCounter,
   createEmptyLayout,
   createEntrance,
-  createKitchen,
+  createKitchenDoor,
   createSequentialIds,
   footprint,
   normalizeRotation,
@@ -94,20 +94,19 @@ describe("entities", () => {
       width: 8,
       depth: 6,
       entrance: null,
+      kitchenDoor: null,
       objects: [],
     });
   });
 
-  it("Kitchen และ Counter ใช้ขนาดเริ่มต้นตาม design-system และ snap ตำแหน่ง", () => {
+  it("KitchenDoor และ Counter ใช้ขนาดเริ่มต้นตาม design-system และ snap ตำแหน่ง", () => {
     const next = ids();
-    expect(createKitchen({ position: { x: 0.6, y: 0.4 } }, next)).toEqual({
-      id: "kitchen-01",
-      type: "kitchen",
-      x: 0.5,
-      y: 0.5,
-      width: 2,
-      depth: 1.5,
-      rotation: 0,
+    const room = { width: 8, depth: 6 };
+    expect(createKitchenDoor(room, { wall: "north", position: 1.1 }, next)).toEqual({
+      id: "kitchen-door-01",
+      wall: "north",
+      position: 1,
+      width: 0.9,
     });
     expect(createCounter({ position: { x: 5.1, y: 0.5 }, rotation: 270 }, next)).toMatchObject({
       type: "counter",
@@ -134,9 +133,9 @@ describe("entities", () => {
   });
 
   it("randomId สร้าง id ไม่ซ้ำโดยไม่พึ่ง DOM", () => {
-    const a = createKitchen({ position: { x: 0, y: 0 } });
-    const b = createKitchen({ position: { x: 0, y: 0 } });
-    expect(a.id).toMatch(/^kitchen-/);
+    const a = createCounter({ position: { x: 0, y: 0 } });
+    const b = createCounter({ position: { x: 0, y: 0 } });
+    expect(a.id).toMatch(/^counter-/);
     expect(a.id).not.toBe(b.id);
   });
 });

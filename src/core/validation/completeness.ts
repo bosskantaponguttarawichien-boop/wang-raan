@@ -1,6 +1,6 @@
 /**
  * Completeness Gate — PRD.md §5.3
- * ขาด Entrance / Kitchen / Counter / Table / Chair ที่ใช้งานได้ → Blocked
+ * ขาด Entrance / ประตูครัว / Counter / Table / Chair ที่ใช้งานได้ → Blocked
  * Chair ที่ไม่มีโต๊ะแม่หรืออยู่นอกความสัมพันธ์ที่ตรวจได้ ไม่นับเป็นเก้าอี้ที่ใช้งานได้ (PRD §4.3) → Blocked
  */
 import { checkTableSetIntegrity } from "../layout/table-set";
@@ -25,8 +25,8 @@ export function checkCompleteness(layout: StoreLayout): ValidationIssue[] {
   if (!layout.entrance) {
     issues.push(createIssue("completeness", "missing-entrance", "blocked", [], "ยังไม่มีทางเข้าร้าน"));
   }
-  if (count("kitchen") === 0) {
-    issues.push(createIssue("completeness", "missing-kitchen", "blocked", [], "ยังไม่มีครัว"));
+  if (!layout.kitchenDoor) {
+    issues.push(createIssue("completeness", "missing-kitchen", "blocked", [], "ยังไม่มีประตูครัว"));
   }
   if (count("counter") === 0) {
     issues.push(createIssue("completeness", "missing-counter", "blocked", [], "ยังไม่มีเคาน์เตอร์"));

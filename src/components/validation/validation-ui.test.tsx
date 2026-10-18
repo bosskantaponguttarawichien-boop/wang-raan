@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { layoutStore } from "@/store/use-layout-store";
 import { IsometricView } from "@/components/preview-3d/isometric-view";
-import { cafeLayout, withObjects, withoutType } from "@/test/fixtures/layouts";
+import { cafeLayout, withObjects } from "@/test/fixtures/layouts";
 import { summarizeIssues, useLiveValidation } from "./use-live-validation";
 import { ValidationStatusBar } from "./validation-status-bar";
 
@@ -26,8 +26,7 @@ describe("Validation Status Bar", () => {
 
   it("Instant feedback: ผังเปลี่ยน → สถานะเปลี่ยนใน render เดียวกัน (ไม่ต้องรอ timer)", () => {
     render(<Bar />);
-    const kitchen = state().layout.objects.find((o) => o.type === "kitchen")!;
-    act(() => state().deleteObject(kitchen.id));
+    act(() => state().removeKitchenDoor());
     expect(screen.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "blocked");
     expect(screen.getByRole("status")).toHaveTextContent("ยังจำลองไม่ได้ · ต้องแก้ 1 ข้อก่อนเริ่มจำลอง");
     act(() => state().undo());
@@ -46,8 +45,12 @@ describe("Validation Status Bar", () => {
     const user = userEvent.setup();
     const layout = cafeLayout();
     const table = layout.objects.find((o) => o.type === "table")!;
-    const kitchen = layout.objects.find((o) => o.type === "kitchen")!;
-    state().loadLayout(withoutType({ ...layout, objects: layout.objects.map((o) => (o.id === table.id ? { ...o, x: kitchen.x, y: kitchen.y } : o)) }, "counter"));
+    const counter = layout.objects.find((o) => o.type === "counter")!;
+    state().loadLayout({
+      ...layout,
+      kitchenDoor: null,
+      objects: layout.objects.map((o) => (o.id === table.id ? { ...o, x: counter.x, y: counter.y } : o)),
+    });
     render(<Bar />);
     await user.click(screen.getByRole("button", { name: /ดูรายการ/ }));
     const dialog = screen.getByRole("dialog", { name: "รายการที่ต้องตรวจ" });

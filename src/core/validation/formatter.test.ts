@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   createEmptyLayout,
   addTableSet,
-  createKitchen,
   createCounter,
   createEntrance,
   type ValidationIssue,
@@ -31,14 +30,14 @@ describe("Issue Humanizer & Formatter (feat-054)", () => {
     let layout = createEmptyLayout({ width: 8, depth: 6 });
     const r1 = addTableSet(layout, "table-2-seats", { x: 2, y: 2 });
     layout = r1.layout;
-    const kitchen = createKitchen({ position: { x: 1, y: 1 } });
     const counter = createCounter({ position: { x: 3, y: 1 } });
-    layout = { ...layout, objects: [...layout.objects, kitchen, counter] };
+    layout = { ...layout, objects: [...layout.objects, counter] };
     layout = { ...layout, entrance: createEntrance(layout, { wall: "south", position: 3.5 }) };
+    layout = { ...layout, kitchenDoor: { id: "kitchen-door-01", wall: "north", position: 1, width: 0.9 } };
 
     expect(getObjectName(r1.tableSet.table, layout)).toBe("โต๊ะ 1");
     expect(getObjectName(r1.tableSet.chairs[0], layout)).toBe("เก้าอี้โต๊ะ 1");
-    expect(getObjectName(kitchen, layout)).toBe("ครัว");
+    expect(getObjectName(layout.kitchenDoor!.id, layout)).toBe("ประตูครัว");
     expect(getObjectName(counter, layout)).toBe("เคาน์เตอร์");
     expect(getObjectName(layout.entrance!.id, layout)).toBe("ทางเข้าร้าน");
   });

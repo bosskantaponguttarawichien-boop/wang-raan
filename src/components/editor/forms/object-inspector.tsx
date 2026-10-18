@@ -47,7 +47,7 @@ function InspectorForm({ obj, deleteTarget }: { obj: LayoutObject; deleteTarget:
   // id คงที่ (มีฟอร์มนี้ชุดเดียวในหน้า) เพื่อคืนโฟกัสได้หลังฟอร์มถูกสร้างใหม่
   const formId = "inspector";
   useRestoreFocus();
-  const resizable = obj.type === "kitchen" || obj.type === "counter";
+  const resizable = obj.type === "counter";
   const isSet = obj.type === "table" || obj.type === "chair";
   const isTable = obj.type === "table";
   const round = isTable && tableStyleOf(obj).shape === "round";

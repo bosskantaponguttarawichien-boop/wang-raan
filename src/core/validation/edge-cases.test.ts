@@ -20,10 +20,10 @@ describe("edge cases", () => {
     expect(r).not.toBe(p);
   });
 
-  it("ย้าย Kitchen ไปจุดที่ snap แล้วเท่าเดิม → คืนผังเดิม", () => {
+  it("ย้าย Counter ไปจุดที่ snap แล้วเท่าเดิม → คืนผังเดิม", () => {
     const layout = cafeLayout();
-    const kitchen = layout.objects.find((o) => o.type === "kitchen")!;
-    expect(moveObject(layout, kitchen.id, { x: kitchen.x + 0.1, y: kitchen.y - 0.1 })).toBe(layout);
+    const counter = layout.objects.find((o) => o.type === "counter")!;
+    expect(moveObject(layout, counter.id, { x: counter.x + 0.1, y: counter.y - 0.1 })).toBe(layout);
   });
 
   it.each([0, 90, 180, 270] as const)("เก้าอี้สอดใต้โต๊ะทั้งตัว (%s°) → เหลือเฉพาะแถบด้านหลัง", (rotation) => {
@@ -53,6 +53,7 @@ describe("edge cases", () => {
       width: 8,
       depth: 6,
       entrance: null,
+      kitchenDoor: null,
       objects: [
         { id: "t-empty", type: "table", x: 6, y: 5, width: 0.8, depth: 0.8, rotation: 0, chairIds: [] },
         set.table,

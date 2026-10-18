@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { layoutStore } from "@/store/use-layout-store";
 import { cafeLayout } from "@/test/fixtures/layouts";
+import { CounterEditPanel } from "./counter-style-controls";
 import { ObjectInspector } from "./object-inspector";
 import { RoomSettingsForm } from "./room-settings-form";
 import { ObjectInspectorSchema, RoomSettingsSchema } from "./schemas";
@@ -14,7 +15,17 @@ beforeEach(() => state().loadLayout(cafeLayout()));
 afterEach(cleanup);
 
 describe("RoomSettingsSchema", () => {
-  const base = { width: 8, depth: 6, entranceWall: "south" as const, entrancePosition: 3.5, entranceWidth: 1.2 };
+  const base = {
+    width: 8,
+    depth: 6,
+    entranceWall: "south" as const,
+    entrancePosition: 3.5,
+    entranceWidth: 1.2,
+    hasKitchenDoor: false,
+    kitchenDoorWall: "north" as const,
+    kitchenDoorPosition: 1,
+    kitchenDoorWidth: 0.9,
+  };
 
   it("ยอมรับค่าที่ถูกต้อง", () => {
     expect(RoomSettingsSchema.safeParse(base).success).toBe(true);
@@ -129,8 +140,23 @@ describe("RoomSettingsForm: ผังที่ยังไม่มีทาง�
     const user = userEvent.setup();
     act(() => state().loadLayout({ ...cafeLayout(), entrance: null }));
     render(<RoomSettingsForm />);
-    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "north"); // เปลี่ยนตัวเลือก = นำไปใช้ทันที
-    expect(state().layout.entrance).toMatchObject({ wall: "north", position: 0 });
+    await user.selectOptions(screen.getByLabelText("ผนังทางเข้า"), "west"); // เปลี่ยนตัวเลือก = นำไปใช้ทันที
+    expect(state().layout.entrance).toMatchObject({ wall: "west", position: 0 });
+  });
+
+  it("เพิ่ม/ลบ ประตูครัวผ่านฟอร์มแท็บร้าน", async () => {
+    const user = userEvent.setup();
+    act(() => state().loadLayout({ ...cafeLayout(), kitchenDoor: null }));
+    const { unmount } = render(<RoomSettingsForm />);
+    expect(screen.getByRole("button", { name: "+ เพิ่มประตูครัว" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "+ เพิ่มประตูครัว" }));
+    expect(state().layout.kitchenDoor).not.toBeNull();
+    unmount();
+
+    render(<RoomSettingsForm />);
+    expect(screen.getByRole("button", { name: "ลบประตูครัว" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "ลบประตูครัว" }));
+    expect(state().layout.kitchenDoor).toBeNull();
   });
 });
 
@@ -158,10 +184,10 @@ describe("ObjectInspector", () => {
     expect(screen.getByText(/เลือกชิ้นงานบนผัง/)).toBeInTheDocument();
   });
 
-  it("แก้ขนาดและตำแหน่งครัว = Undo ขั้นเดียว และไม่แจ้ง store ระหว่างพิมพ์", async () => {
+  it("แก้ขนาดและตำแหน่งเคาน์เตอร์ = Undo ขั้นเดียว และไม่แจ้ง store ระหว่างพิมพ์", async () => {
     const user = userEvent.setup();
-    const kitchen = state().layout.objects.find((o) => o.type === "kitchen")!;
-    act(() => state().selectObject(kitchen.id));
+    const counter = state().layout.objects.find((o) => o.type === "counter")!;
+    act(() => state().selectObject(counter.id));
     render(<ObjectInspector />);
     let notifications = 0;
     const unsubscribe = layoutStore.subscribe(() => notifications++);
@@ -173,7 +199,7 @@ describe("ObjectInspector", () => {
     const before = state().historyIndex;
     await user.click(document.body); // ออกจากฟอร์ม = นำไปใช้
     unsubscribe();
-    expect(state().layout.objects.find((o) => o.id === kitchen.id)).toMatchObject({ width: 1.8, y: 1, x: kitchen.x });
+    expect(state().layout.objects.find((o) => o.id === counter.id)).toMatchObject({ width: 1.8, y: 1, x: counter.x });
     expect(state().historyIndex).toBe(before + 1);
   });
 
@@ -266,5 +292,35 @@ describe("ObjectInspector", () => {
     await user.click(within(chairShape).getByRole("radio", { name: "สี่เหลี่ยม" }));
     const squareChairs = state().layout.objects.filter((o) => o.type === "chair" && o.tableId === table.id);
     expect(squareChairs.every((c) => c.type === "chair" && c.style?.shape === "square")).toBe(true);
+  });
+});
+
+describe("CounterEditPanel: ปรับความยาว/ความลึกเคาน์เตอร์", () => {
+  const counterOf = (id: string) => state().layout.objects.find((o) => o.id === id)!;
+
+  it("พิมพ์ยาว×ลึกแล้วกด Enter → เคาน์เตอร์เปลี่ยนขนาดเป็น Undo หนึ่งขั้น", async () => {
+    const user = userEvent.setup();
+    const counter = state().layout.objects.find((o) => o.type === "counter")!;
+    if (counter.type !== "counter") throw new Error("fixture");
+    const { rerender } = render(<CounterEditPanel counter={counter} onBack={() => {}} />);
+    const before = state().historyIndex;
+
+    const length = screen.getByLabelText("ความยาวเคาน์เตอร์ (ม.)");
+    await user.clear(length);
+    await user.type(length, "3.2{Enter}");
+    expect(counterOf(counter.id)).toMatchObject({ width: 3.2, depth: counter.depth });
+    expect(state().historyIndex).toBe(before + 1);
+
+    const updated = counterOf(counter.id);
+    if (updated.type !== "counter") throw new Error("type");
+    rerender(<CounterEditPanel counter={updated} onBack={() => {}} />);
+    const depth = screen.getByLabelText("ความลึกเคาน์เตอร์ (ม.)");
+    await user.clear(depth);
+    await user.type(depth, "0.1{Enter}"); // ต่ำกว่าขั้นต่ำ → Core clamp 0.30
+    expect(counterOf(counter.id)).toMatchObject({ width: 3.2, depth: 0.3 });
+    expect(depth).toHaveValue(0.3);
+
+    act(() => state().undo());
+    expect(counterOf(counter.id)).toMatchObject({ width: 3.2, depth: counter.depth });
   });
 });

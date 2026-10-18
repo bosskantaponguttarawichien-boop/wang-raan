@@ -3,6 +3,63 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+
+## [2026-10-18] feat-091 (ต่อ) — แยกสีทางเข้ากับประตูครัวใน 3D
+
+- Three.js: ทางเข้า = วงกบน้ำเงิน `#3b62f4` + พรมฟ้า, ประตูครัว = วงกบเทาอมฟ้า `#64748b` + บานปิดเข้ม + พรมเทา (สีตามป้ายผัง 2D)
+- พรมอยู่บนพื้นด้านในห้อง จึงเห็นประตูที่อยู่บนผนังด้านใกล้กล้อง (ไม่วาดผนัง/วงกบ) ได้ทุกมุมมอง
+- ตรวจเบราว์เซอร์มุม 0° และ 180°; `make test` 896 tests, `make lint` ผ่าน
+
+
+## [2026-10-18] feat-091 — หมุนมุมมองผัง 2D/3D ทีละ 90°
+
+- เพิ่ม `src/core/preview/view-rotation.ts` (Pure TS): แปลงจุด/เวกเตอร์/ผนังระหว่างผังจริงกับมุมมอง, `farWalls`, `rotateLayoutForView`
+- Store: `viewRotation` + `rotateView(±1)` (ไม่เข้า history); ปุ่มหมุนซ้าย/ขวาในการ์ดซูม
+- 2D: Stage หมุนด้วย CSS ในกรอบขนาดมุมมอง, ลาก/ลูกศร/ประตูแปลงทิศจอ→ผัง, ป้ายตั้งตรง, Floating Toolbar ไม่หมุน
+- 3D Three.js: กล้องและไฟหมุนตาม, วาดเฉพาะผนัง 2 ด้านที่ไกลกล้อง, วงกบประตูเฉพาะบนผนังที่วาด; SVG fallback + overlay ลูกค้า/heatmap หมุนตาม
+- ตรวจ: `make test` 67 files / 896 tests, `make lint` ผ่าน; เบราว์เซอร์ 2D 90° และ 3D 4 มุมถูกต้อง
+
+
+## 2026-10-18 ICT — ปรับท่านั่งเก้าอี้ของ mannequin
+
+- ปรับคลิป Sit ให้สะโพกอยู่ระดับผิวเบาะ ต้นขาพับเข้าด้านหน้าเก้าอี้ หน้าแข้งงอลง และแขนวางผ่อนคลายบนตัก
+- เมื่อลูกค้าอยู่สถานะนั่งใน Three.js จะหันตามด้านหน้าของเก้าอี้ที่ใกล้ที่สุด
+- ตรวจ `customer-walk.test.ts` 5/5, `make test` 66 files / 886 tests, `npx tsc --noEmit`, `make lint` (ESLint, TypeScript, API contract, boundary) ผ่าน; GLB สร้างใหม่ 8330 vertices
+- Character Lab เปิดใน Chrome และโหลดโมเดลได้; ยังไม่ได้ตรวจท่านั่งจริงใน browser simulation เพราะ playground ปัจจุบัน Blocked 2 ข้อ จึงคง feat-080 เป็น in-progress ตาม gate
+
+
+
+## [2026-10-18] feat-080 — เก็บท่านั่งและตำแหน่งบนเก้าอี้ให้เข้ากับภาพอ้างอิง
+
+- ปรับ Sit ให้ต้นขาเกือบขนานเบาะและเข่าพ้นขอบหน้า, หน้าแข้งห้อยลง, แขนงอพักใกล้ตัก; ขยับ mannequin ไปข้างหน้า 0.08 ม. โดยสะโพกยังอยู่กลางเบาะ
+- ปรับ Character Lab ให้มุมกล้องเห็นท่านั่งชัดขึ้น และใช้ front offset เดียวกันใน ThreeView ตาม rotation ของเก้าอี้
+- ตรวจ Chrome `localhost:3001/character-lab` เห็นตัวละครนั่งบนเบาะและเก้าอี้ไม่บัง; `make test` 67 files / 893 tests, typecheck, `make lint` (boundary/ESLint/API contract), `make status` ผ่าน
+
+## [2026-10-18] feat-080 — เพิ่มท่านั่งใน Character Lab (เสร็จแล้ว)
+
+- เพิ่มปุ่ม “นั่งบนเก้าอี้” และ “ยืนขึ้น” พร้อมเก้าอี้ตัวอย่างในฉาก Character Lab; กดนั่งเล่นคลิป Sit จนจบแล้วค้างท่า, กดลุกกลับ Idle และคลิกพื้นเพื่อเดินต่อได้
+- ปรับแกนคลิป Sit ให้เข่าพับไปทางด้านหน้าของเก้าอี้; GLB 8330 vertices
+- QA Chrome `localhost:3001/character-lab`: เห็นหุ่นนั่งบนเบาะ, ปุ่มลุกกลับยืน และคลิกพื้นเปลี่ยนเป็น Walk; `make test` 66 files / 886 tests, `npx tsc --noEmit`, `make lint` (boundary/ESLint/TypeScript/API contract), `make status` ผ่าน
+
+## [2026-10-18] feat-081–feat-090 — ประตูครัว: ปรับครัวเป็นห้องแยกนอกพื้นที่ร้านและแทนด้วยประตูบนผนัง
+
+- **ภาพรวมสถาปัตยกรรม**: เปลี่ยนโมเดลครัวจากกล่องสี่เหลี่ยมบนพื้นร้าน (`type: "kitchen"`) กลายเป็นประตูครัวบนผนัง (`kitchenDoor: { id, wall, position, width } | null`) เพื่อคืนพื้นที่จัดร้านให้กับผู้ใช้ และจำลองลูกค้า/พนักงานผ่านประตูครัว
+- **feat-081 (โมเดลข้อมูลหลัก)**: เพิ่ม `KitchenDoor`, `WallDoor` ใน `src/core/layout/types.ts`, `KITCHEN_DOOR_DEFAULT_WIDTH = 0.90` ใน `constants.ts`, ฟังก์ชันจัดการประตูบนผนัง `createKitchenDoor`, `wallDoorOverlap`, `freeWallPosition`, `defaultKitchenDoorInit` ใน `entities.ts`, ปรับ `spot-finder.ts` ให้เว้นหน้าประตูครัวลึก 0.90 ม., `table-set.ts` และ `summary.ts` อัปเดตสอดคล้อง Pure TypeScript 100%
+- **feat-082 (การแปลงผังเก่า)**: สร้าง `src/core/layout/migrate.ts` แปลงกล่องครัวเก่าเป็นประตูครัวบนผนังที่ใกล้ที่สุด เลื่อนหลบทางเข้าอัตโนมัติ; ครอบ `StoreLayoutSchema` ด้วย `z.preprocess(migrateLayoutData)`; `io/layout-file.ts` นำเข้าผังเก่าพร้อมใส่หมายเหตุภาษาไทย
+- **feat-083 (กฎ Validation 5 ข้อ Blocked)**:
+  1. `missing-kitchen` (Completeness, Blocked) เมื่อไม่มีประตูครัว
+  2. `kitchen-door-overlaps-entrance` (Collision, Blocked) เมื่อประตูครัวทับกับทางเข้าบนผนังเดียวกัน
+  3. `kitchen-door-off-wall` (Accessibility, Blocked) เมื่อช่องประตูเลยขอบผนัง
+  4. `unreachable-kitchen` (Accessibility, Blocked) เมื่อคนขนาด 0.60 ม. เดินจากทางเข้าไปแตะหน้าประตูครัวไม่ได้
+  5. `secondary-aisle` (Clearance, Blocked) เมื่อเส้นทางไปหน้าประตูครัวแคบกว่า 0.90 ม.
+- **feat-084 (Store Actions)**: เพิ่ม `addKitchenDoor`, `setKitchenDoor`, `removeKitchenDoor` ใน Zustand store รองรับ Undo/Redo 40 ขั้นและ auto migration
+- **feat-085 (แผงควบคุมฝั่งซ้าย)**: อัปเดตแท็บ "เพิ่ม" มีการ์ด "ประตูครัว · ติดผนัง" พร้อม Toast คำแนะนำ; แท็บ "ร้าน" มีฟอร์มตั้งค่าประตูครัว 4 ทิศทาง ระยะจากมุม ความกว้าง และปุ่มเพิ่ม/ลบ
+- **feat-086 (ผัง 2D)**: แยก `DoorMarker` ใน `artboard.tsx` ให้ใช้ร่วมกันระหว่างทางเข้า (ป้าย 'เข้า') และประตูครัว (ป้าย 'ครัว') รองรับการลากด้วยเมาส์/สัมผัส, คีย์บอร์ดลูกศร (0.25 ม., Shift = 1.0 ม.), ลบด้วย Delete/Backspace และแสดง Issue Ring เมื่อผังมีปัญหา
+- **feat-087 (3D, Isometric, Export, Share)**: `three-view.tsx` เจาะช่องประตูบนผนังเหนือ/ตะวันตกพร้อมวงกบและบานประตูปิดสีเข้ม (#1e293b, #334155, #ffffff), แสดงธรณีบนผนังใต้/ตะวันออก; SVG Isometric fallback แสดง marker ประตูครัว; `plan-svg.ts`, `print-report.tsx`, หน้ารายงานและหน้าแชร์ `/share/[shareKey]` รองรับประตูครัวสมบูรณ์
+- **feat-088 (Fixture & Tests)**: อัปเดตผังตัวอย่างและ fixture ทั้งหมด; เพิ่ม `migrate.test.ts` (7 เคส); อัปเดต test suite เดิมกว่า 125 จุด; **ผลการรัน `make test` ผ่าน 66 test files, 885 tests (100% passed)**
+- **feat-089 (เอกสาร PRD, Architecture, Design System, สัญญา OpenAPI)**: อัปเดต `PRD.md`, `architecture.md`, `design-system.md` (เพิ่ม CSS variables โทเคนใน `app/globals.css`), `contracts/openapi.yaml` และซิงค์ไปยัง `wang-raan-service`
+- **feat-090 (ตรวจรับงาน QA)**: `make contract`, `make lint`, `make test` ผ่าน 100%; ทดสอบด้วย Browser subagent บน `localhost:3000/playground`: ผังตัวอย่างเริ่มต้นแสดงป้าย 'ครัว' สถานะ Ready, ลบประตูเปลี่ยนเป็น Blocked ('ยังไม่มีประตูครัว'), เพิ่มประตูกลับเป็น Ready, มุมมอง 3D เรนเดอร์ถูกต้องไม่มี console error, ระบบจำลองลูกค้า P2 ทำงานปกติ, responsive 6 breakpoints ไม่พบ horizontal scroll
+
 ## [2026-10-17] feat-079 — Character Lab: สัดส่วนและเครื่องแบบตัวละคร
 
 - ปรับ `Cafe staff GLB` ให้เป็นสัดส่วนผู้ใหญ่มากขึ้น: ลดศีรษะเหลือ 70–73% และยกตำแหน่งขึ้นเล็กน้อย, คงคอและสะโพกทรงโค้งเพื่อเชื่อมศีรษะ–ลำตัว–ขาให้เป็นชิ้นเดียว
@@ -869,3 +926,133 @@
 
 - `ChairStyle.shape` (optional, ไม่ระบุ = ตามแบบ) ใน core/schema/openapi + ตัวเลือก "ทรงเก้าอี้" ในหน้าตั้งค่าโต๊ะ + render ทุก view (preview, 2D, SVG iso, 3D, export)
 - QA: vitest 859/859, tsc/eslint(src)/contract ผ่าน; ตรวจในเบราว์เซอร์แล้ว
+
+## 2026-10-17 ICT — feat-080 แก้แขนติดลำตัว
+
+- ขยับแนวแขนและกระดูกศอกออกด้านข้าง; จำกัด smooth union กับลำตัวเฉพาะหัวไหล่ จึงไม่สร้างผิวพังผืดลงมาที่สีข้าง
+- สร้าง `public/assets/models/cafe-customer.glb` ใหม่จาก generator; รูปร่างส่วนอื่นและ clips เดิมคงไว้
+- QA: raycast ที่ y=0.60 พบช่องซ้าย/ขวา 0.01587/0.01597 ม.; Idle/Walk/Sit 25 poses ต่อคลิปไม่มีพิกัดผิดปกติ; Chrome Character Lab ตรวจยืนและคลิกเดินกลับ Idle แล้ว
+- `make test`: 64 files / 859 tests ผ่าน; ESLint generator, typecheck และ startup boundary checks ผ่าน
+
+## [2026-10-17] พนักพิงเก้าอี้กลมทรงเปลือกหอย
+
+- 3D: พนักพิงเก้าอี้กลมเป็น shell โค้งมน (ยอดกลางสูง ลาดลงข้าง) ตามภาพอ้างอิงเก้าอี้คาเฟ่บุผ้า
+- QA: tsc/eslint/vitest 859/859 ผ่าน; ตรวจในเบราว์เซอร์แล้ว
+
+## 2026-10-17 ICT — feat-080 ข้อต่ออ้างอิงสัดส่วน 3 หัว
+
+- ปรับ head diameter เป็น 0.375 ม. ต่อความสูงรวม 1.125 ม.; ย่อขาและวาง shoulder/elbow/wrist ที่ y=0.705/0.55/0.415, hip/knee/ankle ที่ 0.43/0.23/0.055 ตามภาพผู้ใช้
+- เพิ่ม LeftHand/RightHand เป็นกระดูกข้อมือจริง (รวม 16 bones), geometry มือ/นิ้วโป้งผูกกับมือ, ลด weight blend reach เป็น 0.045 เพื่อจำกัดการดึงผิวข้ามข้อต่อ
+- ปรับช่วงสะโพกของ Walk ให้ไม่ต่ำกว่าท่ายืน; ปรับฐาน Hips.position และระดับ Sit ให้ตรงสัดส่วนใหม่
+- QA: Idle/Walk/Sit 33 poses ต่อคลิปทุกพิกัด finite และพื้นต่ำสุด >0.00135 ม.; skin weights รวม 1; browser ตรวจหน้า/ข้างและคลิกเดิน, make test 64 files/859 tests, typecheck, ESLint generator, startup boundaries ผ่าน
+
+## [2026-10-17] เคาน์เตอร์ 3D ลงรายละเอียด
+
+- 3D: เคาน์เตอร์มีฐานเตะเท้า, หน้าระแนงโค้ง, ท็อปหิน, เครื่องเอสเปรสโซ/แก้ว และจอ POS แทนกล่องเรียบ
+- QA: tsc/eslint/vitest 859/859 ผ่าน; ตรวจในเบราว์เซอร์แล้ว
+
+## 2026-10-17 ICT — feat-080 เก็บผิวหัวไหล่ เข่า และข้อพับ
+
+- ลด shoulder cap และรัศมีต้นแขน; รวม SDF ของแต่ละแขนกับลำตัวครั้งเดียวด้วย blend ที่จำกัดตามระดับความสูง แทน hard minimum ระหว่างกิ่ง geometry ที่ซ้อนกัน
+- ลด knee blend 0.04 → 0.008 และเกลี่ยข้อศอก/ข้อมือ/ข้อเท้าอย่างจำกัด เพื่อลดก้อนนูน; ขยับศอกและมือออก 0.01 ม. พร้อม bones เพื่อรักษาช่องรักแร้หลังสร้าง mesh
+- ยกเลิก whitelist กระดูกที่สลับทันทีตาม primitive ใกล้สุด; ใช้น้ำหนักระยะที่ลดลงต่อเนื่องเพื่อไม่เกิดรอยหยักขณะงอ
+- GLB: 7376 vertices, 14748 triangles, 16 bones; น้ำหนักรวม 1, ช่องแขน–ลำตัวที่ y=.60 ทั้งสองฝั่ง 0.01131 ม.; Idle/Walk/Sit 33 poses ต่อคลิป finite และ minY >0.00185 ม.
+- QA: browser ยืน/เดินบน localhost:3123, make test 859/859, typecheck, ESLint และ startup boundaries ผ่าน
+- พอร์ต 3000 เจอ ENOENT อีกครั้ง โดยมี server 3123 ทำงานร่วม .next; รอบนี้ตรวจผ่าน 3123 และไม่ได้หยุด server ของงานอื่น
+
+## 2026-10-17 ICT — feat-080 หุบแขนลงข้างตัว
+
+- เปลี่ยนแนวปลายแขนจากกางเฉียงออกเป็นเกือบแนวดิ่ง: wrist x=±0.22 y=.394 และมือ x=±.222 y=.369; ปรับ hand bones และนิ้วโป้งให้ตรงกัน คงหัวไหล่และช่องรักแร้เดิม
+- มือหุบเข้าข้างละ .08 ม. โดยความยาวปลายแขนใกล้เดิม; GLB 7334 vertices /14664 triangles
+- QA: raycast ที่ y=.60/.50/.42 ยังแยกแขนจากลำตัวทั้งสองข้าง; Idle/Walk/Sit 33 poses ต่อคลิป finite, minY >.00185; Browser localhost:3123 ตรวจยืนและเดิน; make test 859/859, typecheck, ESLint generator และ startup boundaries ผ่าน
+
+## [2026-10-17] เคาน์เตอร์ 4 แบบ + เลือกสี
+
+- CounterStyle (variant 4 แบบ + สี) ใน core/zod/openapi/store; แผงแก้ไขเคาน์เตอร์; render 3D ครบ 4 แบบ + iso ใช้สี
+- QA: make lint ผ่าน, vitest 862/862; ตรวจในเบราว์เซอร์แล้ว
+
+## 2026-10-17 ICT — feat-080 แขนลาดต่อเนื่องตามภาพอ้างอิง
+
+- แก้ข้อผิดพลาดรอบก่อนที่หุบเฉพาะปลายแขนจนศอกหักออกด้านข้าง: shoulder/elbow/wrist อยู่บนแนวลาดเดียวกันราว 13°; x=.155/.190/.225 และ y=.695/.540/.385 พร้อม bone pivots ตรงกัน
+- เปลี่ยนหัวไหล่ก้อนกลมเป็น capsule ลาดจากด้านคอออกไปต้นแขน และลดรัศมีต้นแขนไล่สู่ปลายแขน เพื่อให้ silhouette ต่อเนื่อง
+- GLB 7302 vertices /14600 triangles /16 bones; raycast ที่ y=.60/.50/.42 พบช่องแขนสองข้าง (อย่างน้อย .015 ม. ที่ .60); Idle/Walk/Sit 33 poses ต่อคลิป finite และ minY >.00185
+- QA: Browser localhost:3123 ตรวจหน้า/ข้างและเดิน; make test 862/862, typecheck, ESLint generator, startup boundaries ผ่าน. Typecheck รอบแรกติด Counter ในงานอื่น แต่รอบตรวจสุดท้ายผ่านแล้ว
+
+## 2026-10-17 ICT — feat-080 เก็บคอและหัวไหล่
+
+- ลดรัศมีคอ .036 → .030, ยกศีรษะและ pivot .02 ม. และลด blend ใต้หัวเพื่อให้เห็นคอสั้นชัดขึ้น
+- ลดส่วนบน torso .01 ม., ลดระดับหัวไหล่ .015 ม. พร้อม bone pivot, ลดรัศมีต้นแขนบน .037 → .033 และเกลี่ย shoulder/upper arm .018; elbow/wrist คงตำแหน่งเดิม
+- GLB 7353 vertices /14702 triangles; ช่องแขนที่ y=.60 >.015 ม. ทั้งสองฝั่ง; Idle/Walk/Sit 33 poses ต่อคลิป finite และ minY >.00185
+- QA: browser localhost:3123 ตรวจหน้า/ข้าง/เดิน; make test 862/862, typecheck, ESLint generator, startup boundaries ผ่าน
+
+## 2026-10-17 ICT — feat-080 จังหวะเดินและการวางเท้า
+
+- สร้าง Walk ใหม่ 0.9 วินาที /60 intervals ด้วย two-bone IK จากเป้าข้อเท้า: stance ครึ่งรอบวางเท้ารับน้ำหนัก, swing ครึ่งรอบยก .045 ม.; ข้อเท้าหักล้างมุมขาให้พื้นรองเท้าขนานพื้น
+- ฝัง walkCycleDistance=.44 ใน GLB; แกว่งแขนสลับขา, ศอกผ่อนคลาย, ลำตัวบิด/เอียงเล็กน้อยพร้อมหัวชดเชย
+- Character Lab อ่านความเร็วจากระยะก้าว/ระยะเวลาคลิป (scale .9 ได้ .44 ม./วินาที), เร่ง–ผ่อนความเร็วและชะลอตอนหัน, ปรับ Walk timeScale ตามความเร็ว, ลดระยะ snap ถึงจุดหมายเหลือ .004 ม.
+- Three.js ร้าน: เลื่อนเวลา Walk ตามระยะเคลื่อนที่จริงและหมุนหาทิศใหม่อย่างนุ่มนวล จึงสัมพันธ์กับ simulation speed; คงการเปลี่ยน Sit เดิม
+- เพิ่ม customer-walk.test.ts ตรวจ loop ไม่กระโดด, เท้ารับน้ำหนักอยู่ระดับเดิม/ตำแหน่งโลกคลาด <.001 ม. และ sample skin 121 poses ไม่จมพื้น (minY .000104 ม.)
+- QA: make test 65 files/864 tests, typecheck, ESLint ไฟล์งาน, startup boundaries ผ่าน; Browser Character Lab เดิน/เปลี่ยนจุดหมาย/กลับ Idle และ console error 0. ยังไม่ได้ตรวจ simulation ในร้านด้วย browser รอบนี้
+- ตรวจ React checklist: animation state อยู่ใน effect, ไม่มี setState ทุกเฟรม, คง reduced-motion guard และ cleanup เดิม
+
+## 2026-10-18 ICT — ปรับความยาว/ความลึกเคาน์เตอร์
+
+- แผงแก้ไขเคาน์เตอร์มีช่อง "ยาว (ม.)" / "ลึก (ม.)" (CounterSizeFields ใน counter-style-controls.tsx) ใช้ store.resizeObject เดิม — Core clamp ≥ 0.30 ม. ทีละ 0.05; นำไปใช้เมื่อ Enter/blur = Undo หนึ่งขั้น และแสดงค่าจริงหลัง clamp
+- เพิ่มเทสต์ใน forms.test.tsx (ปรับยาว 3.2, ลึก 0.1 → clamp 0.30, undo)
+- QA: make test 65 files/865 tests, make lint (ESLint+TS+boundary+OpenAPI) ผ่าน; Browser localhost:3001 เพิ่มเคาน์เตอร์ → ยาว 4 ม. ผังเปลี่ยนทันที
+
+## 2026-10-18 ICT — feat-080 ปรับทรงตามภาพสเก็ตช์ใหม่
+
+- ขยายหัวเป็น 0.44 × 0.42 ม., เพิ่มหูสองข้างผูก Head, ลดลำตัว/สะโพก และขยายเท้าโดยคง rig กับ IK เดิม; GLB 8262 vertices /16520 triangles
+- QA: make test 65 files/865 tests ผ่าน; make lint (ESLint, TypeScript, boundary, OpenAPI) ผ่าน; sample Idle/Walk/Sit 33 poses ต่อคลิป finite และไม่จมพื้น; Walk minY .000197 ม.
+- Browser localhost:3001/character-lab โหลดโมเดลใหม่ ตรวจยืน/หัน/คลิกเดินและกลับ Idle แล้ว; localhost:3000 ตอบ 404 สำหรับ Character Lab จึงใช้ dev server 3001 ที่มีอยู่
+- ไม่ได้ตรวจท่านั่งในฉากร้านด้วย browser รอบนี้; คงการเปลี่ยนแปลงงานอื่นใน workspace
+
+## 2026-10-18 ICT — feat-080 เก็บคอ/หัวไหล่และเดินกระชับ
+
+- ยกหัวและหู .03 ม. พร้อม Head pivot; ลดระดับอกบน ลดรัศมี shoulder bridge .030 → .025 และผูกช่วงบ่ากับ Spine เพื่อไม่ให้แขนดึงผิวถึงคอ; เกลี่ยรอยต่อคอ/ต้นแขน
+- Walk: ระยะต่อรอบ .44 → .36 ม., เวลา .90 → .72 วินาที, ยกเท้า .045 → .028 ม., แกว่งแขน .20 → .12 rad และลด bob/twist/sway ครึ่งหนึ่ง; metadata ทำให้ runtime อ่านความเร็วใหม่อัตโนมัติ
+- GLB 8296 vertices /16592 triangles; ปรับข้อความความสูงใน Character Lab เป็น 1.08 ม.
+- QA: ขยาย floor/finite skin test ครบ Idle/Walk/Sit 121 poses ต่อคลิป; make test 65 files/867 tests ผ่าน; make lint และ git diff --check ผ่าน; browser 3001 ตรวจคอด้านหน้า/ข้างและเดินกลับ Idle แล้ว
+- ยังไม่ได้ตรวจ Sit ในฉากร้านด้วย browser รอบนี้; ไม่แตะงานอื่นที่ค้างใน workspace
+
+## 2026-10-18 ICT — feat-080 หัวไหล่ลาดต่อเนื่อง (รอ QA รวม)
+
+- ลดโคนต้นแขน y=.68 → .65 และเลื่อนปลาย shoulder bridge เข้า x=.135; ปรับ Arm pivot ตามและชดเชย ForeArm offset ให้ศอก/มืออยู่เดิม จึงตัดก้อนนูนที่สูงกว่าแนวบ่าโดยไม่เพิ่ม blend จนรักแร้ติด
+- GLB 8246 vertices /16492 triangles; raycast แนวบ่าที่ x=.07–.17 ทั้งสองข้างลดระดับต่อเนื่อง ไม่มี local hump
+- ผ่าน asset tests 4/4 (Idle/Walk/Sit 121 poses, floor/finite และ planted-foot/loop), ESLint generator, git diff --check; startup boundary ผ่าน; browser 3001 โหลดใหม่ ตรวจรูปทรงและเริ่มเดินได้
+- Verification gate ยังไม่ผ่าน: make test 43 files failed (createKitchen is not a function), make lint TypeScript ล้มเพราะ kitchen type/createKitchen กำลังถูกเปลี่ยนในงานอื่นระหว่างเทิร์น; ไม่แก้ทับงานครัว คง feat-080 in-progress เพื่อรัน QA รวมซ้ำเมื่อ workspace นิ่ง
+
+## 2026-10-18 ICT — ปรับหัวไหล่ชิดลำตัวเพิ่มเล็กน้อย
+
+- เลื่อนปลายบ่าเข้าด้านใน x=.135 → .128 และจุดเริ่มต้นต้นแขน x=.155 → .148; คงระดับหัวไหล่และเส้นโค้งเดิม
+- สร้าง GLB ใหม่ 8235 vertices /16470 triangles; Character Lab localhost:3001 แสดงผลและโหลดได้
+- asset tests 4/4 ผ่าน; ESLint generator, diff check ผ่าน; make test/lint รวมยังล้มจากการเปลี่ยน createKitchen ในงานคู่ขนาน (อ้างอิง entry ก่อนหน้า)
+
+## 2026-10-18 ICT — ปรับแขนขาให้ต่อเนื่องสมส่วน
+
+- เกลี่ยข้อศอกด้วย smooth union .008 → .018 และเพิ่มเนื้อเล็กน้อยด้านหน้าแขน; ปรับ Arm/ForeArm pivots ให้รับกับต้นแขนที่ขยับเข้าด้านใน
+- ปรับความต่อเนื่องหัวเข่าและข้อเท้า: เพิ่มรัศมีปลายต้นขา/หน้าแข้งและ smooth union เข่า .008 → .018; ยกผิวรองเท้า 1 มม. ให้ไม่จมพื้นใน Walk
+- GLB 8400 vertices /16800 triangles; asset tests Idle/Walk/Sit + planted feet ผ่าน 4/4; ESLint generator และ git diff --check ผ่าน; Browser Character Lab โหลดและแสดงท่ายืนได้
+- make test รวมยังล้มจากงาน schema ครัวที่แก้ขนานกัน (32 files failed / 176 tests; error createKitchen), รายละเอียดใน entry ก่อนหน้า; คง feat-080 in-progress จนตรวจรวมผ่าน
+
+## 2026-10-18 ICT — ลดปุ่มข้อต่อและหุบแขน
+
+- ย่อมือและปรับรอยต่อข้อมือให้เท่าปลายแขน; ขยับศอก x=.190 → .175 และข้อมือ .225 → .195 พร้อมปรับ ForeArm/Hand pivots ให้ตรงกัน แขนจึงกางน้อยลง
+- ลดปุ่มเข่าและข้อเท้าด้วยรัศมีปลายกระดูกที่ต่อเนื่องและปรับ smooth union; คงพื้นรองเท้าไม่จมระหว่าง Walk
+- GLB 8330 vertices /16660 triangles; `customer-walk.test.ts` 4/4 ผ่าน (Idle/Walk/Sit และ planted feet), ESLint generator, boundary check, make status และ diff check ผ่าน; Browser Character Lab ตรวจท่ายืน/เดิน/กลับ Idle
+- `make test` ใน startup ยังล้ม 32/65 files (176 tests) ด้วยความล้มเหลวจาก createKitchen/layout validation ที่เกิดพร้อมการแก้ core/layout ใน workspace; ไม่แตะงานนั้น, feat-080 คง in-progress จน full suite ผ่าน
+
+## 2026-10-18 ICT — เก็บแขนท่านั่งให้สมมาตรและชิดตัก
+
+- ปรับท่า Sit ให้ต้นแขนและปลายแขนหมุนเข้าด้านในแบบสะท้อนซ้าย/ขวา มือจึงอยู่ใกล้ต้นขาและไม่กางออกข้างลำตัว
+- เพิ่ม asset assertion ว่ามือซ้าย/ขวาสมมาตร เข้ามาอยู่ใกล้แนวลำตัว และยื่นมาทางด้านหน้า; `customer-walk.test.ts` 5/5 ผ่าน
+- QA: `make test` 67 files / 896 tests, `make lint` (รวม boundary, ESLint, TypeScript, API contract), `npx tsc --noEmit` และ `make status` ผ่าน
+- Browser QA รอบนี้ติดข้อจำกัด: localhost:3001 ตอบหน้าไม่พบเส้นทาง Character Lab และเปิด dev server เพิ่มไม่ได้เพราะระบบปฏิเสธการ bind port (EPERM); จึงยังไม่ได้ยืนยันภาพหลังปรับใน browser
+
+## 2026-10-18 ICT — แก้ Character Lab Runtime Error จาก `.next` ค้าง
+
+- จากภาพพบ dev server พยายามเปิด `.next/server/app/(app)/character-lab/page.js` ที่ไม่มีอยู่; ตรวจพบ route เหลือเพียง client-reference manifest และเซิร์ฟเวอร์เดิมหยุดตอบแล้ว
+- ล้างเฉพาะ build cache `.next` ที่สร้างใหม่ได้ และเริ่ม Next.js dev server ใหม่บน localhost:3001; เปิด `/character-lab` ได้และ assets โหลดครบ
+- QA ใน Chrome: หน้า Character Lab แสดงโมเดล, กด “นั่งบนเก้าอี้” แล้วภาพ/สถานะยืนยันว่า `นั่ง (Sit)` และเก้าอี้ปรากฏ; console errors 0
+- `./harness/init.sh` ผ่าน รวม 67 files / 896 tests; `make status` ผ่าน. ไม่แก้ source code เพิ่ม

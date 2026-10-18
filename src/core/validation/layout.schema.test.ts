@@ -36,6 +36,13 @@ describe("Zod schemas — type-safe ตรงกับ Core types", () => {
     expect(LayoutObjectSchema.safeParse({ ...chair, style: { kind: "chair", shape: "oval", legStyle: "four-legs", color: "sage" } }).success).toBe(false);
   });
 
+  it("style ของเคาน์เตอร์: รับเฉพาะแบบ 4 แบบ + สีใน enum", () => {
+    const counter = cafeLayout().objects.find((o) => o.type === "counter")!;
+    expect(LayoutObjectSchema.safeParse({ ...counter, style: { variant: "display", color: "sage" } }).success).toBe(true);
+    expect(LayoutObjectSchema.safeParse({ ...counter, style: { variant: "island", color: "sage" } }).success).toBe(false);
+    expect(LayoutObjectSchema.safeParse({ ...counter, style: { variant: "bar", color: "#123456" } }).success).toBe(false);
+  });
+
   it("วัตถุนอกขอบร้านยังผ่าน schema (Non-blocking — ให้ Validation Engine รายงานแทน)", () => {
     const layout = cafeLayout();
     const outside = { ...layout, objects: layout.objects.map((o, i) => (i === 0 ? { ...o, x: -1 } : o)) };

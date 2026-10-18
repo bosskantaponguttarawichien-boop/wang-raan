@@ -56,7 +56,7 @@ const CHAIR_SHAPES: Option<ChairShape>[] = [
   { value: "round", label: "กลม" },
 ];
 
-function Segmented<V extends string>({
+export function Segmented<V extends string>({
   name,
   legend,
   options,
@@ -102,7 +102,7 @@ function Segmented<V extends string>({
   );
 }
 
-function ColorPicker({
+export function ColorPicker({
   name,
   legend,
   value,
@@ -215,7 +215,7 @@ function TableSizeFields({
   );
 }
 
-const groupClass = "grid min-w-0 gap-3 rounded-[12px] border border-line bg-white p-3";
+export const groupClass = "grid min-w-0 gap-3 rounded-[12px] border border-line bg-white p-3";
 
 function GroupHeading({ icon, hint, children }: { icon: "table" | "chair"; hint?: string; children: React.ReactNode }) {
   return (

@@ -6,10 +6,12 @@
  * - วัตถุทุกคู่ที่ทับกัน → Blocked
  * - ยกเว้น Chair กับ Table ของตัวเอง: สอดได้ ≤ 0.10 ม. และเฉพาะจากด้านหน้าของเก้าอี้
  * - วัตถุออกนอกขอบร้าน → Blocked
+ * - ประตูครัวทับช่องทางเข้าบนผนังเดียวกัน → Blocked
  */
 import { CLEARANCE } from "../layout/constants";
 import { EPSILON } from "../layout/epsilon";
 import { footprint, rectOverlap } from "../layout/geometry";
+import { wallDoorOverlap } from "../layout/entities";
 import { chairTuck } from "../layout/table-set";
 import type { Chair, LayoutObject, Rect, StoreLayout, Table, ValidationIssue } from "../layout/types";
 import { OBJECT_LABEL, createIssue } from "./issues";
@@ -39,6 +41,18 @@ function overlapMessage(a: LayoutObject, b: LayoutObject): string {
 export function checkCollisions(layout: StoreLayout): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const items = layout.objects.map((obj) => ({ obj, rect: footprint(obj) }));
+
+  if (layout.entrance && layout.kitchenDoor && wallDoorOverlap(layout.entrance, layout.kitchenDoor) > 0) {
+    issues.push(
+      createIssue(
+        "collision",
+        "kitchen-door-overlaps-entrance",
+        "blocked",
+        [layout.kitchenDoor.id, layout.entrance.id],
+        "ประตูครัวทับทางเข้าร้าน",
+      ),
+    );
+  }
 
   for (const { obj, rect } of items) {
     if (!isInsideRoom(rect, layout)) {

@@ -1,17 +1,12 @@
 import { CLEARANCE, DEFAULT_SIZES, GRID_STEP, TABLE_SET_PRESETS } from "./constants";
 import { EPSILON } from "./epsilon";
 import { footprint, rectsIntersect, roundMeters, snapPoint, snapToGrid } from "./geometry";
-import type { Meters, Point, Rect, StoreLayout, TableSetPreset } from "./types";
+import type { Meters, Point, Rect, StoreLayout, TableSetPreset, WallDoor } from "./types";
 
-export type PaletteCatalogItem = TableSetPreset | "counter" | "kitchen";
+export type PaletteCatalogItem = TableSetPreset | "counter";
 
-/**
- * คำนวณระยะเว้นหน้าประตู (Door Clearance Zone) ลึก 1.2 ม.
- */
-export function getDoorZone(layout: StoreLayout): Rect | null {
-  const entrance = layout.entrance;
-  if (!entrance) return null;
-  const depth = CLEARANCE.mainAisle; // 1.2 เมตร
+/** พื้นที่หน้าประตูลึก `depth` เข้าไปในร้าน */
+export function doorFrontZone(layout: Pick<StoreLayout, "width" | "depth">, entrance: WallDoor, depth: Meters): Rect {
   switch (entrance.wall) {
     case "north":
       return { x: entrance.position, y: 0, width: entrance.width, depth };
@@ -25,8 +20,20 @@ export function getDoorZone(layout: StoreLayout): Rect | null {
 }
 
 /**
+ * คำนวณระยะเว้นหน้าประตู (Door Clearance Zone) ลึก 1.2 ม.
+ */
+export function getDoorZone(layout: StoreLayout): Rect | null {
+  return layout.entrance ? doorFrontZone(layout, layout.entrance, CLEARANCE.mainAisle) : null;
+}
+
+/** พื้นที่หน้าประตูครัวลึก 0.90 ม. (ทางเดินรองของพนักงาน) */
+export function getKitchenDoorZone(layout: StoreLayout): Rect | null {
+  return layout.kitchenDoor ? doorFrontZone(layout, layout.kitchenDoor, CLEARANCE.secondaryAisle) : null;
+}
+
+/**
  * คำนวณ Bounding Box รวมของชิ้นส่วนที่จะวางที่พิกัด (x, y)
- * (x, y) คือจุดอ้างอิง Top-Left ของโต๊ะ/เคาน์เตอร์/ครัว
+ * (x, y) คือจุดอ้างอิง Top-Left ของโต๊ะ/เคาน์เตอร์
  */
 export function getItemBoundingBox(kind: PaletteCatalogItem, pos: Point): Rect {
   const tuck = CLEARANCE.chairTuckMax;
@@ -60,21 +67,11 @@ export function getItemBoundingBox(kind: PaletteCatalogItem, pos: Point): Rect {
     };
   }
 
-  if (kind === "counter") {
-    return {
-      x: pos.x,
-      y: pos.y,
-      width: DEFAULT_SIZES.counter.width,
-      depth: DEFAULT_SIZES.counter.depth,
-    };
-  }
-
-  // kitchen
   return {
     x: pos.x,
     y: pos.y,
-    width: DEFAULT_SIZES.kitchen.width,
-    depth: DEFAULT_SIZES.kitchen.depth,
+    width: DEFAULT_SIZES.counter.width,
+    depth: DEFAULT_SIZES.counter.depth,
   };
 }
 
@@ -93,11 +90,11 @@ function expandRect(rect: Rect, margin: Meters): Rect {
 /**
  * หาจุดว่างที่ใกล้ที่สุดบนกริด 0.25 ม. สำหรับวางวัตถุชนิดที่ระบุ
  * - ไม่ล้นออกนอกผนังร้าน
- * - ไม่ทับ Door Clearance Zone (1.2 ม. หน้าประตู)
+ * - ไม่ทับ Door Clearance Zone (1.2 ม. หน้าประตู) และหน้าประตูครัว (0.9 ม.)
  * - ไม่ชนกับวัตถุเดิมในร้าน (ลองเว้นระยะทางเดิน 0.9 ม. -> 0.6 ม. -> ไม่ชน 0 ม.)
  */
 export function findAvailableSpot(layout: StoreLayout, kind: PaletteCatalogItem): Point {
-  const doorZone = getDoorZone(layout);
+  const doorZones = [getDoorZone(layout), getKitchenDoorZone(layout)].filter((z): z is Rect => z !== null);
   const existingFootprints = layout.objects.map((obj) => footprint(obj));
 
   // กำหนดขอบเขตการค้นหาตามขนาด Bounding Box
@@ -130,7 +127,7 @@ export function findAvailableSpot(layout: StoreLayout, kind: PaletteCatalogItem)
         }
 
         // ตรวจสอบว่าไม่ทับ Door Clearance Zone
-        if (doorZone && rectsIntersect(bbox, doorZone)) {
+        if (doorZones.some((zone) => rectsIntersect(bbox, zone))) {
           continue;
         }
 

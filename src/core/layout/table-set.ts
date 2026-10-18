@@ -403,12 +403,12 @@ export function chairTuck(chair: Chair, table: Table): { depth: Meters; fromFron
 }
 
 /**
- * ปรับขนาด Kitchen / Counter (ขนาดก่อนหมุน) — snap ทีละ 0.05 ม. ไม่ต่ำกว่า 0.30 ม. และไม่เกินขนาดร้านสูงสุด
+ * ปรับขนาด Counter (ขนาดก่อนหมุน) — snap ทีละ 0.05 ม. ไม่ต่ำกว่า 0.30 ม. และไม่เกินขนาดร้านสูงสุด
  * Table / Chair → คืนผังเดิม; ปรับขนาดโต๊ะผ่าน resizeTableSet ซึ่งจัดเก้าอี้ทั้งชุดใหม่เพื่อรักษาระยะสอดใต้โต๊ะ
  */
 export function resizeObject(layout: StoreLayout, id: string, width: Meters, depth: Meters): StoreLayout {
   const obj = findObject(layout, id);
-  if (!obj || (obj.type !== "kitchen" && obj.type !== "counter")) return layout;
+  if (!obj || obj.type !== "counter") return layout;
   const clamp = (v: Meters) =>
     Number.isFinite(v) ? Math.min(ROOM_MAX, Math.max(OBJECT_MIN_SIZE, snapToGrid(v, SIZE_STEP))) : OBJECT_MIN_SIZE;
   const next = { ...obj, width: clamp(width), depth: clamp(depth) };

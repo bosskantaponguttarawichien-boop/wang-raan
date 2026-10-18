@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTableSet, createSequentialIds, type Chair, type StoreLayout } from "@/core/layout";
-import { TARGETS, block, cafeLayout, corridor } from "@/test/fixtures/layouts";
+import { KITCHEN_DOOR_TARGET, TARGETS, block, cafeLayout, corridor } from "@/test/fixtures/layouts";
 import { analyzeRoutes, chairAccessStrips, checkClearance, hasChairAccess, issueCode } from "./index";
 
 const codes = (layout: StoreLayout) => checkClearance(layout).map(issueCode);
@@ -41,12 +41,19 @@ describe("ทางเดินหลัก ≥ 1.20 ม. (Entrance → Counter)
   });
 });
 
-describe("ทางเดินรอง ≥ 0.90 ม. (Entrance → Table / Kitchen)", () => {
-  it.each(["table", "kitchen"] as const)("%s", (type) => {
-    expect(codes(corridor(0.95, TARGETS[type]))).toEqual([]);
-    expect(codes(corridor(0.9, TARGETS[type]))).toEqual([]);
-    expect(codes(corridor(0.85, TARGETS[type]))).toEqual(["secondary-aisle"]);
-    expect(codes(corridor(0.5, TARGETS[type]))).toEqual([]);
+describe("ทางเดินรอง ≥ 0.90 ม. (Entrance → Table / ประตูครัว)", () => {
+  it("table", () => {
+    expect(codes(corridor(0.95, TARGETS.table))).toEqual([]);
+    expect(codes(corridor(0.9, TARGETS.table))).toEqual([]);
+    expect(codes(corridor(0.85, TARGETS.table))).toEqual(["secondary-aisle"]);
+    expect(codes(corridor(0.5, TARGETS.table))).toEqual([]);
+  });
+
+  it("kitchenDoor", () => {
+    expect(codes(corridor(0.95, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual([]);
+    expect(codes(corridor(0.9, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual([]);
+    expect(codes(corridor(0.85, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual(["secondary-aisle"]);
+    expect(codes(corridor(0.5, null, 1.2, KITCHEN_DOOR_TARGET))).toEqual([]);
   });
 
   it("เก้าอี้ต้องการเพียง 0.60 ม. — ไม่มีคำเตือนทางเดินรอง", () => {
@@ -68,6 +75,7 @@ describe("พื้นที่เข้าถึงเก้าอี้ ≥ 0.
       width: 8,
       depth: 6,
       entrance: null,
+      kitchenDoor: null,
       objects: [
         set.table,
         ...set.chairs,
@@ -106,6 +114,7 @@ describe("พื้นที่เข้าถึงเก้าอี้ ≥ 0.
       width: 0.5,
       depth: 2,
       entrance: null,
+      kitchenDoor: null,
       objects: [chair],
     };
     // หันใต้ → ด้านหลังอยู่เหนือ (นอกร้าน), ด้านข้างนอกร้านทั้งสอง

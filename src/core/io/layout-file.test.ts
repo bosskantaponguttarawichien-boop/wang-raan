@@ -127,7 +127,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
       depth: 6,
       entrance: { wall: "east", position: 5.5, width: 1.2 },
       objects: [
-        { type: "kitchen", x: 0.5, y: 0.5, width: 2, depth: 1.5, rotation: 450 },
+        { type: "counter", x: 0.5, y: 0.5, width: 2, depth: 1.5, rotation: 450 },
         { type: "table", x: 4, y: 3, width: 0.8, depth: 0.8 },
       ],
     };
@@ -135,7 +135,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.layout).toMatchObject({ width: 8, entrance: { wall: "east", position: 4.75 } });
-    expect(result.layout.objects.map((o) => o.id)).toEqual(["new-kitchen-01", "new-table-01"]);
+    expect(result.layout.objects.map((o) => o.id)).toEqual(["new-counter-01", "new-table-01"]);
     expect(result.layout.objects[0]!.rotation).toBe(90);
     const notes = result.notes.join("\n");
     for (const text of ["ลงกริด 0.25", "สร้าง id", "มุมหมุน", "ทางเข้า"]) expect(notes).toContain(text);
@@ -143,6 +143,25 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     const noEntrance = importLayoutFile(JSON.stringify({ ...raw, entrance: null }), ids());
     expect(noEntrance.ok && noEntrance.layout.entrance).toBeNull();
     expect(noEntrance.ok && noEntrance.notes.join()).toContain("ไม่มีทางเข้า");
+  });
+
+  it("แปลงไฟล์รุ่นก่อนที่มีกล่องครัว (type: kitchen) เป็นประตูครัวบนผนัง", () => {
+    const raw = {
+      width: 8,
+      depth: 6,
+      entrance: { wall: "south", position: 3, width: 1.2 },
+      objects: [
+        { id: "old-k", type: "kitchen", x: 2, y: 0.5, width: 2, depth: 1, rotation: 0 },
+        { id: "t1", type: "table", x: 4, y: 3, width: 0.8, depth: 0.8 },
+      ],
+    };
+    const result = importLayoutFile(JSON.stringify(raw), ids());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.layout.kitchenDoor).not.toBeNull();
+    expect(result.layout.kitchenDoor?.wall).toBe("north");
+    expect(result.layout.objects.some((o) => (o as { type: string }).type === "kitchen")).toBe(false);
+    expect(result.notes.join("\n")).toContain("ครัวเป็นห้องแยกแล้ว — แปลงกล่องครัวเป็นประตูครัวบนผนัง");
   });
 
   it.each([
@@ -165,7 +184,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
       }),
       "id ซ้ำ: a",
     ],
-    ["พิกัดไกลเกิน (schema สุดท้าย)", JSON.stringify({ width: 8, depth: 6, objects: [{ type: "kitchen", x: 500, y: 0, width: 1, depth: 1 }] }), "layout.objects.0.x"],
+    ["พิกัดไกลเกิน (schema สุดท้าย)", JSON.stringify({ width: 8, depth: 6, objects: [{ type: "counter", x: 500, y: 0, width: 1, depth: 1 }] }), "layout.objects.0.x"],
   ])("ปฏิเสธ: %s", (_name, text, message) => {
     const result = importLayoutFile(text, ids());
     expect(result.ok).toBe(false);
@@ -178,7 +197,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(result).toEqual({ ok: false, errors: ["ไฟล์ใหญ่เกิน 2 MB"] });
   });
 
-  it("พิกัดไม่ลงกริด → snap 0.25 ม.; เก้าอี้ขยับตามโต๊ะด้วยระยะเดียวกัน (คงระยะสอด); ขนาดครัว/เคาน์เตอร์ลงทีละ 0.05", () => {
+  it("พิกัดไม่ลงกริด → snap 0.25 ม.; เก้าอี้ขยับตามโต๊ะด้วยระยะเดียวกัน (คงระยะสอด); ขนาดเคาน์เตอร์ลงทีละ 0.05", () => {
     const raw = {
       width: 8,
       depth: 6,
@@ -198,7 +217,7 @@ describe("Import (feat-029 gate: แปลงเป็น Entity + Table-Chair H
     expect(byId.get("s")).toMatchObject({ x: 3.15, y: 2.6 }); // ขยับ (−0.10, −0.05) เท่าโต๊ะ
     expect(result.notes.join("\n")).toContain("ปรับตำแหน่ง/ขนาด 3 ชิ้นให้ลงกริด 0.25 ม.");
 
-    const tiny = importLayoutFile(JSON.stringify({ ...raw, objects: [{ type: "kitchen", x: 0, y: 0, width: 0.1, depth: 0.1 }] }), ids());
+    const tiny = importLayoutFile(JSON.stringify({ ...raw, objects: [{ type: "counter", x: 0, y: 0, width: 0.1, depth: 0.1 }] }), ids());
     expect(tiny.ok && tiny.layout.objects[0]).toMatchObject({ width: 0.3, depth: 0.3 });
   });
 });

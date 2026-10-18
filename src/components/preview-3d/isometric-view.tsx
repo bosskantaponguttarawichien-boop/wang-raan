@@ -10,6 +10,7 @@ import {
   getChairsOfTable,
 } from "@/core/layout";
 import { buildIsoScene, isoFloorRect, ISO_PALETTE } from "@/core/preview/isometric";
+import { arrowKeyToPlan, rotateLayoutForView, type ViewRotation } from "@/core/preview/view-rotation";
 import { SelectionToolbar } from "@/components/editor-2d/selection-toolbar";
 import { IsoHeatmapLayer, IsoSimulationOverlay } from "@/components/simulation/iso-simulation-overlay";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
@@ -26,6 +27,7 @@ export interface IsometricViewProps {
 export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
   const layout = useLayoutStore((s) => s.layout);
   const zoom = useLayoutStore((s) => s.zoom);
+  const viewRotation = useLayoutStore((s) => s.viewRotation);
   const selectedObjectId = useLayoutStore((s) => s.selectedObjectId);
   const simStatus = useSimulationStore((s) => s.status);
   const isSim = simStatus === "running" || simStatus === "paused";
@@ -54,17 +56,10 @@ export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
       const active = event.target as HTMLElement | null;
       if (active?.closest("input, textarea, select, [contenteditable=true]")) return;
 
-      const step = event.shiftKey ? 1 : 0.25;
-      const moves: Record<string, [number, number]> = {
-        ArrowLeft: [-step, 0],
-        ArrowRight: [step, 0],
-        ArrowUp: [0, -step],
-        ArrowDown: [0, step],
-      };
-      const move = moves[event.key];
+      const move = arrowKeyToPlan(event.key, event.shiftKey ? 1 : 0.25, viewRotation);
       if (move) {
         event.preventDefault();
-        actions().updateObjectPosition(keyboardTarget.id, keyboardTarget.x + move[0], keyboardTarget.y + move[1]);
+        actions().updateObjectPosition(keyboardTarget.id, keyboardTarget.x + move.x, keyboardTarget.y + move.y);
       } else if (event.key === "r" || event.key === "R") {
         event.preventDefault();
         actions().rotateObject(keyboardTarget.id, event.shiftKey ? -90 : 90);
@@ -84,16 +79,17 @@ export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSim, keyboardTarget, layout, onToast, useSvgFallback]);
+  }, [isSim, keyboardTarget, layout, onToast, useSvgFallback, viewRotation]);
 
   if (!useSvgFallback) {
-    return <ThreeView layout={layout} zoom={zoom} isSim={isSim} onUnavailable={showFallback} />;
+    return <ThreeView layout={layout} zoom={zoom} viewRotation={viewRotation} isSim={isSim} onUnavailable={showFallback} />;
   }
 
   return (
     <IsometricScene
       layout={layout}
       zoom={zoom}
+      viewRotation={viewRotation}
       fill
       isSim={isSim}
       simulate
@@ -107,6 +103,7 @@ export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
 export function IsometricScene({
   layout,
   zoom = 1,
+  viewRotation = 0,
   fill = false,
   isSim = false,
   simulate = false,
@@ -115,6 +112,8 @@ export function IsometricScene({
 }: {
   layout: StoreLayout;
   zoom?: number;
+  /** หมุนมุมมองทีละ 90° — วาดจากผังที่หมุนแล้ว ผนังหลัง 2 ด้านจึงเป็นด้านที่ไกลสายตาเสมอ */
+  viewRotation?: ViewRotation;
   fill?: boolean;
   isSim?: boolean;
   /** แสดงลูกค้าจำลองและ heatmap (เฉพาะ Editor — หน้าแชร์ไม่มีการจำลอง) */
@@ -122,7 +121,9 @@ export function IsometricScene({
   selectedObjectId?: string | null;
   onToast?: (message: string) => void;
 }) {
-  const scene = React.useMemo(() => buildIsoScene(layout), [layout]);
+  // ฉากวาดจากผังในพิกัดมุมมอง (id เดิม) — การแก้ไขทุกอย่างยังอ้างผังจริง `layout`
+  const viewLayout = React.useMemo(() => rotateLayoutForView(layout, viewRotation), [layout, viewRotation]);
+  const scene = React.useMemo(() => buildIsoScene(viewLayout), [viewLayout]);
   // id ของ <defs> ต้องไม่ชนกันเมื่อมีหลายฉากในหน้าเดียว (และไม่มี ":" ที่ใช้ใน url() ไม่ได้)
   const uid = React.useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const ids = {
@@ -138,6 +139,7 @@ export function IsometricScene({
   const warnedRef = React.useRef(false);
 
   // fill = เต็มพื้นที่ Canvas ของ Editor (cqw/cqh จาก container ของ Stage เผื่อความสูงให้คำอธิบาย); หน้าแชร์ใช้ขนาดคงที่
+  const planSize = { width: layout.width, depth: layout.depth };
   const [, , vbWidth = 1, vbHeight = 1] = scene.viewBox.split(" ").map(Number);
   const fitWidth = fill ? `min(100cqw, max(140px, 100cqh - 48px) * ${vbWidth / vbHeight})` : "min(100%, 590px)";
   const counts = {
@@ -166,14 +168,14 @@ export function IsometricScene({
 
   // แผ่นไฮไลต์บนพื้นครอบทั้งชุด (โต๊ะ + เก้าอี้ลูก) — เทียบกรอบ Selection ใน 2D
   const selectionPad = React.useMemo(() => {
-    const rects = layout.objects.filter((o) => selectedMemberIds.has(o.id)).map(footprint);
+    const rects = viewLayout.objects.filter((o) => selectedMemberIds.has(o.id)).map(footprint);
     if (rects.length === 0) return null;
     const x = Math.min(...rects.map((r) => r.x));
     const y = Math.min(...rects.map((r) => r.y));
     const width = Math.max(...rects.map((r) => r.x + r.width)) - x;
     const depth = Math.max(...rects.map((r) => r.y + r.depth)) - y;
     return isoFloorRect({ x, y, width, depth }, scene.scale, 0.1);
-  }, [layout, selectedMemberIds, scene.scale]);
+  }, [viewLayout, selectedMemberIds, scene.scale]);
 
   // ── Keyboard handling in 3D ──────────────────────────────────────────────
   React.useEffect(() => {
@@ -182,17 +184,10 @@ export function IsometricScene({
       const targetEl = e.target as HTMLElement | null;
       if (targetEl?.closest("input, textarea, select, [contenteditable=true]")) return;
 
-      const step = e.shiftKey ? 1 : 0.25;
-      const moves: Record<string, [number, number]> = {
-        ArrowLeft: [-step, 0],
-        ArrowRight: [step, 0],
-        ArrowUp: [0, -step],
-        ArrowDown: [0, step],
-      };
-      const move = moves[e.key];
+      const move = arrowKeyToPlan(e.key, e.shiftKey ? 1 : 0.25, viewRotation);
       if (move) {
         e.preventDefault();
-        actions().updateObjectPosition(target.id, target.x + move[0], target.y + move[1]);
+        actions().updateObjectPosition(target.id, target.x + move.x, target.y + move.y);
       } else if (e.key === "r" || e.key === "R") {
         e.preventDefault();
         actions().rotateObject(target.id, e.shiftKey ? -90 : 90);
@@ -216,7 +211,7 @@ export function IsometricScene({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isSim, target, layout, onToast]);
+  }, [isSim, target, layout, onToast, viewRotation]);
 
   const handlePointerDown = (e: React.PointerEvent<SVGElement>) => {
     const el = e.target as SVGElement;
@@ -341,7 +336,7 @@ export function IsometricScene({
             />
           </g>
           {scene.doormat && <polygon points={scene.doormat} fill={ISO_PALETTE.doormat} opacity={0.9} />}
-          {simulate && <IsoHeatmapLayer scale={scene.scale} clipPathId={ids.clip} />}
+          {simulate && <IsoHeatmapLayer scale={scene.scale} clipPathId={ids.clip} viewRotation={viewRotation} planSize={planSize} />}
           {selectionPad && (
             <polygon
               data-testid="iso-selection-pad"
@@ -390,9 +385,17 @@ export function IsometricScene({
               </text>
             </g>
           )}
+          {scene.kitchenDoor && (
+            <g>
+              <circle cx={scene.kitchenDoor.x} cy={scene.kitchenDoor.y} r={5} fill="#64748b" stroke="#fff" strokeWidth={2} />
+              <text x={scene.kitchenDoor.x} y={scene.kitchenDoor.y - 12} textAnchor="middle" fontSize={12} fill="#5f7492" fontFamily="var(--font)">
+                ครัว
+              </text>
+            </g>
+          )}
         </svg>
 
-        {simulate && <IsoSimulationOverlay scene={scene} layout={layout} />}
+        {simulate && <IsoSimulationOverlay scene={scene} layout={viewLayout} viewRotation={viewRotation} planSize={planSize} />}
 
         {!isSim && selected && selected.type !== "table" && selected.type !== "chair" && (
           <SelectionToolbar

@@ -2,7 +2,6 @@ import type { IssueCategory, IssueSeverity, LayoutObjectType, ValidationIssue } 
 
 /** ชื่อเรียกวัตถุภาษาไทยสำหรับข้อความ issue */
 export const OBJECT_LABEL: Record<LayoutObjectType, string> = {
-  kitchen: "ครัว",
   counter: "เคาน์เตอร์",
   table: "โต๊ะ",
   chair: "เก้าอี้",

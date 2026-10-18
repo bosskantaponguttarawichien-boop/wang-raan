@@ -1,7 +1,7 @@
 /**
  * Clearance — PRD.md §5.5 (ตรวจเฉพาะพื้นที่ที่จำเป็นต่อการเดินและใช้งาน)
  * - ทางเดินหลัก (Entrance → Counter) แคบกว่า 1.20 ม. → Blocked
- * - ทางเดินรอง (Entrance → Table / Kitchen) แคบกว่า 0.90 ม. → Blocked
+ * - ทางเดินรอง (Entrance → Table / ประตูครัว) แคบกว่า 0.90 ม. → Blocked
  * - พื้นที่เข้าถึง Chair (ด้านหลังหรือด้านข้างอย่างน้อย 1 ด้าน) แคบกว่า 0.60 ม. → Blocked
  * กรณีเดินไปไม่ถึงเลย เป็นหน้าที่ของ Accessibility (ไม่รายงานซ้ำที่นี่)
  */
@@ -100,6 +100,10 @@ export function checkClearance(
       issues.push(
         createIssue("clearance", code, "blocked", [route.object.id], AISLE_MESSAGE[route.aisle](OBJECT_LABEL[route.object.type])),
       );
+    }
+    const kitchen = analysis.kitchenDoor;
+    if (kitchen?.onWall && kitchen.status === "narrow") {
+      issues.push(createIssue("clearance", "secondary-aisle", "blocked", [kitchen.door.id], AISLE_MESSAGE.secondary("ประตูครัว")));
     }
   }
   return issues;

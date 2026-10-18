@@ -47,10 +47,17 @@ describe("stage-math", () => {
     expect(r.position).toBeCloseTo(position, 9);
   });
 
+  it("มุมมองหมุน 90°: กรอบบนจอ (6 × 8 ม.) แปลงกลับเป็นพิกัดผังจริง", () => {
+    const view = { left: 0, top: 0, width: 600, height: 800 };
+    // มุมขวาบนของจอ = มุมเหนือ-ตะวันตกของผัง; ขวาบนจอ = ทิศเหนือ (−y)
+    expect(clientToMeters({ x: 600, y: 0 }, view, { width: 8, depth: 6 }, 90)).toEqual({ x: 0, y: 0 });
+    expect(deltaToMeters(100, 0, view, { width: 8, depth: 6 }, 90)).toEqual({ x: 0, y: -1 });
+  });
+
   it("aria-label ภาษาไทยระบุตำแหน่ง มุม และปัญหา", () => {
-    const kitchen = cafeLayout().objects[0]!;
-    expect(objectAriaLabel(kitchen)).toBe("ครัว ตำแหน่ง x 0.50 ม. y 0.50 ม. หมุน 0 องศา");
-    expect(objectAriaLabel(kitchen, "ครัวทับโต๊ะ")).toMatch(/— ครัวทับโต๊ะ$/);
+    const counter = cafeLayout().objects[0]!;
+    expect(objectAriaLabel(counter)).toBe("เคาน์เตอร์ ตำแหน่ง x 5.00 ม. y 0.50 ม. หมุน 0 องศา");
+    expect(objectAriaLabel(counter, "เคาน์เตอร์ทับโต๊ะ")).toMatch(/— เคาน์เตอร์ทับโต๊ะ$/);
   });
 });
 
@@ -109,6 +116,23 @@ describe("Keyboard", () => {
     expect(state().layout.objects.some((o) => o.id === table.id || (o.type === "chair" && o.tableId === table.id))).toBe(false);
   });
 
+  it("มุมมองหมุน 90°: ลูกศรขวาเลื่อนไปทางขวาของจอ (= ทิศเหนือของผัง) และ Stage หมุนด้วย CSS", async () => {
+    const user = userEvent.setup();
+    state().rotateView(1);
+    try {
+      render(<Harness />);
+      expect(screen.getByTestId("artboard-stage")).toHaveStyle({ transform: "translate(-50%, -50%) rotate(90deg)" });
+      const table = state().layout.objects.find((o) => o.type === "table")!;
+      document.querySelector<HTMLButtonElement>(`[data-id="${table.id}"]`)!.focus();
+      await user.keyboard("{ArrowRight}");
+      expect(find(table.id)).toMatchObject({ x: table.x, y: table.y - 0.25 });
+      await user.keyboard("{ArrowDown}");
+      expect(find(table.id)).toMatchObject({ x: table.x + 0.25, y: table.y - 0.25 });
+    } finally {
+      state().rotateView(-1);
+    }
+  });
+
   it("ลูกศรบนเก้าอี้ย้ายทั้งชุดโต๊ะ", async () => {
     const user = userEvent.setup();
     render(<Harness />);
@@ -147,14 +171,14 @@ describe("Pointer drag", () => {
     expect(find(table.id)).toMatchObject({ x: 3, y: 3 });
   });
 
-  it("Non-blocking: ลากไปทับครัวได้ และ Issue Ring ขึ้นทันที", () => {
+  it("Non-blocking: ลากไปทับเคาน์เตอร์ได้ และ Issue Ring ขึ้นทันที", () => {
     render(<Harness />);
     const table = state().layout.objects.find((o) => o.type === "table")!;
     const el = document.querySelector<HTMLButtonElement>(`[data-id="${table.id}"]`)!;
-    fireEvent.pointerDown(el, { pointerId: 1, button: 0, clientX: 400, clientY: 400 });
-    fireEvent.pointerMove(el, { pointerId: 1, clientX: 150, clientY: 150 }); // ไป (0.5, 0.5)
+    fireEvent.pointerDown(el, { pointerId: 1, button: 0, clientX: 400, clientY: 350 });
+    fireEvent.pointerMove(el, { pointerId: 1, clientX: 600, clientY: 100 }); // ไป (5.0, 0.5) ทับเคาน์เตอร์
     fireEvent.pointerUp(el, { pointerId: 1 });
-    expect(find(table.id)).toMatchObject({ x: 0.5, y: 0.5 });
+    expect(find(table.id)).toMatchObject({ x: 5, y: 0.5 });
     expect(document.querySelector(`[data-id="${table.id}"]`)).toHaveAttribute("data-issue", "blocked");
   });
 
@@ -172,14 +196,14 @@ describe("Pointer drag", () => {
 
   it("pointer อื่น / ปุ่มขวา ไม่เริ่มการลาก", () => {
     render(<Harness />);
-    const kitchen = state().layout.objects[0]!;
-    const el = document.querySelector<HTMLButtonElement>(`[data-id="${kitchen.id}"]`)!;
+    const counter = state().layout.objects[0]!;
+    const el = document.querySelector<HTMLButtonElement>(`[data-id="${counter.id}"]`)!;
     fireEvent.pointerDown(el, { pointerId: 1, button: 2, clientX: 0, clientY: 0 });
     fireEvent.pointerMove(el, { pointerId: 1, clientX: 300, clientY: 300 });
     fireEvent.pointerDown(el, { pointerId: 1, button: 0, clientX: 0, clientY: 0 });
     fireEvent.pointerMove(el, { pointerId: 2, clientX: 300, clientY: 300 });
     fireEvent.pointerUp(el, { pointerId: 1 });
-    expect(find(kitchen.id)).toMatchObject({ x: 0.5, y: 0.5 });
+    expect(find(counter.id)).toMatchObject({ x: 5, y: 0.5 });
   });
 
   it("ลาก handle ปรับขนาดเคาน์เตอร์ (snap 0.05 ม.) และใช้ลูกศรบน handle ได้", async () => {
@@ -217,11 +241,11 @@ describe("Pointer drag", () => {
 
 describe("Issue rings", () => {
   it("วัตถุที่มีปัญหาแสดง data-issue และข้อความปัญหาใน aria-label", () => {
-    state().loadLayout({ ...cafeLayout(), objects: [...cafeLayout().objects, block("k2", 0.5, 0.5, 1, 1)] });
+    state().loadLayout({ ...cafeLayout(), objects: [...cafeLayout().objects, block("c2", 5, 0.5, 2, 1)] });
     render(<Harness />);
-    const el = document.querySelector('[data-id="k2"]')!;
+    const el = document.querySelector('[data-id="c2"]')!;
     expect(el).toHaveAttribute("data-issue", "blocked");
-    expect(el.getAttribute("aria-label")).toMatch(/ครัวทับครัวตัวอื่น/);
+    expect(el.getAttribute("aria-label")).toMatch(/เคาน์เตอร์ทับเคาน์เตอร์ตัวอื่น/);
     expect(el.className).toContain("issue-ring-blocked");
   });
 
@@ -229,5 +253,12 @@ describe("Issue rings", () => {
     state().loadLayout({ ...cafeLayout(), objects: [...cafeLayout().objects, block("blocker", 1, 5.5, 1.75, 0.5)] });
     render(<Harness />);
     expect(screen.getByTestId("entrance-marker")).toHaveAttribute("data-issue", "blocked");
+  });
+
+  it("ประตูครัวถูกบัง → ป้ายประตูครัวมี ring", () => {
+    // ประตูครัว cafeLayout อยู่ north position 1 กว้าง 0.9 (ช่วง x: [1, 1.9])
+    state().loadLayout({ ...cafeLayout(), objects: [...cafeLayout().objects, block("blocker-kd", 1, 0, 1, 0.5)] });
+    render(<Harness />);
+    expect(screen.getByTestId("kitchen-door-marker")).toHaveAttribute("data-issue", "blocked");
   });
 });

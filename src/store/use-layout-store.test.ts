@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkTableSetIntegrity, createSequentialIds, type Chair } from "@/core/layout";
+import { checkTableSetIntegrity, counterStyleOf, createSequentialIds, type Chair } from "@/core/layout";
 import { computeLayoutRevision } from "@/core/validation";
 import {
   HISTORY_LIMIT,
@@ -21,7 +21,8 @@ function setup() {
 /** สร้างผังคาเฟ่ที่ผ่านทุกกฎผ่าน action ของ store */
 function buildCafe(store = setup()) {
   const s = store.getState();
-  s.addKitchen({ x: 0.5, y: 0.5 });
+  s.addKitchenDoor();
+  s.setKitchenDoor({ wall: "north", position: 1 });
   s.addCounter({ x: 5, y: 0.5 });
   const tableId = s.addTableSet("table-4-seats", { x: 3, y: 3 });
   return { store, tableId };
@@ -51,13 +52,24 @@ describe("Table Set Lifecycle ผ่าน Store", () => {
     expect(selectSelectedObject(store.getState())).toMatchObject({ x: 0, y: 0.5 });
   });
 
-  it("addKitchen / addCounter หาจุดว่างอัตโนมัติเมื่อไม่ระบุตำแหน่งโดยไม่ชนกัน", () => {
+  it("addKitchenDoor / setKitchenDoor / removeKitchenDoor จัดการประตูครัวพร้อม Undo", () => {
     const store = setup();
-    store.getState().addKitchen();
+    expect(store.getState().layout.kitchenDoor).toBeNull();
+    store.getState().addKitchenDoor();
+    expect(store.getState().layout.kitchenDoor).toMatchObject({ wall: "north", position: 3.5, width: 0.9 });
+    store.getState().setKitchenDoor({ wall: "west", position: 2, width: 1.0 });
+    expect(store.getState().layout.kitchenDoor).toMatchObject({ wall: "west", position: 2, width: 1.0 });
+    store.getState().removeKitchenDoor();
+    expect(store.getState().layout.kitchenDoor).toBeNull();
+    store.getState().undo();
+    expect(store.getState().layout.kitchenDoor).toMatchObject({ wall: "west", position: 2, width: 1.0 });
+  });
+
+  it("addCounter หาจุดว่างอัตโนมัติเมื่อไม่ระบุตำแหน่งโดยไม่ชนกัน", () => {
+    const store = setup();
     store.getState().addCounter();
     expect(store.getState().layout.objects.map((o) => [o.type, o.x, o.y])).toEqual([
-      ["kitchen", 0, 0],
-      ["counter", 3, 0],
+      ["counter", 0, 0],
     ]);
   });
 
@@ -140,6 +152,34 @@ describe("รูปลักษณ์และขนาดชุดโต๊ะ�
   });
 });
 
+describe("รูปลักษณ์เคาน์เตอร์ผ่าน Store", () => {
+  it("ค่าเริ่มต้นเป็นระแนงสีส้ม · setCounterStyle = Undo หนึ่งขั้น · เลือกค่าเดิมไม่เพิ่ม history", () => {
+    const { store } = buildCafe();
+    const counter = store.getState().layout.objects.find((o) => o.type === "counter")!;
+    expect(counter.type === "counter" && counterStyleOf(counter)).toEqual({ variant: "fluted", color: "orange" });
+    const before = store.getState().historyIndex;
+    store.getState().setCounterStyle(counter.id, { variant: "fluted" });
+    expect(store.getState().historyIndex).toBe(before);
+    store.getState().setCounterStyle(counter.id, { variant: "bar", color: "oak" });
+    expect(store.getState().historyIndex).toBe(before + 1);
+    expect(store.getState().layout.objects.find((o) => o.id === counter.id)).toMatchObject({
+      width: counter.width,
+      depth: counter.depth,
+      style: { variant: "bar", color: "oak" },
+    });
+    store.getState().undo();
+    expect(store.getState().layout.objects.find((o) => o.id === counter.id)).not.toHaveProperty("style");
+  });
+
+  it("ทำซ้ำเคาน์เตอร์ → คงแบบและสีเดิม", () => {
+    const { store } = buildCafe();
+    const counter = store.getState().layout.objects.find((o) => o.type === "counter")!;
+    store.getState().setCounterStyle(counter.id, { variant: "display", color: "sage" });
+    const copyId = store.getState().duplicateObject(counter.id)!;
+    expect(store.getState().layout.objects.find((o) => o.id === copyId)).toMatchObject({ style: { variant: "display", color: "sage" } });
+  });
+});
+
 describe("Room & Entrance", () => {
   it("ขนาดร้าน snap และบีบอยู่ในช่วง 2–30 ม. แล้วดึงทางเข้ากลับมาบนผนัง (id เดิม)", () => {
     const store = setup();
@@ -191,8 +231,8 @@ describe("Validation ใน Store", () => {
     expect(store.getState().runValidation().status).toBe("ready");
     expect(selectCanStartSimulation(store.getState())).toBe(true);
 
-    const kitchen = store.getState().layout.objects.find((o) => o.type === "kitchen")!;
-    store.getState().updateObjectPosition(tableId, kitchen.x, kitchen.y); // Non-blocking: วางทับครัวได้
+    const counter = store.getState().layout.objects.find((o) => o.type === "counter")!;
+    store.getState().updateObjectPosition(tableId, counter.x, counter.y); // Non-blocking: วางทับเคาน์เตอร์ได้
     expect(selectCanStartSimulation(store.getState())).toBe(false);
     expect(store.getState().runValidation().status).toBe("blocked");
     expect(selectCanStartSimulation(store.getState())).toBe(false);
@@ -210,10 +250,10 @@ describe(`Undo / Redo ${HISTORY_LIMIT} ขั้น`, () => {
   /** ทำ n การแก้ไขที่ต่างกันทุกครั้ง แล้วคืน snapshot หลังแต่ละขั้น (index 0 = ก่อนแก้) */
   function editMany(n: number) {
     const store = setup();
-    const kitchenId = store.getState().addKitchen({ x: 0, y: 0 });
+    const counterId = store.getState().addCounter({ x: 0, y: 0 });
     const snapshots = [store.getState().layout];
     for (let i = 1; i <= n; i++) {
-      store.getState().updateObjectPosition(kitchenId, (i % 20) * 0.25, Math.floor(i / 20) * 0.25 + 0.25);
+      store.getState().updateObjectPosition(counterId, (i % 20) * 0.25, Math.floor(i / 20) * 0.25 + 0.25);
       snapshots.push(store.getState().layout);
     }
     return { store, snapshots };
@@ -312,14 +352,27 @@ describe("Selection & View", () => {
     store.getState().selectObject(tableId);
     store.getState().setZoom(2);
     store.getState().set3DView(true);
+    store.getState().rotateView(1);
     expect(selectUndoDepth(store.getState())).toBe(depth);
+  });
+
+  it("หมุนมุมมองวนทีละ 90° โดยผังจริงไม่เปลี่ยน", () => {
+    const { store } = buildCafe();
+    const layout = store.getState().layout;
+    expect(store.getState().viewRotation).toBe(0);
+    store.getState().rotateView(-1);
+    expect(store.getState().viewRotation).toBe(270);
+    store.getState().rotateView(1);
+    store.getState().rotateView(1);
+    expect(store.getState().viewRotation).toBe(90);
+    expect(store.getState().layout).toBe(layout);
   });
 });
 
 describe("Interaction (ลากต่อเนื่อง) และปรับขนาด", () => {
   it("การลากหนึ่งครั้งที่ผ่านหลายตำแหน่ง = Undo หนึ่งขั้น", () => {
     const store = setup();
-    const id = store.getState().addKitchen({ x: 0, y: 0 });
+    const id = store.getState().addCounter({ x: 0, y: 0 });
     const before = store.getState().layout;
     const depth = selectUndoDepth(store.getState());
     store.getState().beginInteraction();
@@ -332,7 +385,7 @@ describe("Interaction (ลากต่อเนื่อง) และปรั�
 
   it("interaction ที่ไม่เปลี่ยนผังไม่สร้าง history และการแก้หลังจบ interaction ได้ขั้นใหม่", () => {
     const store = setup();
-    const id = store.getState().addKitchen({ x: 0, y: 0 });
+    const id = store.getState().addCounter({ x: 0, y: 0 });
     const depth = selectUndoDepth(store.getState());
     store.getState().beginInteraction();
     store.getState().endInteraction();
@@ -346,7 +399,7 @@ describe("Interaction (ลากต่อเนื่อง) และปรั�
 
   it("interaction ทำงานถูกต้องแม้ history เต็ม 40 ขั้น", () => {
     const store = setup();
-    const id = store.getState().addKitchen({ x: 0, y: 0 });
+    const id = store.getState().addCounter({ x: 0, y: 0 });
     for (let i = 1; i <= 45; i++) store.getState().updateObjectPosition(id, (i % 20) * 0.25, 0.25 * Math.floor(i / 20));
     store.getState().beginInteraction();
     store.getState().updateObjectPosition(id, 6, 4);
@@ -357,7 +410,7 @@ describe("Interaction (ลากต่อเนื่อง) และปรั�
     expect(store.getState().layout.objects[0]).toMatchObject({ x: 0.25 * (45 % 20), y: 0.5 });
   });
 
-  it("resizeObject ปรับเฉพาะ Kitchen/Counter, snap 0.05 ม. ขั้นต่ำ 0.30 ม.", () => {
+  it("resizeObject ปรับเฉพาะ Counter, snap 0.05 ม. ขั้นต่ำ 0.30 ม.", () => {
     const { store, tableId } = buildCafe();
     const counter = store.getState().layout.objects.find((o) => o.type === "counter")!;
     store.getState().resizeObject(counter.id, 3.02, 0.12);
@@ -374,7 +427,7 @@ describe("replaceLayout / restoreHistory / resetLayout (feat-028, feat-029)", ()
   it("replaceLayout เป็นขั้นเดียวที่ Undo ได้ และล้างการเลือก", () => {
     const store = createLayoutStore({ newId: createSequentialIds() });
     const before = store.getState().layout;
-    const id = store.getState().addKitchen();
+    const id = store.getState().addCounter();
     expect(store.getState().selectedObjectId).toBe(id);
     const next = cafeLayout();
     store.getState().replaceLayout(next);
@@ -407,7 +460,7 @@ describe("replaceLayout / restoreHistory / resetLayout (feat-028, feat-029)", ()
 
   it("resetLayout กลับผังเริ่มต้นและล้างประวัติ", () => {
     const store = createLayoutStore({ newId: createSequentialIds() });
-    store.getState().addKitchen();
+    store.getState().addCounter();
     store.getState().resetLayout();
     expect(store.getState().layout.objects).toEqual([]);
     expect(store.getState().history).toHaveLength(1);

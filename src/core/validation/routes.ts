@@ -3,7 +3,7 @@
  *
  * | เส้นทาง                      | ปลายทาง (แตะ bounding box) | ความกว้างที่ต้องการ |
  * | ทางเดินหลัก (ลูกค้าสั่ง/จ่าย) | Entrance → Counter          | 1.20 ม.            |
- * | ทางเดินรอง (ลูกค้า/พนักงาน)   | Entrance → Table, Kitchen   | 0.90 ม.            |
+ * | ทางเดินรอง (ลูกค้า/พนักงาน)   | Entrance → Table, ประตูครัว | 0.90 ม.            |
  * | ทางเข้าถึงเก้าอี้              | Entrance → Chair            | 0.60 ม.            |
  *
  * ผลของแต่ละปลายทาง:
@@ -13,9 +13,10 @@
  */
 import { CLEARANCE } from "../layout/constants";
 import { footprint } from "../layout/geometry";
-import type { LayoutObject, LayoutObjectType, Meters, StoreLayout } from "../layout/types";
+import type { KitchenDoor, LayoutObject, LayoutObjectType, Meters, Rect, StoreLayout } from "../layout/types";
 import {
   buildWalkGrid,
+  entranceSegment,
   entranceStartIndices,
   reachableFromEntrance,
   touchingReachablePoints,
@@ -28,8 +29,13 @@ export type AisleKind = "main" | "secondary" | "chair";
 export const ROUTE_REQUIREMENTS: Record<LayoutObjectType, { aisle: AisleKind; width: Meters }> = {
   counter: { aisle: "main", width: CLEARANCE.mainAisle },
   table: { aisle: "secondary", width: CLEARANCE.secondaryAisle },
-  kitchen: { aisle: "secondary", width: CLEARANCE.secondaryAisle },
   chair: { aisle: "chair", width: CLEARANCE.chairAccess },
+};
+
+/** ประตูครัว (ครัวเป็นห้องแยก) — พนักงานใช้ทางเดินรอง */
+export const KITCHEN_DOOR_ROUTE: { aisle: AisleKind; width: Meters } = {
+  aisle: "secondary",
+  width: CLEARANCE.secondaryAisle,
 };
 
 /** ความกว้างขั้นต่ำที่ถือว่า "ยังเดินได้" */
@@ -53,6 +59,28 @@ export interface RouteAnalysis {
   /** พื้นที่ที่เดินถึงได้ แยกตามความกว้าง */
   reachable: Map<Meters, Uint8Array>;
   routes: RouteResult[];
+  /** เส้นทางไปหน้าประตูครัว (null = ยังไม่มีประตูครัว — Completeness รายงานแล้ว) */
+  kitchenDoor: KitchenDoorRoute | null;
+}
+
+export interface KitchenDoorRoute {
+  door: KitchenDoor;
+  /** ช่องประตูอยู่บนผนังจริง (false → ไม่วัดเส้นทาง) */
+  onWall: boolean;
+  requiredWidth: Meters;
+  status: RouteStatus;
+}
+
+/** ช่องประตูบนผนังในรูป Rect หนา 0 (ใช้หาจุดที่ยืนแตะหน้าประตูได้) */
+export function doorRect(layout: Pick<StoreLayout, "width" | "depth">, door: KitchenDoor): Rect | null {
+  const seg = entranceSegment(layout, door);
+  if (!seg) return null;
+  return {
+    x: Math.min(seg.a.x, seg.b.x),
+    y: Math.min(seg.a.y, seg.b.y),
+    width: Math.abs(seg.b.x - seg.a.x),
+    depth: Math.abs(seg.b.y - seg.a.y),
+  };
 }
 
 /** วิเคราะห์เส้นทางทั้งหมด (null เมื่อยังไม่มีทางเข้า — Completeness รายงานแล้ว) */
@@ -64,18 +92,27 @@ export function analyzeRoutes(layout: StoreLayout): RouteAnalysis | null {
   const entranceOnWall = grid.opening !== null;
   const entranceConnected = entranceStartIndices(grid, MIN_WALK_WIDTH).length > 0;
 
-  const touches = (obj: LayoutObject, width: Meters) =>
-    touchingReachablePoints(grid, reachable.get(width)!, footprint(obj), width).length > 0;
+  const touches = (rect: Rect, width: Meters) =>
+    touchingReachablePoints(grid, reachable.get(width)!, rect, width).length > 0;
+  const statusOf = (rect: Rect, width: Meters): RouteStatus =>
+    touches(rect, width) ? "ok" : width > MIN_WALK_WIDTH && touches(rect, MIN_WALK_WIDTH) ? "narrow" : "unreachable";
 
   const routes = layout.objects.map((object): RouteResult => {
     const { aisle, width } = ROUTE_REQUIREMENTS[object.type];
-    const status: RouteStatus = touches(object, width)
-      ? "ok"
-      : width > MIN_WALK_WIDTH && touches(object, MIN_WALK_WIDTH)
-        ? "narrow"
-        : "unreachable";
-    return { object, aisle, requiredWidth: width, status };
+    return { object, aisle, requiredWidth: width, status: statusOf(footprint(object), width) };
   });
 
-  return { grid, entranceOnWall, entranceConnected, reachable, routes };
+  let kitchenDoor: KitchenDoorRoute | null = null;
+  if (layout.kitchenDoor) {
+    const rect = doorRect(layout, layout.kitchenDoor);
+    const width = KITCHEN_DOOR_ROUTE.width;
+    kitchenDoor = {
+      door: layout.kitchenDoor,
+      onWall: rect !== null,
+      requiredWidth: width,
+      status: rect ? statusOf(rect, width) : "unreachable",
+    };
+  }
+
+  return { grid, entranceOnWall, entranceConnected, reachable, routes, kitchenDoor };
 }

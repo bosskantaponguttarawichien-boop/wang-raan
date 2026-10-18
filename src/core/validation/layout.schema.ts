@@ -6,10 +6,12 @@
  * - พิกัดวัตถุไม่บังคับ ≥ 0: Non-blocking placement ยอมให้วางนอกขอบได้ชั่วคราว
  *   และ Validation Engine จะรายงาน out-of-bounds เป็น issue (BFF จึงตอบ 422 ไม่ใช่ 400)
  * - Table.chairIds อนุญาตเป็น [] (Completeness รายงานเป็น Warning)
- * - entrance เป็น null ได้ (Completeness รายงานเป็น Blocked)
+ * - entrance / kitchenDoor เป็น null ได้ (Completeness รายงานเป็น Blocked)
+ * - ผังรุ่นก่อนที่มีกล่องครัว (`type: "kitchen"`) ถูกแปลงเป็น kitchenDoor ก่อนตรวจ (migrateLayoutData)
  */
 import { z } from "zod";
-import { ENTRANCE_MAX_WIDTH, GRID_STEP, ROOM_MAX, ROOM_MIN } from "../layout/constants";
+import { ENTRANCE_MAX_WIDTH, ENTRANCE_MIN_WIDTH, GRID_STEP, ROOM_MAX, ROOM_MIN } from "../layout/constants";
+import { migrateLayoutData } from "../layout/migrate";
 
 const ID = z.string().min(1).max(128);
 /** พิกัดยอมให้ออกนอกร้านได้ระยะหนึ่ง แต่กันค่าขยะ/Infinity */
@@ -35,9 +37,14 @@ const BaseObjectShape = {
   rotation: RotationSchema,
 };
 
-// C-01: องค์ประกอบหลักคือ kitchen, counter, table, chair (ไม่มี shelf)
-export const KitchenSchema = z.object({ ...BaseObjectShape, type: z.literal("kitchen") }).strict();
-export const CounterSchema = z.object({ ...BaseObjectShape, type: z.literal("counter") }).strict();
+// C-01: วัตถุบนพื้นคือ counter, table, chair (ไม่มี shelf; ครัวเป็นห้องแยก → kitchenDoor)
+export const CounterSchema = z
+  .object({
+    ...BaseObjectShape,
+    type: z.literal("counter"),
+    style: z.object({ variant: z.enum(["fluted", "panel", "bar", "display"]), color: z.enum(["white", "oak", "charcoal", "blue", "orange", "sage"]) }).strict().optional(),
+  })
+  .strict();
 export const TableSchema = z
   .object({
     ...BaseObjectShape,
@@ -54,18 +61,21 @@ export const ChairSchema = z.object({
   style: z.object({ kind: z.enum(["chair", "stool"]), shape: z.enum(["square", "round"]).optional(), legStyle: z.enum(["four-legs", "pedestal"]), color: z.enum(["white", "oak", "charcoal", "blue", "orange", "sage"]) }).strict().optional(),
 }).strict();
 
-export const LayoutObjectSchema = z.discriminatedUnion("type", [KitchenSchema, CounterSchema, TableSchema, ChairSchema]);
+export const LayoutObjectSchema = z.discriminatedUnion("type", [CounterSchema, TableSchema, ChairSchema]);
 
 export const EntranceSchema = z
   .object({
     id: ID,
     wall: z.enum(["north", "south", "east", "west"]),
     position: z.number().finite().min(0).max(ROOM_MAX),
-    width: z.number().finite().min(0.6).max(ENTRANCE_MAX_WIDTH),
+    width: z.number().finite().min(ENTRANCE_MIN_WIDTH).max(ENTRANCE_MAX_WIDTH),
   })
   .strict();
 
-export const StoreLayoutSchema = z
+/** ประตูครัว — รูปแบบเดียวกับทางเข้า */
+export const KitchenDoorSchema = EntranceSchema;
+
+const CurrentStoreLayoutSchema = z
   .object({
     id: ID,
     version: z.number().int().positive(),
@@ -73,6 +83,7 @@ export const StoreLayoutSchema = z
     width: RoomDimension,
     depth: RoomDimension,
     entrance: EntranceSchema.nullable(),
+    kitchenDoor: KitchenDoorSchema.nullable(),
     objects: z.array(LayoutObjectSchema).max(1000),
   })
   .strict()
@@ -85,6 +96,8 @@ export const StoreLayoutSchema = z
       seen.add(obj.id);
     });
   });
+
+export const StoreLayoutSchema = z.preprocess(migrateLayoutData, CurrentStoreLayoutSchema);
 
 export const ValidationIssueSchema = z
   .object({

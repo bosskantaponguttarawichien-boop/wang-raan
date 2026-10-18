@@ -4,7 +4,6 @@ import {
   createCounter,
   createEmptyLayout,
   createEntrance,
-  createKitchen,
   createSequentialIds,
   findAvailableSpot,
   getDoorZone,
@@ -52,7 +51,7 @@ describe("spot-finder (feat-051)", () => {
     };
     const doorZone = getDoorZone(layout)!;
 
-    const items = ["table-2-seats", "table-4-seats", "counter", "kitchen"] as const;
+    const items = ["table-2-seats", "table-4-seats", "counter"] as const;
     for (const item of items) {
       const spot = findAvailableSpot(layout, item);
       expect(spot.x % 0.25).toBeCloseTo(0);
@@ -74,12 +73,9 @@ describe("spot-finder (feat-051)", () => {
     let layout: StoreLayout = {
       ...createEmptyLayout({ width: 8, depth: 6 }, ids),
       entrance: createEntrance({ width: 8, depth: 6 }, { wall: "south", position: 3.5, width: 1.2 }, ids),
+      kitchenDoor: { id: "kitchen-door-01", wall: "north", position: 1, width: 0.9 },
       objects: [],
     };
-
-    // วาง Kitchen
-    const kSpot = findAvailableSpot(layout, "kitchen");
-    layout = { ...layout, objects: [...layout.objects, createKitchen({ position: kSpot }, ids)] };
 
     // วาง Counter
     const cSpot = findAvailableSpot(layout, "counter");
@@ -93,7 +89,7 @@ describe("spot-finder (feat-051)", () => {
     const t2Spot = findAvailableSpot(layout, "table-2-seats");
     layout = addTableSet(layout, "table-2-seats", t2Spot, ids).layout;
 
-    expect(layout.objects.length).toBe(1 + 1 + 5 + 3); // kitchen + counter + (table+4chairs) + (table+2chairs) = 10 objects
+    expect(layout.objects.length).toBe(1 + 5 + 3); // counter + (table+4chairs) + (table+2chairs) = 9 objects
 
     // ตรวจสอบว่าไม่มีวัตถุใดชนกัน
     const validation = validateLayout(layout);

@@ -52,9 +52,10 @@
   --plan-table-stroke: #8da6ef;
   --plan-chair-fill: #f8f0e5;
   --plan-chair-stroke: #d9ad7d;
-  --plan-kitchen-fill: #e8edf5;
-  --plan-kitchen-stroke: #9bb0c9;
-  --plan-kitchen-cooktop: #c4d3e5;
+  --plan-kitchen-door-fill: #ffffff;
+  --plan-kitchen-door-stroke: #334155;
+  --plan-kitchen-door-label: #334155;
+
   --plan-counter-fill: #e1e8f3;
   --plan-counter-stroke: #aebed3;
   --plan-counter-pos: #bdcce0;
@@ -93,6 +94,8 @@
   --iso-kitchen-cooktop-1: #41464f;
   --iso-kitchen-cooktop-2: #2b2f36;
   --iso-kitchen-cooktop-3: #363a42;
+  --iso-kitchen-door: #334155;
+  --iso-kitchen-door-border: #1e293b;
   --iso-counter-top: #ffffff;
   --iso-counter-right: #dee1e7;
   --iso-counter-front: #eceef2;
