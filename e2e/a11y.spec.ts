@@ -49,7 +49,7 @@ for (const viewport of [
 
     test("Playground: selection toolbar + ป๊อปโอเวอร์พิกัด, ฟอร์มขนาดร้านที่มี error, ข้อความนำเข้าไฟล์", async ({ page }) => {
       await page.goto("/playground");
-      await addItem(page, "ครัว");
+      await addItem(page, "เคาน์เตอร์");
       const toolbar = page.getByTestId("selection-toolbar");
       await toolbar.getByRole("button", { name: "ปรับละเอียด" }).click();
       await expect(toolbar.getByRole("dialog", { name: "ปรับตำแหน่งละเอียด" })).toBeVisible();

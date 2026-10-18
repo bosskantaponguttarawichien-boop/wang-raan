@@ -50,7 +50,7 @@ test.describe("บัญชี + ผังออนไลน์ + แชร์",
     await expect(page.getByTestId("cloud-message")).toContainText("บันทึกแล้วเมื่อ");
     const saved = page.getByTestId("saved-layouts").getByRole("listitem");
     await expect(saved).toHaveCount(1);
-    await expect(saved.first()).toContainText("ร้าน 8 × 6 ม. · 7 ชิ้น · กำลังเปิดอยู่");
+    await expect(saved.first()).toContainText("ร้าน 8 × 6 ม. · 6 ชิ้น · กำลังเปิดอยู่");
     await expect((await cloud(page)).getByRole("button", { name: "บันทึกทับ" })).toBeVisible();
 
     // รีโหลด: รายการมาจาก BFF (ไม่ใช่ localStorage)

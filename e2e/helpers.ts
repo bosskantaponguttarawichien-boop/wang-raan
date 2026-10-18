@@ -49,12 +49,14 @@ export async function cloud(page: Page) {
 }
 
 /** กดเพิ่มของจาก palette ในแท็บ "เพิ่ม" — โต๊ะตั้งค่าบนแผงซ้ายก่อนสร้าง */
-export async function addItem(page: Page, name: "ครัว" | "เคาน์เตอร์" | "โต๊ะ") {
+export async function addItem(page: Page, name: "ประตูครัว" | "เคาน์เตอร์" | "โต๊ะ") {
   await closeDialogs(page);
   await openTab(page, "add");
-  // โต๊ะที่เลือกอยู่ทำให้แท็บ "เพิ่ม" แสดงแผงแก้ไขโต๊ะแทนรายการของ — กด "กลับ" ก่อน
+  // โต๊ะ/เคาน์เตอร์ที่เลือกอยู่ทำให้แท็บ "เพิ่ม" แสดงแผงแก้ไขแทนรายการของ — กด "กลับ" ก่อน
   const editPanel = page.getByRole("region", { name: "แก้ไขโต๊ะ" });
   if (await editPanel.isVisible()) await editPanel.getByRole("button", { name: "กลับ" }).click();
+  const counterPanel = page.getByRole("region", { name: "แก้ไขเคาน์เตอร์" });
+  if (await counterPanel.isVisible()) await counterPanel.getByRole("button", { name: "กลับ" }).click();
   await page.getByRole("button", { name: new RegExp(`^เพิ่ม\\s*${name}`) }).click();
   if (name === "โต๊ะ") {
     const panel = page.getByRole("region", { name: "ตั้งค่าโต๊ะ" });
@@ -63,6 +65,11 @@ export async function addItem(page: Page, name: "ครัว" | "เคาน�
     // มือถือ: sheet พับเองหลังวางโต๊ะ — เปิดกลับมาเพื่อใช้แผงแก้ไขโต๊ะ
     await openTab(page, "add");
     await expect(editPanel).toBeVisible();
+    return;
+  }
+  // ประตูครัวติดผนัง (ไม่ใช่วัตถุบนพื้น) — ไม่มี selection toolbar
+  if (name === "ประตูครัว") {
+    await expect(page.getByTestId("kitchen-door-marker")).toBeVisible();
     return;
   }
   await page.getByTestId("selection-toolbar").waitFor();
@@ -84,10 +91,9 @@ export async function placeSelected(page: Page, x: number, y: number) {
   await toolbar.getByLabel("บน-ล่าง").press("Enter"); // Enter = นำไปใช้และปิดป๊อปโอเวอร์
 }
 
-/** สร้างผังคาเฟ่ 8 × 6 ม. ที่ผ่านทุกกฎผ่าน UI จริง (ครัว + เคาน์เตอร์ + โต๊ะ 4 ที่นั่ง) */
+/** สร้างผังคาเฟ่ 8 × 6 ม. ที่ผ่านทุกกฎผ่าน UI จริง (ประตูครัวบนผนัง + เคาน์เตอร์ + โต๊ะ 4 ที่นั่ง) */
 export async function buildReadyCafe(page: Page) {
-  await addItem(page, "ครัว");
-  await placeSelected(page, 0.5, 0.5);
+  await addItem(page, "ประตูครัว");
   await addItem(page, "เคาน์เตอร์");
   await placeSelected(page, 5, 0.5);
   await addItem(page, "โต๊ะ");
