@@ -45,8 +45,8 @@ function bone(name, position) {
 const model = new THREE.Group();
 model.name = "CafeMannequin";
 
-// Reference: three head units tall (1.125 m); shoulder → elbow → wrist,
-// hip → knee → ankle. Bone pivots and surface endpoints share these landmarks.
+// Shoulder → elbow → wrist, hip → knee → ankle. ตำแหน่งข้อต่อต้องตรงกับ JOINTS ใน build-cafe-customer-mesh.py
+// (ผิวจาก Blender ผูกน้ำหนักไว้กับข้อต่อชุดนั้น)
 // ตัวป้อมขาสั้น: ต้นขา .17 + หน้าแข้ง .15 (เดิม .20 + .175) — ต้องตรงกับ squash_y ใน build-cafe-customer-mesh.py
 const THIGH = 0.17;
 const SHIN = 0.15;

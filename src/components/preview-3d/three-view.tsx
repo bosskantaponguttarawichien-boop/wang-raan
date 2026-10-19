@@ -786,7 +786,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     /** เล่นท่านั่งย้อนจากจุดที่อยู่ตอนนี้ (นั่งไม่ทันสุดก็ลุกจากตรงนั้น) แล้วค้างท่ายืนไว้ที่ต้นคลิป */
     const standUp = (customer: AnimatedCustomer) => {
       const action = customer.action;
-      if (!action || action.getClip().name !== "Sit") return;
+      if (!action || action.getClip().name !== "Sit") {
+        playClip(customer, customer.animation);
+        return;
+      }
       action.paused = false;
       action.setEffectiveTimeScale(-STAND_UP_RATE);
       customer.standingUp = action.time / STAND_UP_RATE;

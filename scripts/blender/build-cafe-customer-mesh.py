@@ -9,15 +9,15 @@
 ผลลัพธ์คือ GLB มีแค่ผิว + โครงกระดูก + น้ำหนักผิว (ชื่อกระดูกตรงกับ create-cafe-customer-model.mjs)
 สคริปต์ Node จะอ่านไฟล์นี้ไปใส่ animation ต่อ
 
-รัน (ต้องมี Blender หรือ pip install bpy):
+รัน (ต้องมี Blender หรือ pip install bpy==5.2.2 บน Python 3.13):
   python scripts/blender/build-cafe-customer-mesh.py
+แล้วรัน node scripts/create-cafe-customer-model.mjs (และ --lite) เพื่อสร้างไฟล์ที่แอปใช้
 """
+import math
 from pathlib import Path
 
-import math
-
 import bpy
-import bmesh  # noqa: E402 — ต้อง import หลัง bpy
+import bmesh  # ต้อง import หลัง bpy เมื่อใช้ bpy แบบ pip
 from mathutils import Matrix, Vector
 
 OUT_DIR = Path(__file__).resolve().parent
@@ -200,10 +200,11 @@ def lower_arms(rig, body):
     bpy.ops.object.mode_set(mode="OBJECT")
     deform = body.modifiers.new("Armature", "ARMATURE")
     deform.object = rig
+    # กระดูกหลังพับแขนต้องกลับมาตรงข้อต่อท่าห้อย (ที่ create-cafe-customer-model.mjs ใช้)
     for name, (head, tail, _) in JOINTS.items():
         bone = rig.data.bones[name]
-        assert (bone.head_local - Vector(b(*head, leg=name.endswith(LEG_BONES)))).length < 1e-4, name
         leg = name.endswith(LEG_BONES)
+        assert (bone.head_local - Vector(b(*head, leg=leg))).length < 1e-4, name
         assert (bone.tail_local - Vector(b(*tail, leg=leg))).length < 1e-4, name
 
 
