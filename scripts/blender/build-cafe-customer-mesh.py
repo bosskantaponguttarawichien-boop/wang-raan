@@ -83,7 +83,7 @@ def build_body(level):
     waist = add((0, 0.53), (0.118, 0.082))
     chest = add((0, 0.62), (0.13, 0.086))
     neck_base = add((0, 0.71), (0.042, 0.04))
-    neck_top = add((0, 0.8), (0.036, 0.036))
+    neck_top = add((0, 0.77), (0.036, 0.036))
     chain(pelvis, waist, chest, neck_base, neck_top)
     for sign in (-1, 1):
         shoulder = add((sign * 0.13, 0.664), (0.05, 0.05))
@@ -132,34 +132,39 @@ def build(filename, level):
     rig = build_armature()
     parts = [
         build_body(level),
-        # หัวกับหู: ขนาด/ตำแหน่งเดียวกับรุ่นก่อน (หัวเล็กลง 20%, หูระดับตาแนบหัว)
-        ellipsoid("Head", (0, 0.95), (0.178, 0.17, 0.15), level),
-        ellipsoid("EarL", (-0.18, 0.938), (0.024, 0.036, 0.02), level),
-        ellipsoid("EarR", (0.18, 0.938), (0.024, 0.036, 0.02), level),
+        # หัวกับหู: หัวเล็กลง 20% จากรุ่นแรก, หูระดับตาแนบหัว; หัววางต่ำลงให้คอสั้น (เห็นคอราว 3 ซม.)
+        ellipsoid("Head", (0, 0.91), (0.178, 0.17, 0.15), level),
+        ellipsoid("EarL", (-0.18, 0.898), (0.024, 0.036, 0.02), level),
+        ellipsoid("EarR", (0.18, 0.898), (0.024, 0.036, 0.02), level),
     ]
     for part in parts:
         bpy.context.view_layer.objects.active = part
         for modifier in list(part.modifiers):
             bpy.ops.object.modifier_apply(modifier=modifier.name)
-    bpy.ops.object.select_all(action="DESELECT")
-    for part in parts:
-        part.select_set(True)
-    bpy.context.view_layer.objects.active = parts[0]
-    bpy.ops.object.join()
-    body = parts[0]
-    body.data.validate()
+    body, *head_parts = parts
     body.name = "MannequinBody"
     body.data.name = "MannequinBody"
     material = bpy.data.materials.new("Mannequin")
     material.diffuse_color = (0.34, 0.37, 0.42, 1)
     body.data.materials.append(material)
 
-    # น้ำหนักผิวอัตโนมัติ (heat): ผิวรอบข้อต่อเป็นวงเรียบ จึงแบ่งน้ำหนักเป็นแถบต่อเนื่อง
+    # น้ำหนักผิวอัตโนมัติ (heat) เฉพาะลำตัว: ผิวรอบข้อต่อเป็นวงเรียบ จึงแบ่งน้ำหนักเป็นแถบต่อเนื่อง
     bpy.ops.object.select_all(action="DESELECT")
     body.select_set(True)
     rig.select_set(True)
     bpy.context.view_layer.objects.active = rig
     bpy.ops.object.parent_set(type="ARMATURE_AUTO")
+
+    # หัวและหูแข็งทั้งชิ้น ผูกกับกระดูก Head เต็มน้ำหนัก (heat คำนวณชิ้นที่ซ้อนกับคอไม่ได้)
+    for part in head_parts:
+        group = part.vertex_groups.new(name="Head")
+        group.add([vertex.index for vertex in part.data.vertices], 1.0, "REPLACE")
+    bpy.ops.object.select_all(action="DESELECT")
+    for part in parts:
+        part.select_set(True)
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.join()
+    body.data.validate()
 
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(

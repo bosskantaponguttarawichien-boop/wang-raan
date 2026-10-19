@@ -4,7 +4,7 @@
  * ผิวปั้นแบบ box modeling ใน Blender (scripts/blender/build-cafe-customer-mesh.py): เส้นบนผิวเรียงเป็นวง
  * รอบแขน ขา และข้อต่อ จึงงอได้เรียบ ไม่ยับ — สคริปต์นี้ผูกผิวนั้นกับโครงกระดูกและใส่ animation
  *
- * ตัวละครมีความสูง native ราว 1.12 ม. (แสดงผลที่ scale 0.9 = ราว 1.01 ม.)
+ * ตัวละครมีความสูง native ราว 1.08 ม. (แสดงผลที่ scale 0.9 = ราว 0.97 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่าง)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)

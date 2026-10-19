@@ -1077,3 +1077,4 @@
 - `create-cafe-customer-model.mjs` เลิกใช้ SDF/surface nets: อ่าน `scripts/blender/cafe-customer-mesh(-lite).glb` จับคู่กระดูกตามชื่อ แล้วใส่ animation ชุดเดิม
 - ผล: ข้อต่อ (สะโพก เอว ไหล่ เข่า) งอเรียบไม่ยับ; GLB ละเอียด 4389 จุด / รุ่นเบา 1137 จุด
 - QA: `npm test` 67 files / 896 tests, typecheck, ESLint ผ่าน; Chromium Character Lab ตรวจยืน/นั่ง/เดิน
+- คอสั้นลง: วางหัว/หูต่ำลง 4 ซม. (คอที่เห็นเหลือราว 3 ซม.) ความสูง native ~1.08 ม.; หัวและหูผูกกระดูก Head เต็มน้ำหนักแทน heat (heat คำนวณชิ้นที่ซ้อนคอไม่ได้ เหลือจุดไม่มีน้ำหนัก); `npm test` 896 ผ่าน, Chromium ตรวจยืน/นั่ง
