@@ -4,7 +4,7 @@
  * ผิวปั้นแบบ box modeling ใน Blender (scripts/blender/build-cafe-customer-mesh.py): เส้นบนผิวเรียงเป็นวง
  * รอบแขน ขา และข้อต่อ จึงงอได้เรียบ ไม่ยับ — สคริปต์นี้ผูกผิวนั้นกับโครงกระดูกและใส่ animation
  *
- * ตัวละครมีความสูง native ราว 1.08 ม. (แสดงผลที่ scale 0.9 = ราว 0.97 ม.)
+ * ตัวละครมีความสูง native ราว 1.03 ม. (แสดงผลที่ scale 0.9 = ราว 0.92 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่าง)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
@@ -47,7 +47,10 @@ model.name = "CafeMannequin";
 
 // Reference: three head units tall (1.125 m); shoulder → elbow → wrist,
 // hip → knee → ankle. Bone pivots and surface endpoints share these landmarks.
-const HIPS_Y = 0.46;
+// ตัวป้อมขาสั้น: ต้นขา .17 + หน้าแข้ง .15 (เดิม .20 + .175) — ต้องตรงกับ squash_y ใน build-cafe-customer-mesh.py
+const THIGH = 0.17;
+const SHIN = 0.15;
+const HIPS_Y = 0.055 + SHIN + THIGH + 0.03;
 const hips = bone("Hips", [0, HIPS_Y, 0]);
 const spine = bone("Spine", [0, 0.15, 0]);
 const neck = bone("Neck", [0, 0.13, 0]);
@@ -62,10 +65,10 @@ const leftHand = bone("LeftHand", [-0.017, -0.155, 0]);
 const rightHand = bone("RightHand", [0.017, -0.155, 0]);
 const leftLeg = bone("LeftLeg", [-0.07, -0.03, 0]);
 const rightLeg = bone("RightLeg", [0.07, -0.03, 0]);
-const leftLowerLeg = bone("LeftLowerLeg", [0, -0.20, 0]);
-const rightLowerLeg = bone("RightLowerLeg", [0, -0.20, 0]);
-const leftFoot = bone("LeftFoot", [0, -0.175, 0]);
-const rightFoot = bone("RightFoot", [0, -0.175, 0]);
+const leftLowerLeg = bone("LeftLowerLeg", [0, -THIGH, 0]);
+const rightLowerLeg = bone("RightLowerLeg", [0, -THIGH, 0]);
+const leftFoot = bone("LeftFoot", [0, -SHIN, 0]);
+const rightFoot = bone("RightFoot", [0, -SHIN, 0]);
 
 model.add(hips);
 hips.add(spine, leftLeg, rightLeg);
@@ -154,12 +157,12 @@ const idle = new THREE.AnimationClip("Idle", 2.4, [
 ]);
 
 // Solve a two-bone leg toward a planted/swinging ankle instead of swinging
-// every joint independently. ก้าวสั้นแต่จังหวะกลาง ๆ (~130 ก้าว/นาที) ไม่รัวและไม่ยืด
-const WALK_DURATION = 0.84;
-const WALK_DISTANCE = 0.36;
+// every joint independently. ขาสั้นก้าวสั้นจึงถี่ขึ้นนิด (~150 ก้าว/นาที) ดูเดินต้วมเตี้ยมน่ารัก ไม่รัว
+const WALK_DURATION = 0.78;
+const WALK_DISTANCE = 0.31;
 const walkCycle = sampled(WALK_DURATION, 60);
 model.userData.walkCycleDistance = WALK_DISTANCE;
-const hipHeights = walkCycle.phases.map((phase) => 0.4464 + 0.002 * (1 - Math.cos(phase * 2)));
+const hipHeights = walkCycle.phases.map((phase) => HIPS_Y - 0.0136 + 0.002 * (1 - Math.cos(phase * 2)));
 function legPose(phase, hipY) {
   const t = ((phase / (Math.PI * 2)) % 1 + 1) % 1;
   const swing = Math.max(0, (t - 0.5) * 2);
@@ -168,8 +171,8 @@ function legPose(phase, hipY) {
     : -WALK_DISTANCE / 4 + WALK_DISTANCE / 2 * (swing * swing * (3 - 2 * swing));
   const ankleY = 0.055 + 0.028 * Math.sin(Math.PI * swing) ** 2;
   const down = hipY - 0.03 - ankleY;
-  const thigh = 0.20;
-  const shin = 0.175;
+  const thigh = THIGH;
+  const shin = SHIN;
   const knee = Math.acos(THREE.MathUtils.clamp((down * down + z * z - thigh * thigh - shin * shin) / (2 * thigh * shin), -1, 1));
   const hip = Math.atan2(-z, down) - Math.atan2(shin * Math.sin(knee), thigh + shin * Math.cos(knee));
   return { hip, knee, ankle: -hip - knee };

@@ -21,9 +21,25 @@ OUT_DIR = Path(__file__).resolve().parent
 LEVELS = {"cafe-customer-mesh.glb": 2, "cafe-customer-mesh-lite.glb": 1}
 
 
+# ตัวป้อม: ขาสั้นลง (ข้อเท้าอยู่ที่เดิม สะโพก .43 → .375) ส่วนเหนือสะโพกทั้งหมดเลื่อนลงตาม
+# ตัวเลขในไฟล์นี้เขียนตามสัดส่วนเดิม แล้วแปลงความสูงผ่าน squash_y — ต้องตรงกับ create-cafe-customer-model.mjs
+ANKLE_Y = 0.055
+HIP_JOINT_Y = 0.43
+SHORT_HIP_JOINT_Y = 0.375
+LEG_SCALE = (SHORT_HIP_JOINT_Y - ANKLE_Y) / (HIP_JOINT_Y - ANKLE_Y)
+
+
+def squash_y(y):
+    if y <= ANKLE_Y:
+        return y
+    if y <= HIP_JOINT_Y:
+        return ANKLE_Y + (y - ANKLE_Y) * LEG_SCALE
+    return y - (HIP_JOINT_Y - SHORT_HIP_JOINT_Y)
+
+
 def b(x, y, z=0.0):
     """พิกัดแบบ glTF (Y ขึ้น, หน้าตัวละคร +Z) → Blender (Z ขึ้น, หน้า -Y)"""
-    return (x, -z, y)
+    return (x, -z, squash_y(y))
 
 
 # ---- โครงกระดูก: ตำแหน่งข้อต่อเดียวกับ create-cafe-customer-model.mjs ----
@@ -79,31 +95,33 @@ def build_body(level):
     def chain(*ids):
         edges.extend(zip(ids, ids[1:]))
 
-    pelvis = add((0, 0.47, -0.008), (0.13, 0.088))
-    waist = add((0, 0.53), (0.118, 0.082))
-    chest = add((0, 0.62), (0.13, 0.086))
-    neck_base = add((0, 0.71), (0.042, 0.04))
+    pelvis = add((0, 0.47, -0.004), (0.15, 0.104))
+    # พุงกลมยื่นมาข้างหน้านิด ๆ
+    waist = add((0, 0.525, 0.012), (0.142, 0.108))
+    # อกกว้างเท่าเดิม ให้แขนห้อยพ้นลำตัว (ความป้อมไปอยู่ที่พุงกับสะโพก)
+    chest = add((0, 0.625), (0.13, 0.092))
+    neck_base = add((0, 0.71), (0.046, 0.044))
     neck_top = add((0, 0.77), (0.036, 0.036))
     chain(pelvis, waist, chest, neck_base, neck_top)
     for sign in (-1, 1):
-        shoulder = add((sign * 0.13, 0.664), (0.05, 0.05))
-        elbow = add((sign * 0.163, 0.54), (0.039, 0.039))
-        wrist = add((sign * 0.18, 0.392), (0.03, 0.029))
+        shoulder = add((sign * 0.142, 0.664), (0.054, 0.054))
+        elbow = add((sign * 0.184, 0.54), (0.043, 0.043))
+        wrist = add((sign * 0.198, 0.392), (0.034, 0.033))
         # มือแบบถุงมือ: ก้อนแบนเล็กน้อยปลายมน นิ้วโป้งแยกออกไปทางหน้าและเข้าหาลำตัว
-        palm = add((sign * 0.182, 0.36, 0.004), (0.03, 0.036))
-        fingertip = add((sign * 0.183, 0.33, 0.006), (0.022, 0.026))
+        palm = add((sign * 0.2, 0.36, 0.004), (0.036, 0.04))
+        fingertip = add((sign * 0.201, 0.33, 0.006), (0.028, 0.031))
         chain(chest, shoulder, elbow, wrist, palm, fingertip)
-        thumb_base = add((sign * 0.17, 0.374, 0.03), (0.016, 0.016))
-        thumb_tip = add((sign * 0.156, 0.35, 0.062), (0.014, 0.014))
+        thumb_base = add((sign * 0.188, 0.374, 0.034), (0.018, 0.018))
+        thumb_tip = add((sign * 0.174, 0.35, 0.066), (0.016, 0.016))
         chain(palm, thumb_base, thumb_tip)
 
         # ขาเยื้องออกด้านข้างเล็กน้อยและต้นขาด้านในบางลง ให้เห็นช่องระหว่างขาตั้งแต่เป้าลงมา
-        hip = add((sign * 0.088, 0.385), (0.05, 0.064))
-        knee = add((sign * 0.08, 0.23), (0.048, 0.054))
-        ankle = add((sign * 0.075, 0.07), (0.042, 0.045))
+        hip = add((sign * 0.09, 0.385), (0.058, 0.072))
+        knee = add((sign * 0.082, 0.23), (0.054, 0.06))
+        ankle = add((sign * 0.077, 0.07), (0.048, 0.05))
         # รองเท้าทรงมน: ส้นอยู่ใต้ข้อเท้า ปลายยื่นไปหน้า ไม่มีนิ้วเท้า
-        heel = add((sign * 0.074, 0.049, -0.014), (0.05, 0.04))
-        toe = add((sign * 0.08, 0.047, 0.105), (0.056, 0.038))
+        heel = add((sign * 0.076, 0.054, -0.014), (0.056, 0.04))
+        toe = add((sign * 0.082, 0.052, 0.105), (0.062, 0.038))
         chain(pelvis, hip, knee, ankle, heel, toe)
 
     mesh = bpy.data.meshes.new("Body")
