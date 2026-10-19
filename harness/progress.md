@@ -1070,3 +1070,10 @@
 - QA: preview-3d tests 10/10 ผ่าน; Chromium Character Lab ตรวจท่ายืน/นั่ง
 - หูแนบหัวขึ้น: จุดกลางหู x .193 → .18, ความหนาออกด้านข้าง .035 → .024 (ยื่นพ้นหัวเหลือราวครึ่งเดียว)
 - ต้นแขนหนาขึ้น (รัศมี .032/.030 → .040/.033) และห้อยชิดลำตัว (ศอก x .175 → .163, ข้อมือ .195 → .18); ใต้รักแร้ลดการแบ่งน้ำหนักผิวข้ามแขน↔ลำตัว (reach .045 → .008) กันผิวเอวยับตามแขน; preview-3d tests 10/10, Chromium ตรวจยืน/นั่ง
+
+## 2026-10-19 ICT — mannequin: เปลี่ยนผิวเป็น box modeling ใน Blender
+
+- ผิวใหม่สร้างด้วย `scripts/blender/build-cafe-customer-mesh.py` (Blender/bpy): Skin modifier จากเส้นโครง → วงเหลี่ยมรอบแขนขา + Subdivision Surface, หัว/หูทรงรีแยกชิ้น, น้ำหนักผิวอัตโนมัติ (heat); มือเป็นถุงมือ เท้าเป็นรองเท้ามน ไม่มีนิ้ว
+- `create-cafe-customer-model.mjs` เลิกใช้ SDF/surface nets: อ่าน `scripts/blender/cafe-customer-mesh(-lite).glb` จับคู่กระดูกตามชื่อ แล้วใส่ animation ชุดเดิม
+- ผล: ข้อต่อ (สะโพก เอว ไหล่ เข่า) งอเรียบไม่ยับ; GLB ละเอียด 4389 จุด / รุ่นเบา 1137 จุด
+- QA: `npm test` 67 files / 896 tests, typecheck, ESLint ผ่าน; Chromium Character Lab ตรวจยืน/นั่ง/เดิน

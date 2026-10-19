@@ -1,20 +1,20 @@
 /**
  * สร้าง GLB mannequin สีเทาสำหรับ Character Lab และฉาก 3D
  *
- * ผิวทั้งตัวเป็น SkinnedMesh ชิ้นเดียว: ประกอบรูปทรงด้วย signed distance field แบบ smooth union
- * (ข้อต่อมีส่วนโค้งเชื่อมแทนรอยตัดระหว่างชิ้น) แล้วผูกน้ำหนักกับกระดูกแบบไล่ระดับ
- * ทำให้หัวไหล่ สะโพก และหัวเข่างอได้โดยผิวยืดต่อเนื่อง ไม่แยกเป็นก้อน
+ * ผิวปั้นแบบ box modeling ใน Blender (scripts/blender/build-cafe-customer-mesh.py): เส้นบนผิวเรียงเป็นวง
+ * รอบแขน ขา และข้อต่อ จึงงอได้เรียบ ไม่ยับ — สคริปต์นี้ผูกผิวนั้นกับโครงกระดูกและใส่ animation
  *
  * ตัวละครมีความสูง native ราว 1.12 ม. (แสดงผลที่ scale 0.9 = ราว 1.01 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
- * รัน: node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
+ * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่าง)
+ *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
  * สองไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน ต่างกันแค่จำนวน polygon
  */
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
-import { SimplifyModifier } from "three/addons/modifiers/SimplifyModifier.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
 if (!globalThis.FileReader) {
   globalThis.FileReader = class FileReader {
@@ -32,10 +32,8 @@ const LITE = process.argv.includes("--lite");
 const outputFile = new URL(LITE ? "cafe-customer-lite.glb" : "cafe-customer.glb", outputDirectory);
 const mannequin = new THREE.MeshStandardMaterial({ color: "#9da4af", roughness: 0.84, metalness: 0 });
 
-const GRID_STEP = 0.009;
-// ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ลด polygon ได้โดยภาพไม่ต่าง
-const KEEP_VERTEX_RATIO = LITE ? 0.1 : 0.38;
-const WEIGHT_REACH = 0.045;
+// ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ใช้ผิวที่เกลาน้อยกว่า
+const meshFile = new URL(LITE ? "blender/cafe-customer-mesh-lite.glb" : "blender/cafe-customer-mesh.glb", import.meta.url);
 
 function bone(name, position) {
   const part = new THREE.Bone();
@@ -90,295 +88,39 @@ const bones = [
 ];
 const boneIndex = new Map(bones.map((part, index) => [part, index]));
 
-// ---- รูปทรงพื้นฐาน (พิกัดท่ายืน หน่วยเมตร) ----
-const v3 = (x, y, z = 0) => new THREE.Vector3(x, y, z);
-
-/** capsule จาก a→b รัศมี r; scale ย่อ/ขยายหน้าตัดแกน x/z (ประมาณค่า distance พอสำหรับหา surface). */
-function capsule(owner, a, b, r, scale = [1, 1, 1]) {
-  const inv = v3(1 / scale[0], 1 / scale[1], 1 / scale[2]);
-  const minScale = Math.min(...scale);
-  const center = a.clone().add(b).multiplyScalar(0.5);
-  const sa = a.clone().sub(center).multiply(inv);
-  const sb = b.clone().sub(center).multiply(inv);
-  const ab = sb.clone().sub(sa);
-  const abLengthSq = ab.lengthSq();
-  const q = new THREE.Vector3();
-  return {
-    owner,
-    distance(p) {
-      q.copy(p).sub(center).multiply(inv).sub(sa);
-      const t = THREE.MathUtils.clamp(q.dot(ab) / abLengthSq, 0, 1);
-      q.addScaledVector(ab, -t);
-      return (q.length() - r) * minScale;
-    },
-  };
-}
-
-/** capsule เรียว (round cone): รัศมี r1 ที่ a ค่อย ๆ ลดเป็น r2 ที่ b — ใช้กับแขนให้โคนหนา ปลายเรียว. */
-function roundCone(owner, a, b, r1, r2) {
-  const ba = b.clone().sub(a);
-  const l2 = ba.lengthSq();
-  const rr = r1 - r2;
-  const a2 = l2 - rr * rr;
-  const il2 = 1 / l2;
-  const pa = new THREE.Vector3();
-  const side = new THREE.Vector3();
-  return {
-    owner,
-    distance(p) {
-      pa.copy(p).sub(a);
-      const y = pa.dot(ba);
-      const z = y - l2;
-      const x2 = side.copy(pa).multiplyScalar(l2).addScaledVector(ba, -y).lengthSq();
-      const y2 = y * y * l2;
-      const z2 = z * z * l2;
-      const k = Math.sign(rr) * rr * rr * x2;
-      if (Math.sign(z) * a2 * z2 > k) return Math.sqrt(x2 + z2) * il2 - r2;
-      if (Math.sign(y) * a2 * y2 < k) return Math.sqrt(x2 + y2) * il2 - r1;
-      return (Math.sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;
-    },
-  };
-}
-
-function ellipsoid(owner, center, radii) {
-  const q = new THREE.Vector3();
-  const minRadius = Math.min(radii.x, radii.y, radii.z);
-  return {
-    owner,
-    distance(p) {
-      q.copy(p).sub(center).divide(radii);
-      return (q.length() - 1) * minRadius;
-    },
-  };
-}
-
-function smoothMin(a, b, k) {
-  const h = Math.max(k - Math.abs(a - b), 0) / k;
-  return Math.min(a, b) - h * h * k * 0.25;
-}
-
-// Reference silhouette: oversized broad head, visible ears, a small straight torso,
-// relaxed slender arms and wide feet. Keep leg landmarks for the planted-foot IK.
-const torso = capsule(spine, v3(0, 0.535), v3(0, 0.625), 0.105, [1.08, 1, 0.72]);
-const pelvis = ellipsoid(hips, v3(0, 0.455, -0.008), v3(0.125, 0.085, 0.085));
-const neckPart = capsule(neck, v3(0, 0.713), v3(0, 0.825), 0.029);
-// หัวเล็กลงราว 20% จากรุ่นแรก โดยคงคาง (ขอบล่างของหัว) ไว้ที่เดิมบนคอ
-const skull = ellipsoid(head, v3(0, 0.95), v3(0.178, 0.17, 0.15));
-// หูอยู่ระดับตา (ใต้กึ่งกลางหัวเล็กน้อย) แนบข้างหัว ยื่นออกมาแค่พอเห็น
-const ears = [-1, 1].map((side) =>
-  ellipsoid(head, v3(side * 0.18, 0.938, 0), v3(0.024, 0.036, 0.02)),
-);
-const arms = [
-  [leftArm, leftForeArm, leftHand, -1],
-  [rightArm, rightForeArm, rightHand, 1],
-].map(([upper, fore, hand, side]) => ({
-  // End the clavicle above/inboard of the upper-arm pivot. The old arm cap
-  // stood above this slope, producing a second hump at the shoulder tip.
-  shoulder: capsule(spine, v3(side * 0.038, 0.709), v3(side * 0.128, 0.675), 0.025, [1, 0.85, 1]),
-  // ต้นแขนหนาขึ้นและห้อยชิดลำตัว (ศอกห่างเอวราว 1.5 ซม.) แต่ยังเหลือช่องใต้รักแร้
-  upper: roundCone(upper, v3(side * 0.148, 0.65), v3(side * 0.163, 0.54), 0.04, 0.033),
-  fore: roundCone(fore, v3(side * 0.163, 0.54), v3(side * 0.18, 0.385), 0.031, 0.024),
-  hand: ellipsoid(hand, v3(side * 0.183, 0.36), v3(0.026, 0.03, 0.025)),
-}));
-const thumbs = arms.map((_, i) => {
-  const side = i === 0 ? -1 : 1;
-  return capsule(i === 0 ? leftHand : rightHand, v3(side * 0.179, 0.371, 0.016), v3(side * 0.175, 0.385, 0.038), 0.012);
+// ---- ผิว: ปั้นใน Blender (scripts/blender/build-cafe-customer-mesh.py) แล้วผูกกับโครงกระดูกชุดนี้ ----
+// ไฟล์จาก Blender มีกระดูกชื่อและตำแหน่งเดียวกัน — ใช้แค่ตำแหน่งผิว normal และน้ำหนักผิว แล้วจับคู่กระดูกตามชื่อ
+const meshBytes = await readFile(meshFile);
+const source = await new GLTFLoader().parseAsync(meshBytes.buffer.slice(meshBytes.byteOffset, meshBytes.byteOffset + meshBytes.byteLength), "");
+let sourceMesh = null;
+source.scene.traverse((object) => {
+  if (object.isSkinnedMesh) sourceMesh = object;
 });
-const legs = [
-  [leftLeg, leftLowerLeg, leftFoot, -1],
-  [rightLeg, rightLowerLeg, rightFoot, 1],
-].map(([upper, lower, foot, side]) => {
-  const x = side * 0.07;
-  return {
-    thigh: roundCone(upper, v3(x, 0.43), v3(x, 0.23), 0.064, 0.052),
-    shin: roundCone(lower, v3(x, 0.23), v3(x, 0.055), 0.052, 0.038),
-    foot: capsule(foot, v3(x, 0.037, -0.018), v3(x + side * 0.012, 0.037, 0.102), 0.036, [1.62, 0.95, 1]),
-  };
+if (!sourceMesh) throw new Error(`ไม่พบผิวที่ผูกกระดูกใน ${meshFile.pathname}`);
+const boneByName = new Map(bones.map((part) => [part.name, part]));
+const remap = sourceMesh.skeleton.bones.map((part) => {
+  const target = boneByName.get(part.name);
+  if (!target) throw new Error(`กระดูก ${part.name} จาก Blender ไม่มีในโครงกระดูกของ mannequin`);
+  return boneIndex.get(target);
 });
-const primitives = [
-  torso, pelvis, neckPart, skull, ...thumbs,
-  ...arms.flatMap((arm) => [arm.shoulder, arm.upper, arm.fore, arm.hand]),
-  ...legs.flatMap((leg) => [leg.thigh, leg.shin, leg.foot]),
-  ...ears,
-];
-
-const distances = new Float64Array(primitives.length);
-function bodyDistance(p) {
-  for (let i = 0; i < primitives.length; i += 1) distances[i] = primitives[i].distance(p);
-  const [dTorso, dPelvis, dNeck, dSkull, dThumbL, dThumbR, ...limbs] = distances;
-  const [dShoulderL, dUpperL, dForeL, dHandL, dShoulderR, dUpperR, dForeR, dHandR, dThighL, dShinL, dFootL, dThighR, dShinR, dFootR, dEarL, dEarR] = limbs;
-  let body = smoothMin(dTorso, dPelvis, 0.06);
-  body = smoothMin(body, dNeck, 0.032);
-  const headShape = smoothMin(smoothMin(dSkull, dEarL, 0.012), dEarR, 0.012);
-  body = smoothMin(body, headShape, 0.015);
-  // Merge each limb once. Taking a hard minimum of overlapping body/shoulder
-  // branches leaves a crease at the shoulder even though the mesh is connected.
-  const armL = smoothMin(smoothMin(smoothMin(dShoulderL, dUpperL, 0.026), dForeL, 0.022), smoothMin(dHandL, dThumbL, 0.01), 0.012);
-  const armR = smoothMin(smoothMin(smoothMin(dShoulderR, dUpperR, 0.026), dForeR, 0.022), smoothMin(dHandR, dThumbR, 0.01), 0.012);
-  // Broad blend at the shoulder, negligible below the armpit to preserve air gaps.
-  const shoulderBlend = THREE.MathUtils.lerp(0.002, 0.045, THREE.MathUtils.smoothstep(p.y, 0.61, 0.70));
-  body = smoothMin(smoothMin(body, armL, shoulderBlend), armR, shoulderBlend);
-  // A small knee blend avoids adding a ball-shaped bulge to matching radii.
-  const legL = smoothMin(smoothMin(dThighL, dShinL, 0.012), dFootL, 0.014);
-  const legR = smoothMin(smoothMin(dThighR, dShinR, 0.012), dFootR, 0.014);
-  const hipBlend = THREE.MathUtils.lerp(0.002, 0.035, THREE.MathUtils.smoothstep(p.y, 0.34, 0.43));
-  return smoothMin(smoothMin(body, legL, hipBlend), legR, hipBlend);
-}
-
-const EPSILON = 1e-4;
-const probe = new THREE.Vector3();
-function gradient(p, target) {
-  const axis = (dx, dy, dz) =>
-    bodyDistance(probe.set(p.x + dx, p.y + dy, p.z + dz)) - bodyDistance(probe.set(p.x - dx, p.y - dy, p.z - dz));
-  return target.set(axis(EPSILON, 0, 0), axis(0, EPSILON, 0), axis(0, 0, EPSILON)).normalize();
-}
-
-function projectToSurface(p) {
-  const normal = new THREE.Vector3();
-  for (let i = 0; i < 4; i += 1) p.addScaledVector(gradient(p, normal), -bodyDistance(p));
-  return p;
-}
-
-// ---- Surface nets: สุ่ม SDF บนกริดแล้วต่อเป็น mesh ปิดชิ้นเดียว ----
-function buildSurface() {
-  const min = v3(-0.36, -0.02, -0.21);
-  const max = v3(0.36, 1.23, 0.21);
-  const nx = Math.ceil((max.x - min.x) / GRID_STEP) + 1;
-  const ny = Math.ceil((max.y - min.y) / GRID_STEP) + 1;
-  const nz = Math.ceil((max.z - min.z) / GRID_STEP) + 1;
-  const at = (i, j, k) => i + nx * (j + ny * k);
-  const field = new Float64Array(nx * ny * nz);
-  const point = new THREE.Vector3();
-  for (let k = 0; k < nz; k += 1)
-    for (let j = 0; j < ny; j += 1)
-      for (let i = 0; i < nx; i += 1)
-        field[at(i, j, k)] = bodyDistance(point.set(min.x + i * GRID_STEP, min.y + j * GRID_STEP, min.z + k * GRID_STEP));
-
-  const cellVertex = new Int32Array(nx * ny * nz).fill(-1);
-  const positions = [];
-  const corners = [];
-  for (let c = 0; c < 8; c += 1) corners.push([c & 1, (c >> 1) & 1, (c >> 2) & 1]);
-  const cubeEdges = [];
-  for (let a = 0; a < 8; a += 1)
-    for (let b = a + 1; b < 8; b += 1) if ([1, 2, 4].includes(a ^ b)) cubeEdges.push([a, b]);
-
-  for (let k = 0; k < nz - 1; k += 1)
-    for (let j = 0; j < ny - 1; j += 1)
-      for (let i = 0; i < nx - 1; i += 1) {
-        const values = corners.map(([di, dj, dk]) => field[at(i + di, j + dj, k + dk)]);
-        if (values.every((value) => value < 0) || values.every((value) => value >= 0)) continue;
-        const sum = new THREE.Vector3();
-        let count = 0;
-        for (const [a, b] of cubeEdges) {
-          if (values[a] < 0 === values[b] < 0) continue;
-          const t = values[a] / (values[a] - values[b]);
-          sum.x += corners[a][0] + t * (corners[b][0] - corners[a][0]);
-          sum.y += corners[a][1] + t * (corners[b][1] - corners[a][1]);
-          sum.z += corners[a][2] + t * (corners[b][2] - corners[a][2]);
-          count += 1;
-        }
-        sum.divideScalar(count);
-        cellVertex[at(i, j, k)] = positions.length;
-        positions.push(v3(min.x + (i + sum.x) * GRID_STEP, min.y + (j + sum.y) * GRID_STEP, min.z + (k + sum.z) * GRID_STEP));
-      }
-
-  const indices = [];
-  const quad = (a, b, c, d, flip) => {
-    if (a < 0 || b < 0 || c < 0 || d < 0) return;
-    if (flip) indices.push(a, c, b, a, d, c);
-    else indices.push(a, b, c, a, c, d);
-  };
-  for (let k = 1; k < nz - 1; k += 1)
-    for (let j = 1; j < ny - 1; j += 1)
-      for (let i = 1; i < nx - 1; i += 1) {
-        const inside = field[at(i, j, k)] < 0;
-        if (i < nx - 1 && inside !== field[at(i + 1, j, k)] < 0)
-          quad(cellVertex[at(i, j - 1, k - 1)], cellVertex[at(i, j, k - 1)], cellVertex[at(i, j, k)], cellVertex[at(i, j - 1, k)], inside);
-        if (j < ny - 1 && inside !== field[at(i, j + 1, k)] < 0)
-          quad(cellVertex[at(i - 1, j, k - 1)], cellVertex[at(i - 1, j, k)], cellVertex[at(i, j, k)], cellVertex[at(i, j, k - 1)], inside);
-        if (k < nz - 1 && inside !== field[at(i, j, k + 1)] < 0)
-          quad(cellVertex[at(i - 1, j - 1, k)], cellVertex[at(i, j - 1, k)], cellVertex[at(i, j, k)], cellVertex[at(i - 1, j, k)], inside);
-      }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions.flatMap((p) => p.toArray()), 3));
-  geometry.setIndex(indices);
-  return geometry;
-}
-
-function orientFaces(geometry) {
-  const position = geometry.getAttribute("position");
-  const index = geometry.getIndex();
-  const [a, b, c] = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
-  const normal = new THREE.Vector3();
-  const outward = new THREE.Vector3();
-  for (let f = 0; f < index.count; f += 3) {
-    a.fromBufferAttribute(position, index.getX(f));
-    b.fromBufferAttribute(position, index.getX(f + 1));
-    c.fromBufferAttribute(position, index.getX(f + 2));
-    normal.subVectors(c, b).cross(a.clone().sub(b));
-    gradient(a.add(b).add(c).divideScalar(3), outward);
-    if (normal.dot(outward) < 0) {
-      const second = index.getX(f + 1);
-      index.setX(f + 1, index.getX(f + 2));
-      index.setX(f + 2, second);
-    }
+const geometry = new THREE.BufferGeometry();
+for (const name of ["position", "normal"]) geometry.setAttribute(name, sourceMesh.geometry.getAttribute(name).clone());
+geometry.setIndex(sourceMesh.geometry.getIndex().clone());
+const sourceJoints = sourceMesh.geometry.getAttribute("skinIndex");
+const sourceWeights = sourceMesh.geometry.getAttribute("skinWeight");
+const skinIndices = new Uint16Array(sourceJoints.count * 4);
+const skinWeights = new Float32Array(sourceJoints.count * 4);
+for (let i = 0; i < sourceJoints.count; i += 1) {
+  let total = 0;
+  for (let slot = 0; slot < 4; slot += 1) total += sourceWeights.getComponent(i, slot);
+  for (let slot = 0; slot < 4; slot += 1) {
+    skinIndices[i * 4 + slot] = remap[sourceJoints.getComponent(i, slot)];
+    skinWeights[i * 4 + slot] = total > 0 ? sourceWeights.getComponent(i, slot) / total : slot === 0 ? 1 : 0;
   }
 }
-
-const armBones = new Set([leftArm, rightArm, leftForeArm, rightForeArm, leftHand, rightHand]);
-/** น้ำหนักกระดูกจากระยะถึงแต่ละชิ้น: ใกล้รอยต่อจะแบ่งน้ำหนักให้ทั้งสองฝั่ง ผิวจึงยืดแบบไล่ระดับ. */
-function skinFor(p) {
-  for (let i = 0; i < primitives.length; i += 1) distances[i] = primitives[i].distance(p);
-  let nearest = 0;
-  for (let i = 1; i < primitives.length; i += 1) if (distances[i] < distances[nearest]) nearest = i;
-  // Every nearby influence fades continuously. Switching an allowed-bone list
-  // at the nearest primitive boundary caused jagged deformation at the armpit.
-  const weights = new Map();
-  // แขนห้อยชิดลำตัว: ใต้รักแร้ไม่แบ่งน้ำหนักข้ามระหว่างแขนกับลำตัว ไม่งั้นผิวเอวยับตามแขนตอนขยับ
-  const nearestIsArm = armBones.has(primitives[nearest].owner);
-  const belowArmpit = p.y < 0.6;
-  primitives.forEach((primitive, i) => {
-    const crossesArm = belowArmpit && armBones.has(primitive.owner) !== nearestIsArm;
-    const reach = 1 - THREE.MathUtils.clamp((distances[i] - distances[nearest]) / (crossesArm ? 0.008 : WEIGHT_REACH), 0, 1);
-    const weight = reach * reach * (3 - 2 * reach);
-    if (weight > (weights.get(primitive.owner) ?? 0)) weights.set(primitive.owner, weight);
-  });
-  const ranked = [...weights].sort((x, y) => y[1] - x[1]).slice(0, 4);
-  const total = ranked.reduce((sum, [, weight]) => sum + weight, 0);
-  const joints = [0, 0, 0, 0];
-  const values = [0, 0, 0, 0];
-  ranked.forEach(([part, weight], slot) => {
-    joints[slot] = boneIndex.get(part);
-    values[slot] = weight / total;
-  });
-  return { joints, values };
-}
-
-let geometry = buildSurface();
-geometry = new SimplifyModifier().modify(geometry, Math.floor(geometry.getAttribute("position").count * (1 - KEEP_VERTEX_RATIO)));
-geometry.deleteAttribute("normal");
-geometry.deleteAttribute("uv");
-
-const position = geometry.getAttribute("position");
-const normals = [];
-const skinIndices = [];
-const skinWeights = [];
-const point = new THREE.Vector3();
-const normal = new THREE.Vector3();
-for (let i = 0; i < position.count; i += 1) {
-  // หลังลดจำนวน polygon ดึงจุดกลับมาบนผิวจริง และใช้ normal จาก SDF ให้แสงเงาเนียน.
-  projectToSurface(point.fromBufferAttribute(position, i));
-  position.setXYZ(i, point.x, point.y, point.z);
-  normals.push(...gradient(point, normal).toArray());
-  const skin = skinFor(point);
-  skinIndices.push(...skin.joints);
-  skinWeights.push(...skin.values);
-}
-geometry.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
 geometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(skinIndices, 4));
 geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(skinWeights, 4));
-orientFaces(geometry);
+const position = geometry.getAttribute("position");
 
 const body = new THREE.SkinnedMesh(geometry, mannequin);
 body.name = "MannequinBody";
