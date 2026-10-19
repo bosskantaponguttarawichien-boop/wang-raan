@@ -9,6 +9,8 @@ const CHARACTER_SCALE = 0.9;
 const MAX_ANIMATION_DELTA_SECONDS = 1 / 30;
 const WALK_ACCELERATION = 1.4;
 const ANIMATION_FADE_SECONDS = 0.22;
+/** ลุกขึ้น = เล่นคลิป Sit ย้อนกลับ เร็วกว่าตอนนั่งลงเล็กน้อย (เท่ากับฉากร้าน) */
+const STAND_UP_RATE = 1.3;
 
 export type CharacterFacing = "front" | "right" | "back" | "left";
 export type CharacterMotion = "idle" | "walking" | "seated";
@@ -147,6 +149,8 @@ export function CharacterLabScene({
     let motion: CharacterMotion = "idle";
     let walkSpeed = 0.44;
     let currentSpeed = 0;
+    /** วินาทีที่เหลือของท่าลุกจากเก้าอี้ */
+    let standingUp = 0;
     let frame = 0;
 
     const setMotion = (next: CharacterMotion) => {
@@ -154,11 +158,23 @@ export function CharacterLabScene({
       motion = next;
       motionChangeRef.current(next);
     };
+    const sitAction = () => {
+      const clip = THREE.AnimationClip.findByName(clips, "Sit");
+      return mixer && clip ? mixer.existingAction(clip) : null;
+    };
     const play = (name: "Idle" | "Walk" | "Sit") => {
+      standingUp = 0;
+      if (activeAnimation === "Sit" && name === "Sit") {
+        // กดนั่งอีกครั้งระหว่างกำลังลุก → นั่งกลับลงจากท่าที่อยู่ตอนนี้
+        const action = sitAction();
+        if (action) action.paused = false;
+        action?.setEffectiveTimeScale(1);
+        return;
+      }
       if (!mixer || activeAnimation === name) return;
       const clip = THREE.AnimationClip.findByName(clips, name);
       if (!clip) return;
-      const next = mixer.clipAction(clip).reset().setEffectiveWeight(1);
+      const next = mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
       if (name === "Sit") {
         next.setLoop(THREE.LoopOnce, 1);
         next.clampWhenFinished = true;
@@ -233,10 +249,20 @@ export function CharacterLabScene({
           play("Sit");
           setMotion("seated");
         } else if (!seatedRef.current && motion === "seated") {
-          play("Idle");
+          // ลุกจากเก้าอี้ด้วยท่านั่งย้อนกลับ แล้วค่อยผสมเข้าท่ายืน
+          const action = sitAction();
+          if (action) {
+            action.paused = false;
+            action.setEffectiveTimeScale(-STAND_UP_RATE);
+            standingUp = action.time / STAND_UP_RATE;
+          } else play("Idle");
           setMotion("idle");
         }
-        chair.visible = seatedRef.current;
+        if (standingUp > 0) {
+          standingUp -= delta;
+          if (standingUp <= 0) play("Idle");
+        }
+        chair.visible = seatedRef.current || standingUp > 0;
         if (walkTarget) {
           const dx = walkTarget.x - root.position.x;
           const dz = walkTarget.z - root.position.z;
