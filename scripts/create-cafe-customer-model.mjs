@@ -5,7 +5,7 @@
  * (ข้อต่อมีส่วนโค้งเชื่อมแทนรอยตัดระหว่างชิ้น) แล้วผูกน้ำหนักกับกระดูกแบบไล่ระดับ
  * ทำให้หัวไหล่ สะโพก และหัวเข่างอได้โดยผิวยืดต่อเนื่อง ไม่แยกเป็นก้อน
  *
- * ตัวละครมีความสูง native 1.20 ม. (แสดงผลที่ scale 0.9 = ราว 1.08 ม.)
+ * ตัวละครมีความสูง native ราว 1.16 ม. (แสดงผลที่ scale 0.9 = ราว 1.04 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
@@ -162,9 +162,10 @@ function smoothMin(a, b, k) {
 const torso = capsule(spine, v3(0, 0.535), v3(0, 0.625), 0.105, [1.08, 1, 0.72]);
 const pelvis = ellipsoid(hips, v3(0, 0.455, -0.008), v3(0.125, 0.085, 0.085));
 const neckPart = capsule(neck, v3(0, 0.713), v3(0, 0.825), 0.029);
-const skull = ellipsoid(head, v3(0, 0.99), v3(0.22, 0.21, 0.185));
+// หัวเล็กลงราว 10% จากรุ่นก่อน โดยคงคาง (ขอบล่างของหัว) ไว้ที่เดิมบนคอ
+const skull = ellipsoid(head, v3(0, 0.969), v3(0.198, 0.189, 0.167));
 const ears = [-1, 1].map((side) =>
-  ellipsoid(head, v3(side * 0.202, 0.873, 0), v3(0.043, 0.047, 0.026)),
+  ellipsoid(head, v3(side * 0.182, 0.864, 0), v3(0.039, 0.042, 0.023)),
 );
 const arms = [
   [leftArm, leftForeArm, leftHand, -1],
@@ -383,9 +384,6 @@ body.bind(new THREE.Skeleton(bones));
 // ---- Animation: keyframe ถี่จากคลื่น sine เพื่อให้ข้อต่อเคลื่อนแบบนุ่ม ไม่หักมุมที่ปลายวงสวิง ----
 const quaternionFrames = (angles) =>
   angles.flatMap((angle) => new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, 0)).toArray());
-// ก้ม/เงยก่อน (X) แล้วค่อยหมุนเข้าหาลำตัว (Y) — ท่อนแขนที่ยื่นไปหน้าจึงหันเข้าด้านในได้
-const armPoseFrames = (x, z, y = 0) =>
-  [0, 1].flatMap(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "YXZ")).toArray());
 
 function sampled(duration, frames) {
   const times = Array.from({ length: frames + 1 }, (_, i) => (duration * i) / frames);
@@ -407,8 +405,8 @@ const idle = new THREE.AnimationClip("Idle", 2.4, [
 ]);
 
 // Solve a two-bone leg toward a planted/swinging ankle instead of swinging
-// every joint independently. Shorter, quicker steps keep the gait compact.
-const WALK_DURATION = 0.72;
+// every joint independently. ก้าวสั้นแต่จังหวะกลาง ๆ (~130 ก้าว/นาที) ไม่รัวและไม่ยืด
+const WALK_DURATION = 0.84;
 const WALK_DISTANCE = 0.36;
 const walkCycle = sampled(WALK_DURATION, 60);
 model.userData.walkCycleDistance = WALK_DISTANCE;
@@ -449,22 +447,35 @@ const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
 
 // ยกสะโพกให้ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ scale 0.9 ≈ 0.533 หน่วยโมเดล).
 const SIT_HIPS_Y = 0.533 + 0.03 + 0.064;
-const sit = new THREE.AnimationClip("Sit", 1, [
-  new THREE.VectorKeyframeTrack("Hips.position", [0, 1], [0, HIPS_Y, 0, 0, SIT_HIPS_Y, 0]),
+// ท่านั่งลงค่อย ๆ เร่งแล้วชะลอ (ease in-out) และโน้มตัวไปหน้าเล็กน้อยกลางจังหวะเหมือนคนหย่อนตัวลงเก้าอี้
+// ฉากเล่นคลิปนี้ย้อนกลับ = ท่าลุกขึ้น
+const SIT_DURATION = 0.9;
+const sitTimes = Array.from({ length: 19 }, (_, i) => (SIT_DURATION * i) / 18);
+const sitEase = sitTimes.map((time) => {
+  const t = time / SIT_DURATION;
+  return t * t * (3 - 2 * t);
+});
+// ก้ม/เงยก่อน (X) แล้วค่อยหมุนเข้าหาลำตัว (Y) — ท่อนแขนที่ยื่นไปหน้าจึงหันเข้าด้านในได้
+const pose = (x, z = 0, y = 0) => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "YXZ"));
+const sitTrack = (name, to) =>
+  new THREE.QuaternionKeyframeTrack(name + ".quaternion", sitTimes, sitEase.flatMap((e) => new THREE.Quaternion().slerp(to, e).toArray()));
+const sit = new THREE.AnimationClip("Sit", SIT_DURATION, [
+  new THREE.VectorKeyframeTrack("Hips.position", sitTimes, sitEase.flatMap((e) => [0, THREE.MathUtils.lerp(HIPS_Y, SIT_HIPS_Y, e), 0])),
+  new THREE.QuaternionKeyframeTrack("Spine.quaternion", sitTimes, quaternionFrames(sitTimes.map((time) => 0.22 * Math.sin((Math.PI * time) / SIT_DURATION)))),
   // GLB faces +Z. Rotate the character toward the chair front so thighs and
   // forearms move forward (+Z) while the knees fold down.
-  new THREE.QuaternionKeyframeTrack("LeftLeg.quaternion", [0, 1], quaternionFrames([0, -1.5])),
-  new THREE.QuaternionKeyframeTrack("RightLeg.quaternion", [0, 1], quaternionFrames([0, -1.5])),
-  new THREE.QuaternionKeyframeTrack("LeftLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.4])),
-  new THREE.QuaternionKeyframeTrack("RightLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.4])),
-  new THREE.QuaternionKeyframeTrack("LeftFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
-  new THREE.QuaternionKeyframeTrack("RightFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
+  sitTrack("LeftLeg", pose(-1.5)),
+  sitTrack("RightLeg", pose(-1.5)),
+  sitTrack("LeftLowerLeg", pose(1.4)),
+  sitTrack("RightLowerLeg", pose(1.4)),
+  sitTrack("LeftFoot", pose(0.1)),
+  sitTrack("RightFoot", pose(0.1)),
   // ต้นแขนห้อยเกือบตรง ปลายแขนงอไปข้างหน้า (ทิศเดียวกับข้อศอกจริง) แล้ววางมือบนต้นขา
   // เดิมปลายแขนหมุนสวนทางต้นแขน ข้อศอกจึงหักไปด้านหลังดูงอผิดท่า
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", [0, 1], armPoseFrames(-0.25, 0.04)),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", [0, 1], armPoseFrames(-0.25, -0.04)),
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", [0, 1], armPoseFrames(-1.05, 0, 0.4)),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", [0, 1], armPoseFrames(-1.05, 0, -0.4)),
+  sitTrack("LeftArm", pose(-0.25, 0.04)),
+  sitTrack("RightArm", pose(-0.25, -0.04)),
+  sitTrack("LeftForeArm", pose(-1.05, 0, 0.4)),
+  sitTrack("RightForeArm", pose(-1.05, 0, -0.4)),
 ]);
 
 const exporter = new GLTFExporter();

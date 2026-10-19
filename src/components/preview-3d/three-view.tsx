@@ -34,6 +34,9 @@ const SEATED_FRONT_OFFSET = 0.055;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
+  action: THREE.AnimationAction | null;
+  /** วินาทีที่เหลือของท่าลุกจากเก้าอี้ — ระหว่างนี้ยืนอยู่ที่เก้าอี้ ยังไม่เดินตามจุดจำลอง */
+  standingUp: number;
   model: THREE.Object3D;
   body: THREE.SkinnedMesh | null;
   target: THREE.Vector3;
@@ -61,7 +64,7 @@ const LITE_MODEL_URL = "/assets/models/cafe-customer-lite.glb";
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;
-const CUSTOMER_HEIGHT = 1.2;
+const CUSTOMER_HEIGHT = 1.16;
 const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
@@ -71,6 +74,12 @@ const CUSTOMER_SCALE = 0.9;
 const AGENT_STATE_SEATED = 4;
 /** กัน animation กระโดดเมื่อ loop หยุดไปนาน (แท็บถูกซ่อน/หยุดวาดตอนไม่มีอะไรขยับ) */
 const MAX_FRAME_DELTA = 1 / 30;
+/** ผสมท่าเดิมกับท่าใหม่ (เดิน ↔ นั่ง) แทนการตัดท่าทันที */
+const ANIMATION_FADE_SECONDS = 0.2;
+/** ลุกขึ้น = เล่นคลิป Sit ย้อนกลับ เร็วกว่าตอนนั่งลงเล็กน้อย */
+const STAND_UP_RATE = 1.3;
+/** จำลองเร็ว (เช่น 60×) ตัวละครเลื่อนเร็วมาก — จำกัดจังหวะก้าวไม่ให้ขารัวจนดูสั่น */
+const MAX_WALK_PLAYBACK_RATE = 1.6;
 
 /** คลัง geometry/material ของฉากหนึ่งชุด — ใช้ซ้ำชิ้นที่ขนาดเท่ากัน และคืน GPU memory ได้ในครั้งเดียว */
 class SceneAssets {
@@ -761,15 +770,26 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     let frame = 0;
     let disposed = false;
 
-    const playClip = (customer: Pick<AnimatedCustomer, "mixer">, name: CustomerAnimation) => {
+    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action">, name: CustomerAnimation) => {
       const clip = THREE.AnimationClip.findByName(clips, name) ?? clips[0];
       if (!clip) return;
-      const action = customer.mixer.clipAction(clip).reset();
+      const action = customer.mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
       if (name === "Sit") {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
       }
       action.play();
+      const previous = customer.action;
+      if (previous && previous !== action) action.crossFadeFrom(previous, ANIMATION_FADE_SECONDS, false);
+      customer.action = action;
+    };
+    /** เล่นท่านั่งย้อนจากจุดที่อยู่ตอนนี้ (นั่งไม่ทันสุดก็ลุกจากตรงนั้น) แล้วค้างท่ายืนไว้ที่ต้นคลิป */
+    const standUp = (customer: AnimatedCustomer) => {
+      const action = customer.action;
+      if (!action || action.getClip().name !== "Sit") return;
+      action.paused = false;
+      action.setEffectiveTimeScale(-STAND_UP_RATE);
+      customer.standingUp = action.time / STAND_UP_RATE;
     };
     const removeCustomer = (id: number, customer: AnimatedCustomer) => {
       customer.mixer.stopAllAction();
@@ -818,6 +838,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
           const body = model.getObjectByName(BODY_MESH_NAME);
           customer = {
             mixer: new THREE.AnimationMixer(model),
+            action: null,
+            standingUp: 0,
             model,
             body: body instanceof THREE.SkinnedMesh ? body : null,
             target: new THREE.Vector3(targetX, 0, targetZ),
@@ -833,8 +855,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
         customer.target.set(targetX, 0, targetZ);
         if (animation !== customer.animation) {
-          customer.mixer.stopAllAction();
-          playClip(customer, animation);
+          if (customer.animation === "Sit") standUp(customer);
+          else {
+            customer.standingUp = 0;
+            playClip(customer, animation);
+          }
           customer.animation = animation;
         }
       }
@@ -861,6 +886,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       const body = bodyForZoom();
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
+        if (customer.standingUp > 0) {
+          // ลุกให้เสร็จที่เก้าอี้ก่อน แล้วค่อยผสมเข้าท่าเดินไปหาจุดจำลอง
+          customer.mixer.update(delta);
+          customer.standingUp -= delta;
+          if (customer.standingUp <= 0) playClip(customer, customer.animation);
+          continue;
+        }
         const beforeX = customer.model.position.x;
         const beforeZ = customer.model.position.z;
         if (simulating) customer.model.position.lerp(customer.target, blend);
@@ -868,7 +900,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         const turn = customer.targetRotation - customer.model.rotation.y;
         customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
         // Advance the walk by distance travelled, including simulation speed changes.
-        customer.mixer.update(customer.animation === "Walk" ? distance / walkSpeed : delta);
+        customer.mixer.update(
+          customer.animation === "Walk" ? Math.min(distance / walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
+        );
       }
       renderer.render(scene, camera);
       if (simulating || customers.size > 0) {
