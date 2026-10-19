@@ -3,6 +3,7 @@
 import * as React from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import {
   FURNITURE_COLOR_HEX,
@@ -34,6 +35,7 @@ const SEATED_FRONT_OFFSET = 0.055;
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
   model: THREE.Object3D;
+  body: THREE.SkinnedMesh | null;
   target: THREE.Vector3;
   animation: CustomerAnimation;
   targetRotation: number;
@@ -54,6 +56,12 @@ type Stage = {
 };
 
 const MODEL_URL = "/assets/models/cafe-customer.glb";
+/** โครงกระดูก/animation เดียวกับ MODEL_URL แต่ polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ */
+const LITE_MODEL_URL = "/assets/models/cafe-customer-lite.glb";
+const BODY_MESH_NAME = "MannequinBody";
+/** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
+const LITE_MAX_SCREEN_HEIGHT = 48;
+const CUSTOMER_HEIGHT = 1.2;
 const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
@@ -557,14 +565,71 @@ function curvedBackrest(assets: SceneAssets, radius: number) {
   });
 }
 
+/**
+ * ฉากจากผังไม่ขยับเลย จึงรวมชิ้นที่ใช้ material และการตั้งค่าเงาเดียวกันเป็น mesh เดียว
+ * (เก้าอี้ 1 ตัว = 6 ชิ้น × 2 รอบรวมเงา → ร้าน 300 ตัวเคยสั่งวาดหลายพันครั้งต่อเฟรม)
+ * ตำแหน่งถูกอบลง vertex ตรง ๆ หน้าตาจึงเหมือนเดิมทุกจุด — เว้นชิ้นโปร่งใส/มี renderOrder ไว้ เพราะลำดับการวาดมีผลกับภาพ
+ */
+function mergeStaticMeshes(group: THREE.Group) {
+  group.updateMatrixWorld(true);
+  const buckets = new Map<string, { source: THREE.Mesh; geometries: THREE.BufferGeometry[] }>();
+  const merged: THREE.Mesh[] = [];
+  group.traverse((object) => {
+    if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
+    const material = object.material as THREE.Material;
+    if (material.transparent || object.renderOrder !== 0 || object.matrixWorld.determinant() <= 0) return;
+    const { geometry } = object;
+    const attributes = Object.entries(geometry.attributes)
+      .map(([name, attribute]) => `${name}:${(attribute as THREE.BufferAttribute).itemSize}`)
+      .sort()
+      .join(",");
+    const key = `${material.uuid}|${object.castShadow}|${object.receiveShadow}|${geometry.index ? "i" : "n"}|${attributes}`;
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = { source: object, geometries: [] };
+      buckets.set(key, bucket);
+    }
+    const baked = geometry.clone().applyMatrix4(object.matrixWorld);
+    baked.clearGroups();
+    bucket.geometries.push(baked);
+    merged.push(object);
+  });
+
+  const created: THREE.BufferGeometry[] = [];
+  for (const { source, geometries } of buckets.values()) {
+    const geometry = geometries.length === 1 ? geometries[0]! : mergeGeometries(geometries);
+    if (geometries.length > 1) for (const part of geometries) part.dispose();
+    if (!geometry) continue;
+    const mesh = new THREE.Mesh(geometry, source.material);
+    mesh.castShadow = source.castShadow;
+    mesh.receiveShadow = source.receiveShadow;
+    group.add(mesh);
+    created.push(geometry);
+  }
+  for (const object of merged) object.removeFromParent();
+  return created;
+}
+
 /** ฉากทั้งหมดที่มาจากผัง (พื้น ผนัง ประตู เฟอร์นิเจอร์) — `dispose` คืน GPU memory ของทุกชิ้น */
 function buildLayoutContent(layout: StoreLayout, viewRotation: ViewRotation) {
   const assets = new SceneAssets();
   const group = new THREE.Group();
   createRoom(group, layout, assets, viewRotation);
   createFurniture(group, layout, assets);
-  group.userData.dispose = () => assets.dispose();
+  const merged = mergeStaticMeshes(group);
+  group.userData.dispose = () => {
+    for (const geometry of merged) geometry.dispose();
+    assets.dispose();
+  };
   return group;
+}
+
+function disposeModel(root: THREE.Object3D | null) {
+  root?.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    object.geometry.dispose();
+    for (const material of [object.material].flat()) material.dispose();
+  });
 }
 
 function disposeContent(group: THREE.Group | null) {
@@ -688,6 +753,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     const customers = new Map<number, AnimatedCustomer>();
     const controller = getSimulationController();
     let modelTemplate: THREE.Object3D | null = null;
+    let fullBody: THREE.BufferGeometry | null = null;
+    let liteBody: THREE.BufferGeometry | null = null;
+    let liteScene: THREE.Object3D | null = null;
     let clips: THREE.AnimationClip[] = [];
     let walkSpeed = 0.44;
     let frame = 0;
@@ -747,7 +815,15 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
           model.position.set(targetX, 0, targetZ);
           model.scale.setScalar(CUSTOMER_SCALE);
           scene.add(model);
-          customer = { mixer: new THREE.AnimationMixer(model), model, target: new THREE.Vector3(targetX, 0, targetZ), animation, targetRotation: 0 };
+          const body = model.getObjectByName(BODY_MESH_NAME);
+          customer = {
+            mixer: new THREE.AnimationMixer(model),
+            model,
+            body: body instanceof THREE.SkinnedMesh ? body : null,
+            target: new THREE.Vector3(targetX, 0, targetZ),
+            animation,
+            targetRotation: 0,
+          };
           playClip(customer, animation);
           customers.set(id, customer);
         }
@@ -767,6 +843,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       }
     };
 
+    /** ลูกค้าหลายสิบตัว × 2 รอบ (ภาพ + เงา) — ตอนตัวเล็กบนจอใช้ผิวรุ่นเบา ซูมเข้าใกล้ค่อยใช้รุ่นละเอียด */
+    const bodyForZoom = () => {
+      if (!liteBody || !fullBody) return fullBody;
+      const pixelsPerMeter = (renderer.domElement.clientHeight * camera.zoom) / (camera.top - camera.bottom);
+      return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT ? liteBody : fullBody;
+    };
+
     // วาดตามต้องการ: ฉากนิ่งวาดเฟรมเดียวแล้วหยุด; ระหว่างจำลอง/มีลูกค้าค้างอยู่ loop ต่อเนื่อง
     const tick = () => {
       frame = 0;
@@ -775,7 +858,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       const simulating = isSimRef.current;
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
+      const body = bodyForZoom();
       for (const customer of customers.values()) {
+        if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         const beforeX = customer.model.position.x;
         const beforeZ = customer.model.position.z;
         if (simulating) customer.model.position.lerp(customer.target, blend);
@@ -822,6 +907,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
           if (object instanceof THREE.Mesh) object.castShadow = true;
         });
         modelTemplate = gltf.scene;
+        const templateBody = modelTemplate.getObjectByName(BODY_MESH_NAME);
+        fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
         clips = gltf.animations;
         const walkClip = THREE.AnimationClip.findByName(clips, "Walk");
         const stride = modelTemplate.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
@@ -833,6 +920,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         if (!disposed) onUnavailable();
       },
     );
+    // รุ่นเบาโหลดไม่ได้ก็ไม่เป็นไร ใช้รุ่นละเอียดต่อ
+    loader.load(LITE_MODEL_URL, (gltf) => {
+      liteScene = gltf.scene;
+      const liteMesh = liteScene.getObjectByName(BODY_MESH_NAME);
+      liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
+      if (disposed) disposeModel(liteScene);
+    });
 
     return () => {
       disposed = true;
@@ -841,11 +935,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       clearCustomers();
       disposeContent(stage.content);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
-      modelTemplate?.traverse((object) => {
-        if (!(object instanceof THREE.Mesh)) return;
-        object.geometry.dispose();
-        for (const material of [object.material].flat()) material.dispose();
-      });
+      disposeModel(modelTemplate);
+      disposeModel(liteScene);
       key.shadow.map?.dispose();
       renderer.dispose();
       renderer.domElement.remove();

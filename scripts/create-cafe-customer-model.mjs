@@ -7,7 +7,9 @@
  *
  * ตัวละครมีความสูง native 1.20 ม. (แสดงผลที่ scale 0.9 = ราว 1.08 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
- * รัน: node scripts/create-cafe-customer-model.mjs
+ * รัน: node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
+ *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
+ * สองไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน ต่างกันแค่จำนวน polygon
  */
 import { mkdir, writeFile } from "node:fs/promises";
 import * as THREE from "three";
@@ -26,11 +28,13 @@ if (!globalThis.FileReader) {
 }
 
 const outputDirectory = new URL("../public/assets/models/", import.meta.url);
-const outputFile = new URL("cafe-customer.glb", outputDirectory);
+const LITE = process.argv.includes("--lite");
+const outputFile = new URL(LITE ? "cafe-customer-lite.glb" : "cafe-customer.glb", outputDirectory);
 const mannequin = new THREE.MeshStandardMaterial({ color: "#9da4af", roughness: 0.84, metalness: 0 });
 
 const GRID_STEP = 0.009;
-const KEEP_VERTEX_RATIO = 0.38;
+// ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ลด polygon ได้โดยภาพไม่ต่าง
+const KEEP_VERTEX_RATIO = LITE ? 0.1 : 0.38;
 const WEIGHT_REACH = 0.045;
 
 function bone(name, position) {
