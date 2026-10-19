@@ -15,6 +15,7 @@
 from pathlib import Path
 
 import bpy
+from mathutils import Vector
 
 OUT_DIR = Path(__file__).resolve().parent
 # ระดับการเกลาผิว: ละเอียดสำหรับ Character Lab / เบาสำหรับฉากร้านที่มีลูกค้าหลายสิบคน
@@ -105,7 +106,7 @@ def build_body(level):
     neck_top = add((0, 0.77), (0.036, 0.036))
     chain(pelvis, waist, chest, neck_base, neck_top)
     for sign in (-1, 1):
-        shoulder = add((sign * 0.14, 0.628), (0.046, 0.046))
+        shoulder = add((sign * 0.124, 0.612), (0.046, 0.046))
         elbow = add((sign * 0.184, 0.54), (0.043, 0.043))
         wrist = add((sign * 0.198, 0.392), (0.034, 0.033))
         # มือแบบถุงมือ: ก้อนแบนเล็กน้อยปลายมน นิ้วโป้งแยกออกไปทางหน้าและเข้าหาลำตัว
@@ -150,6 +151,27 @@ def ellipsoid(name, center, radii, level):
     return shape
 
 
+def blend_shoulders(body):
+    """เกลี่ยรอยต่อแขนกับลำตัว: Skin modifier ต่อแขนเป็นท่อเสียบข้างอก หัวไหล่จึงนูนเป็นสัน
+    เกลี่ยเฉพาะบริเวณหัวไหล่ (น้ำหนักลดลงตามระยะ) ส่วนอื่นของตัวคงรูปเดิม"""
+    group = body.vertex_groups.new(name="ShoulderBlend")
+    centers = [Vector(b(sign * 0.13, 0.62)) for sign in (-1, 1)]
+    reach = 0.075
+    for vertex in body.data.vertices:
+        distance = min((vertex.co - center).length for center in centers)
+        if distance < reach:
+            t = 1 - distance / reach
+            group.add([vertex.index], t * t * (3 - 2 * t), "REPLACE")
+    smooth = body.modifiers.new("ShoulderBlend", "LAPLACIANSMOOTH")
+    smooth.vertex_group = group.name
+    smooth.lambda_factor = 1.0
+    smooth.iterations = 20
+    smooth.use_volume_preserve = False
+    bpy.context.view_layer.objects.active = body
+    bpy.ops.object.modifier_apply(modifier=smooth.name)
+    body.vertex_groups.remove(body.vertex_groups["ShoulderBlend"])
+
+
 def build(filename, level):
     reset_scene()
     rig = build_armature()
@@ -165,6 +187,7 @@ def build(filename, level):
         for modifier in list(part.modifiers):
             bpy.ops.object.modifier_apply(modifier=modifier.name)
     body, *head_parts = parts
+    blend_shoulders(body)
     body.name = "MannequinBody"
     body.data.name = "MannequinBody"
     material = bpy.data.materials.new("Mannequin")
