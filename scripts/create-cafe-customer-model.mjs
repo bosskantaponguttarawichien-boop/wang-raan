@@ -56,12 +56,12 @@ const neck = bone("Neck", [0, 0.13, 0]);
 const head = bone("Head", [0, 0.085, 0]);
 const leftArm = bone("LeftArm", [-0.148, 0.04, 0]);
 const rightArm = bone("RightArm", [0.148, 0.04, 0]);
-const leftForeArm = bone("LeftForeArm", [-0.027, -0.11, 0]);
-const rightForeArm = bone("RightForeArm", [0.027, -0.11, 0]);
+const leftForeArm = bone("LeftForeArm", [-0.015, -0.11, 0]);
+const rightForeArm = bone("RightForeArm", [0.015, -0.11, 0]);
 // Lower the shoulder pivot to follow the rounded shoulder surface; keep elbow/wrist landmarks.
 // Avoid a lateral elbow kink: relaxation is in the sagittal animation plane.
-const leftHand = bone("LeftHand", [-0.02, -0.155, 0]);
-const rightHand = bone("RightHand", [0.02, -0.155, 0]);
+const leftHand = bone("LeftHand", [-0.017, -0.155, 0]);
+const rightHand = bone("RightHand", [0.017, -0.155, 0]);
 const leftLeg = bone("LeftLeg", [-0.07, -0.03, 0]);
 const rightLeg = bone("RightLeg", [0.07, -0.03, 0]);
 const leftLowerLeg = bone("LeftLowerLeg", [0, -0.20, 0]);
@@ -175,13 +175,14 @@ const arms = [
   // End the clavicle above/inboard of the upper-arm pivot. The old arm cap
   // stood above this slope, producing a second hump at the shoulder tip.
   shoulder: capsule(spine, v3(side * 0.038, 0.709), v3(side * 0.128, 0.675), 0.025, [1, 0.85, 1]),
-  upper: roundCone(upper, v3(side * 0.148, 0.65), v3(side * 0.175, 0.54), 0.032, 0.030),
-  fore: roundCone(fore, v3(side * 0.175, 0.54), v3(side * 0.195, 0.385), 0.030, 0.024),
-  hand: ellipsoid(hand, v3(side * 0.198, 0.36), v3(0.026, 0.03, 0.025)),
+  // ต้นแขนหนาขึ้นและห้อยชิดลำตัว (ศอกห่างเอวราว 1.5 ซม.) แต่ยังเหลือช่องใต้รักแร้
+  upper: roundCone(upper, v3(side * 0.148, 0.65), v3(side * 0.163, 0.54), 0.04, 0.033),
+  fore: roundCone(fore, v3(side * 0.163, 0.54), v3(side * 0.18, 0.385), 0.031, 0.024),
+  hand: ellipsoid(hand, v3(side * 0.183, 0.36), v3(0.026, 0.03, 0.025)),
 }));
 const thumbs = arms.map((_, i) => {
   const side = i === 0 ? -1 : 1;
-  return capsule(i === 0 ? leftHand : rightHand, v3(side * 0.194, 0.371, 0.016), v3(side * 0.19, 0.385, 0.038), 0.012);
+  return capsule(i === 0 ? leftHand : rightHand, v3(side * 0.179, 0.371, 0.016), v3(side * 0.175, 0.385, 0.038), 0.012);
 });
 const legs = [
   [leftLeg, leftLowerLeg, leftFoot, -1],
@@ -325,6 +326,7 @@ function orientFaces(geometry) {
   }
 }
 
+const armBones = new Set([leftArm, rightArm, leftForeArm, rightForeArm, leftHand, rightHand]);
 /** น้ำหนักกระดูกจากระยะถึงแต่ละชิ้น: ใกล้รอยต่อจะแบ่งน้ำหนักให้ทั้งสองฝั่ง ผิวจึงยืดแบบไล่ระดับ. */
 function skinFor(p) {
   for (let i = 0; i < primitives.length; i += 1) distances[i] = primitives[i].distance(p);
@@ -333,8 +335,12 @@ function skinFor(p) {
   // Every nearby influence fades continuously. Switching an allowed-bone list
   // at the nearest primitive boundary caused jagged deformation at the armpit.
   const weights = new Map();
+  // แขนห้อยชิดลำตัว: ใต้รักแร้ไม่แบ่งน้ำหนักข้ามระหว่างแขนกับลำตัว ไม่งั้นผิวเอวยับตามแขนตอนขยับ
+  const nearestIsArm = armBones.has(primitives[nearest].owner);
+  const belowArmpit = p.y < 0.6;
   primitives.forEach((primitive, i) => {
-    const reach = 1 - THREE.MathUtils.clamp((distances[i] - distances[nearest]) / WEIGHT_REACH, 0, 1);
+    const crossesArm = belowArmpit && armBones.has(primitive.owner) !== nearestIsArm;
+    const reach = 1 - THREE.MathUtils.clamp((distances[i] - distances[nearest]) / (crossesArm ? 0.008 : WEIGHT_REACH), 0, 1);
     const weight = reach * reach * (3 - 2 * reach);
     if (weight > (weights.get(primitive.owner) ?? 0)) weights.set(primitive.owner, weight);
   });
