@@ -5,7 +5,7 @@
  * (ข้อต่อมีส่วนโค้งเชื่อมแทนรอยตัดระหว่างชิ้น) แล้วผูกน้ำหนักกับกระดูกแบบไล่ระดับ
  * ทำให้หัวไหล่ สะโพก และหัวเข่างอได้โดยผิวยืดต่อเนื่อง ไม่แยกเป็นก้อน
  *
- * ตัวละครมีความสูง native ราว 1.16 ม. (แสดงผลที่ scale 0.9 = ราว 1.04 ม.)
+ * ตัวละครมีความสูง native ราว 1.12 ม. (แสดงผลที่ scale 0.9 = ราว 1.01 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
@@ -162,10 +162,11 @@ function smoothMin(a, b, k) {
 const torso = capsule(spine, v3(0, 0.535), v3(0, 0.625), 0.105, [1.08, 1, 0.72]);
 const pelvis = ellipsoid(hips, v3(0, 0.455, -0.008), v3(0.125, 0.085, 0.085));
 const neckPart = capsule(neck, v3(0, 0.713), v3(0, 0.825), 0.029);
-// หัวเล็กลงราว 10% จากรุ่นก่อน โดยคงคาง (ขอบล่างของหัว) ไว้ที่เดิมบนคอ
-const skull = ellipsoid(head, v3(0, 0.969), v3(0.198, 0.189, 0.167));
+// หัวเล็กลงราว 20% จากรุ่นแรก โดยคงคาง (ขอบล่างของหัว) ไว้ที่เดิมบนคอ
+const skull = ellipsoid(head, v3(0, 0.95), v3(0.178, 0.17, 0.15));
+// หูอยู่ระดับตา (ใต้กึ่งกลางหัวเล็กน้อย) ยื่นจากข้างหัวพอเห็น
 const ears = [-1, 1].map((side) =>
-  ellipsoid(head, v3(side * 0.182, 0.864, 0), v3(0.039, 0.042, 0.023)),
+  ellipsoid(head, v3(side * 0.193, 0.938, 0), v3(0.035, 0.038, 0.021)),
 );
 const arms = [
   [leftArm, leftForeArm, leftHand, -1],

@@ -64,7 +64,7 @@ const LITE_MODEL_URL = "/assets/models/cafe-customer-lite.glb";
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;
-const CUSTOMER_HEIGHT = 1.16;
+const CUSTOMER_HEIGHT = 1.12;
 const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
