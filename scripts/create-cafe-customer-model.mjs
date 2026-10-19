@@ -379,8 +379,9 @@ body.bind(new THREE.Skeleton(bones));
 // ---- Animation: keyframe ถี่จากคลื่น sine เพื่อให้ข้อต่อเคลื่อนแบบนุ่ม ไม่หักมุมที่ปลายวงสวิง ----
 const quaternionFrames = (angles) =>
   angles.flatMap((angle) => new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, 0)).toArray());
-const armPoseFrames = (x, z) =>
-  [0, 1].flatMap(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, 0, z)).toArray());
+// ก้ม/เงยก่อน (X) แล้วค่อยหมุนเข้าหาลำตัว (Y) — ท่อนแขนที่ยื่นไปหน้าจึงหันเข้าด้านในได้
+const armPoseFrames = (x, z, y = 0) =>
+  [0, 1].flatMap(() => new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "YXZ")).toArray());
 
 function sampled(duration, frames) {
   const times = Array.from({ length: frames + 1 }, (_, i) => (duration * i) / frames);
@@ -454,11 +455,12 @@ const sit = new THREE.AnimationClip("Sit", 1, [
   new THREE.QuaternionKeyframeTrack("RightLowerLeg.quaternion", [0, 1], quaternionFrames([0, 1.4])),
   new THREE.QuaternionKeyframeTrack("LeftFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
   new THREE.QuaternionKeyframeTrack("RightFoot.quaternion", [0, 1], quaternionFrames([0, 0.1])),
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", [0, 1], armPoseFrames(-0.75, 0.22)),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", [0, 1], armPoseFrames(-0.75, -0.22)),
-  // วางปลายแขนไว้บนตัก.
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", [0, 1], armPoseFrames(0.75, 0.16)),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", [0, 1], armPoseFrames(0.75, -0.16)),
+  // ต้นแขนห้อยเกือบตรง ปลายแขนงอไปข้างหน้า (ทิศเดียวกับข้อศอกจริง) แล้ววางมือบนต้นขา
+  // เดิมปลายแขนหมุนสวนทางต้นแขน ข้อศอกจึงหักไปด้านหลังดูงอผิดท่า
+  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", [0, 1], armPoseFrames(-0.25, 0.04)),
+  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", [0, 1], armPoseFrames(-0.25, -0.04)),
+  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", [0, 1], armPoseFrames(-1.05, 0, 0.4)),
+  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", [0, 1], armPoseFrames(-1.05, 0, -0.4)),
 ]);
 
 const exporter = new GLTFExporter();
