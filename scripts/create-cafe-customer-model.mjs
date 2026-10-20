@@ -1,5 +1,5 @@
 /**
- * สร้าง GLB mannequin สีเทาสำหรับ Character Lab และฉาก 3D
+ * สร้าง GLB mannequin สำหรับ Character Lab และฉาก 3D — ลูกค้า (สีเทาทั้งตัว) และพนักงาน (เสื้อกั๊ก + หมวกแก๊ป)
  *
  * ผิวปั้นแบบ box modeling ใน Blender เป็นชิ้นแยกตามรอยต่อตุ๊กตา (scripts/blender/blockout-cafe-customer.py)
  * แล้วเกลาและผูกน้ำหนักกับกระดูก (scripts/blender/build-cafe-customer-mesh.py) — สคริปต์นี้ใส่โครงกระดูกและ animation
@@ -9,12 +9,15 @@
  * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่างใน blockout-cafe-customer.py)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
- * สองไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน ต่างกันแค่จำนวน polygon
+ *      เติม --staff → cafe-staff.glb / cafe-staff-lite.glb (พนักงาน)
+ * ทุกไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน — รุ่น lite ต่างแค่จำนวน polygon,
+ * พนักงานต่างแค่สีลำตัว (vertex color) และหมวกที่ผูกกับกระดูก Head
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 
 if (!globalThis.FileReader) {
   globalThis.FileReader = class FileReader {
@@ -29,8 +32,13 @@ if (!globalThis.FileReader) {
 
 const outputDirectory = new URL("../public/assets/models/", import.meta.url);
 const LITE = process.argv.includes("--lite");
-const outputFile = new URL(LITE ? "cafe-customer-lite.glb" : "cafe-customer.glb", outputDirectory);
-const mannequin = new THREE.MeshStandardMaterial({ color: "#9da4af", roughness: 0.84, metalness: 0 });
+const STAFF = process.argv.includes("--staff");
+const outputFile = new URL(`cafe-${STAFF ? "staff" : "customer"}${LITE ? "-lite" : ""}.glb`, outputDirectory);
+const SKIN_COLOR = "#9da4af";
+// สีชุดพนักงาน: เข้มกว่าผิวหุ่นและต่างจากสีเฟอร์นิเจอร์ มองจากมุมสูงในฉากร้านก็แยกออกจากลูกค้า
+const UNIFORM_COLOR = "#2f6b5a";
+// พนักงาน: สีผิวมาจาก vertex color (ลำตัว = ชุด, ที่เหลือ = สีหุ่น) จึงตั้งสีวัสดุเป็นขาว
+const mannequin = new THREE.MeshStandardMaterial({ color: STAFF ? "#ffffff" : SKIN_COLOR, vertexColors: STAFF, roughness: 0.84, metalness: 0 });
 
 // ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ใช้ผิวที่เกลาน้อยกว่า
 const meshFile = new URL(LITE ? "blender/cafe-customer-mesh-lite.glb" : "blender/cafe-customer-mesh.glb", import.meta.url);
@@ -131,7 +139,56 @@ body.castShadow = true;
 body.receiveShadow = true;
 model.add(body);
 model.updateMatrixWorld(true);
-body.bind(new THREE.Skeleton(bones));
+const skeleton = new THREE.Skeleton(bones);
+body.bind(skeleton);
+
+if (STAFF) {
+  // ---- ชุดพนักงาน: จุดผิวที่ขยับตาม Hips/Spine อย่างเดียว = ลำตัว → ระบายสีชุด (แขน ขา คอ หัวยังเป็นสีหุ่น)
+  // ลำตัวเป็นชิ้นแยกจากแขนขาตั้งแต่ใน Blender เส้นแบ่งสีจึงคมตรงรอยต่อตุ๊กตา และไม่มีผ้าทะลุตัวตอนนั่ง/เดิน
+  const torsoBones = new Set([boneIndex.get(hips), boneIndex.get(spine)]);
+  const skin = new THREE.Color(SKIN_COLOR);
+  const uniform = new THREE.Color(UNIFORM_COLOR);
+  const colors = new Float32Array(position.count * 3);
+  for (let i = 0; i < position.count; i += 1) {
+    let torso = true;
+    for (let slot = 0; slot < 4; slot += 1) {
+      if (skinWeights[i * 4 + slot] > 1e-4 && !torsoBones.has(skinIndices[i * 4 + slot])) torso = false;
+    }
+    (torso ? uniform : skin).toArray(colors, i * 3);
+  }
+  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+
+  // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
+  const HEAD_DEPTH = 0.93;
+  const crown = [[0.95, 0.143], [0.962, 0.137], [0.977, 0.124], [0.99, 0.114], [1.004, 0.102], [1.018, 0.086], [1.032, 0.062], [1.046, 0]];
+  // จุดเรียงจากขอบล่างขึ้นยอด (ผิวหันออก); ยอดรัศมี 0 จึงไม่เป็นรู
+  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.007 : 0, y + 0.006));
+  capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.004));
+  const capCrown = new THREE.LatheGeometry(capProfile, LITE ? 16 : 32);
+  capCrown.scale(1, 1, HEAD_DEPTH);
+  const brimShape = new THREE.Shape();
+  brimShape.absellipse(0, 0, 0.115, 0.095, 0, Math.PI, false, 0);
+  const capBrim = new THREE.ExtrudeGeometry(brimShape, { depth: 0.008, bevelEnabled: false, curveSegments: LITE ? 6 : 12 });
+  // Shape อยู่บนระนาบ XY → พลิกลงนอนบนระนาบ XZ ปีกชี้ +Z (หน้า) แล้วกดปลายลงนิดเหมือนปีกหมวกจริง
+  capBrim.rotateX(Math.PI / 2 - 0.12);
+  capBrim.translate(0, 0.96, 0.1);
+  const capGeometry = mergeGeometries([capCrown, capBrim].map((part) => {
+    // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — แค่คลายดัชนีให้รวมกันได้
+    const flat = part.index ? part.toNonIndexed() : part;
+    flat.deleteAttribute("uv");
+    return flat;
+  }));
+  const headIndex = boneIndex.get(head);
+  const count = capGeometry.getAttribute("position").count;
+  capGeometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Uint16Array(count * 4).map((_, i) => (i % 4 === 0 ? headIndex : 0)), 4));
+  capGeometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(new Float32Array(count * 4).map((_, i) => (i % 4 === 0 ? 1 : 0)), 4));
+  const cap = new THREE.SkinnedMesh(capGeometry, new THREE.MeshStandardMaterial({ color: UNIFORM_COLOR, roughness: 0.78, metalness: 0 }));
+  cap.name = "StaffCap";
+  cap.castShadow = true;
+  model.add(cap);
+  model.updateMatrixWorld(true);
+  cap.bind(skeleton);
+}
 
 // ---- Animation: keyframe ถี่จากคลื่น sine เพื่อให้ข้อต่อเคลื่อนแบบนุ่ม ไม่หักมุมที่ปลายวงสวิง ----
 const quaternionFrames = (angles) =>

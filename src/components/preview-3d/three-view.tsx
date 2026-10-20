@@ -18,6 +18,7 @@ import {
 } from "@/core/layout";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
+import { CHARACTER_MODELS } from "./character-models";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
@@ -58,9 +59,9 @@ type Stage = {
   clearCustomers: () => void;
 };
 
-const MODEL_URL = "/assets/models/cafe-customer.glb";
+const MODEL_URL = CHARACTER_MODELS.customer.full;
 /** โครงกระดูก/animation เดียวกับ MODEL_URL แต่ polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ */
-const LITE_MODEL_URL = "/assets/models/cafe-customer-lite.glb";
+const LITE_MODEL_URL = CHARACTER_MODELS.customer.lite;
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;

@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-20 ICT — โมเดลตัวละครแยก ลูกค้า / พนักงาน
+
+- **ผลลัพธ์**: เพิ่ม `cafe-staff(-lite).glb` (เสื้อกั๊กเขียว + หมวกแก๊ป, โครงกระดูก/คลิป Idle·Walk·Sit เดียวกับลูกค้า) และ `character-models.ts` เป็นที่เดียวที่เก็บ path โมเดลตามบทบาท; Character Lab สลับ ลูกค้า/พนักงาน ได้
+- **การตรวจ**: `make test` 900, `make lint` ผ่าน; Chromium Character Lab ตรวจภาพแล้ว
+- **ค้าง**: ฉากร้าน 3D ยังแสดงแค่ลูกค้า — ถ้าจะให้พนักงานยืนหลังเคาน์เตอร์/เดินเสิร์ฟ ต้องเพิ่ม agent พนักงานใน Simulation ก่อน
+
 ## 2026-10-19 ICT — mannequin: ผิวใหม่จาก Blender (box modeling) + ทรงป้อม
 
 - **ผลลัพธ์**: ผิวสร้างด้วย `scripts/blender/build-cafe-customer-mesh.py` (Skin modifier + Subdivision, ปั้นแขนท่ากาง 25° แล้วพับลง, อุดรู Skin modifier) → `create-cafe-customer-model.mjs` จับคู่กระดูกตามชื่อแล้วใส่ animation; ทรงป้อมขาสั้น (HIPS_Y .405), หัวเล็กลง คอสั้น หูระดับตา นิ้วโป้ง ไหล่ลาดมน; ลุกจากเก้าอี้ = Sit ย้อนกลับ

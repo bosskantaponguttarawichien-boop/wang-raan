@@ -4,6 +4,13 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
+## [2026-10-20] โมเดลตัวละครแยก ลูกค้า / พนักงาน
+
+- `scripts/create-cafe-customer-model.mjs --staff` สร้าง `cafe-staff.glb` + `cafe-staff-lite.glb`: โครงกระดูกและ animation เดียวกับลูกค้า, ลำตัวสีเขียว `#2f6b5a` (vertex color จากจุดที่ขยับตาม Hips/Spine) + หมวกแก๊ปผูกกระดูก Head
+- `src/components/preview-3d/character-models.ts` รวม path โมเดลตามบทบาท; Character Lab มีปุ่มเลือก ลูกค้า/พนักงาน; ฉากร้าน 3D ยังใช้โมเดลลูกค้าเหมือนเดิม (Simulation ยังไม่มีพนักงาน)
+- ตรวจ: `make test` 68 files / 900 tests, `make lint` ผ่าน; Chromium Character Lab ตรวจพนักงานยืน/หันข้าง/นั่ง และสลับกลับเป็นลูกค้า
+
+
 ## [2026-10-18] feat-091 (ต่อ) — แยกสีทางเข้ากับประตูครัวใน 3D
 
 - Three.js: ทางเข้า = วงกบน้ำเงิน `#3b62f4` + พรมฟ้า, ประตูครัว = วงกบเทาอมฟ้า `#64748b` + บานปิดเข้ม + พรมเทา (สีตามป้ายผัง 2D)
