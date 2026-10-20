@@ -174,10 +174,76 @@ def head():
     return head_shell("Head")
 
 
-def hair():
-    """ผมสั้นแนบหัว: ผิวหัวดันออกจากกลางหัว 9 มม. (หนาเท่ากันทั้งข้างหัวและกลางกระหม่อม) แล้วตัดส่วนล่างทิ้ง
-    — ไรผมหน้าผากสูง ข้างหูต่ำลง ท้ายทอยต่ำสุด"""
-    return head_shell("Hair", keep=lambda height, front: height >= 1.592 + 0.052 * front, offset=0.009)
+# ไรผมรอบหัว: (มุมจากหน้ากลางไปทางข้าง [องศา], ความสูงไรผม) — หน้าผากสูง มุมหน้าผากร่นนิด
+# จอนลงมาหน้าหู, ผมเหนือใบหู, หลังหูลงต่ำ, ท้ายทอยลงถึงต้นคอแบบผมสั้นรองทรง
+HAIRLINE = [
+    (0, 1.648), (30, 1.642), (55, 1.628), (72, 1.585), (88, 1.6), (104, 1.603),
+    (118, 1.54), (140, 1.5), (180, 1.488),
+]
+
+
+def hairline(angle):
+    """ความสูงไรผมที่มุม angle (เรเดียน, 0 = หน้า) — สมมาตรซ้าย-ขวา ต่อกันโค้งนุ่มแบบ cosine"""
+    degrees = abs(math.degrees(math.atan2(math.sin(angle), math.cos(angle))))
+    for (a0, h0), (a1, h1) in zip(HAIRLINE, HAIRLINE[1:]):
+        if a0 <= degrees <= a1:
+            t = (degrees - a0) / (a1 - a0)
+            t = (1 - math.cos(math.pi * t)) / 2
+            return h0 + (h1 - h0) * t
+    return HAIRLINE[-1][1]
+
+
+def head_direction(height, angle):
+    """ทิศ (ลูกบอลหน่วย) ที่ head_point ให้จุดที่ความสูง height และมุมรอบหัว angle (0 = หน้า, + = ไปทาง +x)"""
+    top, bottom = HEAD_PROFILE[0][0], HEAD_PROFILE[-1][0]
+    z = max(-1.0, min(1.0, 2 * (height - bottom) / (top - bottom) - 1))
+    ring = math.sqrt(max(0.0, 1 - z * z))
+    return Vector((math.sin(angle) * ring, -math.cos(angle) * ring, z))
+
+
+def hair(around=32, rows=12):
+    """
+    ผมสั้นรองทรงเป็นตาข่ายตามแนวหัว: แถวจากกลางกระหม่อมลงมาถึงไรผม (HAIRLINE) ทุกมุมรอบหัว
+    ไรผมจึงเป็นเส้นโค้งเรียบ ไม่เป็นหยักตามตารางของหัว — หนาสุดบนกลางหัว/หน้าผาก (ผมด้านบนยาวกว่า ปัดขึ้นนิด)
+    แล้วบางลงจนเกือบแนบหนังศีรษะที่ไรผม ขอบผมจึงกลืนกับผิว ไม่เป็นสันเหมือนหมวก
+    """
+    top = HEAD_PROFILE[0][0]
+    verts, faces = [], []
+    apex_point, _, _ = head_point(Vector((0, 0, 1)))
+    apex = len(verts)
+    verts.append(apex_point + Vector((0, 0, 0.013)))
+    grid = []
+    for row in range(1, rows + 1):
+        t = row / rows
+        ring = []
+        for k in range(around):
+            angle = 2 * math.pi * k / around
+            # แถวถี่ใกล้กระหม่อม (ช่วงที่ผิวโค้งมาก) — รุ่นเบาที่ไม่เกลาผิวจึงไม่มีหนังหัวโผล่กลางหัว
+            height = top + (hairline(angle) - top) * (1 - (1 - t) ** 1.25)
+            point, _, front = head_point(head_direction(height, angle))
+            # ผมบนหัวยาว ~1.4 ซม. (หน้าผาก/กลางหัวพองกว่า) ลดเหลือ 3 มม. ที่ไรผม
+            # ข้างและหลังรองทรงสั้นแนบหัว (ไม่พองเป็นทรงกะลา) — ด้านหน้าคงความหนาไว้มากกว่า
+            fringe = 0.006 * max(0.0, front) ** 2 * (1 - t) ** 0.5
+            taper = min(1.0, max(0.0, (t - 0.15) / 0.45))
+            sides = 1 - 0.78 * taper * taper * (3 - 2 * taper) * (1 - max(0.0, front) ** 2)
+            # ขอบผมลอยจากหนังศีรษะ ≥ 3 มม. — บางกว่านี้ผิวหัว (เกลาต่างชิ้นกัน) จะโผล่ทะลุเป็นหยักตามไรผม
+            thickness = 0.003 + 0.0105 * (1 - t ** 2.2) * sides + fringe
+            ring.append(len(verts))
+            verts.append(point + (point - HEAD_CENTER).normalized() * thickness)
+        grid.append(ring)
+    first = grid[0]
+    for k in range(0, around, 2):
+        faces.append((apex, first[k], first[(k + 1) % around], first[(k + 2) % around]))
+    for upper, lower in zip(grid, grid[1:]):
+        for k in range(around):
+            faces.append((upper[k], lower[k], lower[(k + 1) % around], upper[(k + 1) % around]))
+    part = add_object("Hair", verts, faces)
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    bmesh.ops.recalc_face_normals(shape, faces=shape.faces)
+    shape.to_mesh(part.data)
+    shape.free()
+    return part
 
 
 def ear(sign):

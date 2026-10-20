@@ -170,8 +170,8 @@ if (STAFF) {
   const HEAD_FORWARD = 0.012;
   const crown = [[1.612, 0.086], [1.635, 0.085], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
   // จุดเรียงจากขอบล่างขึ้นยอด (ผิวหันออก); ยอดรัศมี 0 จึงไม่เป็นรู
-  // ครอบผม (หนา 8 มม.) ได้มิด: ใหญ่กว่าหัว 1.4 ซม.
-  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.014 : 0, y + 0.01));
+  // ครอบผมได้มิด (กลางกระหม่อม ~1.3 ซม., ผมหน้าผากปัดขึ้น ~1.9 ซม.): ใหญ่กว่าหัว 2.2 ซม. ยอดสูงกว่า 1.8 ซม.
+  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.022 : 0, y + 0.018));
   capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.004));
   const capCrown = new THREE.LatheGeometry(capProfile, LITE ? 16 : 32);
   capCrown.scale(1, 1, HEAD_DEPTH);
