@@ -253,9 +253,14 @@ def body_parts():
     return parts
 
 
+def cage_parts():
+    """ชิ้นโครงตาข่ายแยกกัน (ยังไม่รวม) — build-cafe-customer-mesh.py ใช้ผูกแต่ละชิ้นกับกระดูก"""
+    return [head(), *body_parts()]
+
+
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    parts = [head(), *body_parts()]
+    parts = cage_parts()
     bpy.ops.object.select_all(action="DESELECT")
     for part in parts:
         part.select_set(True)
@@ -267,4 +272,5 @@ def build():
     print(f"สร้าง {OUT}: {len(faces)} หน้า, สี่เหลี่ยม {sum(len(face.vertices) == 4 for face in faces)} หน้า")
 
 
-build()
+if __name__ == "__main__":
+    build()
