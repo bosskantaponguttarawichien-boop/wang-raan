@@ -18,6 +18,7 @@ import {
 } from "@/core/layout";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
+import { staffSpots } from "@/core/preview/staff-spots";
 import { CHARACTER_MODELS } from "./character-models";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
@@ -57,11 +58,30 @@ type Stage = {
   invalidate: () => void;
   resize: () => void;
   clearCustomers: () => void;
+  /** วางพนักงานหลังเคาน์เตอร์ใหม่ตามผังปัจจุบัน */
+  syncStaff: () => void;
+};
+
+type StandingStaff = {
+  mixer: THREE.AnimationMixer;
+  model: THREE.Object3D;
+  body: THREE.SkinnedMesh | null;
+};
+
+/** โมเดลหนึ่งบทบาท: template ไว้ clone + ผิวรุ่นละเอียด/รุ่นเบาสำหรับสลับตามขนาดบนจอ */
+type CharacterAsset = {
+  template: THREE.Object3D | null;
+  fullBody: THREE.BufferGeometry | null;
+  liteBody: THREE.BufferGeometry | null;
+  liteScene: THREE.Object3D | null;
+  clips: THREE.AnimationClip[];
 };
 
 const MODEL_URL = CHARACTER_MODELS.customer.full;
 /** โครงกระดูก/animation เดียวกับ MODEL_URL แต่ polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ */
 const LITE_MODEL_URL = CHARACTER_MODELS.customer.lite;
+/** เหลื่อมจังหวะท่ายืนของพนักงานแต่ละคน ไม่ให้ขยับพร้อมกันทั้งร้าน (วินาที) */
+const STAFF_IDLE_PHASE = 0.83;
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;
@@ -767,6 +787,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     let liteBody: THREE.BufferGeometry | null = null;
     let liteScene: THREE.Object3D | null = null;
     let clips: THREE.AnimationClip[] = [];
+    const staffAsset: CharacterAsset = { template: null, fullBody: null, liteBody: null, liteScene: null, clips: [] };
+    const staff: StandingStaff[] = [];
     let walkSpeed = 0.44;
     let frame = 0;
     let disposed = false;
@@ -803,6 +825,32 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     };
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
+    };
+
+    /** พนักงานยืนท่า Idle หลังเคาน์เตอร์ — แสดงตลอด (ไม่ต้องรอจำลอง) และไม่อยู่ใน simulation */
+    const syncStaff = () => {
+      for (const member of staff) {
+        member.mixer.stopAllAction();
+        member.mixer.uncacheRoot(member.model);
+        scene.remove(member.model);
+      }
+      staff.length = 0;
+      const layout = stageRef.current?.layout;
+      const idle = THREE.AnimationClip.findByName(staffAsset.clips, "Idle");
+      if (!staffAsset.template || !layout) return;
+      staffSpots(layout).forEach((spot, index) => {
+        const model = cloneSkinned(staffAsset.template!);
+        model.position.set(spot.position.x, 0, spot.position.y);
+        model.rotation.y = Math.atan2(spot.facing.x, spot.facing.y);
+        model.scale.setScalar(CUSTOMER_SCALE);
+        scene.add(model);
+        const mixer = new THREE.AnimationMixer(model);
+        if (idle) mixer.clipAction(idle).play();
+        // ตั้งท่าทันที — ฉากนิ่งวาดเฟรมเดียว พนักงานจึงต้องอยู่ในท่ายืนตั้งแต่เฟรมแรก
+        mixer.update(index * STAFF_IDLE_PHASE);
+        const body = model.getObjectByName(BODY_MESH_NAME);
+        staff.push({ mixer, model, body: body instanceof THREE.SkinnedMesh ? body : null });
+      });
     };
 
     const syncCustomers = () => {
@@ -873,11 +921,12 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     };
 
     /** ลูกค้าหลายสิบตัว × 2 รอบ (ภาพ + เงา) — ตอนตัวเล็กบนจอใช้ผิวรุ่นเบา ซูมเข้าใกล้ค่อยใช้รุ่นละเอียด */
-    const bodyForZoom = () => {
-      if (!liteBody || !fullBody) return fullBody;
+    const wantsLiteBody = () => {
       const pixelsPerMeter = (renderer.domElement.clientHeight * camera.zoom) / (camera.top - camera.bottom);
-      return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT ? liteBody : fullBody;
+      return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT;
     };
+    const bodyForZoom = (full: THREE.BufferGeometry | null, lite: THREE.BufferGeometry | null) =>
+      lite && full && wantsLiteBody() ? lite : full;
 
     // วาดตามต้องการ: ฉากนิ่งวาดเฟรมเดียวแล้วหยุด; ระหว่างจำลอง/มีลูกค้าค้างอยู่ loop ต่อเนื่อง
     const tick = () => {
@@ -887,7 +936,12 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       const simulating = isSimRef.current;
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
-      const body = bodyForZoom();
+      const body = bodyForZoom(fullBody, liteBody);
+      const staffBody = bodyForZoom(staffAsset.fullBody, staffAsset.liteBody);
+      for (const member of staff) {
+        if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
+        member.mixer.update(delta);
+      }
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         if (customer.standingUp > 0) {
@@ -931,7 +985,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       // วาดทันที (ไม่รอ rAF) เพื่อไม่ให้ canvas ว่างกระพริบหลังเปลี่ยนขนาด
       renderer.render(scene, camera);
     };
-    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers };
+    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers, syncStaff };
     stageRef.current = stage;
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -965,6 +1019,28 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
       if (disposed) disposeModel(liteScene);
     });
+    // พนักงานเป็นของประกอบฉาก — โหลดไม่ได้ก็แค่ไม่มีพนักงาน ไม่ต้องถอยไปใช้ SVG
+    loader.load(CHARACTER_MODELS.staff.full, (gltf) => {
+      if (disposed) {
+        disposeModel(gltf.scene);
+        return;
+      }
+      gltf.scene.traverse((object) => {
+        if (object instanceof THREE.Mesh) object.castShadow = true;
+      });
+      staffAsset.template = gltf.scene;
+      const templateBody = gltf.scene.getObjectByName(BODY_MESH_NAME);
+      staffAsset.fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
+      staffAsset.clips = gltf.animations;
+      syncStaff();
+      invalidate();
+    });
+    loader.load(CHARACTER_MODELS.staff.lite, (gltf) => {
+      staffAsset.liteScene = gltf.scene;
+      const liteMesh = gltf.scene.getObjectByName(BODY_MESH_NAME);
+      staffAsset.liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
+      if (disposed) disposeModel(gltf.scene);
+    });
 
     return () => {
       disposed = true;
@@ -975,6 +1051,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
       disposeModel(modelTemplate);
       disposeModel(liteScene);
+      for (const member of staff) member.mixer.stopAllAction();
+      disposeModel(staffAsset.template);
+      disposeModel(staffAsset.liteScene);
       key.shadow.map?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -997,6 +1076,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth || stage.viewRotation !== viewRotation;
     stage.layout = layout;
     stage.viewRotation = viewRotation;
+    stage.syncStaff();
     if (sizeChanged) {
       fitKeyLight(stage.key, layout, viewRotation);
       stage.resize();

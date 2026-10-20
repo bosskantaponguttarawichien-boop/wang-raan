@@ -4,6 +4,13 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
+## [2026-10-20] พนักงานยืนหลังเคาน์เตอร์ในฉากร้าน 3D
+
+- `src/core/preview/staff-spots.ts` (Pure TS): จุดยืนพนักงานฝั่ง −z ของเคาน์เตอร์ (ตาม `createCounter`) หมุนตาม rotation, เคาน์เตอร์ ≥ 2.4 ม. มี 2 คน; ถอยห่างขอบ 0.45 ม. ถ้ามีที่ (หุ่นเตี้ยกว่าท็อป 1.05 ม.) ไม่พอก็ขยับเข้าถึง 0.25 ม., ชนผนัง/วัตถุอื่นไม่วาง
+- `three-view.tsx`: โหลด `cafe-staff(-lite).glb` แยกจากลูกค้า, วางพนักงานท่า Idle ทุกครั้งที่ผังเปลี่ยน (แสดงตลอด ไม่ต้องรอจำลอง), สลับผิวรุ่นเบาตามซูมเหมือนลูกค้า; ไม่แตะ Simulation/Worker
+- ตรวจ: `make test` 69 files / 908 tests, `make lint` ผ่าน; Chromium Playground 3D เห็นพนักงาน 2 คนหลังเคาน์เตอร์ 2.4 ม. ทั้งมุมปกติและหมุน 180°
+
+
 ## [2026-10-20] โมเดลตัวละครแยก ลูกค้า / พนักงาน
 
 - `scripts/create-cafe-customer-model.mjs --staff` สร้าง `cafe-staff.glb` + `cafe-staff-lite.glb`: โครงกระดูกและ animation เดียวกับลูกค้า, ลำตัวสีเขียว `#2f6b5a` (vertex color จากจุดที่ขยับตาม Hips/Spine) + หมวกแก๊ปผูกกระดูก Head
