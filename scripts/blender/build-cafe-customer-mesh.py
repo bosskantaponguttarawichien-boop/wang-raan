@@ -93,7 +93,7 @@ def part_category(name):
         return PART_PANTS
     if name.startswith("Shoe"):
         return PART_SHOE
-    if name.startswith("Sole"):
+    if name.startswith(("Sole", "Laces")):
         return PART_SOLE
     if name == "Hair":
         return PART_HAIR
@@ -116,7 +116,7 @@ def part_weights(name, point):
         return chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"])
     if name.startswith("Leg"):
         return chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"])
-    if name.startswith(("Shoe", "Sole")):
+    if name.startswith(("Shoe", "Sole", "Laces")):
         return {f"{side}Foot": 1.0}
     raise ValueError(f"ไม่รู้ว่าชิ้น {name} ผูกกับกระดูกไหน")
 
