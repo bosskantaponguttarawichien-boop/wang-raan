@@ -32,24 +32,24 @@ OUT_DIR = Path(__file__).resolve().parent
 # ที่มีพร้อมกันหลายสิบคน) — งบเท่ารุ่นเดิม
 LEVELS = {"cafe-customer-mesh.glb": 1, "cafe-customer-mesh-lite.glb": 0}
 # ระยะ (เมตร) ทั้งสองข้างของข้อต่อที่น้ำหนักผิวค่อย ๆ เปลี่ยนจากกระดูกแม่ไปกระดูกลูก
-BLEND = 0.028
+BLEND = 0.045
 SOLE_Z = 0.002
 
 # ข้อต่อแบบ glTF (X ข้าง, Y ขึ้น, Z หน้า) — ต้องตรงกับตำแหน่งกระดูกใน create-cafe-customer-model.mjs
 JOINTS = {
-    "Hips": (0, 0.40, 0),
-    "Spine": (0, 0.52, 0),
-    "Neck": (0, 0.70, 0),
-    "Head": (0, 0.722, 0),
+    "Hips": (0, 0.92, 0),
+    "Spine": (0, 1.05, 0),
+    "Neck": (0, 1.40, 0),
+    "Head": (0, 1.50, 0),
 }
 for _side, _sign in (("Left", -1), ("Right", 1)):
     JOINTS.update({
-        f"{_side}Arm": (_sign * 0.09, 0.635, 0),        # หัวไหล่ (กลางโดมต้นแขน)
-        f"{_side}ForeArm": (_sign * 0.141, 0.521, 0),   # ศอก
-        f"{_side}Hand": (_sign * 0.175, 0.425, 0),      # ข้อมือ
-        f"{_side}Leg": (_sign * 0.068, 0.36, 0),        # ข้อสะโพก
-        f"{_side}LowerLeg": (_sign * 0.068, 0.231, 0),  # เข่า
-        f"{_side}Foot": (_sign * 0.066, 0.065, 0),      # ข้อเท้า (ในรองเท้า)
+        f"{_side}Arm": (_sign * 0.175, 1.355, 0),       # หัวไหล่ (กลางโดมต้นแขน)
+        f"{_side}ForeArm": (_sign * 0.198, 1.065, 0),   # ศอก
+        f"{_side}Hand": (_sign * 0.21, 0.815, 0),       # ข้อมือ
+        f"{_side}Leg": (_sign * 0.09, 0.88, 0),         # ข้อสะโพก
+        f"{_side}LowerLeg": (_sign * 0.095, 0.49, 0),   # เข่า
+        f"{_side}Foot": (_sign * 0.095, 0.08, 0),       # ข้อเท้า (ในรองเท้า)
     })
 PARENT = {
     "Spine": "Hips", "Neck": "Spine", "Head": "Neck",
@@ -90,7 +90,7 @@ def part_weights(name, point):
         return {"Neck": 1.0}
     if name == "Torso":
         # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips
-        share = smoothstep(0.43, 0.51, point.z)
+        share = smoothstep(0.98, 1.1, point.z)
         return {"Hips": 1 - share, "Spine": share}
     if name.startswith(("Arm", "Thumb")):
         chain = [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]

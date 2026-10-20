@@ -128,7 +128,7 @@ export function CharacterLab() {
         </section>
 
         <aside className="grid gap-3 sm:grid-cols-3" aria-label="สถานะการทดลอง">
-          <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ 1.67 ม.`} />
+          <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ 1.70 ม.`} />
           <StatusCard
             label="ท่าปัจจุบัน"
             value={motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}

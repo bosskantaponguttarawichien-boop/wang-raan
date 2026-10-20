@@ -19,7 +19,7 @@ import {
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
-import { CHARACTER_MODELS, CHARACTER_SCALE } from "./character-models";
+import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE } from "./character-models";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
@@ -32,8 +32,8 @@ export interface ThreeViewProps {
 }
 
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
-/** เลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ให้สะโพกอยู่กลางเบาะ หัวเข่าพ้นขอบหน้า (ปรับตามขนาดตัว) */
-const SEATED_FRONT_OFFSET = 0.06 * CHARACTER_SCALE;
+/** ระยะเลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ — ติดลบ = ถอยข้อสะโพกไปหลังกลางเบาะ ให้หลังชิดพนักพิง (ไม่จม) */
+const SEATED_FRONT_OFFSET = -0.04;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
@@ -86,7 +86,7 @@ const STAFF_IDLE_PHASE = 0.83;
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;
-const CUSTOMER_HEIGHT = 1.05;
+const CUSTOMER_HEIGHT = CHARACTER_HEIGHT / CHARACTER_SCALE;
 const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
@@ -336,7 +336,8 @@ function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneA
       addLegs(object, style.legStyle, item.width, item.depth, topHeight - 0.02, round);
     } else if (item.type === "chair") {
       const style = chairStyleOf(item);
-      const seatHeight = 0.45;
+      // ผิวบนเบาะสูง 0.45 ม. ตามเก้าอี้ทานอาหารมาตรฐาน (ท่า Sit ใน GLB วางต้นขาไว้ที่ระดับนี้)
+      const seatHeight = 0.42;
       const seatW = item.width * 0.86;
       const seatD = item.depth * 0.86;
       const round = style.shape === "round";

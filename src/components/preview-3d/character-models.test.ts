@@ -66,7 +66,7 @@ describe("character models", () => {
     const position = cap.geometry.getAttribute("position");
     for (let i = 0; i < position.count; i++) bounds.expandByPoint(cap.applyBoneTransform(i, point.fromBufferAttribute(position, i)).applyMatrix4(cap.matrixWorld));
     // หมวกอยู่เหนือข้อต่อหัว (สูงกว่าหู) และปีกยื่นไปหน้า
-    expect(bounds.min.y).toBeGreaterThan(head.y + 0.15);
-    expect(bounds.max.z).toBeGreaterThan(head.z + 0.18);
+    expect(bounds.min.y).toBeGreaterThan(head.y + 0.1);
+    expect(bounds.max.z).toBeGreaterThan(head.z + 0.15);
   });
 });

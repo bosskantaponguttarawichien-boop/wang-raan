@@ -13,7 +13,7 @@ import type { Counter, Meters, Point, Rect, StoreLayout } from "../layout/types"
 
 /** ระยะจากขอบเคาน์เตอร์ถึงกลางตัวพนักงาน ไล่จากที่อยากได้ไปถึงชิดที่สุด */
 export const STAFF_STANDOFFS: readonly Meters[] = [0.35, 0.3, 0.25];
-/** รัศมีพื้นที่ยืนของพนักงาน (mannequin สูง ~1.67 ม. ลำตัวหนาราว 0.3 ม.) */
+/** รัศมีพื้นที่ยืนของพนักงาน (mannequin สูง 1.70 ม. ลำตัวหนาราว 0.23 ม. + ส้นเท้า) */
 export const STAFF_RADIUS: Meters = 0.2;
 /** เคาน์เตอร์ยาวตั้งแต่ค่านี้มีพนักงาน 2 คน */
 export const TWO_STAFF_MIN_LENGTH: Meters = 2.4;

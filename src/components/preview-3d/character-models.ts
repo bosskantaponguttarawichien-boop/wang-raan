@@ -1,9 +1,10 @@
 /**
- * ขนาดแสดงผลของ mannequin (โมเดลสูง native ราว 1.05 หน่วย) → สูงราว 1.67 ม. เท่าผู้ใหญ่ เทียบกับโต๊ะ 0.74 ม.
- * เบาะ 0.48 ม. และเคาน์เตอร์ 1.05 ม. — ท่า Sit ในไฟล์ GLB คำนวณระดับสะโพกจากค่านี้ (DISPLAY_SCALE ใน
- * scripts/create-cafe-customer-model.mjs ต้องตรงกัน)
+ * mannequin ปั้นด้วยสัดส่วนผู้ใหญ่จริง สูง 1.70 ม. ที่ขนาด 1:1 (หน่วยโมเดล = เมตร) จึงแสดงที่ scale 1
+ * เข้ากับโต๊ะ 0.74 ม. เบาะ 0.45 ม. และเคาน์เตอร์ 1.05 ม. — ท่า Sit ใน GLB วางต้นขาไว้บนเบาะที่ขนาดนี้
  */
-export const CHARACTER_SCALE = 1.6;
+export const CHARACTER_SCALE = 1;
+/** ความสูงตัวละครที่แสดงผล (เมตร) */
+export const CHARACTER_HEIGHT = 1.7;
 
 /** บทบาทตัวละครในร้าน — แต่ละบทบาทมีไฟล์ GLB ของตัวเอง แต่ใช้โครงกระดูกและ animation (Idle/Walk/Sit) ชุดเดียวกัน */
 export type CharacterRole = "customer" | "staff";

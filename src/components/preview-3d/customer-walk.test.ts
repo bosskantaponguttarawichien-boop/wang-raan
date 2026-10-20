@@ -25,9 +25,11 @@ describe("customer walk asset", () => {
     const ankle = scene.getObjectByName("LeftFoot")!.getWorldPosition(new THREE.Vector3());
     const leftHand = scene.getObjectByName("LeftHand")!.getWorldPosition(new THREE.Vector3());
     const rightHand = scene.getObjectByName("RightHand")!.getWorldPosition(new THREE.Vector3());
-    // ใต้ต้นขา (ข้อสะโพกต่ำกว่า Hips 0.04 + รัศมีต้นขา 0.055) อยู่บนเบาะ 0.48 ม. ที่ขนาดแสดงผลจริง
-    expect((hips.y - 0.04 - 0.055) * CHARACTER_SCALE).toBeCloseTo(0.48, 3);
+    // ใต้ต้นขา (ข้อสะโพกต่ำกว่า Hips 0.04 + ครึ่งความหนาต้นขา 0.09) อยู่บนเบาะ 0.45 ม. ที่ขนาดแสดงผลจริง
+    expect((hips.y - 0.04 - 0.09) * CHARACTER_SCALE).toBeCloseTo(0.45, 3);
     expect(knee.y).toBeGreaterThan(hips.y - 0.1);
+    // คนสูง 1.70 ม. นั่งเบาะมาตรฐานแล้วเท้าวางบนพื้น (ข้อเท้ากลับมาระดับเดียวกับตอนยืน)
+    expect(ankle.y).toBeCloseTo(0.08, 3);
     // ต้นขายาว .129 พับไปหน้าเกือบขนานพื้น
     expect(knee.z).toBeGreaterThan(0.12);
     expect(ankle.y).toBeLessThan(knee.y);
@@ -35,9 +37,10 @@ describe("customer walk asset", () => {
     expect(rightHand.x).toBeGreaterThan(0);
     expect(leftHand.x).toBeCloseTo(-rightHand.x, 3);
     expect(Math.abs(leftHand.x)).toBeLessThan(0.16);
-    // ข้อมืออยู่หน้าลำตัวระดับตัก ถุงมือห้อยจากข้อมือลงไปวางบนต้นขา
+    // ข้อมืออยู่หน้าลำตัวเหนือหน้าตัก ถุงมือวางบนต้นขาชี้ไปทางเข่า
     expect(leftHand.z).toBeGreaterThan(0.03);
     expect(leftHand.y).toBeLessThan(0.75);
+    expect(leftHand.y).toBeGreaterThan(knee.y);
   });
 
   it("loops without a pose jump and plants each support foot at the authored travel speed", async () => {
@@ -61,7 +64,7 @@ describe("customer walk asset", () => {
         const worldZ = foot.z + stride / walk.duration * time;
         contactZ ??= worldZ;
         expect(Math.abs(worldZ - contactZ)).toBeLessThan(0.001);
-        expect(foot.y).toBeCloseTo(0.065, 3);
+        expect(foot.y).toBeCloseTo(0.08, 3);
       }
     }
   });

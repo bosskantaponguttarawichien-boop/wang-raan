@@ -114,11 +114,12 @@ export function CharacterLabScene({
       part.receiveShadow = true;
       chair.add(part);
     };
-    addChairPart(0.44, 0.06, 0.42, 0, 0.45, 0);
+    // ผิวบนเบาะ 0.45 ม. เท่าเก้าอี้ในฉากร้าน
+    addChairPart(0.44, 0.06, 0.42, 0, 0.42, 0);
     for (const x of [-0.17, 0.17]) {
-      for (const z of [-0.15, 0.15]) addChairPart(0.045, 0.42, 0.045, x, 0.21, z);
+      for (const z of [-0.15, 0.15]) addChairPart(0.045, 0.39, 0.045, x, 0.195, z);
     }
-    addChairPart(0.44, 0.42, 0.05, 0, 0.70, -0.18);
+    addChairPart(0.44, 0.42, 0.05, 0, 0.67, -0.18);
     chair.visible = false;
     scene.add(chair);
 
@@ -259,8 +260,8 @@ export function CharacterLabScene({
           walkTarget = null;
           currentSpeed = 0;
           targetMarker.visible = false;
-          // ขยับสะโพกไว้กลางเบาะ แต่ให้หัวเข่าพ้นขอบหน้าของเบาะเล็กน้อย.
-          root.position.set(0, 0, 0.09 * CHARACTER_SCALE);
+          // ถอยข้อสะโพกไปหลังกลางเบาะเล็กน้อย ให้หลังชิดพนักพิงโดยไม่จม (เท่าฉากร้าน)
+          root.position.set(0, 0, -0.035);
           root.rotation.y = FACING_RADIANS.front;
           play("Sit");
           setMotion("seated");
