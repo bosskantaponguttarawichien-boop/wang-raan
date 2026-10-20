@@ -829,6 +829,34 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       for (const [id, customer] of customers) removeCustomer(id, customer);
     };
 
+    /** พนักงานเป็นของประกอบฉาก — โหลดเฉพาะเมื่อมีเคาน์เตอร์ที่ยืนได้ และโหลดไม่ได้ก็แค่ไม่มีพนักงาน ไม่ต้องถอยไปใช้ SVG */
+    let staffRequested = false;
+    const loadStaffModels = () => {
+      if (staffRequested) return;
+      staffRequested = true;
+      loader.load(CHARACTER_MODELS.staff.full, (gltf) => {
+        if (disposed) {
+          disposeModel(gltf.scene);
+          return;
+        }
+        gltf.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) object.castShadow = true;
+        });
+        staffAsset.template = gltf.scene;
+        const templateBody = gltf.scene.getObjectByName(BODY_MESH_NAME);
+        staffAsset.fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
+        staffAsset.clips = gltf.animations;
+        syncStaff();
+        invalidate();
+      });
+      loader.load(CHARACTER_MODELS.staff.lite, (gltf) => {
+        staffAsset.liteScene = gltf.scene;
+        const liteMesh = gltf.scene.getObjectByName(BODY_MESH_NAME);
+        staffAsset.liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
+        if (disposed) disposeModel(gltf.scene);
+      });
+    };
+
     /** พนักงานยืนท่า Idle หลังเคาน์เตอร์ — แสดงตลอด (ไม่ต้องรอจำลอง) และไม่อยู่ใน simulation */
     const syncStaff = () => {
       for (const member of staff) {
@@ -838,9 +866,15 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       }
       staff.length = 0;
       const layout = stageRef.current?.layout;
+      const spots = layout ? staffSpots(layout) : [];
+      if (spots.length === 0) return;
+      // โหลดโมเดลพนักงานครั้งแรกที่ผังมีจุดให้ยืน — โหลดเสร็จจะเรียก syncStaff อีกรอบ
+      if (!staffAsset.template) {
+        loadStaffModels();
+        return;
+      }
       const idle = THREE.AnimationClip.findByName(staffAsset.clips, "Idle");
-      if (!staffAsset.template || !layout) return;
-      staffSpots(layout).forEach((spot, index) => {
+      spots.forEach((spot, index) => {
         const model = cloneSkinned(staffAsset.template!);
         model.position.set(spot.position.x, 0, spot.position.y);
         model.rotation.y = Math.atan2(spot.facing.x, spot.facing.y);
@@ -1021,29 +1055,6 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
       if (disposed) disposeModel(liteScene);
     });
-    // พนักงานเป็นของประกอบฉาก — โหลดไม่ได้ก็แค่ไม่มีพนักงาน ไม่ต้องถอยไปใช้ SVG
-    loader.load(CHARACTER_MODELS.staff.full, (gltf) => {
-      if (disposed) {
-        disposeModel(gltf.scene);
-        return;
-      }
-      gltf.scene.traverse((object) => {
-        if (object instanceof THREE.Mesh) object.castShadow = true;
-      });
-      staffAsset.template = gltf.scene;
-      const templateBody = gltf.scene.getObjectByName(BODY_MESH_NAME);
-      staffAsset.fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
-      staffAsset.clips = gltf.animations;
-      syncStaff();
-      invalidate();
-    });
-    loader.load(CHARACTER_MODELS.staff.lite, (gltf) => {
-      staffAsset.liteScene = gltf.scene;
-      const liteMesh = gltf.scene.getObjectByName(BODY_MESH_NAME);
-      staffAsset.liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
-      if (disposed) disposeModel(gltf.scene);
-    });
-
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);

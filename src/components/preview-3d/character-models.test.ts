@@ -44,8 +44,14 @@ describe("character models", () => {
       expect(customer.scene.getObjectByName("MannequinBody")).toBeInstanceOf(THREE.SkinnedMesh);
       expect((customer.scene.getObjectByName("MannequinBody") as THREE.Mesh).geometry.getAttribute("color")).toBeUndefined();
 
+      // สีเก็บช่องละ 8 บิต ไม่ใช่ float
+      expect(colors.array).toBeInstanceOf(Uint8Array);
+      expect(colors.normalized).toBe(true);
+      // หมวกแข็งทั้งใบ: mesh ธรรมดาที่ติดกับกระดูก Head (ไม่มีน้ำหนักผิว)
       const cap = staff.scene.getObjectByName("StaffCap");
-      expect(cap).toBeInstanceOf(THREE.SkinnedMesh);
+      expect(cap).toBeInstanceOf(THREE.Mesh);
+      expect(cap).not.toBeInstanceOf(THREE.SkinnedMesh);
+      expect(cap?.parent?.name).toBe("Head");
       expect(customer.scene.getObjectByName("StaffCap")).toBeUndefined();
     });
   }
@@ -59,12 +65,9 @@ describe("character models", () => {
     action.play();
     mixer.setTime(sit.duration);
     scene.updateMatrixWorld(true);
-    const cap = scene.getObjectByName("StaffCap") as THREE.SkinnedMesh;
+    const cap = scene.getObjectByName("StaffCap")!;
     const head = scene.getObjectByName("Head")!.getWorldPosition(new THREE.Vector3());
-    const bounds = new THREE.Box3();
-    const point = new THREE.Vector3();
-    const position = cap.geometry.getAttribute("position");
-    for (let i = 0; i < position.count; i++) bounds.expandByPoint(cap.applyBoneTransform(i, point.fromBufferAttribute(position, i)).applyMatrix4(cap.matrixWorld));
+    const bounds = new THREE.Box3().setFromObject(cap);
     // หมวกอยู่เหนือข้อต่อหัว (สูงกว่าหู) และปีกยื่นไปหน้า
     expect(bounds.min.y).toBeGreaterThan(head.y + 0.1);
     expect(bounds.max.z).toBeGreaterThan(head.z + 0.15);

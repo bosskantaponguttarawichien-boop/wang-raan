@@ -17,7 +17,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 
 if (!globalThis.FileReader) {
   globalThis.FileReader = class FileReader {
@@ -148,15 +148,17 @@ if (STAFF) {
   const torsoBones = new Set([boneIndex.get(hips), boneIndex.get(spine)]);
   const skin = new THREE.Color(SKIN_COLOR);
   const uniform = new THREE.Color(UNIFORM_COLOR);
-  const colors = new Float32Array(position.count * 3);
+  // มีแค่สองสี → เก็บช่องละ 8 บิต (normalized) แทน float 32 บิต ไฟล์เล็กลงโดยสีไม่ต่างกันให้เห็น
+  const colors = new Uint8Array(position.count * 3);
   for (let i = 0; i < position.count; i += 1) {
     let torso = true;
     for (let slot = 0; slot < 4; slot += 1) {
       if (skinWeights[i * 4 + slot] > 1e-4 && !torsoBones.has(skinIndices[i * 4 + slot])) torso = false;
     }
-    (torso ? uniform : skin).toArray(colors, i * 3);
+    const color = torso ? uniform : skin;
+    colors.set([color.r, color.g, color.b].map((channel) => Math.round(channel * 255)), i * 3);
   }
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3, true));
 
   // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
   const HEAD_DEPTH = 1.18;
@@ -174,22 +176,16 @@ if (STAFF) {
   // Shape อยู่บนระนาบ XY → พลิกลงนอนบนระนาบ XZ ปีกชี้ +Z (หน้า) แล้วกดปลายลงนิดเหมือนปีกหมวกจริง
   capBrim.rotateX(Math.PI / 2 - 0.12);
   capBrim.translate(0, 1.622, 0.085);
-  const capGeometry = mergeGeometries([capCrown, capBrim].map((part) => {
-    // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — แค่คลายดัชนีให้รวมกันได้
-    const flat = part.index ? part.toNonIndexed() : part;
-    flat.deleteAttribute("uv");
-    return flat;
-  }));
-  const headIndex = boneIndex.get(head);
-  const count = capGeometry.getAttribute("position").count;
-  capGeometry.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(new Uint16Array(count * 4).map((_, i) => (i % 4 === 0 ? headIndex : 0)), 4));
-  capGeometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(new Float32Array(count * 4).map((_, i) => (i % 4 === 0 ? 1 : 0)), 4));
-  const cap = new THREE.SkinnedMesh(capGeometry, new THREE.MeshStandardMaterial({ color: UNIFORM_COLOR, roughness: 0.78, metalness: 0 }));
+  // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — ปีกหมวกรวมจุดซ้ำให้มีดัชนีเหมือนโดม
+  // (mergeVertices รวมเฉพาะจุดที่ normal ตรงกัน ขอบคมจึงยังคม) จุดน้อยลงหลายเท่าจากการคลายดัชนี
+  for (const part of [capCrown, capBrim]) part.deleteAttribute("uv");
+  const capGeometry = mergeGeometries([capCrown, mergeVertices(capBrim)]);
+  // หมวกแข็งทั้งใบ → เป็น mesh ธรรมดาลูกของกระดูก Head ไม่ต้องเก็บน้ำหนักผิวทุกจุด
+  capGeometry.translate(...head.getWorldPosition(new THREE.Vector3()).negate().toArray());
+  const cap = new THREE.Mesh(capGeometry, new THREE.MeshStandardMaterial({ color: UNIFORM_COLOR, roughness: 0.78, metalness: 0 }));
   cap.name = "StaffCap";
   cap.castShadow = true;
-  model.add(cap);
-  model.updateMatrixWorld(true);
-  cap.bind(skeleton);
+  head.add(cap);
 }
 
 // ---- Animation: keyframe ถี่จากคลื่น sine เพื่อให้ข้อต่อเคลื่อนแบบนุ่ม ไม่หักมุมที่ปลายวงสวิง ----
