@@ -33,9 +33,9 @@ describe("customer walk asset", () => {
     expect(rightHand.x).toBeGreaterThan(0);
     expect(leftHand.x).toBeCloseTo(-rightHand.x, 3);
     expect(Math.abs(leftHand.x)).toBeLessThan(0.16);
-    // ข้อมืออยู่หน้าลำตัว ถุงมือพับลงนอนบนต้นขาต่อไปข้างหน้าอีก ~5 ซม.
+    // ข้อมืออยู่หน้าลำตัวระดับตัก ถุงมือห้อยจากข้อมือลงไปวางบนต้นขา
     expect(leftHand.z).toBeGreaterThan(0.03);
-    expect(leftHand.y).toBeLessThan(0.7);
+    expect(leftHand.y).toBeLessThan(0.75);
   });
 
   it("loops without a pose jump and plants each support foot at the authored travel speed", async () => {
