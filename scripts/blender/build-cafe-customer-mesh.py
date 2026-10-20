@@ -1,11 +1,12 @@
 """
 สร้างผิว mannequin ลูกค้าจากโครงตาข่ายสี่เหลี่ยม (blockout-cafe-customer.py) แล้วผูกกับกระดูก
 
-- แต่ละชิ้นเกลาผิวด้วย Subdivision Surface 2 ขั้น (โครงตาข่ายตั้งขนาดไว้สำหรับ 2 ขั้น) แล้วลดจำนวนสามเหลี่ยม
-  (Decimate) ให้เท่างบของรุ่นเดิม — รูปทรงยังเป็นผิวเรียบแบบ 2 ขั้น แค่ใช้สามเหลี่ยมน้อยลง
-- ชิ้นส่วนแยกตามรอยต่อตุ๊กตา: ชิ้นละกระดูก (หัว คอ มือ รองเท้า แข็งทั้งชิ้น)
-- รอบข้อต่อ (ศอก ข้อมือ เข่า ข้อเท้า สะโพก-เอว) น้ำหนักค่อย ๆ ส่งต่อจากกระดูกแม่ไปกระดูกลูกในระยะ BLEND
-  ผิวสองฝั่งรอยต่อได้น้ำหนักเท่ากัน รอยต่อจึงไม่แยกเป็นช่องตอนงอ
+- แต่ละชิ้นแบ่งช่องตามงบ (Subdivision 1 ขั้น ≈ 8k สามเหลี่ยม / ใช้โครงตาข่ายตรง ๆ ≈ 2k สำหรับลูกค้าไกล)
+  แล้วดูดทุกจุดลงบนผิวเรียบแบบเกลา 3 ขั้น (Shrinkwrap) — รูปทรงเท่าผิวเรียบจริง (โครงตาข่ายตั้งขนาดไว้แบบนั้น)
+  และยังเป็นตารางสี่เหลี่ยมเรียบ ๆ ไม่ใช่สามเหลี่ยมยาว ๆ ข้อต่อจึงงอแล้วผิวไม่บิดเป็นริ้ว
+- หัว ปลอกคอ นิ้วโป้ง รองเท้า แข็งทั้งชิ้น (ชิ้นละกระดูก)
+- แขนและขาเป็นท่อเดียวไม่มีเส้นรอยต่อ: รอบข้อต่อ (ศอก ข้อมือ เข่า ข้อเท้า สะโพก-เอว) น้ำหนักค่อย ๆ
+  ส่งต่อจากกระดูกแม่ไปกระดูกลูกในระยะ BLEND ผิวจึงงอโค้งต่อเนื่อง
 
 ผลลัพธ์คือ GLB มีแค่ผิว + กระดูก + น้ำหนักผิว ชื่อกระดูกตรงกับ create-cafe-customer-model.mjs
 (ตำแหน่งข้อต่อจริงอยู่ใน JOINTS ด้านล่าง — สคริปต์ Node ต้องใช้ตำแหน่งเดียวกัน)
@@ -27,11 +28,11 @@ cage = importlib.import_module("blockout-cafe-customer")
 
 OUT_DIR = Path(__file__).resolve().parent
 # ระดับการเกลาผิว: ละเอียดสำหรับ Character Lab / เบาสำหรับฉากร้านที่มีลูกค้าหลายสิบคน
-# สัดส่วนสามเหลี่ยมที่เก็บไว้หลังเกลา 2 ขั้น (~30k): งบเท่ารุ่นเดิม ราว 9k (Character Lab / ลูกค้าใกล้)
-# และ 2.2k (ลูกค้าไกลในฉากร้าน ที่มีพร้อมกันหลายสิบคน)
-LEVELS = {"cafe-customer-mesh.glb": 0.3, "cafe-customer-mesh-lite.glb": 0.075}
+# ระดับการแบ่งช่อง: 1 ≈ 8k สามเหลี่ยม (Character Lab / ลูกค้าใกล้), 0 ≈ 2k (ลูกค้าไกลในฉากร้าน
+# ที่มีพร้อมกันหลายสิบคน) — งบเท่ารุ่นเดิม
+LEVELS = {"cafe-customer-mesh.glb": 1, "cafe-customer-mesh-lite.glb": 0}
 # ระยะ (เมตร) ทั้งสองข้างของข้อต่อที่น้ำหนักผิวค่อย ๆ เปลี่ยนจากกระดูกแม่ไปกระดูกลูก
-BLEND = 0.014
+BLEND = 0.028
 SOLE_Z = 0.002
 
 # ข้อต่อแบบ glTF (X ข้าง, Y ขึ้น, Z หน้า) — ต้องตรงกับตำแหน่งกระดูกใน create-cafe-customer-model.mjs
@@ -44,10 +45,10 @@ JOINTS = {
 for _side, _sign in (("Left", -1), ("Right", 1)):
     JOINTS.update({
         f"{_side}Arm": (_sign * 0.09, 0.635, 0),        # หัวไหล่ (กลางโดมต้นแขน)
-        f"{_side}ForeArm": (_sign * 0.141, 0.521, 0),   # รอยต่อศอก
-        f"{_side}Hand": (_sign * 0.175, 0.425, 0),      # รอยต่อข้อมือ
+        f"{_side}ForeArm": (_sign * 0.141, 0.521, 0),   # ศอก
+        f"{_side}Hand": (_sign * 0.175, 0.425, 0),      # ข้อมือ
         f"{_side}Leg": (_sign * 0.068, 0.36, 0),        # ข้อสะโพก
-        f"{_side}LowerLeg": (_sign * 0.068, 0.231, 0),  # รอยต่อเข่า
+        f"{_side}LowerLeg": (_sign * 0.068, 0.231, 0),  # เข่า
         f"{_side}Foot": (_sign * 0.066, 0.065, 0),      # ข้อเท้า (ในรองเท้า)
     })
 PARENT = {
@@ -91,10 +92,10 @@ def part_weights(name, point):
         # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips
         share = smoothstep(0.43, 0.51, point.z)
         return {"Hips": 1 - share, "Spine": share}
-    if name.startswith(("UpperArm", "ForeArm", "Hand", "Thumb")):
+    if name.startswith(("Arm", "Thumb")):
         chain = [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]
         return {f"{side}Hand": 1.0} if name.startswith("Thumb") else chain_weights(point, chain)
-    if name.startswith(("Thigh", "Shin")):
+    if name.startswith("Leg"):
         return chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"])
     if name.startswith(("Shoe", "Sole")):
         return {f"{side}Foot": 1.0}
@@ -121,19 +122,27 @@ def build_armature():
     return rig
 
 
-def build(filename, keep):
+def build(filename, level):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     rig = build_armature()
     parts = cage.cage_parts()
     for part in parts:
         bpy.context.view_layer.objects.active = part
-        smooth = part.modifiers.new("Smooth", "SUBSURF")
-        smooth.levels = 2
-        bpy.ops.object.modifier_apply(modifier=smooth.name)
-        reduce = part.modifiers.new("Reduce", "DECIMATE")
-        reduce.ratio = keep
-        bpy.ops.object.modifier_apply(modifier=reduce.name)
-        # การลดสามเหลี่ยมขยับจุดใต้พื้นรองเท้าลงต่ำกว่าพื้นได้เล็กน้อย — ยกให้ลอย 2 มม. (เผื่อเท้าเอียงตอนเดิน)
+        # ผิวเรียบอ้างอิง (เกลา 3 ขั้น) ไว้ให้ชิ้นจริงดูดจุดลงไป
+        target = part.copy()
+        target.data = part.data.copy()
+        bpy.context.scene.collection.objects.link(target)
+        target.modifiers.new("Smooth", "SUBSURF").levels = 3
+        if level:
+            smooth = part.modifiers.new("Split", "SUBSURF")
+            smooth.levels = level
+            bpy.ops.object.modifier_apply(modifier=smooth.name)
+        snap = part.modifiers.new("Snap", "SHRINKWRAP")
+        snap.target = target
+        snap.wrap_method = "NEAREST_SURFACEPOINT"
+        bpy.ops.object.modifier_apply(modifier=snap.name)
+        bpy.data.objects.remove(target)
+        # การดูดจุดขยับจุดใต้พื้นรองเท้าลงต่ำกว่าพื้นได้เล็กน้อย — ยกให้ลอย 2 มม. (เผื่อเท้าเอียงตอนเดิน)
         for vertex in part.data.vertices:
             vertex.co.z = max(vertex.co.z, SOLE_Z)
         for polygon in part.data.polygons:
@@ -172,5 +181,5 @@ def build(filename, keep):
     print(f"สร้าง {filename}: {len(body.data.vertices)} จุด, {len(body.data.polygons)} หน้า")
 
 
-for name, keep in LEVELS.items():
-    build(name, keep)
+for name, level in LEVELS.items():
+    build(name, level)
