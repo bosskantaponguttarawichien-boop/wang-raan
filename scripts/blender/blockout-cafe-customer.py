@@ -551,6 +551,193 @@ def shirt(grow=SMOOTH_SHRINK, power=2.3):
     return part
 
 
+# แขนผิว: (กึ่งกลาง x ไม่คิดเครื่องหมาย, y, z), ครึ่งกว้าง, ครึ่งลึกหน้า, ครึ่งลึกหลัง — จากในไหล่ลงไปฝ่ามือ
+# หน้า (+z) = กล้ามแขนท่อนบน/ปลายแขนด้านงอ, หลัง (−z) = ไตรเซ็ปส์และปุ่มศอก; ต้นแขนซ่อนในแขนเสื้อ
+ARM_RINGS = [
+    # โดมหัวไหล่ต่ำกว่าแนวบ่าเสื้อ ไม่ดันแขนเสื้อให้นูนเป็นก้อนเหนือบ่า
+    ((0.14, 1.36, 0), 0.036, 0.036, 0.036),
+    ((0.172, 1.325, 0), 0.046, 0.046, 0.046),
+    ((0.186, 1.265, 0), 0.045, 0.044, 0.047),
+    ((0.192, 1.2, 0), 0.042, 0.045, 0.043),
+    ((0.195, 1.13, 0), 0.039, 0.041, 0.04),
+    # วงถี่รอบศอกให้ผิวงอโค้งไม่หัก
+    ((0.197, 1.09, 0), 0.036, 0.036, 0.038),
+    ((0.198, 1.065, 0), 0.035, 0.035, 0.04),
+    ((0.2, 1.035, 0), 0.037, 0.039, 0.038),
+    ((0.202, 0.99, 0), 0.037, 0.038, 0.036),
+    ((0.205, 0.93, 0), 0.032, 0.033, 0.031),
+    ((0.208, 0.87, 0), 0.026, 0.027, 0.026),
+    ((0.21, 0.83, 0.001), 0.021, 0.026, 0.026),
+    # ฝ่ามือแบน (ฝ่ามือหันเข้าหาต้นขา) กว้างขึ้นจนถึงข้อนิ้ว
+    ((0.21, 0.81, 0.004), 0.019, 0.029, 0.029),
+    ((0.211, 0.792, 0.006), 0.018, 0.039, 0.039),
+    ((0.212, 0.77, 0.008), 0.017, 0.044, 0.044),
+    ((0.211, 0.75, 0.008), 0.016, 0.045, 0.045),
+]
+ARM_RING = 18
+KNUCKLE_Y = 0.731
+# ข้อนิ้ว: ขอบนิ้ว (z) จากด้านนิ้วชี้ (หน้า) ถึงนิ้วก้อย (หลัง) และกึ่งกลางนิ้ว
+FINGER_EDGES = (0.049, 0.029, 0.009, -0.011, -0.029)
+FINGER_CENTERS = (0.039, 0.019, -0.001, -0.02)
+FINGER_LENGTHS = (0.074, 0.082, 0.077, 0.062)
+
+
+def frame(tangent, reference):
+    """แกนข้าง/หน้าตั้งฉากกับแนวท่อ (แบบเดียวกับ tube) — reference = ทิศ 'หน้า' โดยประมาณ"""
+    front = (reference - tangent * reference.dot(tangent)).normalized()
+    return front.cross(tangent).normalized(), front
+
+
+def arm(sign):
+    """
+    แขน มือ และนิ้วเป็นตาข่ายชิ้นเดียว (แบบเดียวกับกางเกง/เสื้อ): ท่อแขน 18 จุดลงมาถึงข้อนิ้ว
+    วงข้อนิ้วเรียงเป็นแถวหลังมือ 9 จุด + แถวฝ่ามือ 9 จุด (ขอบนิ้วและกึ่งกลางนิ้วสลับกัน)
+    แต่ละนิ้วงอกจาก 6 จุด (ขอบซ้าย-กลาง-ขวา ทั้งหลังมือและฝ่ามือ) — นิ้วข้างกันใช้จุดขอบร่วมกัน
+    นิ้วโป้งงอกจากรูบนฝ่ามือด้านนิ้วชี้ ผิวจึงต่อเนื่องจากแขนถึงปลายนิ้ว ไม่มีชิ้นเสียบซ้อน
+    """
+    grow = SMOOTH_SHRINK
+    verts, faces = [], []
+    reference = b(0, 0, 1)
+
+    def add(point):
+        verts.append(point)
+        return len(verts) - 1
+
+    def unwrap(angles):
+        """ต่อมุมให้ต่อเนื่อง (ถอยหลังได้นิดหน่อย เช่นจุดง่ามนิ้วที่บางกว่า) — ไม่กระโดดข้าม 2π"""
+        result = [angles[0]]
+        for angle in angles[1:]:
+            while angle < result[-1] - math.pi:
+                angle += 2 * math.pi
+            while angle > result[-1] + math.pi:
+                angle -= 2 * math.pi
+            result.append(angle)
+        return result
+
+    # ---- วงข้อนิ้ว (จุดจริงทั้ง 18 จุด)
+    cx, cz = sign * 0.21, 0.008
+    thick = 0.014 * grow
+    back_row = []
+    for k, z in enumerate((FINGER_EDGES[0], FINGER_CENTERS[0], FINGER_EDGES[1], FINGER_CENTERS[1], FINGER_EDGES[2],
+                           FINGER_CENTERS[2], FINGER_EDGES[3], FINGER_CENTERS[3], FINGER_EDGES[4])):
+        knuckle = 0.003 if k % 2 else 0.0  # ปุ่มข้อนิ้วนูนบนหลังมือ
+        # ง่ามนิ้ว (ขอบระหว่างนิ้ว) บางกว่าและต่ำกว่าข้อนิ้ว ผิวจึงลาดลงเป็นง่ามนุ่ม ๆ ไม่เป็นสันแหลม
+        web = k % 2 == 0 and 0 < k < 8
+        depth = thick * (0.55 if web else 1.0) + knuckle
+        back_row.append(add(b(cx + sign * depth, KNUCKLE_Y - (0.007 if web else 0.0), z)))
+    front_row = []
+    for i in back_row[::-1]:
+        web_y = verts[i].z
+        depth = thick * (0.55 if web_y < KNUCKLE_Y - 1e-4 else 1.0)
+        front_row.append(add(b(cx - sign * depth, web_y, -verts[i].y)))
+    knuckle_ring = back_row + front_row
+    # เรียงให้มุมรอบฝ่ามือเพิ่มขึ้นทางเดียวกับวงแขน (มุม 0 = +x, 90° = หน้า)
+    # ใช้มุมพารามิเตอร์ของวงรีฝ่ามือ (หาร x/z ด้วยครึ่งหนา/ครึ่งกว้าง) ไม่ใช่มุมจริงรอบจุดกลาง —
+    # วงแขน/ฝ่ามือสร้างจุดด้วยมุมพารามิเตอร์ ถ้าใช้มุมจริงของฝ่ามือแบน ๆ ผิวจะบิดเป็นเกลียวที่ข้อมือ
+    palm_half = (0.016 * grow, 0.045 * grow)
+    # คิดมุมจากตำแหน่งข้อนิ้วก่อนบุ๋มเป็นง่าม (หนาเท่ากันทั้งแถว) มุมจึงเรียงเรียบ หลังมือไม่ย่นตรงง่ามนิ้ว
+    angles = [math.atan2((-verts[i].y - cz) / palm_half[1], math.copysign(thick, verts[i].x - cx) / palm_half[0])
+              for i in knuckle_ring]
+    if sum(math.sin(a1 - a0) for a0, a1 in zip(angles, angles[1:] + angles[:1])) < 0:
+        knuckle_ring = knuckle_ring[::-1]
+        angles = angles[::-1]
+    angles = unwrap(angles)
+    uniform = [angles[0] + 2 * math.pi * i / ARM_RING for i in range(ARM_RING)]
+
+    # ---- วงแขนจากไหล่ถึงฝ่ามือ: ใกล้ฝ่ามือใช้มุมเดียวกับวงข้อนิ้ว แล้วค่อย ๆ เป็นระยะเท่ากันขึ้นไปถึงศอก
+    centers = [b(sign * x, y, z) for (x, y, z), *_ in ARM_RINGS] + [b(cx, KNUCKLE_Y, cz)]
+    rings = []
+    for index, ((_, side_r, front_r, back_r), center) in enumerate(zip([(r[0], r[1], r[2], r[3]) for r in ARM_RINGS], centers)):
+        tangent = (centers[min(index + 1, len(centers) - 1)] - centers[max(index - 1, 0)]).normalized()
+        side, front = frame(tangent, reference)
+        weight = min(1.0, max(0.0, (index - 8) / 4))
+        ring = []
+        for i in range(ARM_RING):
+            angle = uniform[i] + (angles[i] - uniform[i]) * weight
+            c, s_ = math.cos(angle), math.sin(angle)
+            ring.append(add(center + side * (side_r * grow * c) + front * ((front_r if s_ >= 0 else back_r) * grow * s_)))
+        rings.append(ring)
+    rings.append(knuckle_ring)
+
+    # รูนิ้วโป้ง: 2 ช่องบนฝ่ามือด้านนิ้วชี้ ระหว่างวง 0.792 กับ 0.77
+    c0_front, b0_front, b0_back = front_row[-2], front_row[-1], back_row[0]
+    positions = [knuckle_ring.index(i) for i in (c0_front, b0_front, b0_back)]
+    upper, lower = rings[13], rings[14]
+    skip = {frozenset(pair) for pair in zip(positions, positions[1:])}
+    for r in range(len(rings) - 1):
+        for i in range(ARM_RING):
+            j = (i + 1) % ARM_RING
+            if r == 13 and frozenset((i, j)) in skip:
+                continue
+            faces.append((rings[r][i], rings[r][j], rings[r + 1][j], rings[r + 1][i]))
+    # ปิดโดมหัวไหล่
+    top = rings[0]
+    dome = add(centers[0] + (centers[0] - centers[1]).normalized() * 0.025)
+    for i in range(0, ARM_RING, 2):
+        faces.append((dome, top[(i + 2) % ARM_RING], top[(i + 1) % ARM_RING], top[i]))
+
+    def branch(base, path, radii):
+        """ท่อนิ้วงอกจากวงฐาน (ลำดับจุดรอบฐาน) ตามจุดกึ่งกลาง path (glTF) รัศมี radii ต่อวง ปิดปลายโค้ง"""
+        count = len(base)
+        start = sum((verts[i] for i in base), Vector()) / count
+        points = [start] + [b(*p) for p in path]
+        tangent0 = (points[1] - points[0]).normalized()
+        ref = Vector((sign, 0, 0))
+        side0, front0 = frame(tangent0, ref)
+        around = [math.atan2((verts[i] - start).dot(front0), (verts[i] - start).dot(side0)) for i in base]
+        if sum(math.sin(a1 - a0) for a0, a1 in zip(around, around[1:] + around[:1])) < 0:
+            base = base[::-1]
+            around = around[::-1]
+        around = unwrap(around)
+        even = [around[0] + 2 * math.pi * i / count for i in range(count)]
+        previous = base
+        for k, (center, radius) in enumerate(zip(points[1:], radii)):
+            following = points[min(k + 2, len(points) - 1)]
+            tangent = (following - points[k]).normalized()
+            side, front = frame(tangent, ref)
+            mix = min(1.0, (k + 1) / 2)
+            ring = []
+            for i in range(count):
+                angle = around[i] + (even[i] - around[i]) * mix
+                ring.append(add(center + side * (radius[0] * grow * math.cos(angle)) + front * (radius[1] * grow * math.sin(angle))))
+            for i in range(count):
+                faces.append((previous[i], previous[(i + 1) % count], ring[(i + 1) % count], ring[i]))
+            previous = ring
+        tip = add(points[-1] + (points[-1] - points[-2]).normalized() * radii[-1][0] * 0.7)
+        for i in range(0, count, 2):
+            faces.append((tip, previous[i], previous[(i + 1) % count], previous[(i + 2) % count]))
+
+    # ---- นิ้วสี่นิ้ว: งอโค้งเข้าหาฝ่ามือทีละข้อ
+    # มือผ่อนคลาย: นิ้วงอเข้าหาฝ่ามือพอประมาณ ไม่เหยียดตรง
+    curl = -sign * 0.028
+    for j, (z, length) in enumerate(zip(FINGER_CENTERS, FINGER_LENGTHS)):
+        base = [back_row[2 * j], back_row[2 * j + 1], back_row[2 * j + 2],
+                front_row[len(front_row) - 1 - (2 * j + 2)], front_row[len(front_row) - 1 - (2 * j + 1)],
+                front_row[len(front_row) - 1 - 2 * j]]
+        path, radii = [], []
+        for f, r in ((0.25, (0.0085, 0.0088)), (0.5, (0.008, 0.0082)), (0.76, (0.0073, 0.0075)), (1.0, (0.0066, 0.0068))):
+            bend = {0.25: 0.1, 0.5: 0.35, 0.76: 0.68, 1.0: 1.0}[f]
+            path.append((cx + curl * bend, KNUCKLE_Y - length * f, z * (1 - 0.05 * f)))
+            radii.append(r)
+        branch(base, path, radii)
+    # ---- นิ้วโป้ง: จากรูฝ่ามือชี้ลงไปหน้าและเข้าหาฝ่ามือเล็กน้อย
+    thumb_base = [upper[positions[0]], upper[positions[1]], upper[positions[2]],
+                  lower[positions[2]], lower[positions[1]], lower[positions[0]]]
+    branch(thumb_base, [
+        (sign * 0.207, 0.768, 0.062),
+        (sign * 0.203, 0.752, 0.068),
+        (sign * 0.198, 0.737, 0.07),
+    ], [(0.0105, 0.0105), (0.0095, 0.0095), (0.0085, 0.0085)])
+
+    part = add_object(f"Arm{'LR'[sign > 0]}", verts, faces)
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    bmesh.ops.recalc_face_normals(shape, faces=shape.faces)
+    shape.to_mesh(part.data)
+    shape.free()
+    return part
+
+
 def body_parts():
     """ชิ้นส่วนแยกกัน: หัว ปลอกคอ ลำตัว แขน (ถึงปลายมือ) นิ้วโป้ง ขา รองเท้า พื้นรองเท้า หู
     แขนและขาเป็นท่อเดียวต่อเนื่อง ไม่มีเส้นรอยต่อที่ศอก ข้อมือ เข่า — ข้อต่องอได้ด้วยน้ำหนักผิว"""
@@ -574,50 +761,7 @@ def body_parts():
     ], up=(0, 1, 0), cap_start=0.3, cap_end=0.7))
     for sign in (-1, 1):
         side = "LR"[sign > 0]
-        # แขนผิวจากในไหล่ถึงข้อมือ (งอได้ด้วยน้ำหนักผิว) — ต้นแขนซ่อนในแขนเสื้อ
-        # หน้า (+z) = กล้ามแขนท่อนบน/ปลายแขนด้านงอ, หลัง (−z) = ไตรเซ็ปส์และปุ่มศอก
-        parts.append(tube(f"Arm{side}", [
-            # โดมหัวไหล่ต่ำกว่าแนวบ่าเสื้อ ไม่ดันแขนเสื้อให้นูนเป็นก้อนเหนือบ่า
-            ((sign * 0.14, 1.36, 0), 0.036, 0.036),
-            ((sign * 0.172, 1.325, 0), 0.046, 0.046),
-            ((sign * 0.186, 1.265, 0), 0.045, 0.044, 0.047),
-            ((sign * 0.192, 1.2, 0), 0.042, 0.045, 0.043),
-            ((sign * 0.195, 1.13, 0), 0.039, 0.041, 0.04),
-            # วงถี่รอบศอกให้ผิวงอโค้งไม่หัก
-            ((sign * 0.197, 1.09, 0), 0.036, 0.036, 0.038),
-            ((sign * 0.198, 1.065, 0), 0.035, 0.035, 0.04),
-            ((sign * 0.2, 1.035, 0), 0.037, 0.039, 0.038),
-            ((sign * 0.202, 0.99, 0), 0.037, 0.038, 0.036),
-            ((sign * 0.205, 0.93, 0), 0.032, 0.033, 0.031),
-            ((sign * 0.208, 0.87, 0), 0.026, 0.027, 0.026),
-            ((sign * 0.21, 0.83, 0.001), 0.021, 0.026),
-            ((sign * 0.21, 0.812, 0.002), 0.02, 0.027),
-        ], cap_start=0.7, cap_end=0.3))
-        # ฝ่ามือแบน (ฝ่ามือหันเข้าหาต้นขา) กว้างขึ้นจนถึงข้อนิ้ว
-        parts.append(tube(f"Palm{side}", [
-            ((sign * 0.21, 0.815, 0.004), 0.02, 0.027),
-            ((sign * 0.211, 0.795, 0.006), 0.018, 0.038),
-            ((sign * 0.212, 0.77, 0.008), 0.017, 0.044),
-            ((sign * 0.211, 0.745, 0.008), 0.016, 0.045),
-            ((sign * 0.21, 0.731, 0.008), 0.014, 0.043),
-        ], cap_start=0.3, cap_end=0.3))
-        # นิ้วสี่นิ้วเรียงหน้า-หลัง (ชี้ลงข้างขา) — วงที่ข้อนิ้วให้งอโค้งเข้าหาฝ่ามือทีละข้อ
-        for index, (z, length) in enumerate(((0.031, 0.074), (0.011, 0.082), (-0.009, 0.077), (-0.027, 0.062))):
-            x = sign * 0.21
-            curl = -sign * 0.016  # ปลายนิ้วโค้งเข้าหาลำตัว (ฝั่งฝ่ามือ)
-            parts.append(tube(f"Finger{index}{side}", [
-                ((x, 0.735, 0.008 + z), 0.0088, 0.009),
-                ((x + curl * 0.15, 0.735 - length * 0.25, 0.008 + z), 0.0083, 0.0085),
-                ((x + curl * 0.4, 0.735 - length * 0.5, 0.008 + z * 0.98), 0.0079, 0.008),
-                ((x + curl * 0.7, 0.735 - length * 0.76, 0.008 + z * 0.96), 0.0072, 0.0074),
-                ((x + curl, 0.735 - length, 0.008 + z * 0.95), 0.0065, 0.0067),
-            ], cap_start=0.3, cap_end=0.7))
-        parts.append(tube(f"Thumb{side}", [
-            ((sign * 0.207, 0.8, 0.026), 0.012, 0.013),
-            ((sign * 0.204, 0.78, 0.042), 0.011, 0.011),
-            ((sign * 0.2, 0.758, 0.052), 0.0095, 0.0095),
-            ((sign * 0.196, 0.738, 0.056), 0.0085, 0.0085),
-        ], cap_start=0.2, cap_end=0.7))
+        parts.append(arm(sign))
         # รองเท้าผ้าใบ: วงเหลี่ยมมน (หัวมนกว้างไม่แหลม) ซ้อนจากพื้นขึ้นไป หัวรองเท้าลาดลงหาปลายเท้า
         # ยาว ~0.27 ม. (ส้น −0.062 ถึงปลาย +0.206 จากข้อเท้า) ข้อรองเท้าจมในปลายขากางเกง
         x = sign * 0.095

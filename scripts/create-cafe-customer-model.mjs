@@ -243,17 +243,28 @@ const legsAt = (offset) => walkCycle.phases.map((phase, i) => legPose(phase + of
 const leftPoses = legsAt(0);
 const rightPoses = legsAt(Math.PI);
 const jointTrack = (name, poses, key) => new THREE.QuaternionKeyframeTrack(name + ".quaternion", walkCycle.times, quaternionFrames(poses.map((pose) => pose[key])));
-const armAngles = (offset) => walkCycle.phases.map((phase) => 0.22 * Math.cos(phase + offset));
+// แขนแกว่งสวนขา: ไปหน้ามากกว่าไปหลัง (ศูนย์กลางเอนหน้า 0.05 rad) และกางออกจากลำตัวนิดหนึ่งไม่ให้มือถูขา
+const ARM_SWING = 0.24;
+const armAngles = (offset) => walkCycle.phases.map((phase) => -0.05 + ARM_SWING * Math.cos(phase + offset));
+// ศอกงอเสมอเล็กน้อย และงอมากขึ้นตอนแขนแกว่งไปหน้า (ท่อนแขนตามแรงเหวี่ยง) งอน้อยลงตอนแกว่งไปหลัง
+const foreArmAngles = (offset) => armAngles(offset).map((a) => -0.22 + Math.min(0, a) * 0.9 + Math.max(0, a) * 0.35);
+// ข้อมือห้อยผ่อนคลาย ตามจังหวะแขนช้ากว่านิดหน่อย
+const handAngles = (offset) => walkCycle.phases.map((phase) => -0.03 + 0.04 * Math.cos(phase + offset - 0.5));
+const armTrack = (name, angles, outward) =>
+  new THREE.QuaternionKeyframeTrack(name + ".quaternion", walkCycle.times, angles.flatMap((angle) => new THREE.Quaternion().setFromEuler(new THREE.Euler(angle, 0, outward, "XYZ")).toArray()));
 const upperBodyFrames = (sign) => walkCycle.phases.flatMap((phase) => new THREE.Quaternion().setFromEuler(new THREE.Euler(0, sign * 0.012 * Math.sin(phase), sign * 0.006 * Math.cos(phase))).toArray());
 const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
   jointTrack("LeftLeg", leftPoses, "hip"), jointTrack("RightLeg", rightPoses, "hip"),
   jointTrack("LeftLowerLeg", leftPoses, "knee"), jointTrack("RightLowerLeg", rightPoses, "knee"),
   jointTrack("LeftFoot", leftPoses, "ankle"), jointTrack("RightFoot", rightPoses, "ankle"),
   // Left leg forward → left arm back, right arm forward.
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", walkCycle.times, quaternionFrames(armAngles(0))),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", walkCycle.times, quaternionFrames(armAngles(Math.PI))),
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", walkCycle.times, quaternionFrames(armAngles(0).map((a) => -0.15 + a * 0.3))),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", walkCycle.times, quaternionFrames(armAngles(Math.PI).map((a) => -0.15 + a * 0.3))),
+  // ต้นแขนกางออก ~3° (แกน z: ซ้าย −, ขวา +) มือจึงผ่านข้างสะโพก ไม่ทะลุกางเกง
+  armTrack("LeftArm", armAngles(0), -0.05),
+  armTrack("RightArm", armAngles(Math.PI), 0.05),
+  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", walkCycle.times, quaternionFrames(foreArmAngles(0))),
+  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", walkCycle.times, quaternionFrames(foreArmAngles(Math.PI))),
+  new THREE.QuaternionKeyframeTrack("LeftHand.quaternion", walkCycle.times, quaternionFrames(handAngles(0))),
+  new THREE.QuaternionKeyframeTrack("RightHand.quaternion", walkCycle.times, quaternionFrames(handAngles(Math.PI))),
   new THREE.QuaternionKeyframeTrack("Spine.quaternion", walkCycle.times, upperBodyFrames(1)),
   new THREE.QuaternionKeyframeTrack("Head.quaternion", walkCycle.times, upperBodyFrames(-0.6)),
   new THREE.VectorKeyframeTrack("Hips.position", walkCycle.times, hipHeights.flatMap((y) => [0, y, 0])),
