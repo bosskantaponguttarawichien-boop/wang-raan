@@ -222,24 +222,169 @@ def seam(center, side_r, up_r, toward):
     return [(center, side_r, up_r), ((x + dx * step, y + dy * step, z + dz * step), side_r, up_r)]
 
 
+# กางเกงยีนส์: (ความสูง, กึ่งกลางหน้า-หลัง, ครึ่งกว้าง, ครึ่งลึกหน้า, ครึ่งลึกหลัง)
+# ช่วงสะโพก — วงเดียวรอบทั้งสองขา ก้นนูนไปหลัง ขอบเอวซ่อนใต้ชายเสื้อ
+PANTS_SEAT = [
+    (1.0, 0.0, 0.156, 0.1, 0.1),
+    (0.975, -0.004, 0.162, 0.102, 0.104),
+    (0.93, -0.006, 0.172, 0.106, 0.114),
+    (0.88, -0.006, 0.178, 0.104, 0.122),
+    (0.83, -0.005, 0.178, 0.098, 0.114),
+    (0.79, -0.004, 0.174, 0.092, 0.1),
+]
+# ขาแต่ละข้าง (ใต้เป้า) — (ความสูง, x กึ่งกลางขา, กึ่งกลางหน้า-หลัง, ครึ่งกว้าง, ครึ่งลึกหน้า, ครึ่งลึกหลัง)
+# ทรงกระบอก: หน้าขาอูมกว่าหลังขา, ผ้าเผื่อรอบเข่า/น่อง, ปลายขาพับคลุมขอบรองเท้า
+PANTS_LEG = [
+    (0.74, 0.092, 0.0, 0.077, 0.084, 0.08),
+    (0.63, 0.094, 0.0, 0.066, 0.072, 0.068),
+    (0.54, 0.095, 0.0, 0.059, 0.064, 0.06),
+    (0.49, 0.095, 0.0, 0.058, 0.064, 0.06),
+    (0.44, 0.095, -0.003, 0.057, 0.06, 0.063),
+    (0.34, 0.095, -0.004, 0.056, 0.058, 0.064),
+    (0.22, 0.095, -0.002, 0.054, 0.057, 0.058),
+    (0.14, 0.095, 0.0, 0.055, 0.059, 0.06),
+    (0.115, 0.095, 0.002, 0.057, 0.062, 0.062),
+    (0.1, 0.095, 0.002, 0.056, 0.061, 0.061),
+]
+
+
+def pants(grow=SMOOTH_SHRINK, power=2.6):
+    """
+    กางเกงเป็นตาข่ายชิ้นเดียว: ช่วงสะโพกเป็นวง 12 จุดรอบทั้งตัว แล้ววงล่างสุดแบ่งครึ่งซ้าย-ขวา
+    แต่ละครึ่ง (7 จุด หน้ากลาง → ข้าง → หลังกลาง) ต่อกับเส้นเป้า 5 จุดที่ลากใต้หว่างขาจากหลังมาหน้า
+    ได้วงขาละ 12 จุดพอดี — สองขาใช้จุดเส้นเป้าร่วมกัน ผิวจึงต่อเนื่องจากสะโพกลงขาไม่มีรอยซ้อน
+    """
+    verts, faces = [], []
+
+    def ring_point(cx, cy, cz, side_r, front_r, back_r, angle):
+        c, s_ = math.cos(angle), math.sin(angle)
+        exponent = 2 / power
+        c, s_ = math.copysign(abs(c) ** exponent, c), math.copysign(abs(s_) ** exponent, s_)
+        return (cx + side_r * grow * c, cy, cz + (front_r if s_ >= 0 else back_r) * grow * s_)
+
+    def add(point):
+        verts.append(b(*point))
+        return len(verts) - 1
+
+    # วงสะโพก: จุด 0 = หน้ากลาง, 1–5 ข้างซ้าย (x−), 6 = หลังกลาง, 7–11 ข้างขวา
+    seat = []
+    for height, cz, side_r, front_r, back_r in PANTS_SEAT:
+        seat.append([add(ring_point(0, height, cz, side_r, front_r, back_r, math.pi / 2 + k * math.pi / 6)) for k in range(RING)])
+    for upper, lower in zip(seat, seat[1:]):
+        for k in range(RING):
+            faces.append((upper[k], upper[(k + 1) % RING], lower[(k + 1) % RING], lower[k]))
+    # ปิดขอบเอว (ซ่อนใต้เสื้อ)
+    top = seat[0]
+    middle = add((0, PANTS_SEAT[0][0] + 0.02, PANTS_SEAT[0][1]))
+    for k in range(0, RING, 2):
+        faces.append((middle, top[(k + 2) % RING], top[(k + 1) % RING], top[k]))
+
+    # เส้นเป้า: จากหลังกลางมาหน้ากลางใต้หว่างขา ต่ำลงจากวงสะโพกเล็กน้อยตรงกลาง
+    bottom = seat[-1]
+    back_point = verts[bottom[6]]
+    front_point = verts[bottom[0]]
+    crotch = []
+    for j in range(1, 6):
+        t = j / 6
+        point = back_point.lerp(front_point, t)
+        point.z -= 0.014 * math.sin(math.pi * t)
+        verts.append(point)
+        crotch.append(len(verts) - 1)
+
+    for sign in (-1, 1):
+        if sign < 0:
+            first = [bottom[k] for k in range(0, 7)] + crotch
+        else:
+            first = [bottom[6]] + [bottom[k] for k in range(7, RING)] + [bottom[0]] + crotch[::-1]
+        center_x = sign * PANTS_LEG[0][1]
+        # มุมของแต่ละจุดรอบแกนขา — วงถัดลงไปใช้มุมเดียวกัน (ค่อย ๆ ปรับเป็นระยะเท่ากัน) จุดจึงเรียงตรงกัน
+        angles = []
+        for index in first:
+            point = verts[index]
+            angle = math.atan2(-point.y, point.x - center_x)
+            if angles:
+                while angle < angles[-1]:
+                    angle += 2 * math.pi
+            angles.append(angle)
+        uniform = [angles[0] + (2 * math.pi * i / RING) * (1 if angles[-1] > angles[0] else -1) for i in range(RING)]
+        previous = first
+        for row, (height, x, cz, side_r, front_r, back_r) in enumerate(PANTS_LEG):
+            blend = min(1.0, (row + 1) / 3)
+            ring = []
+            for i in range(RING):
+                angle = angles[i] + (uniform[i] - angles[i]) * blend
+                ring.append(add(ring_point(sign * x, height, cz, side_r, front_r, back_r, angle)))
+            for i in range(RING):
+                faces.append((previous[i], previous[(i + 1) % RING], ring[(i + 1) % RING], ring[i]))
+            previous = ring
+        end = add((sign * PANTS_LEG[-1][1], PANTS_LEG[-1][0] - 0.002, PANTS_LEG[-1][2]))
+        for i in range(0, RING, 2):
+            faces.append((end, previous[i], previous[(i + 1) % RING], previous[(i + 2) % RING]))
+
+    part = bpy.data.objects.new("Pants", bpy.data.meshes.new("Pants"))
+    part.data.from_pydata([tuple(v) for v in verts], [], faces)
+    part.data.validate()
+    bpy.context.scene.collection.objects.link(part)
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    bmesh.ops.recalc_face_normals(shape, faces=shape.faces)
+    shape.to_mesh(part.data)
+    shape.free()
+    return part
+
+
+# คอเสื้อกลม: ขอบคอด้านหน้าต่ำกว่าด้านข้างและด้านหลัง (หลังคอสูงสุด)
+NECKLINE_TOP = 1.426
+
+
+def neckline_height(x, front):
+    """ความสูงขอบคอเสื้อรอบคอ — front = ระยะไปทางหน้า (glTF +z)"""
+    angle = math.atan2(x, front)
+    return 1.437 - 0.012 * math.cos(angle)
+
+
+def lift_neckline(part):
+    """ยกช่วงบนของตัวเสื้อตามแนวคอกลม (เดิมตัดตรงแนวนอนที่ NECKLINE_TOP)"""
+    for vertex in part.data.vertices:
+        x, front, height = vertex.co.x, -vertex.co.y, vertex.co.z
+        share = min(1.0, max(0.0, (height - 1.37) / (NECKLINE_TOP - 1.37)))
+        vertex.co.z += share * share * (neckline_height(x, front) - NECKLINE_TOP)
+
+
+def neckband(segments=24, ring=8):
+    """ขอบยางคอกลม: ห่วงท่อกลมหนา ~1.4 ซม. วางบนขอบคอเสื้อ ตามแนว neckline_height"""
+    verts, faces = [], []
+    for i in range(segments):
+        angle = 2 * math.pi * i / segments
+        # วงรีรอบฐานคอ กว้างกว่าคอเล็กน้อย
+        x, front = 0.071 * math.sin(angle), 0.066 * math.cos(angle) - 0.006
+        center = b(x, neckline_height(x, front) + 0.004, front)
+        outward = Vector((math.sin(angle), -math.cos(angle), 0)).normalized()
+        upward = Vector((0, 0, 1))
+        for k in range(ring):
+            t = 2 * math.pi * k / ring
+            verts.append(center + outward * (0.006 * math.cos(t)) + upward * (0.0075 * math.sin(t)))
+    for i in range(segments):
+        for k in range(ring):
+            a = i * ring + k
+            c = i * ring + (k + 1) % ring
+            n = ((i + 1) % segments) * ring
+            faces.append((a, c, n + (k + 1) % ring, n + k))
+    part = add_object("Neckband", verts, faces)
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    bmesh.ops.recalc_face_normals(shape, faces=shape.faces)
+    shape.to_mesh(part.data)
+    shape.free()
+    return part
+
+
 def body_parts():
     """ชิ้นส่วนแยกกัน: หัว ปลอกคอ ลำตัว แขน (ถึงปลายมือ) นิ้วโป้ง ขา รองเท้า พื้นรองเท้า หู
     แขนและขาเป็นท่อเดียวต่อเนื่อง ไม่มีเส้นรอยต่อที่ศอก ข้อมือ เข่า — ข้อต่องอได้ด้วยน้ำหนักผิว"""
     parts = []
     up, down = (0, 1, 0), (0, -1, 0)
-    # กางเกง (เชิงกราน): สะโพกกว้าง ก้นนูนไปหลัง ขอบเอวซ่อนใต้ชายเสื้อ
-    # ช่วงล่างกว้างเท่าโคนขาทั้งสองข้าง เป้าต่ำ (~0.78 ม.) — ผ้าคลุมโคนขาเรียบ ไม่เป็นรอยรูปตัว U
-    # วง: (กึ่งกลาง, ครึ่งกว้าง, ครึ่งลึกด้านหน้า, ครึ่งลึกด้านหลัง)
-    parts.append(tube("Pelvis", [
-        # ด้านหน้าช่วงเป้าไม่ยื่นเกินหน้าต้นขา (ไม่เป็นขอบ) แค่เติมช่องระหว่างโคนขา
-        ((0, 0.772, 0.0), 0.1, 0.055, 0.08),
-        ((0, 0.8, -0.004), 0.166, 0.074, 0.106),
-        ((0, 0.84, -0.006), 0.176, 0.084, 0.118),
-        ((0, 0.88, -0.006), 0.178, 0.1, 0.124),
-        ((0, 0.93, -0.006), 0.17, 0.106, 0.114),
-        ((0, 0.975, -0.004), 0.162, 0.102, 0.104),
-        ((0, 1.0, 0.0), 0.156, 0.1, 0.1),
-    ], cap_start=0.15, cap_end=0.3, power=2.2))
+    parts.append(pants())
     # เสื้อยืด: ชายเสื้อพับหนา, อกยื่นไปหน้า, สะบักนูนด้านหลัง, ไหล่ลาด, คอกลมมีขอบยาง
     parts.append(tube("Shirt", [
         ((0, 0.945, -0.004), 0.179, 0.118, 0.118),
@@ -253,10 +398,11 @@ def body_parts():
         ((0, 1.365, -0.004), 0.178, 0.088, 0.088),
         # บ่าลาดขึ้นหาคอ (กล้ามบ่า) แล้วเป็นขอบคอเสื้อรอบคอ
         ((0, 1.395, -0.006), 0.15, 0.076, 0.074),
-        ((0, 1.418, -0.006), 0.098, 0.072, 0.07),
-        ((0, 1.432, -0.006), 0.08, 0.068, 0.066),
-        ((0, 1.44, -0.006), 0.075, 0.065, 0.063),
+        ((0, 1.41, -0.006), 0.1, 0.073, 0.071),
+        ((0, 1.426, -0.006), 0.076, 0.066, 0.064),
     ], cap_start=0.1, cap_end=0.05, power=2.3))
+    lift_neckline(parts[-1])
+    parts.append(neckband())
     # คอ: ท่อสั้นจากในคอเสื้อขึ้นไปซ่อนใต้คาง (ชิ้น "Collar" ผูกกระดูก Neck)
     parts.append(tube("Collar", [
         ((0, 1.39, -0.008), 0.062, 0.064, 0.058),
@@ -324,23 +470,6 @@ def body_parts():
             ((sign * 0.2, 0.758, 0.052), 0.0095, 0.0095),
             ((sign * 0.196, 0.738, 0.056), 0.0085, 0.0085),
         ], cap_start=0.2, cap_end=0.7))
-        # ขากางเกงยีนส์ทรงกระบอก: หน้าขาอูมกว่าหลังขา, ผ้าเผื่อรอบเข่า/น่อง, ปลายขาพับคลุมขอบรองเท้า
-        parts.append(tube(f"Leg{side}", [
-            # โคนขาซ่อนในช่วงสะโพกของกางเกง (ไม่โผล่เป็นสันข้างสะโพก) แล้วโผล่ออกมาใต้เป้า
-            ((sign * 0.09, 0.9, 0), 0.07, 0.074, 0.078),
-            ((sign * 0.09, 0.85, 0), 0.085, 0.089, 0.093),
-            ((sign * 0.092, 0.74, 0), 0.077, 0.084, 0.08),
-            ((sign * 0.094, 0.63, 0), 0.066, 0.072, 0.068),
-            # วงถี่รอบเข่าให้ผ้างอโค้งไม่หัก
-            ((sign * 0.095, 0.54, 0), 0.059, 0.064, 0.06),
-            ((sign * 0.095, 0.49, 0), 0.058, 0.064, 0.06),
-            ((sign * 0.095, 0.44, -0.003), 0.057, 0.06, 0.063),
-            ((sign * 0.095, 0.34, -0.004), 0.056, 0.058, 0.064),
-            ((sign * 0.095, 0.22, -0.002), 0.054, 0.057, 0.058),
-            ((sign * 0.095, 0.14, 0), 0.055, 0.059, 0.06),
-            ((sign * 0.095, 0.115, 0.002), 0.057, 0.062, 0.062),
-            ((sign * 0.095, 0.1, 0.002), 0.056, 0.061, 0.061),
-        ], cap_start=0.3, cap_end=0.05))
         # รองเท้าผ้าใบ: วงเหลี่ยมมน (หัวมนกว้างไม่แหลม) ซ้อนจากพื้นขึ้นไป หัวรองเท้าลาดลงหาปลายเท้า
         # ยาว ~0.27 ม. (ส้น −0.062 ถึงปลาย +0.206 จากข้อเท้า) ข้อรองเท้าจมในปลายขากางเกง
         x = sign * 0.095

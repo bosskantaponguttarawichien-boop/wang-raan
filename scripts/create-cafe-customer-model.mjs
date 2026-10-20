@@ -36,7 +36,7 @@ const STAFF = process.argv.includes("--staff");
 const outputFile = new URL(`cafe-${STAFF ? "staff" : "customer"}${LITE ? "-lite" : ""}.glb`, outputDirectory);
 // สีชุดพนักงาน: เขียวเข้มต่างจากสีเฟอร์นิเจอร์และเสื้อลูกค้า มองจากมุมสูงในฉากร้านก็แยกออก
 const UNIFORM_COLOR = "#2f5e47";
-// สีตามหมวดชิ้น (_part จาก build-cafe-customer-mesh.py): ผิว, เสื้อ, กางเกง, รองเท้า, พื้นรองเท้า, ผม
+// สีตามหมวดชิ้น (_part จาก build-cafe-customer-mesh.py): ผิว, เสื้อ, กางเกง, รองเท้า, พื้นรองเท้า, ผม (+ ขอบคอเสื้อ)
 const PALETTE = {
   skin: "#d9ab86",
   shirt: STAFF ? UNIFORM_COLOR : "#c9d2de",
@@ -45,7 +45,9 @@ const PALETTE = {
   sole: "#c4c8cf",
   hair: "#33261d",
 };
-const PART_COLORS = [PALETTE.skin, PALETTE.shirt, PALETTE.pants, PALETTE.shoe, PALETTE.sole, PALETTE.hair].map((hex) => new THREE.Color(hex));
+// ขอบยางคอเสื้อ: สีเดียวกับเสื้อแต่เข้มลงนิดให้เห็นเป็นขอบ
+const RIB_COLOR = new THREE.Color(PALETTE.shirt).multiplyScalar(0.86);
+const PART_COLORS = [PALETTE.skin, PALETTE.shirt, PALETTE.pants, PALETTE.shoe, PALETTE.sole, PALETTE.hair].map((hex) => new THREE.Color(hex)).concat(RIB_COLOR);
 // สีมาจาก vertex color ทั้งตัว จึงตั้งสีวัสดุเป็นขาว
 const mannequin = new THREE.MeshStandardMaterial({ color: "#ffffff", vertexColors: true, roughness: 0.84, metalness: 0 });
 

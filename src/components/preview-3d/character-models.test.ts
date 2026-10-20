@@ -33,7 +33,7 @@ describe("character models", () => {
         customer.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance,
       );
 
-      // เสื้อผ้าระบายด้วย vertex color ช่องละ 8 บิต: ผิว เสื้อ กางเกง รองเท้า พื้นรองเท้า ผม
+      // เสื้อผ้าระบายด้วย vertex color ช่องละ 8 บิต: ผิว เสื้อ ขอบคอเสื้อ กางเกง รองเท้า พื้นรองเท้า ผม
       const palette = (scene: THREE.Object3D) => {
         const body = scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
         expect(body).toBeInstanceOf(THREE.SkinnedMesh);
@@ -47,10 +47,10 @@ describe("character models", () => {
       };
       const customerColors = palette(customer.scene);
       const staffColors = palette(staff.scene);
-      expect(customerColors.size).toBe(6);
-      expect(staffColors.size).toBe(6);
-      // ต่างกันแค่สีเสื้อ
-      expect([...staffColors].filter((color) => !customerColors.has(color))).toHaveLength(1);
+      expect(customerColors.size).toBe(7);
+      expect(staffColors.size).toBe(7);
+      // ต่างกันแค่สีเสื้อ (ตัวเสื้อ + ขอบคอ)
+      expect([...staffColors].filter((color) => !customerColors.has(color))).toHaveLength(2);
 
       // หมวกแข็งทั้งใบ: mesh ธรรมดาที่ติดกับกระดูก Head (ไม่มีน้ำหนักผิว)
       const cap = staff.scene.getObjectByName("StaffCap");

@@ -83,13 +83,15 @@ def chain_weights(point, chain):
 
 
 # หมวดสีของแต่ละชิ้น — เก็บใน attribute "_part" ให้ create-cafe-customer-model.mjs ระบายสีตามบทบาท
-PART_SKIN, PART_SHIRT, PART_PANTS, PART_SHOE, PART_SOLE, PART_HAIR = range(6)
+PART_SKIN, PART_SHIRT, PART_PANTS, PART_SHOE, PART_SOLE, PART_HAIR, PART_RIB = range(7)
 
 
 def part_category(name):
+    if name == "Neckband":
+        return PART_RIB
     if name in ("Shirt",) or name.startswith("Sleeve"):
         return PART_SHIRT
-    if name == "Pelvis" or name.startswith("Leg"):
+    if name == "Pants":
         return PART_PANTS
     if name.startswith("Shoe"):
         return PART_SHOE
@@ -106,7 +108,18 @@ def part_weights(name, point):
         return {"Head": 1.0}
     if name == "Collar":
         return {"Neck": 1.0}
-    if name in ("Shirt", "Pelvis"):
+    if name == "Neckband":
+        return {"Spine": 1.0}
+    if name == "Pants":
+        # ช่วงสะโพกตาม Hips/Spine เหมือนเสื้อ แล้วค่อย ๆ ส่งให้ขาข้างนั้นลงไปตั้งแต่ใต้ก้น — กลางเป้าคงตาม Hips
+        side = "Left" if point.x < 0 else "Right"
+        share = smoothstep(0.98, 1.1, point.z)
+        leg = smoothstep(0.9, 0.79, point.z) * smoothstep(0.0, 0.05, abs(point.x))
+        weights = {"Hips": (1 - share) * (1 - leg), "Spine": share * (1 - leg)}
+        for bone, weight in chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"]).items():
+            weights[bone] = weights.get(bone, 0.0) + weight * leg
+        return weights
+    if name == "Shirt":
         # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips — เสื้อกับกางเกงใช้สูตรเดียวกัน ชายเสื้อจึงซ้อนขอบเอวพอดีตลอดท่า
         share = smoothstep(0.98, 1.1, point.z)
         return {"Hips": 1 - share, "Spine": share}
