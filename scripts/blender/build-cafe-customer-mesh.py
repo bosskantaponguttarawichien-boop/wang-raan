@@ -89,7 +89,7 @@ PART_SKIN, PART_SHIRT, PART_PANTS, PART_SHOE, PART_SOLE, PART_HAIR, PART_RIB = r
 def part_category(name):
     if name == "Neckband":
         return PART_RIB
-    if name in ("Shirt",) or name.startswith("Sleeve"):
+    if name == "Shirt":
         return PART_SHIRT
     if name == "Pants":
         return PART_PANTS
@@ -102,7 +102,7 @@ def part_category(name):
     return PART_SKIN
 
 
-def part_weights(name, point):
+def part_weights(name, point, sleeve=0.0):
     side = "Left" if name.endswith("L") else "Right"
     if name.startswith(("Head", "Ear", "Nose", "Hair")):
         return {"Head": 1.0}
@@ -122,10 +122,16 @@ def part_weights(name, point):
     if name == "Shirt":
         # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips — เสื้อกับกางเกงใช้สูตรเดียวกัน ชายเสื้อจึงซ้อนขอบเอวพอดีตลอดท่า
         share = smoothstep(0.98, 1.1, point.z)
-        return {"Hips": 1 - share, "Spine": share}
+        weights = {"Hips": (1 - share) * (1 - sleeve), "Spine": share * (1 - sleeve)}
+        # แขนเสื้อ (และหัวไหล่บางส่วน — ค่า _sleeve จาก blockout) ขยับตามแขนข้างนั้น
+        if sleeve > 0:
+            side = "Left" if point.x < 0 else "Right"
+            for bone, weight in chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]).items():
+                weights[bone] = weights.get(bone, 0.0) + weight * sleeve
+        return weights
     if name.startswith(("Palm", "Finger", "Thumb")):
         return {f"{side}Hand": 1.0}
-    if name.startswith(("Arm", "Sleeve")):
+    if name.startswith("Arm"):
         return chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"])
     if name.startswith("Leg"):
         return chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"])
@@ -183,8 +189,14 @@ def build(filename, level):
         for item in category.data:
             item.value = part_category(part.name)
         groups = {}
+        sleeve = part.data.attributes.get("_sleeve")
+        sleeve_values = [item.value for item in sleeve.data] if sleeve else None
+        if sleeve:
+            # ใช้แค่คำนวณน้ำหนักผิว ไม่ต้องส่งออกไปกับ GLB
+            part.data.attributes.remove(sleeve)
         for vertex in part.data.vertices:
-            for bone, weight in part_weights(part.name, vertex.co).items():
+            share = sleeve_values[vertex.index] if sleeve_values else 0.0
+            for bone, weight in part_weights(part.name, vertex.co, share).items():
                 if weight < 1e-4:
                     continue
                 if bone not in groups:

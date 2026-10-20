@@ -379,28 +379,180 @@ def neckband(segments=24, ring=8):
     return part
 
 
+# เสื้อยืด: ตัวเสื้อใต้รักแร้ (ความสูง, กึ่งกลางหน้า-หลัง, ครึ่งกว้าง, ครึ่งลึกหน้า, ครึ่งลึกหลัง)
+# ชายเสื้อพับหนา, อกยื่นไปหน้า, สะบักนูนด้านหลัง — เรียงจากรักแร้ลงไปชายเสื้อ
+SHIRT_SPLIT = (1.3, 0.002, 0.188, 0.11, 0.106)
+SHIRT_BODY = [
+    (1.26, 0.004, 0.183, 0.118, 0.114),
+    (1.19, 0.006, 0.176, 0.124, 0.106),
+    (1.12, 0.004, 0.163, 0.11, 0.104),
+    (1.04, 0.0, 0.158, 0.104, 0.108),
+    (0.968, -0.004, 0.175, 0.114, 0.114),
+    (0.955, -0.004, 0.181, 0.12, 0.12),
+    (0.945, -0.004, 0.179, 0.118, 0.118),
+]
+# แขนเสื้อใต้รักแร้: (ความสูง, x กึ่งกลางแขน, ครึ่งกว้าง, ครึ่งลึก) ปลายพับหนาเล็กน้อย หลวมกว่าแขน ~1 ซม.
+SHIRT_SLEEVE = [
+    (1.27, 0.192, 0.053, 0.053),
+    (1.225, 0.197, 0.052, 0.053),
+    (1.207, 0.199, 0.054, 0.055),
+    (1.196, 0.2, 0.052, 0.053),
+]
+SLEEVE_AXIS_X = 0.19
+SLEEVE_CAP_R = 0.057
+# บ่า/ไหล่เหนือรักแร้: (ความสูง, ย่อกว้าง, ย่อลึก, ผสมเข้าวงรีรอบคอ, ครึ่งกว้างวงรี, ครึ่งลึกวงรี, ส่วนที่ขยับตามแขน)
+SHIRT_YOKE = [
+    (1.335, 0.97, 0.98, 0.0, 0.0, 0.0, 0.85),
+    (1.365, 0.88, 0.9, 0.0, 0.0, 0.0, 0.55),
+    (1.395, 0.68, 0.8, 0.3, 0.15, 0.075, 0.2),
+    (1.41, 0.5, 0.72, 0.7, 0.1, 0.072, 0.0),
+    (NECKLINE_TOP, 0.4, 0.62, 1.0, 0.076, 0.066, 0.0),
+]
+
+
+def shirt(grow=SMOOTH_SHRINK, power=2.3):
+    """
+    เสื้อยืดเป็นตาข่ายชิ้นเดียว (แบบเดียวกับกางเกง): บ่า/ไหล่เป็นวง 24 จุดรอบทั้งตัวรวมหัวไหล่
+    วงที่รักแร้แยกเป็น 3 ท่อ — ตัวเสื้อ 16 จุด และแขนเสื้อข้างละ 12 จุด — โดยเส้นใต้รักแร้ 3 จุดใช้ร่วมกัน
+    ระหว่างตัวเสื้อกับแขนเสื้อ ผิวจึงต่อเนื่องจากบ่าลงแขนเสื้อ ไม่มีแขนเสื้อเสียบซ้อนตัวเสื้อ
+    attribute "_sleeve" = ส่วนที่ขยับตามแขน (build-cafe-customer-mesh.py ใช้ผสมน้ำหนักผิว)
+    """
+    verts, faces, sleeve = [], [], []
+    exponent = 2 / power
+
+    def add(x, y, z, share=0.0):
+        verts.append(b(x, y, z))
+        sleeve.append(share)
+        return len(verts) - 1
+
+    def body_point(cz, side_r, front_r, back_r, angle):
+        c, s_ = math.cos(angle), math.sin(angle)
+        c, s_ = math.copysign(abs(c) ** exponent, c), math.copysign(abs(s_) ** exponent, s_)
+        return side_r * grow * c, cz + (front_r if s_ >= 0 else back_r) * grow * s_
+
+    def quads(lower, upper):
+        n = len(lower)
+        for i in range(n):
+            faces.append((lower[i], lower[(i + 1) % n], upper[(i + 1) % n], upper[i]))
+
+    def cap(ring, center, flip):
+        for i in range(0, len(ring), 2):
+            quad = (center, ring[i], ring[(i + 1) % len(ring)], ring[(i + 2) % len(ring)])
+            faces.append(quad[::-1] if flip else quad)
+
+    # ---- วงที่รักแร้: มุมรอบลำตัวทีละ 22.5° เริ่มหน้าขวา (45°) ทวนเข็มผ่านหน้า → หน้าซ้าย (135°) → ใต้รักแร้ซ้าย →
+    # หลังซ้าย (225°) → หลัง → หลังขวา (315°) → ใต้รักแร้ขวา
+    split_y, split_cz, split_w, split_f, split_b = SHIRT_SPLIT
+    angles = [math.radians(45 + 22.5 * i) for i in range(16)]
+    corner = {}
+    torso = []
+    for i, angle in enumerate(angles):
+        x, z = body_point(split_cz, split_w, split_f, split_b, angle)
+        armpit = i in (5, 6, 7, 13, 14, 15)
+        if armpit:
+            # เส้นใต้รักแร้อยู่ตรงรอยต่อลำตัวกับแขน ลึกเข้ามาจากข้างลำตัว และต่ำลงนิดตรงกลาง
+            x = math.copysign(min(abs(x), 0.152), x)
+        dip = 0.008 if i in (6, 14) else 0.0
+        share = 0.8 if armpit else (0.5 if i in (0, 4, 8, 12) else 0.0)
+        torso.append(add(x, split_y - dip, z, share))
+        if i in (0, 4, 8, 12):
+            corner[i] = (x, z)
+
+    def sleeve_arc(sign, start, end):
+        """จุดรอบหัวไหล่ด้านนอกจากมุมหน้า/หลังของรักแร้ อ้อมแกนแขน (ระยะจากแกนค่อย ๆ ลดเป็นรัศมีแขนเสื้อ)"""
+        cx = sign * SLEEVE_AXIS_X
+        a0 = math.atan2(start[1], start[0] - cx)
+        a1 = math.atan2(end[1], end[0] - cx)
+        d0 = math.hypot(start[0] - cx, start[1])
+        # ทั้งสองข้างวนมุมเพิ่มขึ้น = อ้อมด้านนอกของแขน (ซ้าย −x, ขวา +x)
+        while a1 < a0:
+            a1 += 2 * math.pi
+        points = []
+        for j in range(1, 8):
+            t = j / 8
+            angle = a0 + (a1 - a0) * t
+            radius = SLEEVE_CAP_R * grow + (d0 - SLEEVE_CAP_R * grow) * (1 - math.sin(math.pi * t)) ** 2
+            points.append((cx + radius * math.cos(angle), radius * math.sin(angle)))
+        return points
+
+    # หัวไหล่ซ้าย: จากหน้าซ้าย (4) อ้อมด้านนอกไปหลังซ้าย (8); ขวา: จากหลังขวา (12) อ้อมไปหน้าขวา (0)
+    left_arc = [add(x, split_y, z, 1.0) for x, z in sleeve_arc(-1, corner[4], corner[8])]
+    right_arc = [add(x, split_y, z, 1.0) for x, z in sleeve_arc(1, corner[12], corner[0])]
+
+    # ---- ตัวเสื้อลงไปชายเสื้อ (16 จุด มุมเดิม)
+    previous = torso
+    for y, cz, side_r, front_r, back_r in SHIRT_BODY:
+        ring = [add(*(lambda p: (p[0], y, p[1]))(body_point(cz, side_r, front_r, back_r, angle))) for angle in angles]
+        quads(previous, ring)
+        previous = ring
+    hem = SHIRT_BODY[-1]
+    cap(previous, add(0, hem[0] - 0.01, hem[1]), flip=True)
+
+    # ---- แขนเสื้อ: วงแรก = มุมหน้า + หัวไหล่ + มุมหลัง + เส้นใต้รักแร้ (ใช้จุดร่วมกับตัวเสื้อ) = 12 จุด
+    for sign in (-1, 1):
+        if sign < 0:
+            first = [torso[4]] + left_arc + [torso[8], torso[7], torso[6], torso[5]]
+        else:
+            first = [torso[12]] + right_arc + [torso[0], torso[15], torso[14], torso[13]]
+        cx = sign * SLEEVE_AXIS_X
+        around = []
+        for index in first:
+            point = verts[index]
+            angle = math.atan2(-point.y, point.x - cx)
+            if around:
+                while angle < around[-1]:
+                    angle += 2 * math.pi
+            around.append(angle)
+        step = 2 * math.pi / 12
+        uniform = [around[0] + step * i for i in range(12)]
+        previous = first
+        for row, (y, x, side_r, depth_r) in enumerate(SHIRT_SLEEVE):
+            blend = min(1.0, (row + 1) / 2)
+            ring = []
+            for i in range(12):
+                angle = around[i] + (uniform[i] - around[i]) * blend
+                ring.append(add(sign * x + side_r * grow * math.cos(angle), y, depth_r * grow * math.sin(angle), 1.0))
+            quads(previous, ring)
+            previous = ring
+        cuff = SHIRT_SLEEVE[-1]
+        cap(previous, add(sign * cuff[1], cuff[0] - 0.002, 0, 1.0), flip=False)
+
+    # ---- บ่า/ไหล่: วงนอกของวงรักแร้ (ไม่รวมเส้นใต้รักแร้) = 24 จุด ย่อเข้าหาคอทีละชั้น
+    contour = [torso[0], torso[1], torso[2], torso[3], torso[4], *left_arc, torso[8], torso[9], torso[10], torso[11], torso[12], *right_arc]
+    base = [(verts[i].x, -verts[i].y, sleeve[i]) for i in contour]
+    previous = contour
+    for y, sx, sz, blend, ax, az, follow in SHIRT_YOKE:
+        ring = []
+        for x, z, share in base:
+            px, pz = x * sx, z * sz
+            if blend:
+                angle = math.atan2(z, x)
+                px += (ax * math.cos(angle) - px) * blend
+                pz += (az * math.sin(angle) - pz) * blend
+            ring.append(add(px, y, pz, share * follow))
+        quads(previous, ring)
+        previous = ring
+    cap(previous, add(0, NECKLINE_TOP + 0.004, -0.006), flip=False)
+
+    part = add_object("Shirt", verts, faces)
+    attribute = part.data.attributes.new(name="_sleeve", type="FLOAT", domain="POINT")
+    for item, share in zip(attribute.data, sleeve):
+        item.value = share
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    bmesh.ops.recalc_face_normals(shape, faces=shape.faces)
+    shape.to_mesh(part.data)
+    shape.free()
+    return part
+
+
 def body_parts():
     """ชิ้นส่วนแยกกัน: หัว ปลอกคอ ลำตัว แขน (ถึงปลายมือ) นิ้วโป้ง ขา รองเท้า พื้นรองเท้า หู
     แขนและขาเป็นท่อเดียวต่อเนื่อง ไม่มีเส้นรอยต่อที่ศอก ข้อมือ เข่า — ข้อต่องอได้ด้วยน้ำหนักผิว"""
     parts = []
     up, down = (0, 1, 0), (0, -1, 0)
     parts.append(pants())
-    # เสื้อยืด: ชายเสื้อพับหนา, อกยื่นไปหน้า, สะบักนูนด้านหลัง, ไหล่ลาด, คอกลมมีขอบยาง
-    parts.append(tube("Shirt", [
-        ((0, 0.945, -0.004), 0.179, 0.118, 0.118),
-        ((0, 0.955, -0.004), 0.181, 0.12, 0.12),
-        ((0, 0.968, -0.004), 0.175, 0.114, 0.114),
-        ((0, 1.04, 0.0), 0.158, 0.104, 0.108),
-        ((0, 1.12, 0.004), 0.163, 0.11, 0.104),
-        ((0, 1.19, 0.006), 0.176, 0.124, 0.106),
-        ((0, 1.26, 0.004), 0.183, 0.118, 0.114),
-        ((0, 1.32, 0.0), 0.19, 0.102, 0.104),
-        ((0, 1.365, -0.004), 0.178, 0.088, 0.088),
-        # บ่าลาดขึ้นหาคอ (กล้ามบ่า) แล้วเป็นขอบคอเสื้อรอบคอ
-        ((0, 1.395, -0.006), 0.15, 0.076, 0.074),
-        ((0, 1.41, -0.006), 0.1, 0.073, 0.071),
-        ((0, 1.426, -0.006), 0.076, 0.066, 0.064),
-    ], cap_start=0.1, cap_end=0.05, power=2.3))
+    parts.append(shirt())
     lift_neckline(parts[-1])
     parts.append(neckband())
     # คอ: ท่อสั้นจากในคอเสื้อขึ้นไปซ่อนใต้คาง (ชิ้น "Collar" ผูกกระดูก Neck)
@@ -436,15 +588,6 @@ def body_parts():
             ((sign * 0.21, 0.83, 0.001), 0.021, 0.026),
             ((sign * 0.21, 0.812, 0.002), 0.02, 0.027),
         ], cap_start=0.7, cap_end=0.3))
-        # แขนเสื้อสั้นถึงกลางต้นแขน: โคนจมในตัวเสื้อ ปลายพับหนาเล็กน้อย หลวมกว่าแขน ~1 ซม.
-        parts.append(tube(f"Sleeve{side}", [
-            ((sign * 0.15, 1.37, 0), 0.04, 0.04),
-            ((sign * 0.178, 1.325, 0), 0.053, 0.053),
-            ((sign * 0.19, 1.27, 0), 0.053, 0.053),
-            ((sign * 0.197, 1.225, 0), 0.052, 0.053),
-            ((sign * 0.199, 1.207, 0), 0.054, 0.055),
-            ((sign * 0.2, 1.196, 0), 0.052, 0.053),
-        ], cap_start=0.3, cap_end=0.04))
         # ฝ่ามือแบน (ฝ่ามือหันเข้าหาต้นขา) กว้างขึ้นจนถึงข้อนิ้ว
         parts.append(tube(f"Palm{side}", [
             ((sign * 0.21, 0.815, 0.004), 0.02, 0.027),
