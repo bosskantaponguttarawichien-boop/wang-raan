@@ -129,18 +129,35 @@ def head():
 
 
 def ear(sign):
-    """หูรูปตัว C: ขอบโค้งจากบนหัว ออกข้าง แล้ววนลงมาติดหัวด้านล่าง + แผ่นหลังทำให้เป็นแอ่งหันหน้า"""
-    rim = []
-    for step in range(7):
-        angle = math.pi / 2 - math.pi * step / 6
-        rim.append(((sign * (0.151 + 0.022 * math.cos(angle)), 0.822 + 0.034 * math.sin(angle), 0.004), 0.022, 0.025))
-    rim_part = tube(f"EarRim{'LR'[sign > 0]}", rim, up=(0, 0, 1), cap_start=0.3, cap_end=0.3, grow=1)
-    back = tube(
-        f"EarBack{'LR'[sign > 0]}",
-        [((sign * 0.14, 0.822, -0.012), 0.014, 0.042), ((sign * 0.172, 0.822, -0.012), 0.014, 0.036)],
-        up=(0, 1, 0), cap_start=0.2, cap_end=0.9, grow=1,
-    )
-    return [rim_part, back]
+    """
+    หูเปลือกหนารูปถ้วย: กล่องแบ่ง 3×3 ช่อง → ดันช่องกลางของหน้าด้านนอกลึกเข้าไปเป็นแอ่ง
+    → มนมุม → หมุนให้แอ่งหันออกด้านหน้าเฉียง ๆ แบบหูตุ๊กตาในภาพอ้างอิง (ฝั่งในจมในหัว)
+    """
+    shape = bmesh.new()
+    bmesh.ops.create_cube(shape, size=2)
+    bmesh.ops.subdivide_edges(shape, edges=shape.edges[:], cuts=2, use_grid_fill=True)
+    for vertex in shape.verts:
+        x, y, z = vertex.co
+        if x > 0.99 and abs(y) < 0.5 and abs(z) < 0.5:
+            vertex.co.x = -0.3  # ก้นแอ่ง
+        else:
+            vertex.co = vertex.co.lerp(vertex.co.normalized(), 0.75)  # มนมุมกล่องจนเกือบกลม
+    angle = math.radians(25)
+    center = (0.158, 0.822, 0.006)
+    for vertex in shape.verts:
+        # หน่วยกล่อง → ขนาดหู (หนา 4.8 ซม., สูง 10 ซม., ลึก 7.2 ซม.) ในพิกัด glTF; หน้าด้านนอก = +x
+        x, y, z = vertex.co.x * 0.024, vertex.co.z * 0.05, -vertex.co.y * 0.036
+        # หมุนรอบแกนตั้งให้แอ่งหันไปหน้า แล้วสะท้อนไปฝั่งซ้ายตาม sign
+        x, z = x * math.cos(angle) - z * math.sin(angle), x * math.sin(angle) + z * math.cos(angle)
+        vertex.co = b(sign * (center[0] + x), center[1] + y, center[2] + z)
+    if sign < 0:
+        bmesh.ops.reverse_faces(shape, faces=shape.faces[:])
+    mesh = bpy.data.meshes.new(f"Ear{'LR'[sign > 0]}")
+    shape.to_mesh(mesh)
+    shape.free()
+    part = bpy.data.objects.new(mesh.name, mesh)
+    bpy.context.scene.collection.objects.link(part)
+    return [part]
 
 
 def seam(center, side_r, up_r, toward):
@@ -219,11 +236,14 @@ def body_parts():
         # ตั้งบนพื้นรองเท้าบางที่กว้างกว่า 2–3 มม. เห็นเป็นขอบรอบล่างแบบภาพอ้างอิง
         x = sign * 0.069
         parts.append(tube(f"Shoe{side}", [
-            *seam((x, 0.008, 0.022), 0.047, 0.08, up),
-            ((x, 0.026, 0.022), 0.049, 0.084),
-            ((x, 0.043, 0.018), 0.047, 0.08),
-            ((x, 0.056, 0.01), 0.04, 0.068),
-            ((x, 0.064, 0.002), 0.029, 0.052),
+            # ส้นโค้งมนยื่นพ้นหน้าแข้งไปข้างหลัง แล้วลาดลงหาข้อเท้า (ไม่เป็นผนังตั้งตรง)
+            # วงละความสูง: (หลังสุด, หน้าสุด) ส้นยื่นพ้นหน้าแข้ง ~3 ซม. แล้วโค้งขึ้นหาข้อเท้าเป็นส่วนโค้งเดียว
+            *seam((x, 0.008, 0.018), 0.047, 0.0882, up),
+            ((x, 0.02, 0.0185), 0.049, 0.0907),
+            ((x, 0.032, 0.02), 0.049, 0.0882),
+            ((x, 0.044, 0.02), 0.046, 0.0804),
+            ((x, 0.054, 0.018), 0.041, 0.0686),
+            ((x, 0.062, 0.011), 0.032, 0.0539),
         ], cap_start=0.02, cap_end=0.12, level=True))
         parts.append(tube(f"Sole{side}", [
             *seam((x, 0.0, 0.022), 0.05, 0.083, up),
