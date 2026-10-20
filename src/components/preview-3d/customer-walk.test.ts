@@ -24,16 +24,18 @@ describe("customer walk asset", () => {
     const ankle = scene.getObjectByName("LeftFoot")!.getWorldPosition(new THREE.Vector3());
     const leftHand = scene.getObjectByName("LeftHand")!.getWorldPosition(new THREE.Vector3());
     const rightHand = scene.getObjectByName("RightHand")!.getWorldPosition(new THREE.Vector3());
-    expect(hips.y).toBeCloseTo(0.627, 3);
+    expect(hips.y).toBeCloseTo(0.628, 3);
     expect(knee.y).toBeGreaterThan(0.57);
-    // ต้นขายาว .17 พับไปหน้าเกือบขนานพื้น
-    expect(knee.z).toBeGreaterThan(0.15);
+    // ต้นขายาว .129 พับไปหน้าเกือบขนานพื้น
+    expect(knee.z).toBeGreaterThan(0.12);
     expect(ankle.y).toBeLessThan(knee.y);
     expect(leftHand.x).toBeLessThan(0);
     expect(rightHand.x).toBeGreaterThan(0);
     expect(leftHand.x).toBeCloseTo(-rightHand.x, 3);
     expect(Math.abs(leftHand.x)).toBeLessThan(0.16);
-    expect(leftHand.z).toBeGreaterThan(0.05);
+    // ข้อมืออยู่หน้าลำตัวระดับตัก ถุงมือห้อยจากข้อมือลงไปวางบนต้นขา
+    expect(leftHand.z).toBeGreaterThan(0.03);
+    expect(leftHand.y).toBeLessThan(0.75);
   });
 
   it("loops without a pose jump and plants each support foot at the authored travel speed", async () => {
@@ -57,7 +59,7 @@ describe("customer walk asset", () => {
         const worldZ = foot.z + stride / walk.duration * time;
         contactZ ??= worldZ;
         expect(Math.abs(worldZ - contactZ)).toBeLessThan(0.001);
-        expect(foot.y).toBeCloseTo(0.055, 3);
+        expect(foot.y).toBeCloseTo(0.065, 3);
       }
     }
   });

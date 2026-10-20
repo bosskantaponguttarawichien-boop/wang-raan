@@ -1,12 +1,12 @@
 /**
  * สร้าง GLB mannequin สีเทาสำหรับ Character Lab และฉาก 3D
  *
- * ผิวปั้นแบบ box modeling ใน Blender (scripts/blender/build-cafe-customer-mesh.py): เส้นบนผิวเรียงเป็นวง
- * รอบแขน ขา และข้อต่อ จึงงอได้เรียบ ไม่ยับ — สคริปต์นี้ผูกผิวนั้นกับโครงกระดูกและใส่ animation
+ * ผิวปั้นแบบ box modeling ใน Blender เป็นชิ้นแยกตามรอยต่อตุ๊กตา (scripts/blender/blockout-cafe-customer.py)
+ * แล้วเกลาและผูกน้ำหนักกับกระดูก (scripts/blender/build-cafe-customer-mesh.py) — สคริปต์นี้ใส่โครงกระดูกและ animation
  *
- * ตัวละครมีความสูง native ราว 1.03 ม. (แสดงผลที่ scale 0.9 = ราว 0.92 ม.)
+ * ตัวละครมีความสูง native ราว 1.05 ม. (แสดงผลที่ scale 0.9 = ราว 0.94 ม.)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
- * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่าง)
+ * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่างใน blockout-cafe-customer.py)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
  * สองไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน ต่างกันแค่จำนวน polygon
@@ -45,30 +45,30 @@ function bone(name, position) {
 const model = new THREE.Group();
 model.name = "CafeMannequin";
 
-// Shoulder → elbow → wrist, hip → knee → ankle. ตำแหน่งข้อต่อต้องตรงกับ JOINTS ใน build-cafe-customer-mesh.py
-// (ผิวจาก Blender ผูกน้ำหนักไว้กับข้อต่อชุดนั้น)
-// ตัวป้อมขาสั้น: ต้นขา .17 + หน้าแข้ง .15 (เดิม .20 + .175) — ต้องตรงกับ squash_y ใน build-cafe-customer-mesh.py
-const THIGH = 0.17;
-const SHIN = 0.15;
-const HIPS_Y = 0.055 + SHIN + THIGH + 0.03;
+// Shoulder → elbow → wrist, hip → knee → ankle. ตำแหน่งข้อต่อ (ตำแหน่งจริงในโมเดล) ต้องตรงกับ JOINTS
+// ใน build-cafe-customer-mesh.py — ผิวจาก Blender ผูกน้ำหนักไว้กับข้อต่อชุดนั้น; ศอก ข้อมือ เข่า อยู่ตรงรอยต่อตุ๊กตา
+const ANKLE_Y = 0.065;
+const THIGH = 0.129;
+const SHIN = 0.166;
+// ข้อสะโพกต่ำกว่ากระดูก Hips (กลางเชิงกราน)
+const LEG_DROP = 0.04;
+const HIPS_Y = ANKLE_Y + SHIN + THIGH + LEG_DROP;
 const hips = bone("Hips", [0, HIPS_Y, 0]);
-const spine = bone("Spine", [0, 0.15, 0]);
-const neck = bone("Neck", [0, 0.13, 0]);
-const head = bone("Head", [0, 0.085, 0]);
-const leftArm = bone("LeftArm", [-0.148, 0.04, 0]);
-const rightArm = bone("RightArm", [0.148, 0.04, 0]);
-const leftForeArm = bone("LeftForeArm", [-0.015, -0.11, 0]);
-const rightForeArm = bone("RightForeArm", [0.015, -0.11, 0]);
-// Lower the shoulder pivot to follow the rounded shoulder surface; keep elbow/wrist landmarks.
-// Avoid a lateral elbow kink: relaxation is in the sagittal animation plane.
-const leftHand = bone("LeftHand", [-0.017, -0.155, 0]);
-const rightHand = bone("RightHand", [0.017, -0.155, 0]);
-const leftLeg = bone("LeftLeg", [-0.07, -0.03, 0]);
-const rightLeg = bone("RightLeg", [0.07, -0.03, 0]);
+const spine = bone("Spine", [0, 0.12, 0]);
+const neck = bone("Neck", [0, 0.18, 0]);
+const head = bone("Head", [0, 0.022, 0]);
+const leftArm = bone("LeftArm", [-0.09, 0.115, 0]);
+const rightArm = bone("RightArm", [0.09, 0.115, 0]);
+const leftForeArm = bone("LeftForeArm", [-0.051, -0.114, 0]);
+const rightForeArm = bone("RightForeArm", [0.051, -0.114, 0]);
+const leftHand = bone("LeftHand", [-0.034, -0.096, 0]);
+const rightHand = bone("RightHand", [0.034, -0.096, 0]);
+const leftLeg = bone("LeftLeg", [-0.068, -LEG_DROP, 0]);
+const rightLeg = bone("RightLeg", [0.068, -LEG_DROP, 0]);
 const leftLowerLeg = bone("LeftLowerLeg", [0, -THIGH, 0]);
 const rightLowerLeg = bone("RightLowerLeg", [0, -THIGH, 0]);
-const leftFoot = bone("LeftFoot", [0, -SHIN, 0]);
-const rightFoot = bone("RightFoot", [0, -SHIN, 0]);
+const leftFoot = bone("LeftFoot", [0.002, -SHIN, 0]);
+const rightFoot = bone("RightFoot", [-0.002, -SHIN, 0]);
 
 model.add(hips);
 hips.add(spine, leftLeg, rightLeg);
@@ -169,8 +169,8 @@ function legPose(phase, hipY) {
   const z = t <= 0.5
     ? WALK_DISTANCE / 4 - WALK_DISTANCE * t
     : -WALK_DISTANCE / 4 + WALK_DISTANCE / 2 * (swing * swing * (3 - 2 * swing));
-  const ankleY = 0.055 + 0.028 * Math.sin(Math.PI * swing) ** 2;
-  const down = hipY - 0.03 - ankleY;
+  const ankleY = ANKLE_Y + 0.028 * Math.sin(Math.PI * swing) ** 2;
+  const down = hipY - LEG_DROP - ankleY;
   const thigh = THIGH;
   const shin = SHIN;
   const knee = Math.acos(THREE.MathUtils.clamp((down * down + z * z - thigh * thigh - shin * shin) / (2 * thigh * shin), -1, 1));
@@ -197,8 +197,9 @@ const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
   new THREE.VectorKeyframeTrack("Hips.position", walkCycle.times, hipHeights.flatMap((y) => [0, y, 0])),
 ]);
 
-// ยกสะโพกให้ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ scale 0.9 ≈ 0.533 หน่วยโมเดล).
-const SIT_HIPS_Y = 0.533 + 0.03 + 0.064;
+// ยกสะโพกให้ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ scale 0.9 ≈ 0.533 หน่วยโมเดล)
+// = เบาะ + ข้อสะโพกต่ำกว่า Hips + รัศมีต้นขา (~5.5 ซม.)
+const SIT_HIPS_Y = 0.533 + LEG_DROP + 0.055;
 // ท่านั่งลงค่อย ๆ เร่งแล้วชะลอ (ease in-out) และโน้มตัวไปหน้าเล็กน้อยกลางจังหวะเหมือนคนหย่อนตัวลงเก้าอี้
 // ฉากเล่นคลิปนี้ย้อนกลับ = ท่าลุกขึ้น
 const SIT_DURATION = 0.9;
@@ -222,12 +223,15 @@ const sit = new THREE.AnimationClip("Sit", SIT_DURATION, [
   sitTrack("RightLowerLeg", pose(1.4)),
   sitTrack("LeftFoot", pose(0.1)),
   sitTrack("RightFoot", pose(0.1)),
-  // ต้นแขนห้อยเกือบตรง ปลายแขนงอไปข้างหน้า (ทิศเดียวกับข้อศอกจริง) แล้ววางมือบนต้นขา
-  // เดิมปลายแขนหมุนสวนทางต้นแขน ข้อศอกจึงหักไปด้านหลังดูงอผิดท่า
-  sitTrack("LeftArm", pose(-0.25, 0.04)),
-  sitTrack("RightArm", pose(-0.25, -0.04)),
-  sitTrack("LeftForeArm", pose(-1.05, 0, 0.4)),
-  sitTrack("RightForeArm", pose(-1.05, 0, -0.4)),
+  // ท่าผ่อนคลาย มือวางบนเข่า: ต้นแขนห้อยข้างตัวเอนไปหน้านิด ศอกอยู่ใต้ไหล่ ปลายแขนลาดลงไปหาเข่า
+  // ถุงมือวางตะแคง (นิ้วโป้งขึ้น) บนเข่าค่อนด้านนอก ข้อมืองอนิดเดียว — มุมหาจากการวัดผิว:
+  // ก้นมือแตะผิวต้นขา และแขนไม่จมลำตัว
+  sitTrack("LeftArm", pose(-0.2, -0.114)),
+  sitTrack("RightArm", pose(-0.2, 0.114)),
+  sitTrack("LeftForeArm", pose(-0.857, 0, 0.615)),
+  sitTrack("RightForeArm", pose(-0.857, 0, -0.615)),
+  sitTrack("LeftHand", pose(-0.08, 0.055)),
+  sitTrack("RightHand", pose(-0.08, -0.055)),
 ]);
 
 const exporter = new GLTFExporter();
