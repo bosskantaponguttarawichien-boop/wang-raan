@@ -19,7 +19,7 @@ import {
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
-import { CHARACTER_MODELS } from "./character-models";
+import { CHARACTER_MODELS, CHARACTER_SCALE } from "./character-models";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
@@ -32,7 +32,8 @@ export interface ThreeViewProps {
 }
 
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
-const SEATED_FRONT_OFFSET = 0.055;
+/** เลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ให้สะโพกอยู่กลางเบาะ หัวเข่าพ้นขอบหน้า (ปรับตามขนาดตัว) */
+const SEATED_FRONT_OFFSET = 0.06 * CHARACTER_SCALE;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
@@ -90,7 +91,7 @@ const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
 const CAMERA_TARGET_Y = 0.45;
-const CUSTOMER_SCALE = 0.9;
+const CUSTOMER_SCALE = CHARACTER_SCALE;
 /** state ของ agent ที่นั่งรอ/กิน (ดู AGENT_STRIDE ใน core/simulation) → ใช้ท่านั่งของมาสคอต */
 const AGENT_STATE_SEATED = 4;
 /** กัน animation กระโดดเมื่อ loop หยุดไปนาน (แท็บถูกซ่อน/หยุดวาดตอนไม่มีอะไรขยับ) */

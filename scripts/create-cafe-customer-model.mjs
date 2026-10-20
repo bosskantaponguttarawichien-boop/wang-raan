@@ -4,7 +4,7 @@
  * ผิวปั้นแบบ box modeling ใน Blender เป็นชิ้นแยกตามรอยต่อตุ๊กตา (scripts/blender/blockout-cafe-customer.py)
  * แล้วเกลาและผูกน้ำหนักกับกระดูก (scripts/blender/build-cafe-customer-mesh.py) — สคริปต์นี้ใส่โครงกระดูกและ animation
  *
- * ตัวละครมีความสูง native ราว 1.05 ม. (แสดงผลที่ scale 0.9 = ราว 0.94 ม.)
+ * ตัวละครมีความสูง native ราว 1.05 หน่วย (แสดงผลที่ scale DISPLAY_SCALE 1.6 = ราว 1.67 ม. เท่าผู้ใหญ่)
  * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
  * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่างใน blockout-cafe-customer.py)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
@@ -254,9 +254,11 @@ const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
   new THREE.VectorKeyframeTrack("Hips.position", walkCycle.times, hipHeights.flatMap((y) => [0, y, 0])),
 ]);
 
-// ยกสะโพกให้ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ scale 0.9 ≈ 0.533 หน่วยโมเดล)
-// = เบาะ + ข้อสะโพกต่ำกว่า Hips + รัศมีต้นขา (~5.5 ซม.)
-const SIT_HIPS_Y = 0.533 + LEG_DROP + 0.055;
+// ขนาดแสดงผลในแอป — ต้องตรงกับ CHARACTER_SCALE ใน src/components/preview-3d/character-models.ts
+const DISPLAY_SCALE = 1.6;
+// ใต้ต้นขาอยู่ระดับเบาะเก้าอี้ในฉากร้าน (0.48 ม. ÷ DISPLAY_SCALE หน่วยโมเดล)
+// = เบาะ + ข้อสะโพกต่ำกว่า Hips + รัศมีต้นขา (~5.5 ซม.) — ขาสั้นแบบตุ๊กตา เท้าจึงลอยเหนือพื้นตอนนั่ง
+const SIT_HIPS_Y = 0.48 / DISPLAY_SCALE + LEG_DROP + 0.055;
 // ท่านั่งลงค่อย ๆ เร่งแล้วชะลอ (ease in-out) และโน้มตัวไปหน้าเล็กน้อยกลางจังหวะเหมือนคนหย่อนตัวลงเก้าอี้
 // ฉากเล่นคลิปนี้ย้อนกลับ = ท่าลุกขึ้น
 const SIT_DURATION = 0.9;

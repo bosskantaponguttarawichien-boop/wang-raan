@@ -3,9 +3,8 @@
 import * as React from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { CHARACTER_MODELS, type CharacterRole } from "@/components/preview-3d/character-models";
+import { CHARACTER_MODELS, CHARACTER_SCALE, type CharacterRole } from "@/components/preview-3d/character-models";
 
-const CHARACTER_SCALE = 0.9;
 const MAX_ANIMATION_DELTA_SECONDS = 1 / 30;
 const WALK_ACCELERATION = 1.4;
 const ANIMATION_FADE_SECONDS = 0.22;
@@ -86,8 +85,8 @@ export function CharacterLabScene({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#f4f7fc");
     const camera = new THREE.PerspectiveCamera(31, 1, 0.1, 100);
-    camera.position.set(1.1, 2.1, 3.6);
-    camera.lookAt(0, 0.55, 0);
+    camera.position.set(1.7, 2.5, 5.4);
+    camera.lookAt(0, 0.8, 0);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true;
@@ -261,7 +260,7 @@ export function CharacterLabScene({
           currentSpeed = 0;
           targetMarker.visible = false;
           // ขยับสะโพกไว้กลางเบาะ แต่ให้หัวเข่าพ้นขอบหน้าของเบาะเล็กน้อย.
-          root.position.set(0, 0, 0.08);
+          root.position.set(0, 0, 0.09 * CHARACTER_SCALE);
           root.rotation.y = FACING_RADIANS.front;
           play("Sit");
           setMotion("seated");

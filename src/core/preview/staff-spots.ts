@@ -4,17 +4,17 @@
  * ฝั่งพนักงานของเคาน์เตอร์ (ตรงกับ createCounter ใน three-view):
  * - ก่อนหมุน ถ้า width ≥ depth ด้านยาวอยู่แนว x ฝั่งพนักงานคือเหนือ (−y); ถ้า depth > width ฝั่งพนักงานคือตะวันตก (−x)
  * - แล้วหมุนตามเข็มตาม `rotation` ของเคาน์เตอร์
- * พนักงานหันหน้าเข้าหาเคาน์เตอร์ ยืนห่างขอบได้ไกลสุด STAFF_STANDOFFS[0] ถ้ามีที่ (mannequin สูง ~0.94 ม. เตี้ยกว่าท็อป
- * เคาน์เตอร์ 1.05 ม. — ยืนชิดไปกล้องมุมสูงจะเห็นแค่หมวก) ไม่พอก็ขยับเข้าใกล้ ใกล้สุดแล้วยังชนผนัง/วัตถุอื่นก็ไม่วาง
+ * พนักงานหันหน้าเข้าหาเคาน์เตอร์ ยืนห่างขอบ STAFF_STANDOFFS[0] ถ้ามีที่ ไม่พอก็ขยับเข้าใกล้
+ * ใกล้สุดแล้วยังชนผนัง/วัตถุอื่นก็ไม่วาง
  * ไม่กระทบ validation และ simulation (ลูกค้ายังเดินตาม flow field เดิม)
  */
 import { footprint, objectCenter, rotatePoint } from "../layout/geometry";
 import type { Counter, Meters, Point, Rect, StoreLayout } from "../layout/types";
 
 /** ระยะจากขอบเคาน์เตอร์ถึงกลางตัวพนักงาน ไล่จากที่อยากได้ไปถึงชิดที่สุด */
-export const STAFF_STANDOFFS: readonly Meters[] = [0.45, 0.4, 0.35, 0.3, 0.25];
-/** รัศมีพื้นที่ยืนของพนักงาน (mannequin สูง ~0.94 ม. กว้างราว 0.3 ม.) */
-export const STAFF_RADIUS: Meters = 0.15;
+export const STAFF_STANDOFFS: readonly Meters[] = [0.35, 0.3, 0.25];
+/** รัศมีพื้นที่ยืนของพนักงาน (mannequin สูง ~1.67 ม. ลำตัวหนาราว 0.3 ม.) */
+export const STAFF_RADIUS: Meters = 0.2;
 /** เคาน์เตอร์ยาวตั้งแต่ค่านี้มีพนักงาน 2 คน */
 export const TWO_STAFF_MIN_LENGTH: Meters = 2.4;
 

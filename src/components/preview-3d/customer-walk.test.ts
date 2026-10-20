@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { CHARACTER_SCALE } from "./character-models";
 
 async function loadCustomer() {
   const bytes = await readFile("public/assets/models/cafe-customer.glb");
@@ -24,8 +25,9 @@ describe("customer walk asset", () => {
     const ankle = scene.getObjectByName("LeftFoot")!.getWorldPosition(new THREE.Vector3());
     const leftHand = scene.getObjectByName("LeftHand")!.getWorldPosition(new THREE.Vector3());
     const rightHand = scene.getObjectByName("RightHand")!.getWorldPosition(new THREE.Vector3());
-    expect(hips.y).toBeCloseTo(0.628, 3);
-    expect(knee.y).toBeGreaterThan(0.57);
+    // ใต้ต้นขา (ข้อสะโพกต่ำกว่า Hips 0.04 + รัศมีต้นขา 0.055) อยู่บนเบาะ 0.48 ม. ที่ขนาดแสดงผลจริง
+    expect((hips.y - 0.04 - 0.055) * CHARACTER_SCALE).toBeCloseTo(0.48, 3);
+    expect(knee.y).toBeGreaterThan(hips.y - 0.1);
     // ต้นขายาว .129 พับไปหน้าเกือบขนานพื้น
     expect(knee.z).toBeGreaterThan(0.12);
     expect(ankle.y).toBeLessThan(knee.y);
