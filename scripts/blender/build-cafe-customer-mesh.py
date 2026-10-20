@@ -82,19 +82,38 @@ def chain_weights(point, chain):
     return weights
 
 
+# หมวดสีของแต่ละชิ้น — เก็บใน attribute "_part" ให้ create-cafe-customer-model.mjs ระบายสีตามบทบาท
+PART_SKIN, PART_SHIRT, PART_PANTS, PART_SHOE, PART_SOLE, PART_HAIR = range(6)
+
+
+def part_category(name):
+    if name in ("Shirt",) or name.startswith("Sleeve"):
+        return PART_SHIRT
+    if name == "Pelvis" or name.startswith("Leg"):
+        return PART_PANTS
+    if name.startswith("Shoe"):
+        return PART_SHOE
+    if name.startswith("Sole"):
+        return PART_SOLE
+    if name == "Hair":
+        return PART_HAIR
+    return PART_SKIN
+
+
 def part_weights(name, point):
     side = "Left" if name.endswith("L") else "Right"
-    if name.startswith(("Head", "Ear")):
+    if name.startswith(("Head", "Ear", "Nose", "Hair")):
         return {"Head": 1.0}
     if name == "Collar":
         return {"Neck": 1.0}
-    if name == "Torso":
-        # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips
+    if name in ("Shirt", "Pelvis"):
+        # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips — เสื้อกับกางเกงใช้สูตรเดียวกัน ชายเสื้อจึงซ้อนขอบเอวพอดีตลอดท่า
         share = smoothstep(0.98, 1.1, point.z)
         return {"Hips": 1 - share, "Spine": share}
-    if name.startswith(("Arm", "Thumb")):
-        chain = [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]
-        return {f"{side}Hand": 1.0} if name.startswith("Thumb") else chain_weights(point, chain)
+    if name.startswith(("Palm", "Finger", "Thumb")):
+        return {f"{side}Hand": 1.0}
+    if name.startswith(("Arm", "Sleeve")):
+        return chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"])
     if name.startswith("Leg"):
         return chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"])
     if name.startswith(("Shoe", "Sole")):
@@ -147,6 +166,9 @@ def build(filename, level):
             vertex.co.z = max(vertex.co.z, SOLE_Z)
         for polygon in part.data.polygons:
             polygon.use_smooth = True
+        category = part.data.attributes.new(name="_part", type="FLOAT", domain="POINT")
+        for item in category.data:
+            item.value = part_category(part.name)
         groups = {}
         for vertex in part.data.vertices:
             for bone, weight in part_weights(part.name, vertex.co).items():
@@ -176,6 +198,7 @@ def build(filename, level):
         export_animations=False,
         export_skins=True,
         export_materials="NONE",
+        export_attributes=True,
         export_yup=True,
     )
     print(f"สร้าง {filename}: {len(body.data.vertices)} จุด, {len(body.data.polygons)} หน้า")

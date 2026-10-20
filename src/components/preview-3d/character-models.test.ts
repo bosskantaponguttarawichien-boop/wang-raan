@@ -33,20 +33,25 @@ describe("character models", () => {
         customer.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance,
       );
 
-      const body = staff.scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
-      const colors = body.geometry.getAttribute("color");
-      expect(colors).toBeDefined();
-      expect((body.material as THREE.MeshStandardMaterial).vertexColors).toBe(true);
-      // ลำตัวเป็นสีชุด ส่วนที่เหลือคงสีหุ่น → มีสองสีบนผิว
-      const distinct = new Set<string>();
-      for (let i = 0; i < colors.count; i++) distinct.add(`${colors.getX(i).toFixed(3)},${colors.getY(i).toFixed(3)},${colors.getZ(i).toFixed(3)}`);
-      expect(distinct.size).toBe(2);
-      expect(customer.scene.getObjectByName("MannequinBody")).toBeInstanceOf(THREE.SkinnedMesh);
-      expect((customer.scene.getObjectByName("MannequinBody") as THREE.Mesh).geometry.getAttribute("color")).toBeUndefined();
+      // เสื้อผ้าระบายด้วย vertex color ช่องละ 8 บิต: ผิว เสื้อ กางเกง รองเท้า พื้นรองเท้า ผม
+      const palette = (scene: THREE.Object3D) => {
+        const body = scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
+        expect(body).toBeInstanceOf(THREE.SkinnedMesh);
+        expect((body.material as THREE.MeshStandardMaterial).vertexColors).toBe(true);
+        const colors = body.geometry.getAttribute("color");
+        expect(colors.array).toBeInstanceOf(Uint8Array);
+        expect(colors.normalized).toBe(true);
+        const distinct = new Set<string>();
+        for (let i = 0; i < colors.count; i++) distinct.add(`${colors.getX(i).toFixed(3)},${colors.getY(i).toFixed(3)},${colors.getZ(i).toFixed(3)}`);
+        return distinct;
+      };
+      const customerColors = palette(customer.scene);
+      const staffColors = palette(staff.scene);
+      expect(customerColors.size).toBe(6);
+      expect(staffColors.size).toBe(6);
+      // ต่างกันแค่สีเสื้อ
+      expect([...staffColors].filter((color) => !customerColors.has(color))).toHaveLength(1);
 
-      // สีเก็บช่องละ 8 บิต ไม่ใช่ float
-      expect(colors.array).toBeInstanceOf(Uint8Array);
-      expect(colors.normalized).toBe(true);
       // หมวกแข็งทั้งใบ: mesh ธรรมดาที่ติดกับกระดูก Head (ไม่มีน้ำหนักผิว)
       const cap = staff.scene.getObjectByName("StaffCap");
       expect(cap).toBeInstanceOf(THREE.Mesh);

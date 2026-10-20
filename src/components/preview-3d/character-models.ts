@@ -19,12 +19,12 @@ export const CHARACTER_MODELS: Record<CharacterRole, { full: string; lite: strin
     full: "/assets/models/cafe-customer.glb",
     lite: "/assets/models/cafe-customer-lite.glb",
     label: "ลูกค้า",
-    description: "Mannequin สีเทาทั้งตัว",
+    description: "เสื้อยืดสีอ่อน กางเกงยีนส์ รองเท้าผ้าใบ",
   },
   staff: {
     full: "/assets/models/cafe-staff.glb",
     lite: "/assets/models/cafe-staff-lite.glb",
     label: "พนักงาน",
-    description: "Mannequin สวมเสื้อกั๊กและหมวกแก๊ปสีเขียว",
+    description: "เสื้อยืดและหมวกแก๊ปสีเขียว กางเกงยีนส์",
   },
 };

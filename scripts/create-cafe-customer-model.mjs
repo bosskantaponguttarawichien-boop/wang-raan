@@ -1,7 +1,7 @@
 /**
- * สร้าง GLB mannequin สำหรับ Character Lab และฉาก 3D — ลูกค้า (สีเทาทั้งตัว) และพนักงาน (เสื้อกั๊ก + หมวกแก๊ป)
+ * สร้าง GLB ตัวละครสำหรับ Character Lab และฉาก 3D — ลูกค้า (เสื้อยืดสีอ่อน) และพนักงาน (เสื้อยืด + หมวกแก๊ปสีเขียว)
  *
- * ผิวปั้นแบบ box modeling ใน Blender เป็นชิ้นแยกตามรอยต่อตุ๊กตา (scripts/blender/blockout-cafe-customer.py)
+ * ผิวและเสื้อผ้าปั้นแบบ box modeling ใน Blender เป็นชิ้นแยก (scripts/blender/blockout-cafe-customer.py)
  * แล้วเกลาและผูกน้ำหนักกับกระดูก (scripts/blender/build-cafe-customer-mesh.py) — สคริปต์นี้ใส่โครงกระดูกและ animation
  *
  * ตัวละครสัดส่วนผู้ใหญ่จริง สูง 1.70 ม. ที่ขนาด 1:1 (หน่วยโมเดล = เมตร) เข้ากับโต๊ะ เก้าอี้ เคาน์เตอร์ขนาดจริงในฉากร้าน
@@ -10,8 +10,8 @@
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
  *      เติม --staff → cafe-staff.glb / cafe-staff-lite.glb (พนักงาน)
- * ทุกไฟล์ใช้โครงกระดูกและ animation ชุดเดียวกัน — รุ่น lite ต่างแค่จำนวน polygon,
- * พนักงานต่างแค่สีลำตัว (vertex color) และหมวกที่ผูกกับกระดูก Head
+ * ทุกไฟล์ใช้รูปร่าง โครงกระดูก และ animation ชุดเดียวกัน — รุ่น lite ต่างแค่จำนวน polygon,
+ * ลูกค้า/พนักงานต่างกันที่สีเสื้อผ้า (vertex color ตามหมวดชิ้นจาก Blender) และหมวกที่ผูกกับกระดูก Head
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as THREE from "three";
@@ -34,11 +34,20 @@ const outputDirectory = new URL("../public/assets/models/", import.meta.url);
 const LITE = process.argv.includes("--lite");
 const STAFF = process.argv.includes("--staff");
 const outputFile = new URL(`cafe-${STAFF ? "staff" : "customer"}${LITE ? "-lite" : ""}.glb`, outputDirectory);
-const SKIN_COLOR = "#9da4af";
-// สีชุดพนักงาน: เข้มกว่าผิวหุ่นและต่างจากสีเฟอร์นิเจอร์ มองจากมุมสูงในฉากร้านก็แยกออกจากลูกค้า
-const UNIFORM_COLOR = "#2f6b5a";
-// พนักงาน: สีผิวมาจาก vertex color (ลำตัว = ชุด, ที่เหลือ = สีหุ่น) จึงตั้งสีวัสดุเป็นขาว
-const mannequin = new THREE.MeshStandardMaterial({ color: STAFF ? "#ffffff" : SKIN_COLOR, vertexColors: STAFF, roughness: 0.84, metalness: 0 });
+// สีชุดพนักงาน: เขียวเข้มต่างจากสีเฟอร์นิเจอร์และเสื้อลูกค้า มองจากมุมสูงในฉากร้านก็แยกออก
+const UNIFORM_COLOR = "#2f5e47";
+// สีตามหมวดชิ้น (_part จาก build-cafe-customer-mesh.py): ผิว, เสื้อ, กางเกง, รองเท้า, พื้นรองเท้า, ผม
+const PALETTE = {
+  skin: "#d9ab86",
+  shirt: STAFF ? UNIFORM_COLOR : "#c9d2de",
+  pants: "#3d5a86",
+  shoe: "#eef0f3",
+  sole: "#c4c8cf",
+  hair: "#33261d",
+};
+const PART_COLORS = [PALETTE.skin, PALETTE.shirt, PALETTE.pants, PALETTE.shoe, PALETTE.sole, PALETTE.hair].map((hex) => new THREE.Color(hex));
+// สีมาจาก vertex color ทั้งตัว จึงตั้งสีวัสดุเป็นขาว
+const mannequin = new THREE.MeshStandardMaterial({ color: "#ffffff", vertexColors: true, roughness: 0.84, metalness: 0 });
 
 // ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ใช้ผิวที่เกลาน้อยกว่า
 const meshFile = new URL(LITE ? "blender/cafe-customer-mesh-lite.glb" : "blender/cafe-customer-mesh.glb", import.meta.url);
@@ -142,40 +151,35 @@ model.updateMatrixWorld(true);
 const skeleton = new THREE.Skeleton(bones);
 body.bind(skeleton);
 
-if (STAFF) {
-  // ---- ชุดพนักงาน: จุดผิวที่ขยับตาม Hips/Spine อย่างเดียว = ลำตัว → ระบายสีชุด (แขน ขา คอ หัวยังเป็นสีหุ่น)
-  // ลำตัวเป็นชิ้นแยกจากแขนขาตั้งแต่ใน Blender เส้นแบ่งสีจึงคมตรงรอยต่อตุ๊กตา และไม่มีผ้าทะลุตัวตอนนั่ง/เดิน
-  const torsoBones = new Set([boneIndex.get(hips), boneIndex.get(spine)]);
-  const skin = new THREE.Color(SKIN_COLOR);
-  const uniform = new THREE.Color(UNIFORM_COLOR);
-  // มีแค่สองสี → เก็บช่องละ 8 บิต (normalized) แทน float 32 บิต ไฟล์เล็กลงโดยสีไม่ต่างกันให้เห็น
-  const colors = new Uint8Array(position.count * 3);
-  for (let i = 0; i < position.count; i += 1) {
-    let torso = true;
-    for (let slot = 0; slot < 4; slot += 1) {
-      if (skinWeights[i * 4 + slot] > 1e-4 && !torsoBones.has(skinIndices[i * 4 + slot])) torso = false;
-    }
-    const color = torso ? uniform : skin;
-    colors.set([color.r, color.g, color.b].map((channel) => Math.round(channel * 255)), i * 3);
-  }
-  geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3, true));
+// ---- สีเสื้อผ้า: แต่ละชิ้นจาก Blender มีหมวดเดียวทั้งชิ้น เส้นแบ่งสีจึงคมตรงชายเสื้อ/ปลายแขนเสื้อ/ปลายขากางเกง
+// สีมีไม่กี่ค่า → เก็บช่องละ 8 บิต (normalized) แทน float 32 บิต ไฟล์เล็กลงโดยสีไม่ต่างกันให้เห็น
+const sourcePart = sourceMesh.geometry.getAttribute("_part");
+if (!sourcePart) throw new Error(`ไม่พบหมวดชิ้น (_part) ใน ${meshFile.pathname} — รัน build-cafe-customer-mesh.py ใหม่`);
+const colors = new Uint8Array(position.count * 3);
+for (let i = 0; i < position.count; i += 1) {
+  const color = PART_COLORS[Math.round(sourcePart.getX(i))] ?? PART_COLORS[0];
+  colors.set([color.r, color.g, color.b].map((channel) => Math.round(channel * 255)), i * 3);
+}
+geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3, true));
 
+if (STAFF) {
   // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
   const HEAD_DEPTH = 1.18;
   const HEAD_FORWARD = 0.012;
   const crown = [[1.612, 0.086], [1.635, 0.085], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
   // จุดเรียงจากขอบล่างขึ้นยอด (ผิวหันออก); ยอดรัศมี 0 จึงไม่เป็นรู
-  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.004 : 0, y + 0.004));
+  // ครอบผม (หนา 8 มม.) ได้มิด: ใหญ่กว่าหัว 1.4 ซม.
+  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.014 : 0, y + 0.01));
   capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.004));
   const capCrown = new THREE.LatheGeometry(capProfile, LITE ? 16 : 32);
   capCrown.scale(1, 1, HEAD_DEPTH);
   capCrown.translate(0, 0, HEAD_FORWARD);
   const brimShape = new THREE.Shape();
-  brimShape.absellipse(0, 0, 0.085, 0.09, 0, Math.PI, false, 0);
+  brimShape.absellipse(0, 0, 0.095, 0.095, 0, Math.PI, false, 0);
   const capBrim = new THREE.ExtrudeGeometry(brimShape, { depth: 0.006, bevelEnabled: false, curveSegments: LITE ? 6 : 12 });
   // Shape อยู่บนระนาบ XY → พลิกลงนอนบนระนาบ XZ ปีกชี้ +Z (หน้า) แล้วกดปลายลงนิดเหมือนปีกหมวกจริง
   capBrim.rotateX(Math.PI / 2 - 0.12);
-  capBrim.translate(0, 1.622, 0.085);
+  capBrim.translate(0, 1.628, 0.1);
   // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — ปีกหมวกรวมจุดซ้ำให้มีดัชนีเหมือนโดม
   // (mergeVertices รวมเฉพาะจุดที่ normal ตรงกัน ขอบคมจึงยังคม) จุดน้อยลงหลายเท่าจากการคลายดัชนี
   for (const part of [capCrown, capBrim]) part.deleteAttribute("uv");
