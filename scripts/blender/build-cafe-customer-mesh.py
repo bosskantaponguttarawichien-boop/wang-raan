@@ -4,7 +4,7 @@
 
 - ลำตัว แขน ขา: Skin modifier จากเส้นโครงกระดูก (ได้วงเหลี่ยมรอบแขนขาเหมือนดึงจากทรงกระบอก)
 - หัวและหู: ทรงรีแยกชิ้น ต่อบนคอ
-- มือ/เท้า: ตัดรายละเอียดออก มือเป็นถุงมือมีนิ้วโป้ง เท้าเป็นรองเท้าทรงมน ไม่มีนิ้วเท้า
+- มือ/เท้า: ตัดรายละเอียดออก มือเป็นถุงมือ (สี่นิ้วติดกัน + นิ้วโป้ง) เท้าเป็นรองเท้าทรงมนพื้นเรียบ ไม่มีนิ้วเท้า
 
 ผลลัพธ์คือ GLB มีแค่ผิว + โครงกระดูก + น้ำหนักผิว (ชื่อกระดูกตรงกับ create-cafe-customer-model.mjs)
 สคริปต์ Node จะอ่านไฟล์นี้ไปใส่ animation ต่อ
@@ -137,23 +137,26 @@ def build_body(level):
 
         shoulder = arm(0.146, 0.655, radius=(0.05, 0.05))
         elbow = arm(0.172, 0.54, radius=(0.043, 0.043))
-        wrist = arm(0.186, 0.392, radius=(0.034, 0.033))
-        # มือแบบถุงมือ: ก้อนแบนเล็กน้อยปลายมน นิ้วโป้งแยกออกไปทางหน้าและเข้าหาลำตัว
-        palm = arm(0.188, 0.36, 0.004, radius=(0.036, 0.04))
-        fingertip = arm(0.189, 0.33, 0.006, radius=(0.028, 0.031))
-        chain(chest, shoulder, elbow, wrist, palm, fingertip)
-        thumb_base = arm(0.176, 0.374, 0.034, radius=(0.018, 0.018))
-        thumb_tip = arm(0.162, 0.35, 0.066, radius=(0.016, 0.016))
+        wrist = arm(0.186, 0.392, radius=(0.028, 0.026))
+        # มือแบบถุงมือ: นิ้วทั้งสี่ติดกันเป็นก้อนเดียว แบนข้าง (หันฝ่ามือเข้าหาขา) งอเข้าเล็กน้อย
+        # นิ้วโป้งแยกออกไปทางหน้า
+        palm = arm(0.19, 0.352, 0.006, radius=(0.054, 0.028))
+        knuckles = arm(0.19, 0.31, 0.008, radius=(0.052, 0.026))
+        fingertip = arm(0.182, 0.278, 0.0, radius=(0.04, 0.022))
+        chain(chest, shoulder, elbow, wrist, palm, knuckles, fingertip)
+        thumb_base = arm(0.18, 0.365, 0.04, radius=(0.018, 0.018))
+        thumb_tip = arm(0.172, 0.335, 0.062, radius=(0.015, 0.015))
         chain(palm, thumb_base, thumb_tip)
 
         # ขาเยื้องออกด้านข้างเล็กน้อยและต้นขาด้านในบางลง ให้เห็นช่องระหว่างขาตั้งแต่เป้าลงมา
         hip = add((sign * 0.09, 0.385), (0.058, 0.072), leg=True)
         knee = add((sign * 0.082, 0.23), (0.054, 0.06), leg=True)
-        ankle = add((sign * 0.077, 0.07), (0.048, 0.05), leg=True)
-        # รองเท้าทรงมน: ส้นอยู่ใต้ข้อเท้า ปลายยื่นไปหน้า ไม่มีนิ้วเท้า
-        heel = add((sign * 0.076, 0.054, -0.014), (0.056, 0.04), leg=True)
-        toe = add((sign * 0.082, 0.052, 0.105), (0.062, 0.038), leg=True)
-        chain(pelvis, hip, knee, ankle, heel, toe)
+        ankle = add((sign * 0.077, 0.07), (0.043, 0.045), leg=True)
+        # รองเท้าทรงมน: หลังเท้าลาดจากข้อเท้าลงหาปลายเท้า ปลายกว้างกว่าส้น ไม่มีนิ้วเท้า
+        # (พื้นรองเท้าถูกตัดให้เรียบทีหลังใน flatten_soles)
+        instep = add((sign * 0.078, 0.034, 0.012), (0.054, 0.058), leg=True)
+        toe = add((sign * 0.085, 0.028, 0.108), (0.064, 0.04), leg=True)
+        chain(pelvis, hip, knee, ankle, instep, toe)
 
     mesh = bpy.data.meshes.new("Body")
     mesh.from_pydata(points, edges, [])
@@ -219,6 +222,16 @@ def close_holes(part):
     mesh.free()
 
 
+SOLE_Z = 0.002
+
+
+def flatten_soles(part):
+    """ตัดใต้รองเท้าให้เรียบแนบพื้น (ผิวที่เกลามนจะทำให้รองเท้าแตะพื้นแค่จุดเดียวเหมือนลูกบอล)"""
+    # ลอยพื้น 2 มม. เผื่อขอบรองเท้าจมพื้นตอนเท้าเอียงในท่าเดิน
+    for vertex in part.data.vertices:
+        vertex.co.z = max(vertex.co.z, SOLE_Z)
+
+
 def build(filename, level):
     reset_scene()
     rig = build_armature()
@@ -235,6 +248,8 @@ def build(filename, level):
             bpy.ops.object.modifier_apply(modifier=name)
             if kind == "SKIN":
                 close_holes(part)
+        if part is parts[0]:
+            flatten_soles(part)
     body, *head_parts = parts
     body.name = "MannequinBody"
     body.data.name = "MannequinBody"
