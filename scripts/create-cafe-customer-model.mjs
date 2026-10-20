@@ -223,12 +223,14 @@ const sit = new THREE.AnimationClip("Sit", SIT_DURATION, [
   sitTrack("RightLowerLeg", pose(1.4)),
   sitTrack("LeftFoot", pose(0.1)),
   sitTrack("RightFoot", pose(0.1)),
-  // ต้นแขนห้อยเกือบตรง ปลายแขนงอไปข้างหน้า (ทิศเดียวกับข้อศอกจริง) แล้ววางมือบนต้นขา
-  // เดิมปลายแขนหมุนสวนทางต้นแขน ข้อศอกจึงหักไปด้านหลังดูงอผิดท่า
-  sitTrack("LeftArm", pose(-0.25, 0.04)),
-  sitTrack("RightArm", pose(-0.25, -0.04)),
-  sitTrack("LeftForeArm", pose(-1.05, 0, 0.4)),
-  sitTrack("RightForeArm", pose(-1.05, 0, -0.4)),
+  // วางมือบนกลางต้นขา: ต้นแขนห้อยตรงข้างตัว ปลายแขนลาดลงไปหน้าแล้วหมุนเข้าหาตัก
+  // ข้อมือพับลงให้ถุงมือนอนราบบนต้นขา (มุมหาจากการวัดผิว: ก้นมือแตะผิวต้นขา กลางมือ x .09 z .10)
+  sitTrack("LeftArm", pose(0.11, 0.005)),
+  sitTrack("RightArm", pose(0.11, -0.005)),
+  sitTrack("LeftForeArm", pose(-0.65, 0, 0.705)),
+  sitTrack("RightForeArm", pose(-0.65, 0, -0.705)),
+  sitTrack("LeftHand", pose(-1.305)),
+  sitTrack("RightHand", pose(-1.305)),
 ]);
 
 const exporter = new GLTFExporter();
