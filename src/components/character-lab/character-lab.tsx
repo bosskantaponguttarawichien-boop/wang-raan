@@ -128,7 +128,7 @@ export function CharacterLab() {
         </section>
 
         <aside className="grid gap-3 sm:grid-cols-3" aria-label="สถานะการทดลอง">
-          <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ 1.70 ม.`} />
+          <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ ${CHARACTER_MODELS[role].height.toFixed(2)} ม.`} />
           <StatusCard
             label="ท่าปัจจุบัน"
             value={motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}
@@ -141,7 +141,7 @@ export function CharacterLab() {
   );
 }
 
-const ROLE_OPTIONS: ReadonlyArray<CharacterRole> = ["customer", "staff"];
+const ROLE_OPTIONS: ReadonlyArray<CharacterRole> = ["customer", "customerFemale", "staff"];
 
 const FACING_OPTIONS: ReadonlyArray<{ value: CharacterFacing; label: string }> = [
   { value: "front", label: "หันหน้า" },

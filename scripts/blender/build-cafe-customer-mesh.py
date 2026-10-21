@@ -31,7 +31,9 @@ OUT_DIR = Path(__file__).resolve().parent
 # ระดับการเกลาผิว: ละเอียดสำหรับ Character Lab / เบาสำหรับฉากร้านที่มีลูกค้าหลายสิบคน
 # ระดับการแบ่งช่อง: 1 ≈ 8k สามเหลี่ยม (Character Lab / ลูกค้าใกล้), 0 ≈ 2k (ลูกค้าไกลในฉากร้าน
 # ที่มีพร้อมกันหลายสิบคน) — งบเท่ารุ่นเดิม
-LEVELS = {"cafe-customer-mesh.glb": 1, "cafe-customer-mesh-lite.glb": 0}
+# รุ่นผู้หญิง: CAFE_VARIANT=female → cafe-customer-female-mesh*.glb (ดู FEMALE ใน blockout-cafe-customer.py)
+_STEM = "cafe-customer-female-mesh" if cage.FEMALE else "cafe-customer-mesh"
+LEVELS = {f"{_STEM}.glb": 1, f"{_STEM}-lite.glb": 0}
 # ระยะ (เมตร) ทั้งสองข้างของข้อต่อที่น้ำหนักผิวค่อย ๆ เปลี่ยนจากกระดูกแม่ไปกระดูกลูก
 BLEND = 0.045
 SOLE_Z = 0.002
@@ -45,9 +47,9 @@ JOINTS = {
 }
 for _side, _sign in (("Left", -1), ("Right", 1)):
     JOINTS.update({
-        f"{_side}Arm": (_sign * 0.175, 1.355, 0),       # หัวไหล่ (กลางโดมต้นแขน)
-        f"{_side}ForeArm": (_sign * 0.198, 1.065, 0),   # ศอก
-        f"{_side}Hand": (_sign * 0.21, 0.815, 0),       # ข้อมือ
+        f"{_side}Arm": (_sign * (0.175 - cage.SHOULDER_IN), 1.355, 0),       # หัวไหล่ (กลางโดมต้นแขน)
+        f"{_side}ForeArm": (_sign * (0.198 - cage.SHOULDER_IN), 1.065, 0),   # ศอก
+        f"{_side}Hand": (_sign * (0.21 - cage.SHOULDER_IN), 0.815, 0),       # ข้อมือ
         f"{_side}Leg": (_sign * 0.09, 0.88, 0),         # ข้อสะโพก
         f"{_side}LowerLeg": (_sign * 0.095, 0.49, 0),   # เข่า
         f"{_side}Foot": (_sign * 0.095, 0.08, 0),       # ข้อเท้า (ในรองเท้า)
@@ -121,7 +123,7 @@ def part_category(name):
         return PART_SHOE
     if name.startswith(("Sole", "Laces")):
         return PART_SOLE
-    if name == "Hair":
+    if name.startswith("Hair"):
         return PART_HAIR
     return PART_SKIN
 

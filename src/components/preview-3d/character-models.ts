@@ -7,25 +7,38 @@ export const CHARACTER_SCALE = 1;
 export const CHARACTER_HEIGHT = 1.7;
 
 /** บทบาทตัวละครในร้าน — แต่ละบทบาทมีไฟล์ GLB ของตัวเอง แต่ใช้โครงกระดูกและ animation (Idle/Walk/Sit) ชุดเดียวกัน */
-export type CharacterRole = "customer" | "staff";
+export type CharacterRole = "customer" | "customerFemale" | "staff";
 
 /**
  * full = ผิวละเอียด (Character Lab, ตัวละครใหญ่บนจอ)
  * lite = polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ
  * สร้างด้วย scripts/create-cafe-customer-model.mjs (--staff สำหรับพนักงาน)
  */
-export const CHARACTER_MODELS: Record<CharacterRole, { full: string; lite: string; label: string; description: string }> = {
+export const CHARACTER_MODELS: Record<
+  CharacterRole,
+  { full: string; lite: string; label: string; description: string; /** ความสูงจริงของโมเดล (เมตร) */ height: number }
+> = {
   customer: {
     full: "/assets/models/cafe-customer.glb",
     lite: "/assets/models/cafe-customer-lite.glb",
-    label: "ลูกค้า",
+    label: "ลูกค้าชาย",
     description: "เสื้อยืดสีอ่อน กางเกงยีนส์ รองเท้าผ้าใบ",
+    height: 1.7,
+  },
+  // ปั้นจากรุ่นชาย (ไหล่แคบ เอวคอด สะโพกกว้าง ผมหน้าม้าคลุมหู มัดหางม้า) แล้วย่อทั้งตัว — ท่านั่งคำนวณใหม่ให้ลงเบาะ 0.45 ม.
+  customerFemale: {
+    full: "/assets/models/cafe-customer-female.glb",
+    lite: "/assets/models/cafe-customer-female-lite.glb",
+    label: "ลูกค้าหญิง",
+    description: "ผมหน้าม้ามัดหางม้า เสื้อยืด กางเกงยีนส์ รองเท้าผ้าใบ",
+    height: 1.6,
   },
   staff: {
     full: "/assets/models/cafe-staff.glb",
     lite: "/assets/models/cafe-staff-lite.glb",
     label: "พนักงาน",
     description: "เสื้อยืดและหมวกแก๊ปสีเขียว กางเกงยีนส์",
+    height: 1.7,
   },
 };
 
@@ -37,8 +50,10 @@ export const CHARACTER_MODELS: Record<CharacterRole, { full: string; lite: strin
 export interface CustomerLook {
   /** สี sRGB เรียงตามหมวดชิ้น 0–6 */
   colors: readonly string[];
-  /** ตัวคูณขนาดตัว (สูง ~1.67–1.73 ม.) — แคบพอให้ท่านั่งยังลงเบาะพอดี (ต่างไม่เกิน ~1 ซม.) */
+  /** ตัวคูณขนาดตัว (±2% จากความสูงของโมเดล) — แคบพอให้ท่านั่งยังลงเบาะพอดี (ต่างไม่เกิน ~1 ซม.) */
   scale: number;
+  /** ใช้โมเดลลูกค้าหญิง (สูง 1.60 ม.) แทนชาย (1.70 ม.) — ความสูงต่างกันจริงโดยท่านั่งยังพอดีเบาะ */
+  female: boolean;
 }
 
 const SKIN_TONES = ["#f1d2b6", "#e8c39e", "#d9ab86", "#c08a64", "#9a6a4a"];
@@ -78,5 +93,6 @@ export function customerLook(id: number): CustomerLook {
   return {
     colors: [pick(SKIN_TONES), shirt, pick(PANTS_COLORS), shoe, sole, pick(HAIR_COLORS), shade(shirt, 0.86)],
     scale: 0.98 + next() * 0.04,
+    female: next() < 0.5,
   };
 }

@@ -18,6 +18,7 @@
 รัน: python scripts/blender/blockout-cafe-customer.py [ไฟล์ปลายทาง.blend]
 """
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -30,6 +31,10 @@ OUT = Path(sys.argv[-1]) if sys.argv[-1].endswith(".blend") else Path(__file__).
 RING = 12
 # Subdivision ทำวง 12 จุดหดเข้าราว 6%
 SMOOTH_SHRINK = 1.065
+# รุ่นผู้หญิง (CAFE_VARIANT=female): ไหล่แคบ เอวคอด สะโพกกว้าง คอเล็ก ผมยาวมัดหางม้า — โครงกระดูกชุดเดิม
+# (แขนเลื่อนเข้าหาลำตัว SHOULDER_IN) ปั้นที่ความสูงอ้างอิง 1.70 ม. แล้ว create-cafe-customer-model.mjs --female ย่อทั้งตัว
+FEMALE = os.environ.get("CAFE_VARIANT") == "female"
+SHOULDER_IN = 0.02 if FEMALE else 0.0
 
 
 def b(x, y, z=0.0):
@@ -183,14 +188,28 @@ HAIRLINE = [
 
 
 def hairline(angle):
-    """ความสูงไรผมที่มุม angle (เรเดียน, 0 = หน้า) — สมมาตรซ้าย-ขวา ต่อกันโค้งนุ่มแบบ cosine"""
+    """ความสูงไรผมที่มุม angle (เรเดียน, 0 = หน้า) — สมมาตรซ้าย-ขวา ต่อกันโค้งนุ่มแบบ cosine
+    รุ่นผู้หญิงมีหน้าม้า: ไรผมด้านหน้าต่ำลงคลุมหน้าผาก"""
     degrees = abs(math.degrees(math.atan2(math.sin(angle), math.cos(angle))))
-    for (a0, h0), (a1, h1) in zip(HAIRLINE, HAIRLINE[1:]):
+    if FEMALE:
+        return hairline_table(degrees, HAIRLINE_FEMALE) - 0.024 * max(0.0, math.cos(math.radians(degrees) * 1.5)) ** 1.5
+    return hairline_table(degrees, HAIRLINE)
+
+
+# รุ่นผู้หญิง: ผมข้างยาวลงคลุมหูถึงระดับกราม ด้านหลังรวบเป็นหางม้า
+HAIRLINE_FEMALE = [
+    (0, 1.648), (30, 1.642), (55, 1.62), (72, 1.548), (88, 1.515), (104, 1.505),
+    (118, 1.5), (140, 1.492), (180, 1.488),
+]
+
+
+def hairline_table(degrees, table):
+    for (a0, h0), (a1, h1) in zip(table, table[1:]):
         if a0 <= degrees <= a1:
             t = (degrees - a0) / (a1 - a0)
             t = (1 - math.cos(math.pi * t)) / 2
             return h0 + (h1 - h0) * t
-    return HAIRLINE[-1][1]
+    return table[-1][1]
 
 
 def head_direction(height, angle):
@@ -201,7 +220,7 @@ def head_direction(height, angle):
     return Vector((math.sin(angle) * ring, -math.cos(angle) * ring, z))
 
 
-def hair(around=32, rows=12):
+def hair(around=32, rows=12, fuller=False):
     """
     ผมสั้นรองทรงเป็นตาข่ายตามแนวหัว: แถวจากกลางกระหม่อมลงมาถึงไรผม (HAIRLINE) ทุกมุมรอบหัว
     ไรผมจึงเป็นเส้นโค้งเรียบ ไม่เป็นหยักตามตารางของหัว — หนาสุดบนกลางหัว/หน้าผาก (ผมด้านบนยาวกว่า ปัดขึ้นนิด)
@@ -223,11 +242,16 @@ def hair(around=32, rows=12):
             point, _, front = head_point(head_direction(height, angle))
             # ผมบนหัวยาว ~1.4 ซม. (หน้าผาก/กลางหัวพองกว่า) ลดเหลือ 3 มม. ที่ไรผม
             # ข้างและหลังรองทรงสั้นแนบหัว (ไม่พองเป็นทรงกะลา) — ด้านหน้าคงความหนาไว้มากกว่า
-            fringe = 0.006 * max(0.0, front) ** 2 * (1 - t) ** 0.5
+            fringe = (0.009 if fuller else 0.006) * max(0.0, front) ** 2 * (1 - t) ** 0.5
             taper = min(1.0, max(0.0, (t - 0.15) / 0.45))
-            sides = 1 - 0.78 * taper * taper * (3 - 2 * taper) * (1 - max(0.0, front) ** 2)
+            # ผมยาวรวบไปหลัง (fuller): ข้างและหลังพองกว่า ไม่รองทรงสั้น
+            sides = 1 - (0.35 if fuller else 0.78) * taper * taper * (3 - 2 * taper) * (1 - max(0.0, front) ** 2)
             # ขอบผมลอยจากหนังศีรษะ ≥ 3 มม. — บางกว่านี้ผิวหัว (เกลาต่างชิ้นกัน) จะโผล่ทะลุเป็นหยักตามไรผม
             thickness = 0.003 + 0.0105 * (1 - t ** 2.2) * sides + fringe
+            if fuller:
+                # ผมข้างที่ห้อยคลุมหูมีความหนาถึงปลาย (ปลายผมเป็นขอบ ไม่บางแนบผิว) — หนาพอคลุมใบหู
+                cover = math.exp(-((abs(math.degrees(math.atan2(math.sin(angle), math.cos(angle)))) - 92) / 26) ** 2)
+                thickness += 0.016 * cover * t ** 1.5
             ring.append(len(verts))
             verts.append(point + (point - HEAD_CENTER).normalized() * thickness)
         grid.append(ring)
@@ -868,12 +892,73 @@ def body_parts():
             ((x, 0.1, 0.09), 0.018, 0.005),
             ((x, 0.088, 0.126), 0.016, 0.005),
         ], up=(0, 1, 0), cap_start=0.4, cap_end=0.4))
-        parts.extend(ear(sign))
+        if not FEMALE:  # รุ่นผู้หญิงผมคลุมหู
+            parts.extend(ear(sign))
+    return parts
+
+
+def ponytail():
+    """หางม้า: รวบที่ท้ายทอยเหนือไรผม ห้อยลงถึงระดับสะบัก (ผูกกระดูก Head ทั้งเส้น)"""
+    back = head_point(head_direction(1.6, math.pi))[0]
+    z = -back.y  # glTF z ของท้ายทอย (ค่าลบ)
+    return tube("HairTail", [
+        ((0, 1.612, z + 0.012), 0.02, 0.018),
+        ((0, 1.6, z - 0.016), 0.024, 0.022),
+        ((0, 1.565, z - 0.032), 0.028, 0.025),
+        ((0, 1.5, z - 0.036), 0.027, 0.024),
+        ((0, 1.44, z - 0.03), 0.021, 0.019),
+        ((0, 1.395, z - 0.02), 0.012, 0.011),
+    ], up=(0, 1, 0), cap_start=0.4, cap_end=0.8)
+
+
+def smooth(edge0, edge1, x):
+    t = max(0.0, min(1.0, (x - edge0) / (edge1 - edge0)))
+    return t * t * (3 - 2 * t)
+
+
+def feminize(parts):
+    """ปรับรูปร่างรุ่นผู้หญิงจากชิ้นรุ่นผู้ชาย (พิกัด Blender: x ข้าง, z ขึ้น)"""
+    for part in parts:
+        name = part.name
+        for vertex in part.data.vertices:
+            x, y, z = vertex.co
+            side = math.copysign(1.0, x) if x else 0.0
+            if name.startswith("Arm"):
+                # แขนทั้งเส้นเลื่อนเข้า — ตรงกับข้อต่อแขนรุ่นผู้หญิงใน build-cafe-customer-mesh.py
+                x -= side * SHOULDER_IN
+            elif name == "Shirt":
+                # บ่า/หัวไหล่/แขนเสื้อแคบลงตามแขน (เฉพาะช่วงนอกลำตัว), อก, เอวคอด, ชายเสื้อบานตามสะโพก
+                shoulder = smooth(1.12, 1.24, z) * smooth(0.04, 0.13, abs(x))
+                if y < 0:
+                    chest = math.exp(-((abs(x) - 0.072) / 0.05) ** 2 - ((z - 1.215) / 0.055) ** 2)
+                    y -= 0.024 * chest
+                x -= side * SHOULDER_IN * shoulder
+                waist = math.exp(-((z - 1.07) / 0.07) ** 2)
+                hips = smooth(1.02, 0.95, z)
+                scale = 1 - 0.055 * waist + 0.05 * hips
+                x *= scale
+                y *= 1 - 0.03 * waist
+            elif name == "Pants":
+                # สะโพก/ก้นกว้างขึ้น ค่อย ๆ หายลงไปถึงต้นขา
+                hips = math.exp(-((z - 0.9) / 0.09) ** 2)
+                x *= 1 + 0.07 * hips
+                y *= 1 + 0.03 * hips
+            elif name.startswith(("Head", "Hair", "Ear", "Nose")):
+                # หัวเล็กลงนิด (รอบจุดกลางหัว — คอ/คางยังต่อกันพอดี)
+                center = Vector((0, HEAD_CENTER.y, HEAD_CENTER.z - 0.06))
+                x, y, z = center + (Vector((x, y, z)) - center) * 0.96
+            elif name in ("Collar", "Neckband"):
+                # คอเล็กลง
+                x *= 0.9
+                y = (y - 0.006) * 0.92 + 0.006
+            vertex.co = (x, y, z)
     return parts
 
 
 def cage_parts():
     """ชิ้นโครงตาข่ายแยกกัน (ยังไม่รวม) — build-cafe-customer-mesh.py ใช้ผูกแต่ละชิ้นกับกระดูก"""
+    if FEMALE:
+        return feminize([head(), hair(fuller=True), ponytail(), *body_parts()])
     return [head(), hair(), *body_parts()]
 
 
