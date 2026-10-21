@@ -5,7 +5,7 @@
  * แล้วเกลาและผูกน้ำหนักกับกระดูก (scripts/blender/build-cafe-customer-mesh.py) — สคริปต์นี้ใส่โครงกระดูกและ animation
  *
  * ตัวละครสัดส่วนผู้ใหญ่จริง สูง 1.70 ม. ที่ขนาด 1:1 (หน่วยโมเดล = เมตร) เข้ากับโต๊ะ เก้าอี้ เคาน์เตอร์ขนาดจริงในฉากร้าน
- * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว
+ * และมีคลิป Idle, Walk, Sit อยู่ในไฟล์เดียว (พนักงานมี Work เพิ่ม)
  * รัน: python scripts/blender/build-cafe-customer-mesh.py   (เมื่อแก้รูปร่างใน blockout-cafe-customer.py)
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
@@ -210,27 +210,76 @@ function sampled(duration, frames) {
   return { times, phases };
 }
 
-const idleCycle = sampled(2.4, 24);
-const idleWave = (amount, shift = 0, base = 0) =>
-  quaternionFrames(idleCycle.phases.map((phase) => base + amount * Math.sin(phase + shift)));
-const idle = new THREE.AnimationClip("Idle", 2.4, [
-  new THREE.QuaternionKeyframeTrack("Head.quaternion", idleCycle.times, idleWave(0.02, Math.PI / 2)),
-  new THREE.QuaternionKeyframeTrack("Neck.quaternion", idleCycle.times, idleWave(0.012, Math.PI / 2)),
-  new THREE.QuaternionKeyframeTrack("Spine.quaternion", idleCycle.times, idleWave(0.012)),
-  new THREE.QuaternionKeyframeTrack("LeftArm.quaternion", idleCycle.times, idleWave(0.03)),
-  new THREE.QuaternionKeyframeTrack("RightArm.quaternion", idleCycle.times, idleWave(0.03)),
-  new THREE.QuaternionKeyframeTrack("LeftForeArm.quaternion", idleCycle.times, idleWave(0.03, -0.6, -0.08)),
-  new THREE.QuaternionKeyframeTrack("RightForeArm.quaternion", idleCycle.times, idleWave(0.03, -0.6, -0.08)),
+/** track หมุนจากฟังก์ชันมุม [x, y, z] ต่อ phase (0..2π ต่อรอบคลิป) — ทุกเทอมเป็น sin/cos ของ phase จำนวนเต็มเท่า คลิปจึงวนต่อกันเนียน */
+const eulerTrack = (name, cycle, angles, order = "XYZ") =>
+  new THREE.QuaternionKeyframeTrack(name + ".quaternion", cycle.times,
+    cycle.phases.flatMap((phase) => new THREE.Quaternion().setFromEuler(new THREE.Euler(...angles(phase), order)).toArray()));
+
+// ---- Idle: ยืนรอ 6 วิ — หายใจ 2 รอบ (อกพองนิด ไหล่ยกตาม), ถ่ายน้ำหนักซ้าย-ขวา 1 รอบ (สะโพกเลื่อน ขาเอียงให้เท้าอยู่ที่เดิม
+// ลำตัวเอียงกลับให้หัวตรง), หันมองรอบ ๆ ช้า ๆ
+const IDLE_DURATION = 6;
+const idleCycle = sampled(IDLE_DURATION, 72);
+const IDLE_SHIFT = 0.014;
+const shift = (phase) => IDLE_SHIFT * Math.sin(phase);
+const breath = (phase) => 0.5 - 0.5 * Math.cos(phase * 2);
+// เท้าอยู่กับที่: สะโพกเลื่อน x → ขาทั้งสองเอียงรอบแกน z ด้วยมุมเท่ากัน แล้วข้อเท้าเอียงกลับ
+const relaxedKnee = (phase) => 0.05 * Math.max(0, Math.sin(phase));
+const legLean = (phase) => Math.atan2(shift(phase), HIPS_Y - LEG_DROP - ANKLE_Y);
+const idle = new THREE.AnimationClip("Idle", IDLE_DURATION, [
+  new THREE.VectorKeyframeTrack("Hips.position", idleCycle.times,
+    // เชิงกรานเอียง → ข้อสะโพกข้างรับน้ำหนักต่ำลง (0.09 ม. × มุมเอียง) ยกสะโพกชดเชยให้เท้าข้างนั้นไม่จมพื้น
+    idleCycle.phases.flatMap((phase) => [shift(phase), HIPS_Y + 0.0026 * Math.abs(Math.sin(phase)), 0])),
+  eulerTrack("Hips", idleCycle, (phase) => [0, 0, 0.025 * Math.sin(phase)]),
+  eulerTrack("LeftLeg", idleCycle, (phase) => [0, 0, -legLean(phase) - 0.025 * Math.sin(phase)]),
+  eulerTrack("RightLeg", idleCycle, (phase) => [0, 0, -legLean(phase) - 0.025 * Math.sin(phase)]),
+  // ขาที่รับน้ำหนักน้อยลงงอเข่านิด ข้อเท้างอกลับให้ฝ่าเท้าราบ (ไม่จิกปลายเท้าลงพื้น)
+  eulerTrack("LeftFoot", idleCycle, (phase) => [-relaxedKnee(phase), 0, legLean(phase)]),
+  eulerTrack("RightFoot", idleCycle, (phase) => [-relaxedKnee(phase + Math.PI), 0, legLean(phase)]),
+  eulerTrack("LeftLowerLeg", idleCycle, (phase) => [relaxedKnee(phase), 0, 0]),
+  eulerTrack("RightLowerLeg", idleCycle, (phase) => [relaxedKnee(phase + Math.PI), 0, 0]),
+  eulerTrack("Spine", idleCycle, (phase) => [-0.012 * breath(phase), 0.02 * Math.sin(phase + 0.8), -0.04 * Math.sin(phase)]),
+  eulerTrack("Neck", idleCycle, (phase) => [0.01 * breath(phase), 0.08 * Math.sin(phase) + 0.03 * Math.sin(phase * 3 + 1), 0.015 * Math.sin(phase)]),
+  eulerTrack("Head", idleCycle, (phase) => [0.02 * Math.sin(phase * 2 + 0.5), 0.2 * Math.sin(phase) + 0.07 * Math.sin(phase * 3 + 1), 0]),
+  eulerTrack("LeftArm", idleCycle, (phase) => [-0.02 + 0.015 * Math.sin(phase), 0, -0.04 - 0.01 * breath(phase)]),
+  eulerTrack("RightArm", idleCycle, (phase) => [-0.02 - 0.015 * Math.sin(phase), 0, 0.04 + 0.01 * breath(phase)]),
+  eulerTrack("LeftForeArm", idleCycle, (phase) => [-0.12 + 0.03 * Math.sin(phase * 2), 0, 0]),
+  eulerTrack("RightForeArm", idleCycle, (phase) => [-0.12 - 0.03 * Math.sin(phase * 2), 0, 0]),
+]);
+
+// ---- Work (พนักงาน): ยืนหลังเคาน์เตอร์ มือสองข้างวางทำงานบนเคาน์เตอร์ (ข้อมือสูง ~1 ม. หน้าตัว ~0.3 ม.) ก้มมองมือ
+// มือขยับสลับกันเหมือนกดเครื่องคิดเงิน/จัดของ, ราวกลางคลิปเงยหน้ามองไปหน้าร้าน แล้วก้มกลับ, ตัวโยกช้า ๆ
+const WORK_DURATION = 8;
+const workCycle = sampled(WORK_DURATION, 96);
+// 0 → 1 → 0 ช่วงเงยหน้า (กลางคลิป) แบบนุ่ม
+const lookUp = (phase) => Math.max(0, Math.cos(phase - Math.PI)) ** 3;
+const work = new THREE.AnimationClip("Work", WORK_DURATION, [
+  new THREE.VectorKeyframeTrack("Hips.position", workCycle.times,
+    workCycle.phases.flatMap((phase) => [0.008 * Math.sin(phase), HIPS_Y - 0.003, 0])),
+  eulerTrack("LeftLeg", workCycle, (phase) => [0, 0, -0.01 * Math.sin(phase)]),
+  eulerTrack("RightLeg", workCycle, (phase) => [0, 0, -0.01 * Math.sin(phase)]),
+  eulerTrack("LeftFoot", workCycle, (phase) => [0, 0, 0.01 * Math.sin(phase)]),
+  eulerTrack("RightFoot", workCycle, (phase) => [0, 0, 0.01 * Math.sin(phase)]),
+  eulerTrack("Spine", workCycle, (phase) => [0.09 - 0.05 * lookUp(phase) - 0.01 * (0.5 - 0.5 * Math.cos(phase * 4)), 0.03 * Math.sin(phase * 2), -0.012 * Math.sin(phase)]),
+  eulerTrack("Neck", workCycle, (phase) => [0.16 - 0.16 * lookUp(phase), 0.04 * Math.sin(phase * 3), 0]),
+  eulerTrack("Head", workCycle, (phase) => [0.2 - 0.22 * lookUp(phase), 0.06 * Math.sin(phase * 2 + 0.4) + 0.12 * lookUp(phase), 0]),
+  // ต้นแขนยื่นไปหน้า ปลายแขนเกือบขนานพื้นและหมุนเข้าหากลางตัว — มือขยับขึ้นลงสลับกัน (ความถี่สูงกว่าตัวโยก)
+  eulerTrack("LeftArm", workCycle, (phase) => [-0.32 + 0.04 * Math.sin(phase * 5), 0, 0.1], "YXZ"),
+  eulerTrack("RightArm", workCycle, (phase) => [-0.3 + 0.04 * Math.sin(phase * 5 + 2.2), 0, -0.1], "YXZ"),
+  eulerTrack("LeftForeArm", workCycle, (phase) => [-1.16 - 0.06 * Math.sin(phase * 5 + 0.6) + 0.1 * lookUp(phase), 0.35, 0], "YXZ"),
+  eulerTrack("RightForeArm", workCycle, (phase) => [-1.14 - 0.06 * Math.sin(phase * 5 + 2.8) + 0.1 * lookUp(phase), -0.35, 0], "YXZ"),
+  eulerTrack("LeftHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 1.2), 0, 0]),
+  eulerTrack("RightHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 3.4), 0, 0]),
 ]);
 
 // Solve a two-bone leg toward a planted/swinging ankle instead of swinging
-// every joint independently. ก้าวละ 0.5 ม. ราว 126 ก้าว/นาที (~1.05 ม./วิ) เท่าคนเดินในร้าน
+// every joint independently. ก้าวละ 0.45 ม. ราว 126 ก้าว/นาที (~0.95 ม./วิ) เท่าคนเดินในร้าน
 const WALK_DURATION = 0.95;
-const WALK_DISTANCE = 1.0;
+const WALK_DISTANCE = 0.9;
 const walkCycle = sampled(WALK_DURATION, 60);
 model.userData.walkCycleDistance = WALK_DISTANCE;
-// สะโพกต่ำสุดตอนสองขากางสุด (ขาเหยียดถึงพื้นพอดี) สูงสุดตอนขาผ่านกัน
-const hipHeights = walkCycle.phases.map((phase) => HIPS_Y - 0.045 + 0.012 * (1 - Math.cos(phase * 2)));
+// สะโพกต่ำสุดตอนสองขากางสุด (ขาเหยียดถึงพื้นพอดี) สูงสุดตอนขาผ่านกัน — ตอนนั้นขาที่รับน้ำหนักเกือบเหยียดตรง
+// (ก้าวละ 0.45 ม.: ขากาง ±0.225 ม. ข้อสะโพกต้องต่ำลง ~3.3 ซม. จากท่ายืน)
+const hipHeights = walkCycle.phases.map((phase) => HIPS_Y - 0.034 + 0.015 * (1 - Math.cos(phase * 2)));
 function legPose(phase, hipY) {
   const t = ((phase / (Math.PI * 2)) % 1 + 1) % 1;
   const swing = Math.max(0, (t - 0.5) * 2);
@@ -334,7 +383,8 @@ const sit = new THREE.AnimationClip("Sit", SIT_DURATION, [
 const exporter = new GLTFExporter();
 const glb = await exporter.parseAsync(model, {
   binary: true,
-  animations: [idle, walk, sit],
+  // Work ใส่เฉพาะไฟล์พนักงาน
+  animations: STAFF ? [idle, walk, sit, work] : [idle, walk, sit],
   onlyVisible: true,
 });
 

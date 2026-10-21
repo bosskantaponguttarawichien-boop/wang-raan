@@ -43,7 +43,8 @@ describe("character models", () => {
       const customer = await load(CHARACTER_MODELS.customer[variant]);
       const staff = await load(CHARACTER_MODELS.staff[variant]);
       expect(boneNames(staff.scene)).toEqual(boneNames(customer.scene));
-      expect(staff.animations.map((clip) => clip.name)).toEqual(customer.animations.map((clip) => clip.name));
+      // พนักงานมีท่าทำงานหลังเคาน์เตอร์เพิ่ม
+      expect(staff.animations.map((clip) => clip.name)).toEqual([...customer.animations.map((clip) => clip.name), "Work"]);
       expect(staff.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance).toBe(
         customer.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance,
       );

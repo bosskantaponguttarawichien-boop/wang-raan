@@ -45,6 +45,10 @@ type AnimatedCustomer = {
   target: THREE.Vector3;
   animation: CustomerAnimation;
   targetRotation: number;
+  /** วินาทีที่ยืนนิ่ง (ต่อคิว/รอ) ต่อเนื่อง — นานพอจะเปลี่ยนจากท่าเดินค้างเป็นท่ายืนรอ */
+  still: number;
+  /** เหลื่อมจังหวะท่ายืนรอ ไม่ให้ลูกค้าที่ต่อคิวขยับพร้อมกัน (วินาที) */
+  idleOffset: number;
 };
 
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนแค่สร้าง `content` ใหม่ ไม่สร้าง WebGL context ใหม่ */
@@ -83,6 +87,10 @@ const MODEL_URL = CHARACTER_MODELS.customer.full;
 const LITE_MODEL_URL = CHARACTER_MODELS.customer.lite;
 /** เหลื่อมจังหวะท่ายืนของพนักงานแต่ละคน ไม่ให้ขยับพร้อมกันทั้งร้าน (วินาที) */
 const STAFF_IDLE_PHASE = 0.83;
+/** ลูกค้าเคลื่อนช้ากว่านี้ (ม./วิ) นานกว่า IDLE_AFTER_SECONDS ถือว่ายืนรอ → เล่น Idle; เร็วกว่า IDLE_EXIT_SPEED กลับไปเดิน */
+const IDLE_SPEED = 0.05;
+const IDLE_EXIT_SPEED = 0.12;
+const IDLE_AFTER_SECONDS = 0.5;
 const BODY_MESH_NAME = "MannequinBody";
 /** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
 const LITE_MAX_SCREEN_HEIGHT = 48;
@@ -817,10 +825,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     let frame = 0;
     let disposed = false;
 
-    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action">, name: CustomerAnimation) => {
+    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action" | "idleOffset">, name: CustomerAnimation) => {
       const clip = THREE.AnimationClip.findByName(clips, name) ?? clips[0];
       if (!clip) return;
       const action = customer.mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
+      if (name === "Idle") action.time = customer.idleOffset % clip.duration;
       if (name === "Sit") {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
@@ -897,7 +906,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         loadStaffModels();
         return;
       }
-      const idle = THREE.AnimationClip.findByName(staffAsset.clips, "Idle");
+      // พนักงานทำงานบนเคาน์เตอร์ (Work) — ไฟล์เก่าที่ไม่มีคลิปนี้ใช้ท่ายืน
+      const idle =
+        THREE.AnimationClip.findByName(staffAsset.clips, "Work") ?? THREE.AnimationClip.findByName(staffAsset.clips, "Idle");
       spots.forEach((spot, index) => {
         const model = cloneSkinned(staffAsset.template!);
         model.position.set(spot.position.x, 0, spot.position.y);
@@ -959,6 +970,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
             target: new THREE.Vector3(targetX, 0, targetZ),
             animation,
             targetRotation: 0,
+            still: 0,
+            idleOffset: (id * 1.37) % 6,
           };
           playClip(customer, animation);
           customers.set(id, customer);
@@ -968,7 +981,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         if (dx * dx + dz * dz > 0.0001) customer.targetRotation = Math.atan2(dx, dz);
         if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
         customer.target.set(targetX, 0, targetZ);
-        if (animation !== customer.animation) {
+        // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
+        const standing = animation === "Walk" && customer.animation === "Idle";
+        if (animation !== customer.animation && !standing) {
           if (customer.animation === "Sit") standUp(customer);
           else {
             customer.standingUp = 0;
@@ -1019,6 +1034,17 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         const distance = Math.hypot(customer.model.position.x - beforeX, customer.model.position.z - beforeZ);
         const turn = customer.targetRotation - customer.model.rotation.y;
         customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+        if (customer.animation === "Walk" || customer.animation === "Idle") {
+          const speed = delta > 0 ? distance / delta : 0;
+          customer.still = speed < IDLE_SPEED ? customer.still + delta : 0;
+          if (customer.animation === "Walk" && customer.still > IDLE_AFTER_SECONDS) {
+            customer.animation = "Idle";
+            playClip(customer, "Idle");
+          } else if (customer.animation === "Idle" && speed > IDLE_EXIT_SPEED) {
+            customer.animation = "Walk";
+            playClip(customer, "Walk");
+          }
+        }
         // Advance the walk by distance travelled, including simulation speed changes.
         customer.mixer.update(
           customer.animation === "Walk" ? Math.min(distance / walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
