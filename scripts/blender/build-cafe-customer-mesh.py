@@ -19,6 +19,7 @@ import sys
 from pathlib import Path
 
 import bpy
+import bmesh  # ต้อง import หลัง bpy เมื่อใช้ bpy แบบ pip
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 
@@ -65,6 +66,22 @@ PARENT = {
 
 def joint(name):
     return Vector(cage.b(*JOINTS[name]))
+
+
+def relax_armpits(part):
+    """
+    มุมรักแร้หน้า/หลังของเสื้อเป็นจุดที่ 5 หน้ามาบรรจบ (ตัวเสื้อ แขนเสื้อ บ่า) ผิวเรียบจึงหักเป็นรอยบากเล็ก ๆ
+    — คลายเฉพาะจุดในรัศมี 4 ซม. รอบมุมทั้งสี่ (Laplacian smooth) แทนการแก้โครงตาข่ายทั้งชิ้น
+    """
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    corners = [Vector((sx * 0.15, sy * 0.08, 1.285)) for sx in (-1, 1) for sy in (-1, 1)]
+    near = [v for v in shape.verts if min((v.co - c).length for c in corners) < 0.045]
+    print(f"คลายรักแร้ {len(near)} จุด")
+    for _ in range(12):
+        bmesh.ops.smooth_vert(shape, verts=near, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    shape.to_mesh(part.data)
+    shape.free()
 
 
 def snap_to_surface(part, target):
@@ -201,6 +218,8 @@ def build(filename, level):
             bpy.ops.object.modifier_apply(modifier=smooth.name)
         snap_to_surface(part, target)
         bpy.data.objects.remove(target)
+        if part.name == "Shirt":
+            relax_armpits(part)
         # การดูดจุดขยับจุดใต้พื้นรองเท้าลงต่ำกว่าพื้นได้เล็กน้อย — ยกให้ลอย 2 มม. (เผื่อเท้าเอียงตอนเดิน)
         for vertex in part.data.vertices:
             vertex.co.z = max(vertex.co.z, SOLE_Z)
