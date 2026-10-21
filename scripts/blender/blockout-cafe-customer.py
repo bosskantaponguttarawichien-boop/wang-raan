@@ -523,7 +523,12 @@ def shirt(grow=SMOOTH_SHRINK, power=2.3):
         if armpit:
             # เส้นใต้รักแร้อยู่ตรงรอยต่อลำตัวกับแขน ลึกเข้ามาจากข้างลำตัว และต่ำลงนิดตรงกลาง
             x = math.copysign(min(abs(x), 0.152), x)
-        dip = 0.008 if i in (6, 14) else 0.0
+        # เส้นใต้รักแร้ต่ำลงเกือบถึงวงถัดไปของตัวเสื้อ/แขนเสื้อ — ร่องระหว่างตัวกับแขนเสื้อก้นมน ไม่เป็นสันมีดที่บุ๋มตรงมุมรักแร้
+        # มุมรักแร้หน้า/หลังต่ำลงนิดและนูนออก ร่องจึงจบแบบลาดหายไปในผ้า ไม่บุ๋มเป็นจุด
+        corner_point = i in (0, 4, 8, 12)
+        dip = 0.026 if i in (6, 14) else (0.018 if armpit else (0.008 if corner_point else 0.0))
+        if corner_point:
+            z *= 1.07
         share = 0.8 if armpit else (0.5 if i in (0, 4, 8, 12) else 0.0)
         torso.append(add(x, split_y - dip, z, share))
         if i in (0, 4, 8, 12):
@@ -542,7 +547,8 @@ def shirt(grow=SMOOTH_SHRINK, power=2.3):
         for j in range(1, 8):
             t = j / 8
             angle = a0 + (a1 - a0) * t
-            radius = SLEEVE_CAP_R * grow + (d0 - SLEEVE_CAP_R * grow) * (1 - math.sin(math.pi * t)) ** 2
+            # ลดระยะลงช้า ๆ จากมุมรักแร้ ขอบวงจึงต่อจากลำตัวไปรอบหัวไหล่แบบโค้งเรียบ ไม่หักเป็นมุมเว้า
+            radius = SLEEVE_CAP_R * grow + (d0 - SLEEVE_CAP_R * grow) * (1 - math.sin(math.pi * t)) ** 1.2
             points.append((cx + radius * math.cos(angle), radius * math.sin(angle)))
         return points
 
@@ -582,7 +588,13 @@ def shirt(grow=SMOOTH_SHRINK, power=2.3):
             ring = []
             for i in range(12):
                 angle = around[i] + (uniform[i] - around[i]) * blend
-                ring.append(add(sign * x + side_r * grow * math.cos(angle), y, depth_r * grow * math.sin(angle), 1.0))
+                px, pz = sign * x + side_r * grow * math.cos(angle), depth_r * grow * math.sin(angle)
+                if row == 0:
+                    # วงแรกยังกว้างกว่าแขนเสื้อ ค่อย ๆ เข้ารูปจากวงรักแร้ — มุมรักแร้หน้า/หลังไม่หักเป็นรอยบุ๋ม
+                    start = verts[first[i]]
+                    px += (start.x - px) * 0.35
+                    pz += (-start.y - pz) * 0.35
+                ring.append(add(px, y, pz, 1.0))
             quads(previous, ring)
             previous = ring
         cuff = SHIRT_SLEEVE[-1]
@@ -689,12 +701,12 @@ def arm(sign):
         knuckle = 0.003 if k % 2 else 0.0  # ปุ่มข้อนิ้วนูนบนหลังมือ
         # ง่ามนิ้ว (ขอบระหว่างนิ้ว) บางกว่าและต่ำกว่าข้อนิ้ว ผิวจึงลาดลงเป็นง่ามนุ่ม ๆ ไม่เป็นสันแหลม
         web = k % 2 == 0 and 0 < k < 8
-        depth = thick * (0.55 if web else 1.0) + knuckle
-        back_row.append(add(b(cx + sign * depth, KNUCKLE_Y - (0.007 if web else 0.0), z)))
+        depth = thick * (0.7 if web else 1.0) + knuckle
+        back_row.append(add(b(cx + sign * depth, KNUCKLE_Y - (0.017 if web else 0.0), z)))
     front_row = []
     for i in back_row[::-1]:
         web_y = verts[i].z
-        depth = thick * (0.55 if web_y < KNUCKLE_Y - 1e-4 else 1.0)
+        depth = thick * (0.7 if web_y < KNUCKLE_Y - 1e-4 else 1.0)
         front_row.append(add(b(cx - sign * depth, web_y, -verts[i].y)))
     knuckle_ring = back_row + front_row
     # เรียงให้มุมรอบฝ่ามือเพิ่มขึ้นทางเดียวกับวงแขน (มุม 0 = +x, 90° = หน้า)

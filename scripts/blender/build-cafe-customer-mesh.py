@@ -20,6 +20,7 @@ from pathlib import Path
 
 import bpy
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import importlib  # noqa: E402
@@ -64,6 +65,29 @@ PARENT = {
 
 def joint(name):
     return Vector(cage.b(*JOINTS[name]))
+
+
+def snap_to_surface(part, target):
+    """
+    ดูดแต่ละจุดลงผิวเรียบที่ใกล้ที่สุด (แบบ Shrinkwrap) แต่ข้ามผิวที่หันคนละทาง —
+    ในร่องแคบ (ง่ามนิ้ว) จุดใกล้สุดมักอยู่บนนิ้วข้าง ๆ ถ้าดูดไปจะเป็นหนามแหลม จึงยิงตามแนว normal ของจุดแทน
+    """
+    surface = target.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
+    tree = BVHTree.FromPolygons([v.co.copy() for v in surface.vertices], [p.vertices[:] for p in surface.polygons])
+    target.to_mesh_clear()
+    part.data.update()
+    for vertex in part.data.vertices:
+        normal = vertex.normal
+        location, face_normal, _, _ = tree.find_nearest(vertex.co)
+        if location is None:
+            continue
+        if face_normal.dot(normal) < 0.3:
+            hits = [tree.ray_cast(vertex.co, direction, 0.02) for direction in (normal, -normal)]
+            hits = [hit for hit in hits if hit[0] is not None and hit[1].dot(normal) > 0]
+            if not hits:
+                continue
+            location = min(hits, key=lambda hit: hit[3])[0]
+        vertex.co = location
 
 
 def smoothstep(edge0, edge1, x):
@@ -175,10 +199,7 @@ def build(filename, level):
             smooth = part.modifiers.new("Split", "SUBSURF")
             smooth.levels = level
             bpy.ops.object.modifier_apply(modifier=smooth.name)
-        snap = part.modifiers.new("Snap", "SHRINKWRAP")
-        snap.target = target
-        snap.wrap_method = "NEAREST_SURFACEPOINT"
-        bpy.ops.object.modifier_apply(modifier=snap.name)
+        snap_to_surface(part, target)
         bpy.data.objects.remove(target)
         # การดูดจุดขยับจุดใต้พื้นรองเท้าลงต่ำกว่าพื้นได้เล็กน้อย — ยกให้ลอย 2 มม. (เผื่อเท้าเอียงตอนเดิน)
         for vertex in part.data.vertices:
