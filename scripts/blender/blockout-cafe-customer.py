@@ -182,8 +182,12 @@ def head():
 # จอนลงมาหน้าหู, ผมเหนือใบหู, หลังหูลงต่ำ, ท้ายทอยลงถึงต้นคอแบบผมสั้นรองทรง
 HAIRLINE = [
     (0, 1.648), (30, 1.642), (55, 1.628), (72, 1.585), (88, 1.6), (104, 1.603),
-    (118, 1.54), (140, 1.5), (180, 1.488),
+    # ท้ายทอยตัดเป็นแนวโค้งตื้น ๆ ที่ต้นคอ (เดิมเป็นตัว V ลึกลงคอเหมือนหมวกกันน็อก)
+    (118, 1.545), (140, 1.512), (165, 1.503), (180, 1.502),
 ]
+# แสกข้าง (มุมจากหน้า, +x) และลายหวีผม: เส้นผมเป็นสันเล็ก ๆ ปัดจากแสกไปข้าง/ไปหน้า
+HAIR_PART = math.radians(28)
+HAIR_STRANDS = 18
 
 
 def hairline(angle):
@@ -205,7 +209,7 @@ def head_direction(height, angle):
     return Vector((math.sin(angle) * ring, -math.cos(angle) * ring, z))
 
 
-def hair(around=32, rows=12):
+def hair(around=48, rows=14):
     """
     ผมสั้นรองทรงเป็นตาข่ายตามแนวหัว: แถวจากกลางกระหม่อมลงมาถึงไรผม (HAIRLINE) ทุกมุมรอบหัว
     ไรผมจึงเป็นเส้นโค้งเรียบ ไม่เป็นหยักตามตารางของหัว — หนาสุดบนกลางหัว/หน้าผาก (ผมด้านบนยาวกว่า ปัดขึ้นนิด)
@@ -223,15 +227,28 @@ def hair(around=32, rows=12):
         for k in range(around):
             angle = 2 * math.pi * k / around
             # แถวถี่ใกล้กระหม่อม (ช่วงที่ผิวโค้งมาก) — รุ่นเบาที่ไม่เกลาผิวจึงไม่มีหนังหัวโผล่กลางหัว
-            height = top + (hairline(angle) - top) * (1 - (1 - t) ** 1.25)
+            line = hairline(angle)
+            # ไรผมหน้าเป็นกระจุกปลายผมสั้นยาวไม่เท่ากัน (ไม่เรียบเป็นเส้นตัด)
+            front_edge = max(0.0, math.cos(angle)) ** 3
+            line -= 0.004 * front_edge * (0.5 + 0.5 * math.sin(angle * 31 + 0.7))
+            height = top + (line - top) * (1 - (1 - t) ** 1.25)
             point, _, front = head_point(head_direction(height, angle))
             # ผมบนหัวยาว ~1.4 ซม. (หน้าผาก/กลางหัวพองกว่า) ลดเหลือ 3 มม. ที่ไรผม
             # ข้างและหลังรองทรงสั้นแนบหัว (ไม่พองเป็นทรงกะลา) — ด้านหน้าคงความหนาไว้มากกว่า
-            fringe = 0.006 * max(0.0, front) ** 2 * (1 - t) ** 0.5
-            taper = min(1.0, max(0.0, (t - 0.15) / 0.45))
+            fringe = 0.009 * max(0.0, front) ** 2 * (1 - t) ** 0.4
+            # ทรงซอยสั้นข้าง: ผมด้านบนยาวจบเป็นชั้นเหนือขมับ (ช่วงเปลี่ยนแคบ เห็นเป็นขั้น) ข้าง/หลังสั้นแนบหัว
+            taper = min(1.0, max(0.0, (t - 0.3) / 0.16))
             sides = 1 - 0.78 * taper * taper * (3 - 2 * taper) * (1 - max(0.0, front) ** 2)
             # ขอบผมลอยจากหนังศีรษะ ≥ 3 มม. — บางกว่านี้ผิวหัว (เกลาต่างชิ้นกัน) จะโผล่ทะลุเป็นหยักตามไรผม
             thickness = 0.003 + 0.0105 * (1 - t ** 2.2) * sides + fringe
+            # แสก: ร่องตื้นตามแนวแสกบนหัว, ผมฝั่งตรงข้ามแสก (ฝั่งที่ปัดไป) พองกว่า
+            offset = math.atan2(math.sin(angle - HAIR_PART), math.cos(angle - HAIR_PART))
+            crown_zone = (1 - t) ** 0.6 * max(0.0, math.cos(angle * 0.9)) ** 0.5
+            thickness -= 0.008 * math.exp(-(offset / 0.075) ** 2) * crown_zone * (1 - t) ** 0.5
+            thickness += 0.004 * crown_zone * (1 - math.exp(-(offset / 0.5) ** 2)) * (1 if offset < 0 else 0.35)
+            # ลายเส้นผม: สันเล็ก ๆ เอียงตามทิศหวี (ห่างแสกออกไปยิ่งเอียง) — หายไปที่ขอบผมบาง ๆ
+            sweep = angle + 0.9 * t * (-1 if offset < 0 else 1)
+            thickness += 0.0032 * math.sin(HAIR_STRANDS * sweep) * (1 - t ** 3) * min(1.0, t * 4)
             ring.append(len(verts))
             verts.append(point + (point - HEAD_CENTER).normalized() * thickness)
         grid.append(ring)

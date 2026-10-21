@@ -179,11 +179,11 @@ if (STAFF) {
   const SEAM_COLOR = CAP_COLOR.clone().multiplyScalar(0.8);
   const UNDER_BRIM_COLOR = CAP_COLOR.clone().multiplyScalar(0.5);
   const crown = [[1.612, 0.086], [1.625, 0.0857], [1.64, 0.084], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
-  // ขอบหมวกรัดแนบหัว (ห่างผิว 1.2 ซม. พอทับผมบาง ๆ ตรงขอบ) แล้วค่อยพองขึ้นครอบผมกลางกระหม่อม (~1.8 ซม.)
+  // ขอบหมวกรัดแนบหัว (ห่างผิว 1.2 ซม. พอทับผมบาง ๆ ตรงขอบ) แล้วค่อยพองขึ้นครอบผมกลางกระหม่อม (~2.2 ซม. — ผมด้านบนพองตามแสก)
   const profile = crown.map(([y, r]) => {
     const t = Math.min(1, Math.max(0, (y - 1.612) / 0.06));
-    const offset = 0.012 + 0.006 * t * t * (3 - 2 * t);
-    return [r > 0 ? r + offset : 0, y + 0.004 + 0.012 * t];
+    const offset = 0.012 + 0.01 * t * t * (3 - 2 * t);
+    return [r > 0 ? r + offset : 0, y + 0.004 + 0.017 * t];
   });
   const profileAt = (t) => {
     const f = t * (profile.length - 1);
