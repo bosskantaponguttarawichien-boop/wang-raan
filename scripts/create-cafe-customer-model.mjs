@@ -19,7 +19,7 @@ import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
 import { NodeIO } from "@gltf-transform/core";
-import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
+import { ALL_EXTENSIONS, EXTMeshoptCompression, KHRMeshQuantization } from "@gltf-transform/extensions";
 import { dedup, prune, quantize, reorder, resample } from "@gltf-transform/functions";
 import { MeshoptEncoder } from "meshoptimizer";
 
@@ -353,6 +353,8 @@ await document.transform(
   quantize({ pattern: /^(NORMAL|JOINTS_0|WEIGHTS_0)$/, quantizeNormal: 8, quantizeWeight: 8 }),
   reorder({ encoder: MeshoptEncoder }),
 );
+// normal เป็น int8 ต้องประกาศ KHR_mesh_quantization เอง (quantize ไม่ประกาศให้เมื่อไม่ได้บีบตำแหน่งจุด)
+document.createExtension(KHRMeshQuantization).setRequired(true);
 document.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
 const compressed = await io.writeBinary(document);
 

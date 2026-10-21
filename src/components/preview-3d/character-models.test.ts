@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { CHARACTER_MODELS } from "./character-models";
+import { CHARACTER_MODELS, customerLook } from "./character-models";
 import { createCharacterLoader } from "./character-loader";
 
 async function load(url: string) {
@@ -16,6 +16,21 @@ function boneNames(scene: THREE.Object3D) {
   });
   return names.sort();
 }
+
+describe("customer look", () => {
+  it("is stable per customer and varies across customers", () => {
+    expect(customerLook(7)).toEqual(customerLook(7));
+    const looks = Array.from({ length: 40 }, (_, id) => customerLook(id));
+    for (const look of looks) {
+      expect(look.colors).toHaveLength(7);
+      for (const color of look.colors) expect(color).toMatch(/^#[0-9a-f]{6}$/);
+      expect(look.scale).toBeGreaterThanOrEqual(0.98);
+      expect(look.scale).toBeLessThanOrEqual(1.02);
+    }
+    // เสื้อ (หมวด 1) ไม่ซ้ำกันหมดทั้งร้าน
+    expect(new Set(looks.map((look) => look.colors[1])).size).toBeGreaterThan(5);
+  });
+});
 
 describe("character models", () => {
   it("gives customers and staff separate files", () => {
@@ -51,6 +66,10 @@ describe("character models", () => {
       expect(staffColors.size).toBe(7);
       // ต่างกันแค่สีเสื้อ (ตัวเสื้อ + ขอบคอ)
       expect([...staffColors].filter((color) => !customerColors.has(color))).toHaveLength(2);
+      // หมวดชิ้น 0–6 ส่งออกไปให้ฉากร้านสุ่มสีลูกค้าแต่ละคน
+      const part = (customer.scene.getObjectByName("MannequinBody") as THREE.Mesh).geometry.getAttribute("_part");
+      expect(part).toBeDefined();
+      expect(Math.max(...Array.from(part.array as ArrayLike<number>))).toBe(6);
 
       // หมวกแข็งทั้งใบ: mesh ธรรมดาที่ติดกับกระดูก Head (ไม่มีน้ำหนักผิว)
       const cap = staff.scene.getObjectByName("StaffCap");

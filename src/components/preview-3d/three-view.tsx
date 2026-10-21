@@ -18,7 +18,7 @@ import {
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
-import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE } from "./character-models";
+import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
 import { createCharacterLoader } from "./character-loader";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
@@ -735,6 +735,27 @@ function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, viewRo
   camera.updateProjectionMatrix();
 }
 
+/**
+ * วัสดุของลูกค้าหนึ่งคน: แทนสี vertex color ที่อบมากับไฟล์ ด้วยสีตามหมวดชิ้น (_part) ของคนนั้น
+ * shader เดียวกันทุกคน (customProgramCacheKey) ต่างกันแค่ uniform — ไม่ต้อง compile ใหม่ต่อคน
+ */
+function customerMaterial(template: THREE.MeshStandardMaterial, colors: readonly string[]) {
+  const material = template.clone();
+  material.vertexColors = false;
+  const partColors = colors.map((hex) => new THREE.Color(hex));
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.partColors = { value: partColors };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float _part;\nvarying float vPart;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvPart = _part;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nuniform vec3 partColors[${partColors.length}];\nvarying float vPart;`)
+      .replace("#include <color_fragment>", "diffuseColor.rgb *= partColors[int(vPart + 0.5)];");
+  };
+  material.customProgramCacheKey = () => "customer-palette";
+  return material;
+}
+
 const animationFor = (state: number): CustomerAnimation => (state === AGENT_STATE_SEATED ? "Sit" : "Walk");
 
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
@@ -785,6 +806,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     const customers = new Map<number, AnimatedCustomer>();
     const controller = getSimulationController();
     let modelTemplate: THREE.Object3D | null = null;
+    let templateMaterial: THREE.MeshStandardMaterial | null = null;
     let fullBody: THREE.BufferGeometry | null = null;
     let liteBody: THREE.BufferGeometry | null = null;
     let liteScene: THREE.Object3D | null = null;
@@ -823,6 +845,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       customer.mixer.stopAllAction();
       customer.mixer.uncacheRoot(customer.model);
       scene.remove(customer.model);
+      // วัสดุสีเฉพาะตัว (customerMaterial) — geometry ใช้ร่วมกับ template จึงไม่คืนที่นี่
+      if (customer.body && customer.body.material !== templateMaterial) (customer.body.material as THREE.Material).dispose();
       customers.delete(id);
     };
     const clearCustomers = () => {
@@ -920,10 +944,12 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         if (!customer) {
           // SkinnedMesh ต้อง clone ผ่าน SkeletonUtils ให้แต่ละตัวมีโครงกระดูกของตัวเอง
           const model = cloneSkinned(modelTemplate);
+          const look = customerLook(id);
           model.position.set(targetX, 0, targetZ);
-          model.scale.setScalar(CUSTOMER_SCALE);
+          model.scale.setScalar(CUSTOMER_SCALE * look.scale);
           scene.add(model);
           const body = model.getObjectByName(BODY_MESH_NAME);
+          if (body instanceof THREE.SkinnedMesh && templateMaterial) body.material = customerMaterial(templateMaterial, look.colors);
           customer = {
             mixer: new THREE.AnimationMixer(model),
             action: null,
@@ -1037,6 +1063,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         modelTemplate = gltf.scene;
         const templateBody = modelTemplate.getObjectByName(BODY_MESH_NAME);
         fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
+        templateMaterial = templateBody instanceof THREE.Mesh && templateBody.material instanceof THREE.MeshStandardMaterial ? templateBody.material : null;
         clips = gltf.animations;
         const walkClip = THREE.AnimationClip.findByName(clips, "Walk");
         const stride = modelTemplate.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
