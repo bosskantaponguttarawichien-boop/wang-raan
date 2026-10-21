@@ -1111,7 +1111,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         key.shadow.map?.dispose();
         key.shadow.map = null;
       }
-      // ไม่มีเงาตัวละคร = เงาในฉากไม่ขยับ วาด shadow map ใหม่เฉพาะตอนผังเปลี่ยน (stage.refreshShadows)
+      // ไม่มีเงาตัวละคร = เงาในฉากไม่ขยับ วาด shadow map ใหม่เฉพาะตอนผังเปลี่ยน (effect ที่สร้าง content ตั้ง needsUpdate)
       renderer.shadowMap.autoUpdate = level.characterShadows;
       renderer.shadowMap.needsUpdate = true;
     };

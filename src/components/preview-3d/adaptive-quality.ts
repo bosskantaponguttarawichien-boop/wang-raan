@@ -21,7 +21,10 @@ export const QUALITY_LEVELS: readonly QualityLevel[] = [
 ];
 
 export interface AdaptiveQualityOptions {
-  /** ช่วงเวลาระหว่างเฟรมที่ยอมรับได้ (ms) — เกินนี้ (ต่ำกว่า ~40 fps) ถือว่าช้า */
+  /**
+   * ช่วงเวลาระหว่างเฟรมที่ยอมรับได้ (ms) — เกินนี้ (ต่ำกว่า ~26 fps) ถือว่าช้า
+   * ต้องมากกว่า 33.3 ms: โหมดประหยัดแบต/จอบางรุ่นจำกัด rAF ไว้ 30 fps ทั้งที่เครื่องวาดทัน — ไม่ควรลดคุณภาพ
+   */
   slowFrameMs: number;
   /** ความยาวช่วงวัดแต่ละรอบ (ms) */
   windowMs: number;
@@ -31,7 +34,7 @@ export interface AdaptiveQualityOptions {
   ignoreAboveMs: number;
 }
 
-const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 25, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 250 };
+const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 250 };
 
 export class AdaptiveQuality {
   level = 0;

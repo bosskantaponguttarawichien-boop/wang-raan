@@ -18,6 +18,11 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     expect(quality.current).toEqual(QUALITY_LEVELS[0]);
   });
 
+  it("rAF ถูกจำกัด 30 fps (โหมดประหยัดแบต) ไม่ถือว่าเครื่องช้า", () => {
+    const quality = new AdaptiveQuality();
+    expect(run(quality, 33.4, 20000)).toEqual([]);
+  });
+
   it("เครื่องช้า (20 fps) ลดทีละขั้นจนถึงขั้นต่ำสุด แล้วหยุด", () => {
     const quality = new AdaptiveQuality();
     expect(run(quality, 50, 30000)).toEqual([1, 2, 3]);
