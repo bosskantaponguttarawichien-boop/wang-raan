@@ -93,8 +93,9 @@ describe("character models", () => {
     const cap = scene.getObjectByName("StaffCap")!;
     const head = scene.getObjectByName("Head")!.getWorldPosition(new THREE.Vector3());
     const bounds = new THREE.Box3().setFromObject(cap);
-    // หมวกอยู่เหนือข้อต่อหัว (ขอบปีกที่โค้งลงยังอยู่เหนือคิ้ว) และปีกยื่นไปหน้า
-    expect(bounds.min.y).toBeGreaterThan(head.y + 0.09);
+    // หมวกอยู่เหนือข้อต่อหัว (ขอบหลังลดลงคลุมท้ายทอย แต่ยังสูงกว่าหู) ยอดอยู่เหนือกระหม่อม และปีกยื่นไปหน้า
+    expect(bounds.min.y).toBeGreaterThan(head.y + 0.06);
+    expect(bounds.max.y).toBeGreaterThan(head.y + 0.2);
     expect(bounds.max.z).toBeGreaterThan(head.z + 0.15);
   });
 });

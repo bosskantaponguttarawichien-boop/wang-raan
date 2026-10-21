@@ -17,7 +17,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS, EXTMeshoptCompression, KHRMeshQuantization } from "@gltf-transform/extensions";
 import { dedup, prune, quantize, reorder, resample } from "@gltf-transform/functions";
@@ -171,43 +171,129 @@ geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3, true));
 geometry.setAttribute("part", new THREE.BufferAttribute(Uint8Array.from({ length: position.count }, (_, i) => Math.round(sourcePart.getX(i))), 1));
 
 if (STAFF) {
-  // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
+  // ---- หมวกแก๊ป 6 ชิ้นผ้า: โดมครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py — หน้าสูงเต็ม ท้ายลาดต่ำลงท้ายทอย,
+  // ตะเข็บ 6 เส้น + กระดุมบนยอด, ปีกหมวกโค้งทั้งแนวยาวและแนวขวาง หนาขึ้นที่โคน ใต้ปีกสีเข้ม
   const HEAD_DEPTH = 1.18;
   const HEAD_FORWARD = 0.012;
+  const CAP_COLOR = new THREE.Color(UNIFORM_COLOR);
+  const SEAM_COLOR = CAP_COLOR.clone().multiplyScalar(0.8);
+  const UNDER_BRIM_COLOR = CAP_COLOR.clone().multiplyScalar(0.5);
   const crown = [[1.612, 0.086], [1.625, 0.0857], [1.64, 0.084], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
-  // จุดเรียงจากขอบล่างขึ้นยอด (ผิวหันออก); ยอดรัศมี 0 จึงไม่เป็นรู
-  // ขอบหมวกรัดแนบหัว (ห่างผิว 1.2 ซม. พอทับผมบาง ๆ ตรงขอบ) แล้วค่อยพองขึ้นครอบผมกลางกระหม่อม (~2 ซม.)
-  // เดิมห่างเท่ากันทั้งใบ หมวกจึงดูลอยเป็นกะลาครอบ
-  const capProfile = crown.map(([y, r]) => {
+  // ขอบหมวกรัดแนบหัว (ห่างผิว 1.2 ซม. พอทับผมบาง ๆ ตรงขอบ) แล้วค่อยพองขึ้นครอบผมกลางกระหม่อม (~1.8 ซม.)
+  const profile = crown.map(([y, r]) => {
     const t = Math.min(1, Math.max(0, (y - 1.612) / 0.06));
     const offset = 0.012 + 0.006 * t * t * (3 - 2 * t);
-    return new THREE.Vector2(r > 0 ? r + offset : 0, y + 0.004 + 0.012 * t);
+    return [r > 0 ? r + offset : 0, y + 0.004 + 0.012 * t];
   });
-  // ขอบล่างพับเข้าเล็กน้อย (หนาแบบผ้า)
-  capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.003));
-  const capCrown = new THREE.LatheGeometry(capProfile, LITE ? 16 : 32);
-  capCrown.scale(1, 1, HEAD_DEPTH);
-  capCrown.translate(0, 0, HEAD_FORWARD);
-  const brimShape = new THREE.Shape();
-  brimShape.absellipse(0, 0, 0.095, 0.095, 0, Math.PI, false, 0);
-  const capBrim = new THREE.ExtrudeGeometry(brimShape, { depth: 0.006, bevelEnabled: false, curveSegments: LITE ? 6 : 12 });
-  // Shape อยู่บนระนาบ XY → พลิกลงนอนบนระนาบ XZ ปีกชี้ +Z (หน้า) แล้วกดปลายลงนิดเหมือนปีกหมวกจริง
-  capBrim.rotateX(Math.PI / 2 - 0.14);
-  // ปีกโค้งลงที่ขอบซ้าย-ขวาแบบปีกหมวกแก๊ปที่ดัดแล้ว
-  const brimPosition = capBrim.getAttribute("position");
-  for (let i = 0; i < brimPosition.count; i += 1) {
-    const side = brimPosition.getX(i) / 0.095;
-    brimPosition.setY(i, brimPosition.getY(i) - 0.014 * side * side);
+  const profileAt = (t) => {
+    const f = t * (profile.length - 1);
+    const i = Math.min(profile.length - 2, Math.floor(f));
+    const k = f - i;
+    return [profile[i][0] + (profile[i + 1][0] - profile[i][0]) * k, profile[i][1] + (profile[i + 1][1] - profile[i][1]) * k];
+  };
+  /** จุดบนโดม: θ รอบหัว (0 = หน้า, + = ไปทาง +x), t จากขอบหมวก (0) ถึงยอด (1) */
+  const crownPoint = (theta, t, lift = 0) => {
+    const [r0, y0] = profileAt(t);
+    const back = (1 - Math.cos(theta)) / 2;
+    // ชิ้นหน้าพองตั้ง (มีแผ่นรองด้านใน), ขอบหมวกด้านหลังลดลงคลุมท้ายทอย
+    const r = r0 * (1 + 0.035 * Math.max(0, Math.cos(theta)) ** 2 * Math.sin(Math.PI * Math.min(1, t * 1.2))) + lift;
+    const y = y0 - 0.016 * back * (1 - t) ** 2 + lift * t;
+    return new THREE.Vector3(r * Math.sin(theta), y, r * Math.cos(theta) * HEAD_DEPTH + HEAD_FORWARD);
+  };
+  const colored = (geometry, color) => {
+    const count = geometry.getAttribute("position").count;
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(Array.from({ length: count }, () => [color.r, color.g, color.b]).flat(), 3));
+    if (geometry.getAttribute("uv")) geometry.deleteAttribute("uv");
+    return geometry;
+  };
+  /** ตาข่ายจาก grid[แถว][คอลัมน์] (คอลัมน์วนรอบถ้า wrap) — ด้านหน้าผิวตามลำดับ (แถว↓, คอลัมน์→) */
+  const gridGeometry = (grid, wrap, flip = false) => {
+    const rows = grid.length;
+    const cols = grid[0].length;
+    const positions = grid.flat().flatMap((point) => point.toArray());
+    const index = [];
+    for (let r = 0; r < rows - 1; r += 1) {
+      for (let c = 0; c < (wrap ? cols : cols - 1); c += 1) {
+        const a = r * cols + c;
+        const b = r * cols + ((c + 1) % cols);
+        const d = (r + 1) * cols + c;
+        const e = (r + 1) * cols + ((c + 1) % cols);
+        index.push(...(flip ? [a, d, b, b, d, e] : [a, b, d, b, e, d]));
+      }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setIndex(index);
+    geometry.computeVertexNormals();
+    return geometry;
+  };
+
+  // โดม: วงจากขอบล่างขึ้นยอด (วงสุดท้ายยุบเป็นจุดยอด) + ขอบล่างพับเข้า (หนาแบบผ้า)
+  const around = LITE ? 18 : 36;
+  const rows = LITE ? 7 : 14;
+  const thetas = Array.from({ length: around }, (_, i) => (2 * Math.PI * i) / around);
+  const crownGrid = [thetas.map((theta) => crownPoint(theta, 0, -0.004).add(new THREE.Vector3(0, -0.003, 0)))];
+  for (let row = 0; row <= rows; row += 1) crownGrid.push(thetas.map((theta) => crownPoint(theta, row / rows)));
+  const capParts = [colored(gridGeometry(crownGrid, true), CAP_COLOR)];
+  // สายปรับขนาดด้านหลัง: แถบผ้าโค้งตามขอบหมวกเหนือท้ายทอย + หัวเข็มขัดเล็ก ๆ
+  const strapRows = [0.015, 0.11].map((t) =>
+    Array.from({ length: 9 }, (_, i) => crownPoint(Math.PI - 0.38 + (0.76 * i) / 8, t, 0.0016)));
+  capParts.push(colored(gridGeometry(strapRows, false), SEAM_COLOR));
+  const buckle = new THREE.BoxGeometry(0.014, 0.011, 0.003);
+  buckle.translate(0, 0, -0.0015);
+  const buckleAt = crownPoint(Math.PI + 0.14, 0.06, 0.003);
+  buckle.lookAt(new THREE.Vector3(buckleAt.x, 0, buckleAt.z - HEAD_FORWARD).normalize().negate());
+  buckle.translate(...buckleAt.toArray());
+  capParts.push(colored(buckle, new THREE.Color("#b8bcc2")));
+
+  // ตะเข็บ 6 เส้น (หน้ากลาง, ±60°, ±120°, หลังกลาง) + กระดุมยอดหมวก — เห็นตอนซูมใกล้, รุ่นเบาไม่ต้องมี
+  if (!LITE) {
+    for (let k = 0; k < 6; k += 1) {
+      const theta = (k * Math.PI) / 3;
+      const path = new THREE.CatmullRomCurve3(Array.from({ length: 9 }, (_, i) => crownPoint(theta, 0.04 + (0.9 * i) / 8, 0.0008)));
+      capParts.push(colored(new THREE.TubeGeometry(path, 16, 0.0014, 4, false), SEAM_COLOR));
+    }
+    const button = new THREE.SphereGeometry(0.0075, 12, 6);
+    button.scale(1, 0.45, 1);
+    button.translate(...crownPoint(0, 1).toArray());
+    capParts.push(colored(button, CAP_COLOR));
   }
-  capBrim.computeVertexNormals();
-  capBrim.translate(0, 1.618, 0.1);
-  // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — ปีกหมวกรวมจุดซ้ำให้มีดัชนีเหมือนโดม
-  // (mergeVertices รวมเฉพาะจุดที่ normal ตรงกัน ขอบคมจึงยังคม) จุดน้อยลงหลายเท่าจากการคลายดัชนี
-  for (const part of [capCrown, capBrim]) part.deleteAttribute("uv");
-  const capGeometry = mergeGeometries([capCrown, mergeVertices(capBrim)]);
+
+  // ปีกหมวก: ขอบในตามแนวขอบหมวกด้านหน้า (±68°), ขอบนอกรูปตัว D ยื่น ~7 ซม.
+  // โค้งลงทั้งปลายปีก (~10°) และขอบซ้าย-ขวา (ดัดโค้งแบบแก๊ปที่ใส่จริง), หนา 6 → 4.5 มม.
+  const across = LITE ? 8 : 16;
+  const along = LITE ? 3 : 6;
+  const bandFront = crownPoint(0, 0);
+  const brimTop = [];
+  const brimBottom = [];
+  for (let j = 0; j <= along; j += 1) {
+    const v = j / along;
+    const topRow = [];
+    const bottomRow = [];
+    for (let i = 0; i <= across; i += 1) {
+      const u = (i / across) * 2 - 1;
+      const inner = crownPoint(u * THREE.MathUtils.degToRad(68), 0, 0.001);
+      const alpha = u * (Math.PI / 2);
+      const outer = new THREE.Vector3(0.093 * Math.sin(alpha), inner.y, bandFront.z - 0.004 + 0.07 * Math.cos(alpha) ** 0.85);
+      const top = inner.clone().lerp(outer, v);
+      top.y = inner.y - 0.012 * v ** 1.2 - 0.02 * u * u * v ** 0.9;
+      topRow.push(top);
+      bottomRow.push(top.clone().add(new THREE.Vector3(0, -(0.006 - 0.0015 * v), 0)));
+    }
+    brimTop.push(topRow);
+    brimBottom.push(bottomRow);
+  }
+  capParts.push(colored(gridGeometry(brimTop, false, true), CAP_COLOR));
+  capParts.push(colored(gridGeometry(brimBottom, false), UNDER_BRIM_COLOR));
+  // ขอบปีก: ปลายหน้า + สองข้าง (เห็นความหนา)
+  const edge = [...brimTop.map((row) => row[0]).reverse(), ...brimTop[along], ...brimTop.map((row) => row[across])];
+  const edgeBottom = [...brimBottom.map((row) => row[0]).reverse(), ...brimBottom[along], ...brimBottom.map((row) => row[across])];
+  capParts.push(colored(gridGeometry([edge, edgeBottom], false, true), CAP_COLOR));
+
+  const capGeometry = mergeGeometries(capParts);
   // หมวกแข็งทั้งใบ → เป็น mesh ธรรมดาลูกของกระดูก Head ไม่ต้องเก็บน้ำหนักผิวทุกจุด
   capGeometry.translate(...head.getWorldPosition(new THREE.Vector3()).negate().toArray());
-  const cap = new THREE.Mesh(capGeometry, new THREE.MeshStandardMaterial({ color: UNIFORM_COLOR, roughness: 0.78, metalness: 0 }));
+  const cap = new THREE.Mesh(capGeometry, new THREE.MeshStandardMaterial({ color: "#ffffff", vertexColors: true, roughness: 0.82, metalness: 0 }));
   cap.name = "StaffCap";
   cap.castShadow = true;
   head.add(cap);
