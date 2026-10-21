@@ -253,10 +253,13 @@ const idle = new THREE.AnimationClip("Idle", IDLE_DURATION, [
   eulerTrack("Spine", idleCycle, (phase) => [-0.012 * breath(phase), 0.02 * Math.sin(phase + 0.8), -0.04 * Math.sin(phase)]),
   eulerTrack("Neck", idleCycle, (phase) => [0.01 * breath(phase), 0.08 * Math.sin(phase) + 0.03 * Math.sin(phase * 3 + 1), 0.015 * Math.sin(phase)]),
   eulerTrack("Head", idleCycle, (phase) => [0.02 * Math.sin(phase * 2 + 0.5), 0.2 * Math.sin(phase) + 0.07 * Math.sin(phase * 3 + 1), 0]),
-  eulerTrack("LeftArm", idleCycle, (phase) => [-0.02 + 0.015 * Math.sin(phase), 0, -0.04 - 0.01 * breath(phase)]),
-  eulerTrack("RightArm", idleCycle, (phase) => [-0.02 - 0.015 * Math.sin(phase), 0, 0.04 + 0.01 * breath(phase)]),
-  eulerTrack("LeftForeArm", idleCycle, (phase) => [-0.12 + 0.03 * Math.sin(phase * 2), 0, 0]),
-  eulerTrack("RightForeArm", idleCycle, (phase) => [-0.12 - 0.03 * Math.sin(phase * 2), 0, 0]),
+  // แขนผ่อนคลาย: กางออกจากตัวนิด ศอกงอ ~13° ข้อมือห้อยงอเข้า — ไม่ห้อยตรงแข็งชิดลำตัว
+  eulerTrack("LeftArm", idleCycle, (phase) => [-0.04 + 0.015 * Math.sin(phase), 0, -0.07 - 0.01 * breath(phase)]),
+  eulerTrack("RightArm", idleCycle, (phase) => [-0.04 - 0.015 * Math.sin(phase), 0, 0.07 + 0.01 * breath(phase)]),
+  eulerTrack("LeftForeArm", idleCycle, (phase) => [-0.22 + 0.03 * Math.sin(phase * 2), 0, 0.04]),
+  eulerTrack("RightForeArm", idleCycle, (phase) => [-0.22 - 0.03 * Math.sin(phase * 2), 0, -0.04]),
+  eulerTrack("LeftHand", idleCycle, () => [-0.06, 0, 0.06]),
+  eulerTrack("RightHand", idleCycle, () => [-0.06, 0, -0.06]),
 ]);
 
 // ---- Work (พนักงาน): ยืนหลังเคาน์เตอร์ มือสองข้างวางทำงานบนเคาน์เตอร์ (ข้อมือสูง ~1 ม. หน้าตัว ~0.3 ม.) ก้มมองมือ
