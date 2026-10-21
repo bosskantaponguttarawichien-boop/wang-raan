@@ -1,11 +1,13 @@
 /**
  * Occupancy Grid 0.25 ม. สำหรับ P2 Simulation (architecture.md §6)
  * ช่องที่มีวัตถุทับ (พื้นที่ทับ > 0) = ไม่ว่าง; ช่องแถวติดผนังตรงช่องประตู = ช่องทางเข้า
+ * จุดยืนพนักงานหลังเคาน์เตอร์ก็ไม่ว่าง (ช่องที่จุดกลางอยู่ในพื้นที่ยืน หรือช่องที่พนักงานยืนอยู่) ลูกค้าจะได้ไม่เดินทะลุ
  */
 import { GRID_STEP } from "../layout/constants";
 import { EPSILON } from "../layout/epsilon";
 import { footprint } from "../layout/geometry";
 import type { Meters, StoreLayout } from "../layout/types";
+import { STAFF_RADIUS, staffSpots } from "../preview/staff-spots";
 import { entranceSegment } from "../validation/walk-grid";
 
 export const SIM_CELL_SIZE: Meters = GRID_STEP;
@@ -34,6 +36,16 @@ export function buildOccupancyGrid(layout: StoreLayout, cellSize: Meters = SIM_C
     const c1 = Math.min(cols - 1, Math.ceil((r.x + r.width) / cellSize - EPSILON) - 1);
     const r0 = Math.max(0, Math.floor(r.y / cellSize + EPSILON));
     const r1 = Math.min(rows - 1, Math.ceil((r.y + r.depth) / cellSize - EPSILON) - 1);
+    for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) cells[row * cols + col] = CELL_BLOCKED;
+  }
+
+  for (const { position } of staffSpots(layout)) {
+    const own = Math.min(rows - 1, Math.floor(position.y / cellSize)) * cols + Math.min(cols - 1, Math.floor(position.x / cellSize));
+    cells[own] = CELL_BLOCKED;
+    const c0 = Math.max(0, Math.ceil((position.x - STAFF_RADIUS) / cellSize - 0.5));
+    const c1 = Math.min(cols - 1, Math.floor((position.x + STAFF_RADIUS) / cellSize - 0.5));
+    const r0 = Math.max(0, Math.ceil((position.y - STAFF_RADIUS) / cellSize - 0.5));
+    const r1 = Math.min(rows - 1, Math.floor((position.y + STAFF_RADIUS) / cellSize - 0.5));
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) cells[row * cols + col] = CELL_BLOCKED;
   }
 

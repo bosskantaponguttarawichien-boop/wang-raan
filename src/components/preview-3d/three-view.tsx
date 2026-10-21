@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import {
@@ -18,6 +17,10 @@ import {
 } from "@/core/layout";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
+import { staffSpots } from "@/core/preview/staff-spots";
+import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
+import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
+import { createCharacterLoader } from "./character-loader";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
@@ -26,11 +29,14 @@ export interface ThreeViewProps {
   /** หมุนมุมมองทีละ 90° — กล้องย้ายไปมุมใหม่ และวาดผนังเฉพาะ 2 ด้านที่ไกลกล้อง */
   viewRotation?: ViewRotation;
   isSim: boolean;
+  /** จำลองอยู่แต่กดหยุดชั่วคราว — ลูกค้าค้างอยู่ในร้าน วาดช้าลงได้ */
+  simPaused?: boolean;
   onUnavailable: () => void;
 }
 
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
-const SEATED_FRONT_OFFSET = 0.055;
+/** ระยะเลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ — ติดลบ = ถอยข้อสะโพกไปหลังกลางเบาะ ให้หลังชิดพนักพิง (ไม่จม) */
+const SEATED_FRONT_OFFSET = -0.04;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
@@ -42,6 +48,10 @@ type AnimatedCustomer = {
   target: THREE.Vector3;
   animation: CustomerAnimation;
   targetRotation: number;
+  /** วินาทีที่ยืนนิ่ง (ต่อคิว/รอ) ต่อเนื่อง — นานพอจะเปลี่ยนจากท่าเดินค้างเป็นท่ายืนรอ */
+  still: number;
+  /** เหลื่อมจังหวะท่ายืนรอ ไม่ให้ลูกค้าที่ต่อคิวขยับพร้อมกัน (วินาที) */
+  idleOffset: number;
 };
 
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนแค่สร้าง `content` ใหม่ ไม่สร้าง WebGL context ใหม่ */
@@ -56,20 +66,99 @@ type Stage = {
   invalidate: () => void;
   resize: () => void;
   clearCustomers: () => void;
+  /** วางพนักงานหลังเคาน์เตอร์ใหม่ตามผังปัจจุบัน */
+  syncStaff: () => void;
 };
 
-const MODEL_URL = "/assets/models/cafe-customer.glb";
-/** โครงกระดูก/animation เดียวกับ MODEL_URL แต่ polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ */
-const LITE_MODEL_URL = "/assets/models/cafe-customer-lite.glb";
+type StandingStaff = {
+  mixer: THREE.AnimationMixer;
+  model: THREE.Object3D;
+  body: THREE.SkinnedMesh | null;
+};
+
+/**
+ * โมเดลหนึ่งบทบาท: template (รุ่นเบา) ไว้ clone + ผิวรุ่นละเอียดที่โหลดทีหลังเมื่อซูมใกล้
+ * สองไฟล์ใช้โครงกระดูก/animation ชุดเดียวกัน จึงสลับแค่ geometry ของผิว
+ */
+type CharacterAsset = {
+  urls: { full: string; lite: string };
+  template: THREE.Object3D | null;
+  liteBody: THREE.BufferGeometry | null;
+  fullBody: THREE.BufferGeometry | null;
+  fullScene: THREE.Object3D | null;
+  fullRequested: boolean;
+  clips: THREE.AnimationClip[];
+  /** ความเร็วเดินตามท่า Walk (ระยะต่อรอบ / เวลาต่อรอบ) — ใช้เดินเท้าไม่ไถลบนพื้น */
+  walkSpeed: number;
+};
+
+/**
+ * เงาของตัวละครวาดจากผิวรุ่นเบาเสมอ (ภาพยังใช้รุ่นละเอียดตอนซูมใกล้) — ตัวแทนเงาใช้โครงกระดูกเดียวกับผิวจริง
+ * three วาดเงาด้วย geometry ของ object เอง จึงทำ object แยก: รอบวาดเงา (ก่อนรอบภาพทุกเฟรม) วาดเต็ม,
+ * รอบวาดภาพตั้ง drawRange เป็น 0 ใน onBeforeRender แล้วคืนค่าหลังวาด — ไม่ต้องคำนวณจุดซ้ำในรอบภาพ
+ * geometry ของตัวแทนเงาใช้ร่วมกันทุกตัวของโมเดลเดียวกัน (shadowGeometry) — attribute/index ชุดเดิมของรุ่นเบา
+ * ไม่กินหน่วยความจำ GPU เพิ่ม และห้าม dispose เอง (จะลบ buffer ของรุ่นเบาไปด้วย)
+ */
+const shadowGeometries = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
+function shadowGeometry(liteGeometry: THREE.BufferGeometry) {
+  let geometry = shadowGeometries.get(liteGeometry);
+  if (!geometry) {
+    geometry = new THREE.BufferGeometry();
+    for (const [name, attribute] of Object.entries(liteGeometry.attributes)) geometry.setAttribute(name, attribute);
+    geometry.setIndex(liteGeometry.index);
+    shadowGeometries.set(liteGeometry, geometry);
+  }
+  return geometry;
+}
+
+function attachShadowProxy(body: THREE.SkinnedMesh, liteGeometry: THREE.BufferGeometry, castShadow: boolean) {
+  const geometry = shadowGeometry(liteGeometry);
+  const proxy = new THREE.SkinnedMesh(geometry, body.material);
+  proxy.name = "ShadowProxy";
+  proxy.bind(body.skeleton, body.bindMatrix);
+  proxy.castShadow = castShadow;
+  proxy.receiveShadow = false;
+  // ผิวขยับตามท่า bounding sphere ตอนยืนไม่ครอบท่าเดิน/นั่ง — ไม่ตัดทิ้งเอง (เป็นแค่เงา)
+  proxy.frustumCulled = false;
+  proxy.onBeforeRender = () => geometry.setDrawRange(0, 0);
+  proxy.onAfterRender = () => geometry.setDrawRange(0, Infinity);
+  body.castShadow = false;
+  body.parent?.add(proxy);
+  proxy.position.copy(body.position);
+  proxy.quaternion.copy(body.quaternion);
+  proxy.scale.copy(body.scale);
+  return proxy;
+}
+
+const characterAsset = (urls: { full: string; lite: string }): CharacterAsset => ({
+  urls, template: null, liteBody: null, fullBody: null, fullScene: null, fullRequested: false, clips: [], walkSpeed: 0.44,
+});
+
+/** เหลื่อมจังหวะท่ายืนของพนักงานแต่ละคน ไม่ให้ขยับพร้อมกันทั้งร้าน (วินาที) */
+const STAFF_IDLE_PHASE = 0.83;
+/** ลูกค้าเคลื่อนช้ากว่านี้ (ม./วิ) นานกว่า IDLE_AFTER_SECONDS ถือว่ายืนรอ → เล่น Idle; เร็วกว่า IDLE_EXIT_SPEED กลับไปเดิน */
+const IDLE_SPEED = 0.05;
+const IDLE_EXIT_SPEED = 0.12;
+const IDLE_AFTER_SECONDS = 0.5;
 const BODY_MESH_NAME = "MannequinBody";
-/** ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบาได้โดยมองไม่เห็นความต่าง — ซูมใหญ่กว่านี้ใช้รุ่นละเอียด */
-const LITE_MAX_SCREEN_HEIGHT = 48;
-const CUSTOMER_HEIGHT = 1.05;
+/** หมวกพนักงาน (mesh แข็งลูกกระดูก Head) — ทอดเงาตามการตั้งค่าเงาตัวละคร */
+const STAFF_CAP_NAME = "StaffCap";
+/**
+ * ความสูงตัวละครบนจอ (CSS px) ที่ยังใช้รุ่นเบา (~6.9k สามเหลี่ยม) ได้โดยมองไม่เห็นความต่าง —
+ * ซูมใหญ่กว่านี้ค่อยโหลด/ใช้รุ่นละเอียด (~27.6k) — มุมมองปกติของร้าน (ตัวสูง ~60–100 px) จึงใช้รุ่นเบา
+ */
+const LITE_MAX_SCREEN_HEIGHT = 160;
+/**
+ * หยุดจำลองแต่ยังมีลูกค้าในร้าน (ท่ายืนรอ/นั่ง ขยับช้า ๆ) วาดแค่ ~30 fps — ภาระการ์ดจอครึ่งหนึ่ง ประหยัดแบต
+ * (ลบนิดเผื่อ rAF ของจอ 60 Hz มาเร็วกว่ากำหนดเล็กน้อย ไม่ให้ตกไปเหลือ 20 fps)
+ */
+const PAUSED_FRAME_MS = 1000 / 30 - 2;
+const CUSTOMER_HEIGHT = CHARACTER_HEIGHT / CHARACTER_SCALE;
 const WALL_HEIGHT = 2.7;
 const WALL_THICKNESS = 0.14;
 const DOOR_HEIGHT = 2.1;
 const CAMERA_TARGET_Y = 0.45;
-const CUSTOMER_SCALE = 0.9;
+const CUSTOMER_SCALE = CHARACTER_SCALE;
 /** state ของ agent ที่นั่งรอ/กิน (ดู AGENT_STRIDE ใน core/simulation) → ใช้ท่านั่งของมาสคอต */
 const AGENT_STATE_SEATED = 4;
 /** กัน animation กระโดดเมื่อ loop หยุดไปนาน (แท็บถูกซ่อน/หยุดวาดตอนไม่มีอะไรขยับ) */
@@ -314,7 +403,8 @@ function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneA
       addLegs(object, style.legStyle, item.width, item.depth, topHeight - 0.02, round);
     } else if (item.type === "chair") {
       const style = chairStyleOf(item);
-      const seatHeight = 0.45;
+      // ผิวบนเบาะสูง 0.45 ม. ตามเก้าอี้ทานอาหารมาตรฐาน (ท่า Sit ใน GLB วางต้นขาไว้ที่ระดับนี้)
+      const seatHeight = 0.42;
       const seatW = item.width * 0.86;
       const seatD = item.depth * 0.86;
       const round = style.shape === "round";
@@ -712,15 +802,37 @@ function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, viewRo
   camera.updateProjectionMatrix();
 }
 
+/**
+ * วัสดุของลูกค้าหนึ่งคน: แทนสี vertex color ที่อบมากับไฟล์ ด้วยสีตามหมวดชิ้น (_part) ของคนนั้น
+ * shader เดียวกันทุกคน (customProgramCacheKey) ต่างกันแค่ uniform — ไม่ต้อง compile ใหม่ต่อคน
+ */
+function customerMaterial(template: THREE.MeshStandardMaterial, colors: readonly string[]) {
+  const material = template.clone();
+  material.vertexColors = false;
+  const partColors = colors.map((hex) => new THREE.Color(hex));
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.partColors = { value: partColors };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nattribute float _part;\nvarying float vPart;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\nvPart = _part;");
+    shader.fragmentShader = shader.fragmentShader
+      .replace("#include <common>", `#include <common>\nuniform vec3 partColors[${partColors.length}];\nvarying float vPart;`)
+      .replace("#include <color_fragment>", "diffuseColor.rgb *= partColors[int(vPart + 0.5)];");
+  };
+  material.customProgramCacheKey = () => "customer-palette";
+  return material;
+}
+
 const animationFor = (state: number): CustomerAnimation => (state === AGENT_STATE_SEATED ? "Sit" : "Walk");
 
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
-export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable }: ThreeViewProps) {
+export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = false, onUnavailable }: ThreeViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Stage | null>(null);
   // อ่านค่าล่าสุดใน render loop โดยไม่ต้องสร้าง renderer ใหม่เมื่อค่าเปลี่ยน
   const zoomRef = React.useRef(zoom);
   const isSimRef = React.useRef(isSim);
+  const pausedRef = React.useRef(simPaused);
 
   // renderer / scene / loop: สร้างครั้งเดียวต่อการ mount (WebGL context มีจำกัดราว 16 ตัวต่อหน้า)
   React.useEffect(() => {
@@ -738,7 +850,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_LEVELS[0]!.maxPixelRatio));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -761,19 +873,20 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     const clock = new THREE.Clock(false);
     const customers = new Map<number, AnimatedCustomer>();
     const controller = getSimulationController();
-    let modelTemplate: THREE.Object3D | null = null;
-    let fullBody: THREE.BufferGeometry | null = null;
-    let liteBody: THREE.BufferGeometry | null = null;
-    let liteScene: THREE.Object3D | null = null;
-    let clips: THREE.AnimationClip[] = [];
-    let walkSpeed = 0.44;
+    let templateMaterial: THREE.MeshStandardMaterial | null = null;
+    const quality = new AdaptiveQuality();
+    const customerAsset = characterAsset(CHARACTER_MODELS.customer);
+    const staffAsset = characterAsset(CHARACTER_MODELS.staff);
+    const staff: StandingStaff[] = [];
     let frame = 0;
     let disposed = false;
 
-    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action">, name: CustomerAnimation) => {
+    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action" | "idleOffset">, name: CustomerAnimation) => {
+      const { clips } = customerAsset;
       const clip = THREE.AnimationClip.findByName(clips, name) ?? clips[0];
       if (!clip) return;
       const action = customer.mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
+      if (name === "Idle") action.time = customer.idleOffset % clip.duration;
       if (name === "Sit") {
         action.setLoop(THREE.LoopOnce, 1);
         action.clampWhenFinished = true;
@@ -798,15 +911,111 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       customer.mixer.stopAllAction();
       customer.mixer.uncacheRoot(customer.model);
       scene.remove(customer.model);
+      // วัสดุสีเฉพาะตัว (customerMaterial) — geometry ใช้ร่วมกับ template จึงไม่คืนที่นี่
+      if (customer.body && customer.body.material !== templateMaterial) (customer.body.material as THREE.Material).dispose();
       customers.delete(id);
     };
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
     };
 
+    const loader = createCharacterLoader();
+    /** โหลดรุ่นเบาเป็น template ก่อน (ไฟล์เล็ก ~1/3) — รุ่นเบาโหลดไม่ได้ค่อยใช้รุ่นละเอียดแทน */
+    const loadCharacter = (asset: CharacterAsset, onReady: () => void, onError?: () => void) => {
+      const accept = (gltf: { scene: THREE.Object3D; animations: THREE.AnimationClip[] }, isFull: boolean) => {
+        if (disposed) {
+          disposeModel(gltf.scene);
+          return;
+        }
+        gltf.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) object.castShadow = true;
+        });
+        asset.template = gltf.scene;
+        const body = gltf.scene.getObjectByName(BODY_MESH_NAME);
+        const geometry = body instanceof THREE.Mesh ? body.geometry : null;
+        if (isFull) {
+          asset.fullBody = geometry;
+          asset.fullRequested = true;
+        } else asset.liteBody = geometry;
+        if (asset === customerAsset && body instanceof THREE.Mesh && body.material instanceof THREE.MeshStandardMaterial) {
+          templateMaterial = body.material;
+        }
+        asset.clips = gltf.animations;
+        const walkClip = THREE.AnimationClip.findByName(asset.clips, "Walk");
+        const stride = gltf.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
+        if (walkClip && typeof stride === "number" && stride > 0) asset.walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
+        onReady();
+      };
+      loader.load(asset.urls.lite, (gltf) => accept(gltf, false), undefined, () => {
+        loader.load(asset.urls.full, (gltf) => accept(gltf, true), undefined, () => onError?.());
+      });
+    };
+    /** ผิวรุ่นละเอียด — โหลดครั้งแรกที่ซูมจนตัวละครใหญ่บนจอ โหลดไม่ได้ก็ใช้รุ่นเบาต่อ */
+    const loadFullBody = (asset: CharacterAsset) => {
+      asset.fullRequested = true;
+      loader.load(asset.urls.full, (gltf) => {
+        if (disposed) {
+          disposeModel(gltf.scene);
+          return;
+        }
+        asset.fullScene = gltf.scene;
+        const body = gltf.scene.getObjectByName(BODY_MESH_NAME);
+        asset.fullBody = body instanceof THREE.Mesh ? body.geometry : null;
+        invalidate();
+      });
+    };
+
+    /** พนักงานเป็นของประกอบฉาก — โหลดเฉพาะเมื่อมีเคาน์เตอร์ที่ยืนได้ และโหลดไม่ได้ก็แค่ไม่มีพนักงาน ไม่ต้องถอยไปใช้ SVG */
+    let staffRequested = false;
+    const loadStaffModels = () => {
+      if (staffRequested) return;
+      staffRequested = true;
+      loadCharacter(staffAsset, () => {
+        syncStaff();
+        invalidate();
+      });
+    };
+
+    /** พนักงานยืนท่า Idle หลังเคาน์เตอร์ — แสดงตลอด (ไม่ต้องรอจำลอง) และไม่อยู่ใน simulation */
+    const syncStaff = () => {
+      for (const member of staff) {
+        member.mixer.stopAllAction();
+        member.mixer.uncacheRoot(member.model);
+        scene.remove(member.model);
+      }
+      staff.length = 0;
+      const layout = stageRef.current?.layout;
+      const spots = layout ? staffSpots(layout) : [];
+      if (spots.length === 0) return;
+      // โหลดโมเดลพนักงานครั้งแรกที่ผังมีจุดให้ยืน — โหลดเสร็จจะเรียก syncStaff อีกรอบ
+      if (!staffAsset.template) {
+        loadStaffModels();
+        return;
+      }
+      // พนักงานทำงานบนเคาน์เตอร์ (Work) — ไฟล์เก่าที่ไม่มีคลิปนี้ใช้ท่ายืน
+      const idle =
+        THREE.AnimationClip.findByName(staffAsset.clips, "Work") ?? THREE.AnimationClip.findByName(staffAsset.clips, "Idle");
+      spots.forEach((spot, index) => {
+        const model = cloneSkinned(staffAsset.template!);
+        model.position.set(spot.position.x, 0, spot.position.y);
+        model.rotation.y = Math.atan2(spot.facing.x, spot.facing.y);
+        model.scale.setScalar(CUSTOMER_SCALE);
+        scene.add(model);
+        const mixer = new THREE.AnimationMixer(model);
+        if (idle) mixer.clipAction(idle).play();
+        // ตั้งท่าทันที — ฉากนิ่งวาดเฟรมเดียว พนักงานจึงต้องอยู่ในท่ายืนตั้งแต่เฟรมแรก
+        mixer.update(index * STAFF_IDLE_PHASE);
+        const body = model.getObjectByName(BODY_MESH_NAME);
+        if (body instanceof THREE.SkinnedMesh && staffAsset.liteBody) attachShadowProxy(body, staffAsset.liteBody, quality.current.characterShadows);
+        const cap = model.getObjectByName(STAFF_CAP_NAME);
+        if (cap) cap.castShadow = quality.current.characterShadows;
+        staff.push({ mixer, model, body: body instanceof THREE.SkinnedMesh ? body : null });
+      });
+    };
+
     const syncCustomers = () => {
       const current = controller.current;
-      if (!modelTemplate || !current) return;
+      if (!customerAsset.template || !current) return;
       const liveIds = new Set<number>();
       const { agents } = current;
       const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
@@ -834,11 +1043,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         let customer = customers.get(id);
         if (!customer) {
           // SkinnedMesh ต้อง clone ผ่าน SkeletonUtils ให้แต่ละตัวมีโครงกระดูกของตัวเอง
-          const model = cloneSkinned(modelTemplate);
+          const model = cloneSkinned(customerAsset.template);
+          const look = customerLook(id);
           model.position.set(targetX, 0, targetZ);
-          model.scale.setScalar(CUSTOMER_SCALE);
+          model.scale.setScalar(CUSTOMER_SCALE * look.scale);
           scene.add(model);
           const body = model.getObjectByName(BODY_MESH_NAME);
+          if (body instanceof THREE.SkinnedMesh && templateMaterial) body.material = customerMaterial(templateMaterial, look.colors);
+          if (body instanceof THREE.SkinnedMesh && customerAsset.liteBody) attachShadowProxy(body, customerAsset.liteBody, quality.current.characterShadows);
           customer = {
             mixer: new THREE.AnimationMixer(model),
             action: null,
@@ -848,6 +1060,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
             target: new THREE.Vector3(targetX, 0, targetZ),
             animation,
             targetRotation: 0,
+            still: 0,
+            idleOffset: (id * 1.37) % 6,
           };
           playClip(customer, animation);
           customers.set(id, customer);
@@ -857,7 +1071,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         if (dx * dx + dz * dz > 0.0001) customer.targetRotation = Math.atan2(dx, dz);
         if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
         customer.target.set(targetX, 0, targetZ);
-        if (animation !== customer.animation) {
+        // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
+        const standing = animation === "Walk" && customer.animation === "Idle";
+        if (animation !== customer.animation && !standing) {
           if (customer.animation === "Sit") standUp(customer);
           else {
             customer.standingUp = 0;
@@ -872,21 +1088,60 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     };
 
     /** ลูกค้าหลายสิบตัว × 2 รอบ (ภาพ + เงา) — ตอนตัวเล็กบนจอใช้ผิวรุ่นเบา ซูมเข้าใกล้ค่อยใช้รุ่นละเอียด */
-    const bodyForZoom = () => {
-      if (!liteBody || !fullBody) return fullBody;
+    const wantsLiteBody = () => {
       const pixelsPerMeter = (renderer.domElement.clientHeight * camera.zoom) / (camera.top - camera.bottom);
-      return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT ? liteBody : fullBody;
+      return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT;
+    };
+    /** ผิวที่ควรใช้ตอนนี้ — ซูมใกล้ครั้งแรกค่อยโหลดรุ่นละเอียด (ระหว่างโหลดใช้รุ่นเบาไปก่อน) */
+    const bodyForZoom = (asset: CharacterAsset) => {
+      if (wantsLiteBody()) return asset.liteBody;
+      if (!asset.fullRequested) loadFullBody(asset);
+      return asset.fullBody ?? asset.liteBody;
     };
 
-    // วาดตามต้องการ: ฉากนิ่งวาดเฟรมเดียวแล้วหยุด; ระหว่างจำลอง/มีลูกค้าค้างอยู่ loop ต่อเนื่อง
+    /** ลดคุณภาพตามขั้นของ AdaptiveQuality: ความละเอียด canvas → เงาตัวละคร + shadow map เล็กลง */
+    const applyQuality = () => {
+      const level = quality.current;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, level.maxPixelRatio));
+      scene.traverse((object) => {
+        if (object.name === "ShadowProxy" || object.name === STAFF_CAP_NAME) object.castShadow = level.characterShadows;
+      });
+      if (key.shadow.mapSize.x !== level.shadowMapSize) {
+        key.shadow.mapSize.set(level.shadowMapSize, level.shadowMapSize);
+        key.shadow.map?.dispose();
+        key.shadow.map = null;
+      }
+      // ไม่มีเงาตัวละคร = เงาในฉากไม่ขยับ วาด shadow map ใหม่เฉพาะตอนผังเปลี่ยน (effect ที่สร้าง content ตั้ง needsUpdate)
+      renderer.shadowMap.autoUpdate = level.characterShadows;
+      renderer.shadowMap.needsUpdate = true;
+    };
+
+    // วาดตามต้องการ: ฉากนิ่งวาดเฟรมเดียวแล้วหยุด; ระหว่างจำลอง loop ต่อเนื่อง; หยุดจำลองแต่มีลูกค้าค้างอยู่ ~30 fps
+    let lastRenderAt = 0;
     const tick = () => {
       frame = 0;
       if (disposed) return;
-      const delta = Math.min(clock.getDelta(), MAX_FRAME_DELTA);
+      const now = performance.now();
       const simulating = isSimRef.current;
+      const running = simulating && !pausedRef.current;
+      if (!running && customers.size > 0 && lastRenderAt && now - lastRenderAt < PAUSED_FRAME_MS) {
+        frame = requestAnimationFrame(tick);
+        return;
+      }
+      // วัดความเร็วเครื่องเฉพาะระหว่างจำลองที่เดินอยู่ (loop เต็มความเร็ว) — ช้าต่อเนื่องก็ลดคุณภาพ
+      if (running && lastRenderAt) {
+        if (quality.sample(now - lastRenderAt) !== null) applyQuality();
+      } else quality.reset();
+      lastRenderAt = now;
+      const delta = Math.min(clock.getDelta(), MAX_FRAME_DELTA);
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
-      const body = bodyForZoom();
+      const body = bodyForZoom(customerAsset);
+      const staffBody = staff.length > 0 ? bodyForZoom(staffAsset) : null;
+      for (const member of staff) {
+        if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
+        member.mixer.update(delta);
+      }
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         if (customer.standingUp > 0) {
@@ -902,9 +1157,20 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         const distance = Math.hypot(customer.model.position.x - beforeX, customer.model.position.z - beforeZ);
         const turn = customer.targetRotation - customer.model.rotation.y;
         customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+        if (customer.animation === "Walk" || customer.animation === "Idle") {
+          const speed = delta > 0 ? distance / delta : 0;
+          customer.still = speed < IDLE_SPEED ? customer.still + delta : 0;
+          if (customer.animation === "Walk" && customer.still > IDLE_AFTER_SECONDS) {
+            customer.animation = "Idle";
+            playClip(customer, "Idle");
+          } else if (customer.animation === "Idle" && speed > IDLE_EXIT_SPEED) {
+            customer.animation = "Walk";
+            playClip(customer, "Walk");
+          }
+        }
         // Advance the walk by distance travelled, including simulation speed changes.
         customer.mixer.update(
-          customer.animation === "Walk" ? Math.min(distance / walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
+          customer.animation === "Walk" ? Math.min(distance / customerAsset.walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
         );
       }
       renderer.render(scene, camera);
@@ -912,6 +1178,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         frame = requestAnimationFrame(tick);
       } else {
         clock.stop();
+        lastRenderAt = 0;
       }
     };
     const invalidate = () => {
@@ -930,41 +1197,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       // วาดทันที (ไม่รอ rAF) เพื่อไม่ให้ canvas ว่างกระพริบหลังเปลี่ยนขนาด
       renderer.render(scene, camera);
     };
-    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers };
+    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers, syncStaff };
     stageRef.current = stage;
     const observer = new ResizeObserver(resize);
     observer.observe(host);
 
-    const loader = new GLTFLoader();
-    loader.load(
-      MODEL_URL,
-      (gltf) => {
-        if (disposed) return;
-        gltf.scene.traverse((object) => {
-          if (object instanceof THREE.Mesh) object.castShadow = true;
-        });
-        modelTemplate = gltf.scene;
-        const templateBody = modelTemplate.getObjectByName(BODY_MESH_NAME);
-        fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
-        clips = gltf.animations;
-        const walkClip = THREE.AnimationClip.findByName(clips, "Walk");
-        const stride = modelTemplate.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
-        if (walkClip && typeof stride === "number" && stride > 0) walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
-        invalidate();
-      },
-      undefined,
-      () => {
-        if (!disposed) onUnavailable();
-      },
-    );
-    // รุ่นเบาโหลดไม่ได้ก็ไม่เป็นไร ใช้รุ่นละเอียดต่อ
-    loader.load(LITE_MODEL_URL, (gltf) => {
-      liteScene = gltf.scene;
-      const liteMesh = liteScene.getObjectByName(BODY_MESH_NAME);
-      liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
-      if (disposed) disposeModel(liteScene);
+    loadCharacter(customerAsset, invalidate, () => {
+      if (!disposed) onUnavailable();
     });
-
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
@@ -972,8 +1212,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       clearCustomers();
       disposeContent(stage.content);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
-      disposeModel(modelTemplate);
-      disposeModel(liteScene);
+      for (const member of staff) member.mixer.stopAllAction();
+      for (const asset of [customerAsset, staffAsset]) {
+        disposeModel(asset.template);
+        disposeModel(asset.fullScene);
+      }
       key.shadow.map?.dispose();
       renderer.dispose();
       renderer.domElement.remove();
@@ -992,16 +1235,23 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     }
     stage.scene.add(content);
     stage.content = content;
+    // เงาฉากนิ่งอาจปิด autoUpdate ไว้ (เครื่องช้า) — ผังเปลี่ยนต้องวาด shadow map ใหม่
+    stage.renderer.shadowMap.needsUpdate = true;
     const sizeChanged =
       stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth || stage.viewRotation !== viewRotation;
     stage.layout = layout;
     stage.viewRotation = viewRotation;
+    stage.syncStaff();
     if (sizeChanged) {
       fitKeyLight(stage.key, layout, viewRotation);
       stage.resize();
     }
     stage.invalidate();
   }, [layout, viewRotation]);
+
+  React.useEffect(() => {
+    pausedRef.current = simPaused;
+  }, [simPaused]);
 
   React.useEffect(() => {
     isSimRef.current = isSim;

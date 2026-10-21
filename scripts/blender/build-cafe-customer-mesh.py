@@ -19,7 +19,9 @@ import sys
 from pathlib import Path
 
 import bpy
+import bmesh  # ต้อง import หลัง bpy เมื่อใช้ bpy แบบ pip
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import importlib  # noqa: E402
@@ -32,24 +34,24 @@ OUT_DIR = Path(__file__).resolve().parent
 # ที่มีพร้อมกันหลายสิบคน) — งบเท่ารุ่นเดิม
 LEVELS = {"cafe-customer-mesh.glb": 1, "cafe-customer-mesh-lite.glb": 0}
 # ระยะ (เมตร) ทั้งสองข้างของข้อต่อที่น้ำหนักผิวค่อย ๆ เปลี่ยนจากกระดูกแม่ไปกระดูกลูก
-BLEND = 0.028
+BLEND = 0.045
 SOLE_Z = 0.002
 
 # ข้อต่อแบบ glTF (X ข้าง, Y ขึ้น, Z หน้า) — ต้องตรงกับตำแหน่งกระดูกใน create-cafe-customer-model.mjs
 JOINTS = {
-    "Hips": (0, 0.40, 0),
-    "Spine": (0, 0.52, 0),
-    "Neck": (0, 0.70, 0),
-    "Head": (0, 0.722, 0),
+    "Hips": (0, 0.92, 0),
+    "Spine": (0, 1.05, 0),
+    "Neck": (0, 1.40, 0),
+    "Head": (0, 1.50, 0),
 }
 for _side, _sign in (("Left", -1), ("Right", 1)):
     JOINTS.update({
-        f"{_side}Arm": (_sign * 0.09, 0.635, 0),        # หัวไหล่ (กลางโดมต้นแขน)
-        f"{_side}ForeArm": (_sign * 0.141, 0.521, 0),   # ศอก
-        f"{_side}Hand": (_sign * 0.175, 0.425, 0),      # ข้อมือ
-        f"{_side}Leg": (_sign * 0.068, 0.36, 0),        # ข้อสะโพก
-        f"{_side}LowerLeg": (_sign * 0.068, 0.231, 0),  # เข่า
-        f"{_side}Foot": (_sign * 0.066, 0.065, 0),      # ข้อเท้า (ในรองเท้า)
+        f"{_side}Arm": (_sign * 0.175, 1.355, 0),       # หัวไหล่ (กลางโดมต้นแขน)
+        f"{_side}ForeArm": (_sign * 0.198, 1.065, 0),   # ศอก
+        f"{_side}Hand": (_sign * 0.21, 0.815, 0),       # ข้อมือ
+        f"{_side}Leg": (_sign * 0.09, 0.88, 0),         # ข้อสะโพก
+        f"{_side}LowerLeg": (_sign * 0.095, 0.49, 0),   # เข่า
+        f"{_side}Foot": (_sign * 0.095, 0.08, 0),       # ข้อเท้า (ในรองเท้า)
     })
 PARENT = {
     "Spine": "Hips", "Neck": "Spine", "Head": "Neck",
@@ -64,6 +66,45 @@ PARENT = {
 
 def joint(name):
     return Vector(cage.b(*JOINTS[name]))
+
+
+def relax_armpits(part):
+    """
+    มุมรักแร้หน้า/หลังของเสื้อเป็นจุดที่ 5 หน้ามาบรรจบ (ตัวเสื้อ แขนเสื้อ บ่า) ผิวเรียบจึงหักเป็นรอยบากเล็ก ๆ
+    — คลายเฉพาะจุดในรัศมี 4 ซม. รอบมุมทั้งสี่ (Laplacian smooth) แทนการแก้โครงตาข่ายทั้งชิ้น
+    """
+    shape = bmesh.new()
+    shape.from_mesh(part.data)
+    corners = [Vector((sx * 0.15, sy * 0.08, 1.285)) for sx in (-1, 1) for sy in (-1, 1)]
+    near = [v for v in shape.verts if min((v.co - c).length for c in corners) < 0.045]
+    print(f"คลายรักแร้ {len(near)} จุด")
+    for _ in range(12):
+        bmesh.ops.smooth_vert(shape, verts=near, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
+    shape.to_mesh(part.data)
+    shape.free()
+
+
+def snap_to_surface(part, target):
+    """
+    ดูดแต่ละจุดลงผิวเรียบที่ใกล้ที่สุด (แบบ Shrinkwrap) แต่ข้ามผิวที่หันคนละทาง —
+    ในร่องแคบ (ง่ามนิ้ว) จุดใกล้สุดมักอยู่บนนิ้วข้าง ๆ ถ้าดูดไปจะเป็นหนามแหลม จึงยิงตามแนว normal ของจุดแทน
+    """
+    surface = target.evaluated_get(bpy.context.evaluated_depsgraph_get()).to_mesh()
+    tree = BVHTree.FromPolygons([v.co.copy() for v in surface.vertices], [p.vertices[:] for p in surface.polygons])
+    target.to_mesh_clear()
+    part.data.update()
+    for vertex in part.data.vertices:
+        normal = vertex.normal
+        location, face_normal, _, _ = tree.find_nearest(vertex.co)
+        if location is None:
+            continue
+        if face_normal.dot(normal) < 0.3:
+            hits = [tree.ray_cast(vertex.co, direction, 0.02) for direction in (normal, -normal)]
+            hits = [hit for hit in hits if hit[0] is not None and hit[1].dot(normal) > 0]
+            if not hits:
+                continue
+            location = min(hits, key=lambda hit: hit[3])[0]
+        vertex.co = location
 
 
 def smoothstep(edge0, edge1, x):
@@ -82,22 +123,60 @@ def chain_weights(point, chain):
     return weights
 
 
-def part_weights(name, point):
+# หมวดสีของแต่ละชิ้น — เก็บใน attribute "_part" ให้ create-cafe-customer-model.mjs ระบายสีตามบทบาท
+PART_SKIN, PART_SHIRT, PART_PANTS, PART_SHOE, PART_SOLE, PART_HAIR, PART_RIB = range(7)
+
+
+def part_category(name):
+    if name == "Neckband":
+        return PART_RIB
+    if name == "Shirt":
+        return PART_SHIRT
+    if name == "Pants":
+        return PART_PANTS
+    if name.startswith("Shoe"):
+        return PART_SHOE
+    if name.startswith(("Sole", "Laces")):
+        return PART_SOLE
+    if name == "Hair":
+        return PART_HAIR
+    return PART_SKIN
+
+
+def part_weights(name, point, sleeve=0.0):
     side = "Left" if name.endswith("L") else "Right"
-    if name.startswith(("Head", "Ear")):
+    if name.startswith(("Head", "Ear", "Nose", "Hair")):
         return {"Head": 1.0}
     if name == "Collar":
         return {"Neck": 1.0}
-    if name == "Torso":
-        # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips
-        share = smoothstep(0.43, 0.51, point.z)
-        return {"Hips": 1 - share, "Spine": share}
-    if name.startswith(("Arm", "Thumb")):
-        chain = [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]
-        return {f"{side}Hand": 1.0} if name.startswith("Thumb") else chain_weights(point, chain)
+    if name == "Neckband":
+        return {"Spine": 1.0}
+    if name == "Pants":
+        # ช่วงสะโพกตาม Hips/Spine เหมือนเสื้อ แล้วค่อย ๆ ส่งให้ขาข้างนั้นลงไปตั้งแต่ใต้ก้น — กลางเป้าคงตาม Hips
+        side = "Left" if point.x < 0 else "Right"
+        share = smoothstep(0.98, 1.1, point.z)
+        leg = smoothstep(0.9, 0.79, point.z) * smoothstep(0.0, 0.05, abs(point.x))
+        weights = {"Hips": (1 - share) * (1 - leg), "Spine": share * (1 - leg)}
+        for bone, weight in chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"]).items():
+            weights[bone] = weights.get(bone, 0.0) + weight * leg
+        return weights
+    if name == "Shirt":
+        # เอว: ช่วงพุงงอตามกระดูกสันหลัง สะโพกนิ่งตาม Hips — เสื้อกับกางเกงใช้สูตรเดียวกัน ชายเสื้อจึงซ้อนขอบเอวพอดีตลอดท่า
+        share = smoothstep(0.98, 1.1, point.z)
+        weights = {"Hips": (1 - share) * (1 - sleeve), "Spine": share * (1 - sleeve)}
+        # แขนเสื้อ (และหัวไหล่บางส่วน — ค่า _sleeve จาก blockout) ขยับตามแขนข้างนั้น
+        if sleeve > 0:
+            side = "Left" if point.x < 0 else "Right"
+            for bone, weight in chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"]).items():
+                weights[bone] = weights.get(bone, 0.0) + weight * sleeve
+        return weights
+    if name.startswith(("Palm", "Finger", "Thumb")):
+        return {f"{side}Hand": 1.0}
+    if name.startswith("Arm"):
+        return chain_weights(point, [f"{side}Arm", f"{side}ForeArm", f"{side}Hand"])
     if name.startswith("Leg"):
         return chain_weights(point, [f"{side}Leg", f"{side}LowerLeg", f"{side}Foot"])
-    if name.startswith(("Shoe", "Sole")):
+    if name.startswith(("Shoe", "Sole", "Laces")):
         return {f"{side}Foot": 1.0}
     raise ValueError(f"ไม่รู้ว่าชิ้น {name} ผูกกับกระดูกไหน")
 
@@ -137,19 +216,27 @@ def build(filename, level):
             smooth = part.modifiers.new("Split", "SUBSURF")
             smooth.levels = level
             bpy.ops.object.modifier_apply(modifier=smooth.name)
-        snap = part.modifiers.new("Snap", "SHRINKWRAP")
-        snap.target = target
-        snap.wrap_method = "NEAREST_SURFACEPOINT"
-        bpy.ops.object.modifier_apply(modifier=snap.name)
+        snap_to_surface(part, target)
         bpy.data.objects.remove(target)
+        if part.name == "Shirt":
+            relax_armpits(part)
         # การดูดจุดขยับจุดใต้พื้นรองเท้าลงต่ำกว่าพื้นได้เล็กน้อย — ยกให้ลอย 2 มม. (เผื่อเท้าเอียงตอนเดิน)
         for vertex in part.data.vertices:
             vertex.co.z = max(vertex.co.z, SOLE_Z)
         for polygon in part.data.polygons:
             polygon.use_smooth = True
+        category = part.data.attributes.new(name="_part", type="FLOAT", domain="POINT")
+        for item in category.data:
+            item.value = part_category(part.name)
         groups = {}
+        sleeve = part.data.attributes.get("_sleeve")
+        sleeve_values = [item.value for item in sleeve.data] if sleeve else None
+        if sleeve:
+            # ใช้แค่คำนวณน้ำหนักผิว ไม่ต้องส่งออกไปกับ GLB
+            part.data.attributes.remove(sleeve)
         for vertex in part.data.vertices:
-            for bone, weight in part_weights(part.name, vertex.co).items():
+            share = sleeve_values[vertex.index] if sleeve_values else 0.0
+            for bone, weight in part_weights(part.name, vertex.co, share).items():
                 if weight < 1e-4:
                     continue
                 if bone not in groups:
@@ -176,6 +263,7 @@ def build(filename, level):
         export_animations=False,
         export_skins=True,
         export_materials="NONE",
+        export_attributes=True,
         export_yup=True,
     )
     print(f"สร้าง {filename}: {len(body.data.vertices)} จุด, {len(body.data.polygons)} หน้า")

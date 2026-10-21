@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import * as React from "react";
+import { CHARACTER_MODELS, type CharacterRole } from "@/components/preview-3d/character-models";
 import type { CharacterFacing, CharacterMotion } from "./character-lab-scene";
 
 const CharacterLabScene = dynamic(
@@ -19,6 +20,7 @@ const CharacterLabScene = dynamic(
 
 /** พื้นที่ตรวจสัดส่วนและท่ายืน/นั่ง/เดินของ mannequin โดยไม่แตะ Simulator หลัก */
 export function CharacterLab() {
+  const [role, setRole] = React.useState<CharacterRole>("customer");
   const [facing, setFacing] = React.useState<CharacterFacing>("front");
   const [motion, setMotion] = React.useState<CharacterMotion>("idle");
   const [seated, setSeated] = React.useState(false);
@@ -44,10 +46,32 @@ export function CharacterLab() {
 
         <section className="overflow-hidden rounded-[24px] border border-line bg-white p-3 shadow-[0_12px_36px_rgba(29,45,72,0.09)] sm:p-4" aria-labelledby="scene-title">
           <h2 id="scene-title" className="sr-only">ฉากทดลองตัวละคร</h2>
-          <CharacterLabScene facing={facing} seated={seated} onMotionChange={(next) => {
+          <CharacterLabScene role={role} facing={facing} seated={seated} onMotionChange={(next) => {
             setMotion(next);
             setSeated(next === "seated");
           }} />
+        </section>
+
+        <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="role-title">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="role-title" className="m-0 text-sm font-semibold text-ink">ตัวละคร</h2>
+              <p className="m-0 mt-1 text-xs text-secondary">ลูกค้าและพนักงานเป็นโมเดลแยกกัน แต่ใช้ท่าทางชุดเดียวกัน</p>
+            </div>
+            <div className="flex gap-2" role="group" aria-label="เลือกตัวละคร">
+              {ROLE_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={role === option}
+                  onClick={() => setRole(option)}
+                  className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${role === option ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
+                >
+                  {CHARACTER_MODELS[option].label}
+                </button>
+              ))}
+            </div>
+          </div>
         </section>
 
         <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="pose-title">
@@ -104,7 +128,7 @@ export function CharacterLab() {
         </section>
 
         <aside className="grid gap-3 sm:grid-cols-3" aria-label="สถานะการทดลอง">
-          <StatusCard label="โมเดล" value="Mannequin สีเทา" detail="หุ่นตุ๊กตาสูงประมาณ 0.94 ม. สำหรับฉากร้าน" />
+          <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ 1.70 ม.`} />
           <StatusCard
             label="ท่าปัจจุบัน"
             value={motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}
@@ -116,6 +140,8 @@ export function CharacterLab() {
     </main>
   );
 }
+
+const ROLE_OPTIONS: ReadonlyArray<CharacterRole> = ["customer", "staff"];
 
 const FACING_OPTIONS: ReadonlyArray<{ value: CharacterFacing; label: string }> = [
   { value: "front", label: "หันหน้า" },

@@ -1,0 +1,101 @@
+import { readFile } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+import * as THREE from "three";
+import { CHARACTER_MODELS, customerLook } from "./character-models";
+import { createCharacterLoader } from "./character-loader";
+
+async function load(url: string) {
+  const bytes = await readFile(`public${url}`);
+  return createCharacterLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
+}
+
+function boneNames(scene: THREE.Object3D) {
+  const names: string[] = [];
+  scene.traverse((object) => {
+    if (object instanceof THREE.Bone) names.push(object.name);
+  });
+  return names.sort();
+}
+
+describe("customer look", () => {
+  it("is stable per customer and varies across customers", () => {
+    expect(customerLook(7)).toEqual(customerLook(7));
+    const looks = Array.from({ length: 40 }, (_, id) => customerLook(id));
+    for (const look of looks) {
+      expect(look.colors).toHaveLength(7);
+      for (const color of look.colors) expect(color).toMatch(/^#[0-9a-f]{6}$/);
+      expect(look.scale).toBeGreaterThanOrEqual(0.98);
+      expect(look.scale).toBeLessThanOrEqual(1.02);
+    }
+    // เสื้อ (หมวด 1) ไม่ซ้ำกันหมดทั้งร้าน
+    expect(new Set(looks.map((look) => look.colors[1])).size).toBeGreaterThan(5);
+  });
+});
+
+describe("character models", () => {
+  it("gives customers and staff separate files", () => {
+    const files = Object.values(CHARACTER_MODELS).flatMap((model) => [model.full, model.lite]);
+    expect(new Set(files).size).toBe(files.length);
+  });
+
+  for (const variant of ["full", "lite"] as const) {
+    it(`staff (${variant}) shares the customer skeleton and clips but wears a uniform and cap`, async () => {
+      const customer = await load(CHARACTER_MODELS.customer[variant]);
+      const staff = await load(CHARACTER_MODELS.staff[variant]);
+      expect(boneNames(staff.scene)).toEqual(boneNames(customer.scene));
+      // พนักงานมีท่าทำงานหลังเคาน์เตอร์เพิ่ม
+      expect(staff.animations.map((clip) => clip.name)).toEqual([...customer.animations.map((clip) => clip.name), "Work"]);
+      expect(staff.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance).toBe(
+        customer.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance,
+      );
+
+      // เสื้อผ้าระบายด้วย vertex color ช่องละ 8 บิต: ผิว เสื้อ ขอบคอเสื้อ กางเกง รองเท้า พื้นรองเท้า ผม
+      const palette = (scene: THREE.Object3D) => {
+        const body = scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
+        expect(body).toBeInstanceOf(THREE.SkinnedMesh);
+        expect((body.material as THREE.MeshStandardMaterial).vertexColors).toBe(true);
+        const colors = body.geometry.getAttribute("color");
+        expect(colors.array).toBeInstanceOf(Uint8Array);
+        expect(colors.normalized).toBe(true);
+        const distinct = new Set<string>();
+        for (let i = 0; i < colors.count; i++) distinct.add(`${colors.getX(i).toFixed(3)},${colors.getY(i).toFixed(3)},${colors.getZ(i).toFixed(3)}`);
+        return distinct;
+      };
+      const customerColors = palette(customer.scene);
+      const staffColors = palette(staff.scene);
+      expect(customerColors.size).toBe(7);
+      expect(staffColors.size).toBe(7);
+      // ต่างกันแค่สีเสื้อ (ตัวเสื้อ + ขอบคอ)
+      expect([...staffColors].filter((color) => !customerColors.has(color))).toHaveLength(2);
+      // หมวดชิ้น 0–6 ส่งออกไปให้ฉากร้านสุ่มสีลูกค้าแต่ละคน
+      const part = (customer.scene.getObjectByName("MannequinBody") as THREE.Mesh).geometry.getAttribute("_part");
+      expect(part).toBeDefined();
+      expect(Math.max(...Array.from(part.array as ArrayLike<number>))).toBe(6);
+
+      // หมวกแข็งทั้งใบ: mesh ธรรมดาที่ติดกับกระดูก Head (ไม่มีน้ำหนักผิว)
+      const cap = staff.scene.getObjectByName("StaffCap");
+      expect(cap).toBeInstanceOf(THREE.Mesh);
+      expect(cap).not.toBeInstanceOf(THREE.SkinnedMesh);
+      expect(cap?.parent?.name).toBe("Head");
+      expect(customer.scene.getObjectByName("StaffCap")).toBeUndefined();
+    });
+  }
+
+  it("keeps the cap on the head while the staff member sits", async () => {
+    const { scene, animations } = await load(CHARACTER_MODELS.staff.full);
+    const sit = animations.find((clip) => clip.name === "Sit")!;
+    const mixer = new THREE.AnimationMixer(scene);
+    const action = mixer.clipAction(sit).setLoop(THREE.LoopOnce, 1);
+    action.clampWhenFinished = true;
+    action.play();
+    mixer.setTime(sit.duration);
+    scene.updateMatrixWorld(true);
+    const cap = scene.getObjectByName("StaffCap")!;
+    const head = scene.getObjectByName("Head")!.getWorldPosition(new THREE.Vector3());
+    const bounds = new THREE.Box3().setFromObject(cap);
+    // หมวกอยู่เหนือข้อต่อหัว (ขอบหลังลดลงคลุมท้ายทอย แต่ยังสูงกว่าหู) ยอดอยู่เหนือกระหม่อม และปีกยื่นไปหน้า
+    expect(bounds.min.y).toBeGreaterThan(head.y + 0.06);
+    expect(bounds.max.y).toBeGreaterThan(head.y + 0.2);
+    expect(bounds.max.z).toBeGreaterThan(head.z + 0.15);
+  });
+});

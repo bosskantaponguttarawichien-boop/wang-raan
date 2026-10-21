@@ -2,10 +2,9 @@
 
 import * as React from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { CHARACTER_MODELS, CHARACTER_SCALE, type CharacterRole } from "@/components/preview-3d/character-models";
+import { createCharacterLoader } from "@/components/preview-3d/character-loader";
 
-const MODEL_URL = "/assets/models/cafe-customer.glb";
-const CHARACTER_SCALE = 0.9;
 const MAX_ANIMATION_DELTA_SECONDS = 1 / 30;
 const WALK_ACCELERATION = 1.4;
 const ANIMATION_FADE_SECONDS = 0.22;
@@ -22,6 +21,14 @@ const FACING_RADIANS: Record<CharacterFacing, number> = {
   left: Math.PI / 2,
 };
 
+function disposeModel(model: THREE.Object3D) {
+  model.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    object.geometry.dispose();
+    for (const material of [object.material].flat()) material.dispose();
+  });
+}
+
 function shortestAngle(from: number, to: number) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
@@ -31,10 +38,12 @@ function shortestAngle(from: number, to: number) {
  * เพื่อให้สัดส่วนและการเดินตรงกับมุมมอง 3D ของร้านเสมอ
  */
 export function CharacterLabScene({
+  role,
   facing,
   seated,
   onMotionChange,
 }: {
+  role: CharacterRole;
   facing: CharacterFacing;
   seated: boolean;
   onMotionChange: (motion: CharacterMotion) => void;
@@ -76,8 +85,8 @@ export function CharacterLabScene({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#f4f7fc");
     const camera = new THREE.PerspectiveCamera(31, 1, 0.1, 100);
-    camera.position.set(1.1, 2.1, 3.6);
-    camera.lookAt(0, 0.55, 0);
+    camera.position.set(1.7, 2.5, 5.4);
+    camera.lookAt(0, 0.8, 0);
 
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     renderer.shadowMap.enabled = true;
@@ -105,11 +114,12 @@ export function CharacterLabScene({
       part.receiveShadow = true;
       chair.add(part);
     };
-    addChairPart(0.44, 0.06, 0.42, 0, 0.45, 0);
+    // ผิวบนเบาะ 0.45 ม. เท่าเก้าอี้ในฉากร้าน
+    addChairPart(0.44, 0.06, 0.42, 0, 0.42, 0);
     for (const x of [-0.17, 0.17]) {
-      for (const z of [-0.15, 0.15]) addChairPart(0.045, 0.42, 0.045, x, 0.21, z);
+      for (const z of [-0.15, 0.15]) addChairPart(0.045, 0.39, 0.045, x, 0.195, z);
     }
-    addChairPart(0.44, 0.42, 0.05, 0, 0.70, -0.18);
+    addChairPart(0.44, 0.42, 0.05, 0, 0.67, -0.18);
     chair.visible = false;
     scene.add(chair);
 
@@ -136,7 +146,7 @@ export function CharacterLabScene({
     scene.add(targetMarker);
 
     const clock = new THREE.Clock();
-    const loader = new GLTFLoader();
+    const loader = createCharacterLoader();
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -199,10 +209,17 @@ export function CharacterLabScene({
       setMotion("walking");
     };
 
+    let disposed = false;
+    // เปลี่ยนบทบาทกลางคัน ตัวละครเดิมหายไป → ท่าเริ่มต้นของฉากใหม่คือยืน (ถ้าไม่ได้สั่งนั่งไว้)
+    if (!seatedRef.current) motionChangeRef.current("idle");
     loader.load(
-      MODEL_URL,
+      CHARACTER_MODELS[role].full,
       (gltf) => {
         const model = gltf.scene;
+        if (disposed) {
+          disposeModel(model);
+          return;
+        }
         model.scale.setScalar(CHARACTER_SCALE);
         model.traverse((object) => {
           if (object instanceof THREE.Mesh) {
@@ -243,8 +260,8 @@ export function CharacterLabScene({
           walkTarget = null;
           currentSpeed = 0;
           targetMarker.visible = false;
-          // ขยับสะโพกไว้กลางเบาะ แต่ให้หัวเข่าพ้นขอบหน้าของเบาะเล็กน้อย.
-          root.position.set(0, 0, 0.08);
+          // ถอยข้อสะโพกไปหลังกลางเบาะเล็กน้อย ให้หลังชิดพนักพิงโดยไม่จม (เท่าฉากร้าน)
+          root.position.set(0, 0, -0.035);
           root.rotation.y = FACING_RADIANS.front;
           play("Sit");
           setMotion("seated");
@@ -297,10 +314,12 @@ export function CharacterLabScene({
     frame = requestAnimationFrame(render);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
       renderer.domElement.removeEventListener("pointerdown", chooseTarget);
       mixer?.stopAllAction();
+      if (root) disposeModel(root);
       chair.traverse((object) => {
         if (!(object instanceof THREE.Mesh)) return;
         object.geometry.dispose();
@@ -311,7 +330,8 @@ export function CharacterLabScene({
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, []);
+    // เปลี่ยนบทบาท = สร้างฉากใหม่ด้วยโมเดลของบทบาทนั้น
+  }, [role]);
 
   if (unavailable || failed) {
     return (
@@ -326,5 +346,5 @@ export function CharacterLabScene({
     );
   }
 
-  return <div ref={hostRef} className="h-[min(62vh,620px)] min-h-[360px] overflow-hidden rounded-[18px]" aria-label={seated ? "Mannequin สีเทานั่งบนเก้าอี้ในฉากทดลอง 3 มิติ" : "Mannequin สีเทาในฉากทดลอง 3 มิติ"} role="img" />;
+  return <div ref={hostRef} className="h-[min(62vh,620px)] min-h-[360px] overflow-hidden rounded-[18px]" aria-label={`Mannequin ${CHARACTER_MODELS[role].label}${seated ? "นั่งบนเก้าอี้" : ""}ในฉากทดลอง 3 มิติ`} role="img" />;
 }
