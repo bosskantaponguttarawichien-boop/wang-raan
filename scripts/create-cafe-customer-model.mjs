@@ -174,11 +174,17 @@ if (STAFF) {
   // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
   const HEAD_DEPTH = 1.18;
   const HEAD_FORWARD = 0.012;
-  const crown = [[1.612, 0.086], [1.635, 0.085], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
+  const crown = [[1.612, 0.086], [1.625, 0.0857], [1.64, 0.084], [1.655, 0.081], [1.672, 0.072], [1.686, 0.058], [1.695, 0.037], [1.7, 0]];
   // จุดเรียงจากขอบล่างขึ้นยอด (ผิวหันออก); ยอดรัศมี 0 จึงไม่เป็นรู
-  // ครอบผมได้มิด (กลางกระหม่อม ~1.3 ซม., ผมหน้าผากปัดขึ้น ~1.9 ซม.): ใหญ่กว่าหัว 2.2 ซม. ยอดสูงกว่า 1.8 ซม.
-  const capProfile = crown.map(([y, r]) => new THREE.Vector2(r > 0 ? r + 0.022 : 0, y + 0.018));
-  capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.004));
+  // ขอบหมวกรัดแนบหัว (ห่างผิว 1.2 ซม. พอทับผมบาง ๆ ตรงขอบ) แล้วค่อยพองขึ้นครอบผมกลางกระหม่อม (~2 ซม.)
+  // เดิมห่างเท่ากันทั้งใบ หมวกจึงดูลอยเป็นกะลาครอบ
+  const capProfile = crown.map(([y, r]) => {
+    const t = Math.min(1, Math.max(0, (y - 1.612) / 0.06));
+    const offset = 0.012 + 0.006 * t * t * (3 - 2 * t);
+    return new THREE.Vector2(r > 0 ? r + offset : 0, y + 0.004 + 0.012 * t);
+  });
+  // ขอบล่างพับเข้าเล็กน้อย (หนาแบบผ้า)
+  capProfile.unshift(new THREE.Vector2(capProfile[0].x - 0.004, capProfile[0].y - 0.003));
   const capCrown = new THREE.LatheGeometry(capProfile, LITE ? 16 : 32);
   capCrown.scale(1, 1, HEAD_DEPTH);
   capCrown.translate(0, 0, HEAD_FORWARD);
@@ -186,8 +192,15 @@ if (STAFF) {
   brimShape.absellipse(0, 0, 0.095, 0.095, 0, Math.PI, false, 0);
   const capBrim = new THREE.ExtrudeGeometry(brimShape, { depth: 0.006, bevelEnabled: false, curveSegments: LITE ? 6 : 12 });
   // Shape อยู่บนระนาบ XY → พลิกลงนอนบนระนาบ XZ ปีกชี้ +Z (หน้า) แล้วกดปลายลงนิดเหมือนปีกหมวกจริง
-  capBrim.rotateX(Math.PI / 2 - 0.12);
-  capBrim.translate(0, 1.628, 0.1);
+  capBrim.rotateX(Math.PI / 2 - 0.14);
+  // ปีกโค้งลงที่ขอบซ้าย-ขวาแบบปีกหมวกแก๊ปที่ดัดแล้ว
+  const brimPosition = capBrim.getAttribute("position");
+  for (let i = 0; i < brimPosition.count; i += 1) {
+    const side = brimPosition.getX(i) / 0.095;
+    brimPosition.setY(i, brimPosition.getY(i) - 0.014 * side * side);
+  }
+  capBrim.computeVertexNormals();
+  capBrim.translate(0, 1.618, 0.1);
   // normal ของแต่ละชิ้นคำนวณมาแล้ว (โดมโค้งเรียบ, ปีกขอบคม) — ปีกหมวกรวมจุดซ้ำให้มีดัชนีเหมือนโดม
   // (mergeVertices รวมเฉพาะจุดที่ normal ตรงกัน ขอบคมจึงยังคม) จุดน้อยลงหลายเท่าจากการคลายดัชนี
   for (const part of [capCrown, capBrim]) part.deleteAttribute("uv");
