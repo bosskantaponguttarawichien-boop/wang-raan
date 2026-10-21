@@ -252,6 +252,13 @@ const WORK_DURATION = 8;
 const workCycle = sampled(WORK_DURATION, 96);
 // 0 → 1 → 0 ช่วงเงยหน้า (กลางคลิป) แบบนุ่ม
 const lookUp = (phase) => Math.max(0, Math.cos(phase - Math.PI)) ** 3;
+/** ปลายแขน: งอ (x) แล้วหันเข้าหากลางตัว (yaw) โดยบิดรอบแกนท่อนแขนก่อน (roll) */
+const pronatedTrack = (name, bendYaw, roll) =>
+  new THREE.QuaternionKeyframeTrack(name + ".quaternion", workCycle.times, workCycle.phases.flatMap((phase) => {
+    const [bend, yaw] = bendYaw(phase);
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(bend, yaw, 0, "YXZ"))
+      .multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, roll, 0))).toArray();
+  }));
 const work = new THREE.AnimationClip("Work", WORK_DURATION, [
   new THREE.VectorKeyframeTrack("Hips.position", workCycle.times,
     workCycle.phases.flatMap((phase) => [0.008 * Math.sin(phase), HIPS_Y - 0.003, 0])),
@@ -265,10 +272,11 @@ const work = new THREE.AnimationClip("Work", WORK_DURATION, [
   // ต้นแขนยื่นไปหน้า ปลายแขนเกือบขนานพื้นและหมุนเข้าหากลางตัว — มือขยับขึ้นลงสลับกัน (ความถี่สูงกว่าตัวโยก)
   eulerTrack("LeftArm", workCycle, (phase) => [-0.32 + 0.04 * Math.sin(phase * 5), 0, 0.1], "YXZ"),
   eulerTrack("RightArm", workCycle, (phase) => [-0.3 + 0.04 * Math.sin(phase * 5 + 2.2), 0, -0.1], "YXZ"),
-  eulerTrack("LeftForeArm", workCycle, (phase) => [-1.16 - 0.06 * Math.sin(phase * 5 + 0.6) + 0.1 * lookUp(phase), 0.35, 0], "YXZ"),
-  eulerTrack("RightForeArm", workCycle, (phase) => [-1.14 - 0.06 * Math.sin(phase * 5 + 2.8) + 0.1 * lookUp(phase), -0.35, 0], "YXZ"),
-  eulerTrack("LeftHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 1.2), 0, 0]),
-  eulerTrack("RightHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 3.4), 0, 0]),
+  // คว่ำมือลงบนเคาน์เตอร์: บิดรอบแกนท่อนแขน แบ่งครึ่งระหว่างปลายแขนกับข้อมือ (บิดที่เดียวผิวจะเป็นเกลียว)
+  pronatedTrack("LeftForeArm", (phase) => [-1.16 - 0.06 * Math.sin(phase * 5 + 0.6) + 0.1 * lookUp(phase), 0.35], 0.75),
+  pronatedTrack("RightForeArm", (phase) => [-1.14 - 0.06 * Math.sin(phase * 5 + 2.8) + 0.1 * lookUp(phase), -0.35], -0.8),
+  eulerTrack("LeftHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 1.2), 0.75, 0], "YXZ"),
+  eulerTrack("RightHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 3.4), -0.8, 0], "YXZ"),
 ]);
 
 // Solve a two-bone leg toward a planted/swinging ankle instead of swinging
