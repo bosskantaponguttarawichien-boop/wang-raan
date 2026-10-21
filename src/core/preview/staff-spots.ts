@@ -6,7 +6,7 @@
  * - แล้วหมุนตามเข็มตาม `rotation` ของเคาน์เตอร์
  * พนักงานหันหน้าเข้าหาเคาน์เตอร์ ยืนห่างขอบ STAFF_STANDOFFS[0] ถ้ามีที่ ไม่พอก็ขยับเข้าใกล้
  * ใกล้สุดแล้วยังชนผนัง/วัตถุอื่นก็ไม่วาง
- * ไม่กระทบ validation และ simulation (ลูกค้ายังเดินตาม flow field เดิม)
+ * ไม่กระทบ validation; simulation กันช่องที่พนักงานยืนออกจากทางเดิน (occupancy-grid)
  */
 import { footprint, objectCenter, rotatePoint } from "../layout/geometry";
 import type { Counter, Meters, Point, Rect, StoreLayout } from "../layout/types";

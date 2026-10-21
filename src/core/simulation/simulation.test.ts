@@ -19,13 +19,14 @@ describe("Occupancy Grid 0.25 ม.", () => {
     expect(at(10, 7)).toBe(CELL_FREE); // x 2.5–2.75
     expect(at(9, 8)).toBe(CELL_FREE); // y 2.0–2.25
     expect(at(1, 2)).toBe(CELL_FREE);
-    expect(grid.freeCount).toBe(32 * 24 - 8 * 6);
+    // + 4 ช่องที่พนักงาน 1 คนยืนหลังเคาน์เตอร์ (2 × 2 ช่อง)
+    expect(grid.freeCount).toBe(32 * 24 - 8 * 6 - 4);
   });
 
   it("วัตถุที่ขอบไม่ลงกริดจะกินช่องที่ทับบางส่วนด้วย (conservative)", () => {
     const grid = buildOccupancyGrid({ ...cafeLayout(), objects: [block("c", 1.1, 1.1, 0.5, 0.5)] });
     const blocked = [...grid.cells].reduce((n, c) => n + c, 0);
-    expect(blocked).toBe(9); // 1.0–1.75 ทั้งสองแกน = 3 × 3 ช่อง
+    expect(blocked).toBe(9 + 2); // 1.0–1.75 ทั้งสองแกน = 3 × 3 ช่อง + ช่องที่พนักงานยืน 2 ช่อง
   });
 
   it.each([
@@ -46,6 +47,18 @@ describe("Occupancy Grid 0.25 ม.", () => {
       if (wall === "west") expect(col).toBe(0);
       if (wall === "east") expect(col).toBe(grid.cols - 1);
     }
+  });
+
+  it("จุดยืนพนักงานหลังเคาน์เตอร์ไม่ว่าง ลูกค้าเดินทะลุไม่ได้", () => {
+    const counter = { id: "c", type: "counter" as const, x: 3, y: 2, width: 2, depth: 0.7, rotation: 0 as const };
+    const grid = buildOccupancyGrid({ ...cafeLayout(), objects: [counter] });
+    const at = (col: number, row: number) => grid.cells[row * grid.cols + col];
+    // พนักงานยืนที่ (4, 1.65) รัศมี 0.2 → จุดกลางช่อง x 3.875, 4.125 และ y 1.625
+    expect(at(15, 6)).toBe(CELL_BLOCKED);
+    expect(at(16, 6)).toBe(CELL_BLOCKED);
+    expect(at(14, 6)).toBe(CELL_FREE);
+    expect(at(15, 5)).toBe(CELL_FREE);
+    expect(grid.freeCount).toBe(32 * 24 - 8 * 3 - 2);
   });
 
   it("ช่องทางเข้าที่มีของวางทับไม่นับ, ไม่มีทางเข้า → ไม่มีช่องทางเข้า", () => {

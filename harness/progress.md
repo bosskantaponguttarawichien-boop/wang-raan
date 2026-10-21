@@ -4,6 +4,26 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
+## [2026-10-21] ลูกค้าไม่เดินทะลุพนักงาน
+
+- `buildOccupancyGrid` กันช่องที่พนักงานยืนหลังเคาน์เตอร์ (จุดจาก `staffSpots`, ช่องที่จุดกลางอยู่ในรัศมี 0.2 ม. + ช่องที่ยืนอยู่) — flow field จึงพาลูกค้าอ้อม
+- ตรวจ: `make test` 910, `make lint` ผ่าน; Chromium จำลองผังตัวอย่าง
+
+
+## [2026-10-21] ลูกค้าแต่ละคนหน้าตาไม่ซ้ำ
+
+- `customerLook(id)` สุ่มแบบคงที่ตาม id: สีผิว เสื้อ 10 สี กางเกง ผม (โทนเข้มเท่านั้น สีอ่อนดูเหมือนหัวล้าน) รองเท้า และความสูง ±2%
+- GLB เก็บหมวดชิ้นส่วนเป็น attribute `_PART`; three-view clone material ต่อคนแล้วแทนสีด้วย shader (`onBeforeCompile`) — โมเดลไฟล์เดียว
+- ตรวจ: `make test` 909, `make lint` ผ่าน; Chromium จำลองผังตัวอย่าง
+
+
+## [2026-10-21] บีบอัดไฟล์โมเดลตัวละคร
+
+- `create-cafe-customer-model.mjs` ส่งผลผ่าน glTF-Transform: dedup, prune, resample, quantize (normal/joints/weights 8 บิต; ตำแหน่งยังเป็น float ให้สลับร่าง full/lite ได้), reorder, `EXT_meshopt_compression`
+- โหลดผ่าน `character-loader.ts` (GLTFLoader + MeshoptDecoder); ลูกค้า 377 → 234 KB, lite → 80 KB; พนักงาน 242 / 85 KB
+- ตรวจ: `make test` 909, `make lint` ผ่าน
+
+
 ## [2026-10-20] ทรงผมใหม่
 
 - `hair()` สร้างตาข่ายตามแนวหัว (32 จุดรอบ × 12 แถว จากกระหม่อมลงไรผม) แทนการลบจุดจากตารางหัว — ไรผมเป็นเส้นโค้งเรียบตาม `HAIRLINE`: หน้าผาก 1.648 ม., จอนหน้าหู, เหนือใบหู, หลังหูลงต่ำ, ท้ายทอยถึงต้นคอ 1.488 ม.
