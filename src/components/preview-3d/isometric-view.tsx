@@ -82,7 +82,7 @@ export function IsometricView({ onToast = () => {} }: IsometricViewProps) {
   }, [isSim, keyboardTarget, layout, onToast, useSvgFallback, viewRotation]);
 
   if (!useSvgFallback) {
-    return <ThreeView layout={layout} zoom={zoom} viewRotation={viewRotation} isSim={isSim} onUnavailable={showFallback} />;
+    return <ThreeView layout={layout} zoom={zoom} viewRotation={viewRotation} isSim={isSim} simPaused={simStatus === "paused"} onUnavailable={showFallback} />;
   }
 
   return (
