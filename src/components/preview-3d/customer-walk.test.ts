@@ -4,18 +4,12 @@ import * as THREE from "three";
 import { CHARACTER_SCALE } from "./character-models";
 import { createCharacterLoader } from "./character-loader";
 
-async function loadFile(file: string) {
-  const bytes = await readFile(`public/assets/models/${file}`);
+async function loadCustomer() {
+  const bytes = await readFile("public/assets/models/cafe-customer.glb");
   return createCharacterLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
 }
 
-// รุ่นผู้หญิงปั้นที่ 1.70 ม. แล้วย่อทั้งตัวเป็น 1.60 ม. — ตัวเลขร่างกายย่อตาม แต่เบาะเก้าอี้/พื้นคงที่
-describe.each([
-  ["cafe-customer.glb", 1],
-  ["cafe-customer-female.glb", 1.6 / 1.7],
-])("customer walk asset (%s)", (file, k) => {
-  const loadCustomer = () => loadFile(file);
-
+describe("customer walk asset", () => {
   it("settles the hips at chair-seat height and folds the knees toward the chair front", async () => {
     const { scene, animations } = await loadCustomer();
     const sit = animations.find((clip) => clip.name === "Sit")!;
@@ -32,13 +26,12 @@ describe.each([
     const leftHand = scene.getObjectByName("LeftHand")!.getWorldPosition(new THREE.Vector3());
     const rightHand = scene.getObjectByName("RightHand")!.getWorldPosition(new THREE.Vector3());
     // ใต้ต้นขา (ข้อสะโพกต่ำกว่า Hips 0.04 + ครึ่งความหนาต้นขา 0.09) อยู่บนเบาะ 0.45 ม. ที่ขนาดแสดงผลจริง
-    expect((hips.y - (0.04 + 0.09) * k) * CHARACTER_SCALE).toBeCloseTo(0.45, 3);
-    // คนตัวเล็กขาสั้นกว่า ต้นขาจึงลาดลงหาเข่ามากกว่าเล็กน้อยเพื่อให้เท้าถึงพื้น
-    expect(knee.y).toBeGreaterThan(hips.y - 0.12);
+    expect((hips.y - 0.04 - 0.09) * CHARACTER_SCALE).toBeCloseTo(0.45, 3);
+    expect(knee.y).toBeGreaterThan(hips.y - 0.1);
     // คนสูง 1.70 ม. นั่งเบาะมาตรฐานแล้วเท้าวางบนพื้น (ข้อเท้ากลับมาระดับเดียวกับตอนยืน)
-    expect(ankle.y).toBeCloseTo(0.08 * k, 3);
+    expect(ankle.y).toBeCloseTo(0.08, 3);
     // ต้นขายาว .129 พับไปหน้าเกือบขนานพื้น
-    expect(knee.z).toBeGreaterThan(0.12 * k);
+    expect(knee.z).toBeGreaterThan(0.12);
     expect(ankle.y).toBeLessThan(knee.y);
     expect(leftHand.x).toBeLessThan(0);
     expect(rightHand.x).toBeGreaterThan(0);
@@ -71,7 +64,7 @@ describe.each([
         const worldZ = foot.z + stride / walk.duration * time;
         contactZ ??= worldZ;
         expect(Math.abs(worldZ - contactZ)).toBeLessThan(0.001);
-        expect(foot.y).toBeCloseTo(0.08 * k, 3);
+        expect(foot.y).toBeCloseTo(0.08, 3);
       }
     }
   });

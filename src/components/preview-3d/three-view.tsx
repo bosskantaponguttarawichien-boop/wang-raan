@@ -49,10 +49,6 @@ type AnimatedCustomer = {
   still: number;
   /** เหลื่อมจังหวะท่ายืนรอ ไม่ให้ลูกค้าที่ต่อคิวขยับพร้อมกัน (วินาที) */
   idleOffset: number;
-  /** โมเดลที่ใช้ (ชาย/หญิง) — คลิปและผิวรุ่นเบาต้องมาจากไฟล์เดียวกัน */
-  asset: CharacterAsset;
-  /** ความเร็วเดินตามท่า Walk ของโมเดลนี้ (ม./วิ) — ใช้เดินเท้าไม่ไถลบนพื้น */
-  walkSpeed: number;
 };
 
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนแค่สร้าง `content` ใหม่ ไม่สร้าง WebGL context ใหม่ */
@@ -84,12 +80,11 @@ type CharacterAsset = {
   liteBody: THREE.BufferGeometry | null;
   liteScene: THREE.Object3D | null;
   clips: THREE.AnimationClip[];
-  /** ความเร็วเดินตามท่า Walk (ระยะต่อรอบ / เวลาต่อรอบ) */
-  walkSpeed: number;
 };
 
-const emptyAsset = (): CharacterAsset => ({ template: null, fullBody: null, liteBody: null, liteScene: null, clips: [], walkSpeed: 0.44 });
-
+const MODEL_URL = CHARACTER_MODELS.customer.full;
+/** โครงกระดูก/animation เดียวกับ MODEL_URL แต่ polygon ราว 1/4 — สลับแค่ geometry ตอนตัวละครเล็กบนจอ */
+const LITE_MODEL_URL = CHARACTER_MODELS.customer.lite;
 /** เหลื่อมจังหวะท่ายืนของพนักงานแต่ละคน ไม่ให้ขยับพร้อมกันทั้งร้าน (วินาที) */
 const STAFF_IDLE_PHASE = 0.83;
 /** ลูกค้าเคลื่อนช้ากว่านี้ (ม./วิ) นานกว่า IDLE_AFTER_SECONDS ถือว่ายืนรอ → เล่น Idle; เร็วกว่า IDLE_EXIT_SPEED กลับไปเดิน */
@@ -818,17 +813,19 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     const clock = new THREE.Clock(false);
     const customers = new Map<number, AnimatedCustomer>();
     const controller = getSimulationController();
+    let modelTemplate: THREE.Object3D | null = null;
     let templateMaterial: THREE.MeshStandardMaterial | null = null;
-    // ลูกค้าชาย (ต้องมี — โหลดไม่ได้ถอยไปใช้ SVG) และหญิง (โหลดไม่ได้/ยังไม่เสร็จก็ใช้ชาย)
-    const maleAsset = emptyAsset();
-    const femaleAsset = emptyAsset();
-    const staffAsset = emptyAsset();
+    let fullBody: THREE.BufferGeometry | null = null;
+    let liteBody: THREE.BufferGeometry | null = null;
+    let liteScene: THREE.Object3D | null = null;
+    let clips: THREE.AnimationClip[] = [];
+    const staffAsset: CharacterAsset = { template: null, fullBody: null, liteBody: null, liteScene: null, clips: [] };
     const staff: StandingStaff[] = [];
+    let walkSpeed = 0.44;
     let frame = 0;
     let disposed = false;
 
-    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action" | "idleOffset" | "asset">, name: CustomerAnimation) => {
-      const { clips } = customer.asset;
+    const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action" | "idleOffset">, name: CustomerAnimation) => {
       const clip = THREE.AnimationClip.findByName(clips, name) ?? clips[0];
       if (!clip) return;
       const action = customer.mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
@@ -929,7 +926,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
 
     const syncCustomers = () => {
       const current = controller.current;
-      if (!maleAsset.template || !current) return;
+      if (!modelTemplate || !current) return;
       const liveIds = new Set<number>();
       const { agents } = current;
       const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
@@ -957,9 +954,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         let customer = customers.get(id);
         if (!customer) {
           // SkinnedMesh ต้อง clone ผ่าน SkeletonUtils ให้แต่ละตัวมีโครงกระดูกของตัวเอง
+          const model = cloneSkinned(modelTemplate);
           const look = customerLook(id);
-          const asset = look.female && femaleAsset.template ? femaleAsset : maleAsset;
-          const model = cloneSkinned(asset.template!);
           model.position.set(targetX, 0, targetZ);
           model.scale.setScalar(CUSTOMER_SCALE * look.scale);
           scene.add(model);
@@ -976,8 +972,6 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
             targetRotation: 0,
             still: 0,
             idleOffset: (id * 1.37) % 6,
-            asset,
-            walkSpeed: asset.walkSpeed * look.scale,
           };
           playClip(customer, animation);
           customers.set(id, customer);
@@ -1019,15 +1013,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       const simulating = isSimRef.current;
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
-      const maleBody = bodyForZoom(maleAsset.fullBody, maleAsset.liteBody);
-      const femaleBody = bodyForZoom(femaleAsset.fullBody, femaleAsset.liteBody);
+      const body = bodyForZoom(fullBody, liteBody);
       const staffBody = bodyForZoom(staffAsset.fullBody, staffAsset.liteBody);
       for (const member of staff) {
         if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
         member.mixer.update(delta);
       }
       for (const customer of customers.values()) {
-        const body = customer.asset === femaleAsset ? femaleBody : maleBody;
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         if (customer.standingUp > 0) {
           // ลุกให้เสร็จที่เก้าอี้ก่อน แล้วค่อยผสมเข้าท่าเดินไปหาจุดจำลอง
@@ -1055,7 +1047,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
         }
         // Advance the walk by distance travelled, including simulation speed changes.
         customer.mixer.update(
-          customer.animation === "Walk" ? Math.min(distance / customer.walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
+          customer.animation === "Walk" ? Math.min(distance / walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
         );
       }
       renderer.render(scene, camera);
@@ -1087,45 +1079,35 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     observer.observe(host);
 
     const loader = createCharacterLoader();
-    const loadCustomerAsset = (asset: CharacterAsset, urls: { full: string; lite: string }, onError?: () => void) => {
-      loader.load(
-        urls.full,
-        (gltf) => {
-          if (disposed) {
-            disposeModel(gltf.scene);
-            return;
-          }
-          gltf.scene.traverse((object) => {
-            if (object instanceof THREE.Mesh) object.castShadow = true;
-          });
-          asset.template = gltf.scene;
-          const templateBody = gltf.scene.getObjectByName(BODY_MESH_NAME);
-          asset.fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
-          // วัสดุ (shader สีต่อคน) ใช้ของรุ่นชายกับทุกคน — สองไฟล์ตั้งวัสดุเหมือนกัน
-          if (asset === maleAsset && templateBody instanceof THREE.Mesh && templateBody.material instanceof THREE.MeshStandardMaterial) {
-            templateMaterial = templateBody.material;
-          }
-          asset.clips = gltf.animations;
-          const walkClip = THREE.AnimationClip.findByName(asset.clips, "Walk");
-          const stride = gltf.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
-          if (walkClip && typeof stride === "number" && stride > 0) asset.walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
-          invalidate();
-        },
-        undefined,
-        () => {
-          if (!disposed) onError?.();
-        },
-      );
-      // รุ่นเบาโหลดไม่ได้ก็ไม่เป็นไร ใช้รุ่นละเอียดต่อ
-      loader.load(urls.lite, (gltf) => {
-        asset.liteScene = gltf.scene;
-        const liteMesh = gltf.scene.getObjectByName(BODY_MESH_NAME);
-        asset.liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
-        if (disposed) disposeModel(gltf.scene);
-      });
-    };
-    loadCustomerAsset(maleAsset, CHARACTER_MODELS.customer, onUnavailable);
-    loadCustomerAsset(femaleAsset, CHARACTER_MODELS.customerFemale);
+    loader.load(
+      MODEL_URL,
+      (gltf) => {
+        if (disposed) return;
+        gltf.scene.traverse((object) => {
+          if (object instanceof THREE.Mesh) object.castShadow = true;
+        });
+        modelTemplate = gltf.scene;
+        const templateBody = modelTemplate.getObjectByName(BODY_MESH_NAME);
+        fullBody = templateBody instanceof THREE.Mesh ? templateBody.geometry : null;
+        templateMaterial = templateBody instanceof THREE.Mesh && templateBody.material instanceof THREE.MeshStandardMaterial ? templateBody.material : null;
+        clips = gltf.animations;
+        const walkClip = THREE.AnimationClip.findByName(clips, "Walk");
+        const stride = modelTemplate.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
+        if (walkClip && typeof stride === "number" && stride > 0) walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
+        invalidate();
+      },
+      undefined,
+      () => {
+        if (!disposed) onUnavailable();
+      },
+    );
+    // รุ่นเบาโหลดไม่ได้ก็ไม่เป็นไร ใช้รุ่นละเอียดต่อ
+    loader.load(LITE_MODEL_URL, (gltf) => {
+      liteScene = gltf.scene;
+      const liteMesh = liteScene.getObjectByName(BODY_MESH_NAME);
+      liteBody = liteMesh instanceof THREE.Mesh ? liteMesh.geometry : null;
+      if (disposed) disposeModel(liteScene);
+    });
     return () => {
       disposed = true;
       cancelAnimationFrame(frame);
@@ -1133,10 +1115,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
       clearCustomers();
       disposeContent(stage.content);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
-      for (const asset of [maleAsset, femaleAsset]) {
-        disposeModel(asset.template);
-        disposeModel(asset.liteScene);
-      }
+      disposeModel(modelTemplate);
+      disposeModel(liteScene);
       for (const member of staff) member.mixer.stopAllAction();
       disposeModel(staffAsset.template);
       disposeModel(staffAsset.liteScene);

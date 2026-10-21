@@ -10,8 +10,6 @@
  *      node scripts/create-cafe-customer-model.mjs         → cafe-customer.glb (ละเอียด, Character Lab)
  *      node scripts/create-cafe-customer-model.mjs --lite  → cafe-customer-lite.glb (ฉากร้านที่มีลูกค้าหลายสิบคน)
  *      เติม --staff → cafe-staff.glb / cafe-staff-lite.glb (พนักงาน)
- *      เติม --female → cafe-customer-female.glb / -lite (ลูกค้าผู้หญิง สูง 1.60 ม.; สร้างผิวก่อนด้วย
- *      CAFE_VARIANT=female python scripts/blender/build-cafe-customer-mesh.py)
  * ทุกไฟล์ใช้รูปร่าง โครงกระดูก และ animation ชุดเดียวกัน — รุ่น lite ต่างแค่จำนวน polygon,
  * ลูกค้า/พนักงานต่างกันที่สีเสื้อผ้า (vertex color ตามหมวดชิ้นจาก Blender) และหมวกที่ผูกกับกระดูก Head
  */
@@ -39,14 +37,7 @@ if (!globalThis.FileReader) {
 const outputDirectory = new URL("../public/assets/models/", import.meta.url);
 const LITE = process.argv.includes("--lite");
 const STAFF = process.argv.includes("--staff");
-// รุ่นผู้หญิง (ลูกค้าเท่านั้น): ผิวจาก CAFE_VARIANT=female build-cafe-customer-mesh.py, สูง 1.60 ม.
-const FEMALE = !STAFF && process.argv.includes("--female");
-const outputFile = new URL(`cafe-${STAFF ? "staff" : FEMALE ? "customer-female" : "customer"}${LITE ? "-lite" : ""}.glb`, outputDirectory);
-// ทั้งตัวปั้นที่ 1.70 ม. — รุ่นผู้หญิงย่อผิว ตำแหน่งกระดูก และการเลื่อนสะโพกในคลิปด้วยอัตรานี้ (ไม่ใช่ scale ของ node
-// เพราะ inverse bind matrix จะไม่ตรง) ตัวเลขด้านล่างทั้งหมดเป็นหน่วยก่อนย่อ
-const BODY_SCALE = FEMALE ? 1.6 / 1.7 : 1;
-// ไหล่แคบกว่า: ข้อไหล่/ศอก/ข้อมือเลื่อนเข้าหาลำตัว — ตรงกับ SHOULDER_IN ใน blockout-cafe-customer.py
-const SHOULDER_IN = FEMALE ? 0.02 : 0;
+const outputFile = new URL(`cafe-${STAFF ? "staff" : "customer"}${LITE ? "-lite" : ""}.glb`, outputDirectory);
 // สีชุดพนักงาน: เขียวเข้มต่างจากสีเฟอร์นิเจอร์และเสื้อลูกค้า มองจากมุมสูงในฉากร้านก็แยกออก
 const UNIFORM_COLOR = "#2f5e47";
 // สีตามหมวดชิ้น (_part จาก build-cafe-customer-mesh.py): ผิว, เสื้อ, กางเกง, รองเท้า, พื้นรองเท้า, ผม (+ ขอบคอเสื้อ)
@@ -65,7 +56,7 @@ const PART_COLORS = [PALETTE.skin, PALETTE.shirt, PALETTE.pants, PALETTE.shoe, P
 const mannequin = new THREE.MeshStandardMaterial({ color: "#ffffff", vertexColors: true, roughness: 0.84, metalness: 0 });
 
 // ฉากร้านเห็นตัวละครเล็กกว่ามาก แต่มีพร้อมกันหลายสิบตัว (×2 รอบรวมเงา) → ใช้ผิวที่เกลาน้อยกว่า
-const meshFile = new URL(`blender/cafe-customer${FEMALE ? "-female" : ""}-mesh${LITE ? "-lite" : ""}.glb`, import.meta.url);
+const meshFile = new URL(LITE ? "blender/cafe-customer-mesh-lite.glb" : "blender/cafe-customer-mesh.glb", import.meta.url);
 
 function bone(name, position) {
   const part = new THREE.Bone();
@@ -89,8 +80,8 @@ const hips = bone("Hips", [0, HIPS_Y, 0]);
 const spine = bone("Spine", [0, 0.13, 0]);
 const neck = bone("Neck", [0, 0.35, 0]);
 const head = bone("Head", [0, 0.1, 0]);
-const leftArm = bone("LeftArm", [-0.175 + SHOULDER_IN, 0.305, 0]);
-const rightArm = bone("RightArm", [0.175 - SHOULDER_IN, 0.305, 0]);
+const leftArm = bone("LeftArm", [-0.175, 0.305, 0]);
+const rightArm = bone("RightArm", [0.175, 0.305, 0]);
 const leftForeArm = bone("LeftForeArm", [-0.023, -0.29, 0]);
 const rightForeArm = bone("RightForeArm", [0.023, -0.29, 0]);
 const leftHand = bone("LeftHand", [-0.012, -0.25, 0]);
@@ -114,8 +105,6 @@ leftLeg.add(leftLowerLeg);
 rightLeg.add(rightLowerLeg);
 leftLowerLeg.add(leftFoot);
 rightLowerLeg.add(rightFoot);
-for (const part of [hips, spine, neck, head, leftArm, rightArm, leftForeArm, rightForeArm, leftHand, rightHand,
-  leftLeg, rightLeg, leftLowerLeg, rightLowerLeg, leftFoot, rightFoot]) part.position.multiplyScalar(BODY_SCALE);
 model.updateMatrixWorld(true);
 
 const bones = [
@@ -143,7 +132,6 @@ const remap = sourceMesh.skeleton.bones.map((part) => {
 const geometry = new THREE.BufferGeometry();
 for (const name of ["position", "normal"]) geometry.setAttribute(name, sourceMesh.geometry.getAttribute(name).clone());
 geometry.setIndex(sourceMesh.geometry.getIndex().clone());
-if (BODY_SCALE !== 1) geometry.scale(BODY_SCALE, BODY_SCALE, BODY_SCALE);
 const sourceJoints = sourceMesh.geometry.getAttribute("skinIndex");
 const sourceWeights = sourceMesh.geometry.getAttribute("skinWeight");
 const skinIndices = new Uint16Array(sourceJoints.count * 4);
@@ -288,7 +276,7 @@ const work = new THREE.AnimationClip("Work", WORK_DURATION, [
 const WALK_DURATION = 0.95;
 const WALK_DISTANCE = 0.9;
 const walkCycle = sampled(WALK_DURATION, 60);
-model.userData.walkCycleDistance = WALK_DISTANCE * BODY_SCALE;
+model.userData.walkCycleDistance = WALK_DISTANCE;
 // สะโพกต่ำสุดตอนสองขากางสุด (ขาเหยียดถึงพื้นพอดี) สูงสุดตอนขาผ่านกัน — ตอนนั้นขาที่รับน้ำหนักเกือบเหยียดตรง
 // (ก้าวละ 0.45 ม.: ขากาง ±0.225 ม. ข้อสะโพกต้องต่ำลง ~3.3 ซม. จากท่ายืน)
 const hipHeights = walkCycle.phases.map((phase) => HIPS_Y - 0.034 + 0.015 * (1 - Math.cos(phase * 2)));
@@ -338,8 +326,7 @@ const walk = new THREE.AnimationClip("Walk", WALK_DURATION, [
 ]);
 
 // ใต้ต้นขาอยู่บนเบาะเก้าอี้ในฉากร้าน (ผิวบน 0.45 ม. มาตรฐานเก้าอี้ทานอาหาร) = เบาะ + ข้อสะโพกต่ำกว่า Hips + ครึ่งความหนาต้นขา
-// หน่วยก่อนย่อ — หลังย่อตัว (BODY_SCALE) ใต้ต้นขาจึงลงที่ 0.45 ม. จริง
-const SEAT_TOP = 0.45 / BODY_SCALE;
+const SEAT_TOP = 0.45;
 const THIGH_UNDER = 0.09;
 const SIT_HIPS_Y = SEAT_TOP + LEG_DROP + THIGH_UNDER;
 // ต้นขาลาดลงหาเข่าเล็กน้อย หน้าแข้งเอนไปหน้านิด → เท้าวางราบบนพื้นพอดี (ข้อเท้ากลับมาที่ ANKLE_Y)
@@ -392,11 +379,6 @@ const sit = new THREE.AnimationClip("Sit", SIT_DURATION, [
   sitTrack("LeftHand", leftSitArm.hand),
   sitTrack("RightHand", rightSitArm.hand),
 ]);
-
-// การเลื่อนสะโพกในคลิปเป็นหน่วยก่อนย่อ — ย่อตามตัว (การหมุนข้อต่อไม่ต้องปรับ)
-for (const clip of [idle, walk, sit, work]) {
-  for (const track of clip.tracks) if (track.name.endsWith(".position")) track.values = track.values.map((value) => value * BODY_SCALE);
-}
 
 const exporter = new GLTFExporter();
 const glb = await exporter.parseAsync(model, {
