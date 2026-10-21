@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CHARACTER_MODELS } from "./character-models";
+import { createCharacterLoader } from "./character-loader";
 
 async function load(url: string) {
   const bytes = await readFile(`public${url}`);
-  return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
+  return createCharacterLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
 }
 
 function boneNames(scene: THREE.Object3D) {

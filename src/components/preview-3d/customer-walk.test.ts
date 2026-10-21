@@ -1,12 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CHARACTER_SCALE } from "./character-models";
+import { createCharacterLoader } from "./character-loader";
 
 async function loadCustomer() {
   const bytes = await readFile("public/assets/models/cafe-customer.glb");
-  return new GLTFLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
+  return createCharacterLoader().parseAsync(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), "");
 }
 
 describe("customer walk asset", () => {

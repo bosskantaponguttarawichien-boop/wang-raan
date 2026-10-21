@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { CHARACTER_MODELS, CHARACTER_SCALE, type CharacterRole } from "@/components/preview-3d/character-models";
+import { createCharacterLoader } from "@/components/preview-3d/character-loader";
 
 const MAX_ANIMATION_DELTA_SECONDS = 1 / 30;
 const WALK_ACCELERATION = 1.4;
@@ -146,7 +146,7 @@ export function CharacterLabScene({
     scene.add(targetMarker);
 
     const clock = new THREE.Clock();
-    const loader = new GLTFLoader();
+    const loader = createCharacterLoader();
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);

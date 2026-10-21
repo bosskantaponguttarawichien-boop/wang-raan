@@ -28,3 +28,4 @@ export const CHARACTER_MODELS: Record<CharacterRole, { full: string; lite: strin
     description: "เสื้อยืดและหมวกแก๊ปสีเขียว กางเกงยีนส์",
   },
 };
+

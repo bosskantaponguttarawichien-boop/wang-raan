@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import {
@@ -20,6 +19,7 @@ import { AGENT_STRIDE } from "@/core/simulation";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE } from "./character-models";
+import { createCharacterLoader } from "./character-loader";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 
 export interface ThreeViewProps {
@@ -1026,7 +1026,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, onUnavailable
     const observer = new ResizeObserver(resize);
     observer.observe(host);
 
-    const loader = new GLTFLoader();
+    const loader = createCharacterLoader();
     loader.load(
       MODEL_URL,
       (gltf) => {

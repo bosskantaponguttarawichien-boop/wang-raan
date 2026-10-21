@@ -18,6 +18,10 @@ import * as THREE from "three";
 import { GLTFExporter } from "three/addons/exporters/GLTFExporter.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { mergeGeometries, mergeVertices } from "three/addons/utils/BufferGeometryUtils.js";
+import { NodeIO } from "@gltf-transform/core";
+import { ALL_EXTENSIONS, EXTMeshoptCompression } from "@gltf-transform/extensions";
+import { dedup, prune, quantize, reorder, resample } from "@gltf-transform/functions";
+import { MeshoptEncoder } from "meshoptimizer";
 
 if (!globalThis.FileReader) {
   globalThis.FileReader = class FileReader {
@@ -163,6 +167,8 @@ for (let i = 0; i < position.count; i += 1) {
   colors.set([color.r, color.g, color.b].map((channel) => Math.round(channel * 255)), i * 3);
 }
 geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3, true));
+// หมวดชิ้นส่งออกไปด้วย (attribute "_part" ใน glTF) — ฉากร้านใช้สุ่มสีเสื้อผ้า/ผม/ผิวของลูกค้าแต่ละคน
+geometry.setAttribute("part", new THREE.BufferAttribute(Uint8Array.from({ length: position.count }, (_, i) => Math.round(sourcePart.getX(i))), 1));
 
 if (STAFF) {
   // ---- หมวกแก๊ป: ครอบหัวตามเงา HEAD_PROFILE ใน blockout-cafe-customer.py (สูงกว่าหู) + ปีกหมวกยื่นไปหน้า
@@ -332,6 +338,24 @@ const glb = await exporter.parseAsync(model, {
   onlyVisible: true,
 });
 
+// ---- บีบอัด (แอปต้องตั้ง MeshoptDecoder ให้ GLTFLoader — ดู src/components/preview-3d/character-models.ts)
+// 1. normal/น้ำหนักผิว/ดัชนีกระดูกเป็นจำนวนเต็มขนาดเล็ก (KHR_mesh_quantization)
+//    ไม่บีบตำแหน่งจุด — ฉากร้านสลับผิวรุ่นละเอียด/รุ่นเบาบนโครงกระดูกเดียวกัน ถ้าบีบตำแหน่งแต่ละไฟล์จะมีสเกลถอดรหัสต่างกัน
+// 2. ตัด keyframe ที่ซ้ำ/อยู่บนเส้นตรงออก (resample)
+// 3. เรียงจุด/หน้าให้บีบได้ดี แล้วเข้ารหัส buffer ด้วย EXT_meshopt_compression (ไม่สูญเสียข้อมูลเพิ่ม)
+await MeshoptEncoder.ready;
+const io = new NodeIO().registerExtensions(ALL_EXTENSIONS).registerDependencies({ "meshopt.encoder": MeshoptEncoder });
+const document = await io.readBinary(new Uint8Array(glb));
+await document.transform(
+  dedup(),
+  prune({ keepAttributes: true }),
+  resample(),
+  quantize({ pattern: /^(NORMAL|JOINTS_0|WEIGHTS_0)$/, quantizeNormal: 8, quantizeWeight: 8 }),
+  reorder({ encoder: MeshoptEncoder }),
+);
+document.createExtension(EXTMeshoptCompression).setRequired(true).setEncoderOptions({ method: EXTMeshoptCompression.EncoderMethod.QUANTIZE });
+const compressed = await io.writeBinary(document);
+
 await mkdir(outputDirectory, { recursive: true });
-await writeFile(outputFile, new Uint8Array(glb));
+await writeFile(outputFile, compressed);
 console.log(`สร้าง ${outputFile.pathname} (${position.count} จุด, ${geometry.getIndex().count / 3} หน้า)`);
