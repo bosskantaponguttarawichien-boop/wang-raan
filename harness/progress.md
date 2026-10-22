@@ -4,6 +4,12 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
+## [2026-10-22] แก้ build บน Cloudflare ล้มเพราะ Next 15 หมดระยะดูแล
+
+- อาการ: CI `E2E (Cloudflare Workers runtime)` ล้มตั้งแต่ 2026-10-21 — `opennextjs-cloudflare build` ไม่ยอม build Next 15.5.27 (`@opennextjs/aws` ถือว่ารุ่นหลักหมดระยะดูแล 2 ปีหลังออก: Next 15 = 2024-10-21)
+- แก้ชั่วคราว: `cf:build` ใส่ `--dangerouslyUseUnsupportedNextVersion` — ต้องอัปเกรดเป็น Next 16 แล้วเอา flag ออก (Next 15 อาจไม่ได้แพตช์ความปลอดภัยแล้ว)
+- ยังค้าง: check `Workers Builds: wang-raan` ล้มภายใน 0 วินาทีมาตั้งแต่ PR #12 (ก่อนเริ่ม build) — ต้องดู log ใน Cloudflare dashboard
+
 ## [2026-10-21] 30 fps ตอนหยุดจำลอง + ปรับคุณภาพอัตโนมัติ
 
 - หยุดจำลองชั่วคราว (หรือจบจำลองแต่ยังมีลูกค้าค้าง) วาดแค่ ~30 fps (`PAUSED_FRAME_MS`) — ThreeView รับ `simPaused` จาก isometric-view (`simStatus === "paused"`; เดิม isSim รวม paused ไว้ด้วย จึงวาดเต็มความเร็ว)

@@ -1,6 +1,7 @@
 {
   // หน้าเว็บ + BFF บน Cloudflare Workers ผ่าน OpenNext (feat-035) — ต้องใช้ Workers Paid (แผนฟรีจำกัด CPU 10 ms/คำขอ)
   // build: `npm run cf:build` · ทดสอบในเครื่อง (workerd): `npm run cf:preview`
+  // cf:build ใส่ --dangerouslyUseUnsupportedNextVersion ชั่วคราว: Next 15 หมดระยะดูแล 2026-10-21 OpenNext จึงไม่ยอม build — เอาออกเมื่ออัปเกรดเป็น Next 16
   // secret (AUTH_SECRET, INTERNAL_TOKEN_SECRET, OAuth) ตั้งด้วย `wrangler secret put` — ห้ามใส่ในไฟล์นี้
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wang-raan",

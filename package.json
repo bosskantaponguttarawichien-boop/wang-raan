@@ -17,7 +17,7 @@
     "core:smoke": "bash scripts/smoke-core-package.sh",
     "mock:build": "tsup --config mock-backend/tsup.config.ts",
     "mock:start": "node mock-backend/dist/server.mjs",
-    "cf:build": "opennextjs-cloudflare build",
+    "cf:build": "opennextjs-cloudflare build --dangerouslyUseUnsupportedNextVersion",
     "cf:preview": "wrangler dev --env local"
   },
   "engines": {
