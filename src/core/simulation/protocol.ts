@@ -3,13 +3,27 @@
  * คำขอทุกข้อความมี `requestId` เพื่อจับคู่คำตอบ; TICK เป็นข้อความที่ Worker ส่งเองเป็นระยะ
  */
 import type { StoreLayout, ValidationResult } from "../layout/types";
-import type { SimulationMetrics } from "./engine";
+import type { DayAnalysis, DayInput } from "./day-analysis";
+import type { PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
 
 export interface SimulationStartConfig {
   customersPerHour: number;
   /** วินาทีจำลองต่อวินาทีจริง */
   speed: number;
   seed?: number;
+  /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-092) — ไม่ส่งใช้ค่าตั้งต้นของ engine */
+  serviceStyle?: ServiceStyle;
+  peak?: PeakWindow | null;
+  closeSeconds?: number | null;
+  frontStaff?: number;
+  cooks?: number;
+  cookMinutesPerDish?: number;
+  dineMinutes?: [number, number];
+  patienceMinutes?: number;
+  /** เดินเวลาเบื้องหลังถึงวินาทีนี้ก่อนเริ่มส่งภาพ (เช่น ต้นช่วงคนเยอะ) — heatmap เริ่มนับจากจุดนี้ */
+  startAtSeconds?: number;
+  /** หยุดเองเมื่อถึงวินาทีนี้ (เช่น จบช่วงคนเยอะ) แล้วส่ง TICK สุดท้ายที่มี finished: true */
+  stopAtSeconds?: number;
 }
 
 export type WorkerRequest =
@@ -19,7 +33,8 @@ export type WorkerRequest =
   | { type: "PAUSE"; requestId: number }
   | { type: "RESUME"; requestId: number }
   | { type: "STOP"; requestId: number }
-  | { type: "SET_SPEED"; requestId: number; speed: number };
+  | { type: "SET_SPEED"; requestId: number; speed: number }
+  | { type: "ANALYZE_DAY"; requestId: number; layoutRevision: string; input: DayInput };
 
 export interface GridSummary {
   cellSize: number;
@@ -40,6 +55,8 @@ export interface TickMessage {
   /** ส่งเป็นระยะ (ไม่ใช่ทุก tick) เพื่อลดปริมาณข้อมูล */
   heatmap?: Float32Array;
   heatmapMax?: number;
+  /** ถึง stopAtSeconds แล้ว — worker หยุดเดินเวลา */
+  finished?: boolean;
 }
 
 export type WorkerResponse =
@@ -47,6 +64,7 @@ export type WorkerResponse =
   | { type: "STATUS"; requestId: number; status: "READY"; layoutRevision: string; grid: GridSummary }
   | { type: "STARTED"; requestId: number; seats: number; grid: { cols: number; rows: number; cellSize: number } }
   | { type: "ACK"; requestId: number; command: "PAUSE" | "RESUME" | "STOP" | "SET_SPEED" }
+  | { type: "ANALYSIS"; requestId: number; layoutRevision: string; analysis: DayAnalysis }
   | { type: "ERROR"; requestId: number; code: WorkerErrorCode; message: string };
 
 export type WorkerMessage = WorkerResponse | TickMessage;

@@ -6,6 +6,8 @@ import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-sto
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { formatSimTime } from "@/components/simulation/simulation-panel";
+import { parseClock } from "@/core/simulation";
+import { formatClock } from "@/lib/day-config";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -20,6 +22,8 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
   const layout = useLayoutStore((s) => s.layout);
   const simStatus = useSimulationStore((s) => s.status);
   const simMetrics = useSimulationStore((s) => s.metrics);
+  const simAnalysis = useSimulationStore((s) => s.analysis);
+  const simOpenMinute = useSimulationStore((s) => parseClock(s.config.openTime) ?? 0);
 
   const { result, blockedCount, warningCount } = live;
   const isSim = simStatus === "running" || simStatus === "paused";
@@ -53,7 +57,8 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
     dotColor = "bg-[#1d9e75]";
     statusText = (
       <span>
-        {simStatus === "paused" ? "หยุดชั่วคราว" : "กำลังจำลอง"} · {formatSimTime(simMetrics?.time ?? 0)}
+        {simStatus === "paused" ? "หยุดชั่วคราว" : "กำลังจำลอง"} ·{" "}
+        {simAnalysis ? `${formatClock(simOpenMinute + (simMetrics?.time ?? 0) / 60)} น.` : formatSimTime(simMetrics?.time ?? 0)}
       </span>
     );
   } else if (!hasTables) {

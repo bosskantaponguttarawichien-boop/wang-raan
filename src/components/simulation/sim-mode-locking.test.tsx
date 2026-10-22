@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import { emptyMetrics } from "@/core/simulation";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Artboard } from "@/components/editor-2d/artboard";
@@ -55,7 +56,7 @@ describe("feat-056: โหมดจำลอง — ล็อกผังแล�
     simulationStore.setState({
       status: "running",
       seats: 6,
-      metrics: { time: 120, arrived: 2, served: 1, noSeat: 0, inStore: 1, queuing: 0, seated: 1, maxQueue: 0, avgVisitMinutes: 10 },
+      metrics: { ...emptyMetrics(), time: 120, arrived: 2, served: 1, noSeat: 0, inStore: 1, queuing: 0, seated: 1, maxQueue: 0, avgVisitMinutes: 10 },
     });
 
     const { container: railContainer } = render(<RailHarness />);
@@ -104,7 +105,7 @@ describe("feat-056: โหมดจำลอง — ล็อกผังแล�
     simulationStore.setState({
       status: "running",
       seats: 6,
-      metrics: { time: 300, arrived: 5, served: 2, noSeat: 0, inStore: 3, queuing: 0, seated: 2, maxQueue: 0, avgVisitMinutes: 15 },
+      metrics: { ...emptyMetrics(), time: 300, arrived: 5, served: 2, noSeat: 0, inStore: 3, queuing: 0, seated: 2, maxQueue: 0, avgVisitMinutes: 15 },
     });
 
     render(<SimPanelHarness />);

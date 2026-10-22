@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen } from "@testing-library/react";
+import { emptyMetrics } from "@/core/simulation";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as exportModule from "@/core/export";
 import { validateLayout } from "@/core/validation";
@@ -43,7 +44,7 @@ describe("PrintReport (สร้างเฉพาะตอนพิมพ์)",
   it("มีผลจำลองรอบล่าสุด → รวมผลจำลองลงในรายงานพิมพ์ (feat-057)", async () => {
     const { simulationStore } = await import("@/store/use-simulation-store");
     simulationStore.setState({
-      metrics: { time: 3600, arrived: 15, served: 12, noSeat: 2, inStore: 1, queuing: 0, seated: 1, maxQueue: 1, avgVisitMinutes: 20 },
+      metrics: { ...emptyMetrics(), time: 3600, arrived: 15, served: 12, noSeat: 2, inStore: 1, queuing: 0, seated: 1, maxQueue: 1, avgVisitMinutes: 20 },
       seats: 6,
     });
     render(<PrintReport live={live()} />);

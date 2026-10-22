@@ -7,11 +7,32 @@ import type { StoreLayout } from "../layout/types";
 import { validateLayout } from "../validation/engine";
 import { StoreLayoutSchema, ValidationResultSchema } from "../validation/layout.schema";
 import { computeLayoutRevision } from "../validation/revision";
+import { analyzeDay } from "./day-analysis";
 import { Simulation } from "./engine";
 import { buildOccupancyGrid } from "./occupancy-grid";
 import type { TickMessage, WorkerResponse } from "./protocol";
 
 const RequestId = z.number().int();
+const DAY_SECONDS = 24 * 3600;
+/** พนักงาน/พ่อครัวสูงสุดต่อตำแหน่ง */
+export const MAX_TEAM = 20;
+
+const Minute = z.number().int().min(0).max(24 * 60 - 1);
+const DayInputSchema = z
+  .object({
+    openMinute: Minute,
+    closeMinute: Minute,
+    dailyCustomers: z.number().int().min(1).max(5000),
+    peakStartMinute: Minute,
+    peakEndMinute: Minute,
+    frontStaff: z.number().int().min(1).max(MAX_TEAM),
+    cooks: z.number().int().min(1).max(MAX_TEAM),
+    cookMinutesPerDish: z.number().finite().min(0.5).max(120),
+    dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]),
+    patienceMinutes: z.number().finite().min(1).max(240),
+  })
+  .refine((d) => d.openMinute !== d.closeMinute, { message: "เวลาเปิดและปิดต้องไม่ตรงกัน" })
+  .refine((d) => d.dineMinutes[0] <= d.dineMinutes[1], { message: "ช่วงเวลาทานไม่ถูกต้อง" });
 const RequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PING"), requestId: RequestId }),
   z.object({
@@ -24,10 +45,33 @@ const RequestSchema = z.discriminatedUnion("type", [
     requestId: RequestId,
     layoutRevision: z.string(),
     config: z.object({
-      customersPerHour: z.number().finite().min(1).max(600),
+      customersPerHour: z.number().finite().min(0).max(600),
       speed: z.number().finite().min(1).max(600),
       seed: z.number().int().optional(),
+      serviceStyle: z.enum(["table-service", "counter-order"]).optional(),
+      peak: z
+        .object({
+          startSeconds: z.number().finite().min(0),
+          endSeconds: z.number().finite().min(0),
+          customersPerHour: z.number().finite().min(0).max(600),
+        })
+        .nullable()
+        .optional(),
+      closeSeconds: z.number().finite().positive().max(DAY_SECONDS).nullable().optional(),
+      frontStaff: z.number().int().min(1).max(MAX_TEAM).optional(),
+      cooks: z.number().int().min(1).max(MAX_TEAM).optional(),
+      cookMinutesPerDish: z.number().finite().min(0.5).max(120).optional(),
+      dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]).optional(),
+      patienceMinutes: z.number().finite().min(1).max(240).optional(),
+      startAtSeconds: z.number().finite().min(0).max(DAY_SECONDS).optional(),
+      stopAtSeconds: z.number().finite().positive().max(DAY_SECONDS + 6 * 3600).optional(),
     }),
+  }),
+  z.object({
+    type: z.literal("ANALYZE_DAY"),
+    requestId: RequestId,
+    layoutRevision: z.string(),
+    input: DayInputSchema,
   }),
   z.object({ type: z.literal("PAUSE"), requestId: RequestId }),
   z.object({ type: z.literal("RESUME"), requestId: RequestId }),
@@ -50,6 +94,7 @@ export class SimulationWorkerRuntime {
   private running = false;
   private speed = 30;
   private ticks = 0;
+  private stopAt: number | null = null;
 
   get isRunning() {
     return this.running;
@@ -93,8 +138,15 @@ export class SimulationWorkerRuntime {
         if (message.layoutRevision !== this.synced.revision) {
           return this.error(requestId, "STALE_VALIDATION", "ผังเปลี่ยนหลังการตรวจ กรุณาตรวจผังใหม่");
         }
-        const { customersPerHour, speed, seed } = message.config;
-        this.simulation = new Simulation(this.synced.layout, { customersPerHour, seed: seed ?? Date.now() % 2 ** 31 });
+        const { speed, seed, startAtSeconds, stopAtSeconds, ...options } = message.config;
+        const defined = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined));
+        this.simulation = new Simulation(this.synced.layout, { ...defined, seed: seed ?? Date.now() % 2 ** 31 });
+        // เดินเวลาเบื้องหลังถึงจุดเริ่มดู (เช่น ต้นช่วงคนเยอะ) แล้วล้าง heatmap ให้เห็นเฉพาะช่วงที่ดู
+        if (startAtSeconds) {
+          this.simulation.step(startAtSeconds);
+          this.simulation.heatmap.fill(0);
+        }
+        this.stopAt = stopAtSeconds ?? null;
         this.speed = speed;
         this.running = true;
         this.ticks = 0;
@@ -115,17 +167,38 @@ export class SimulationWorkerRuntime {
       case "SET_SPEED":
         this.speed = message.speed;
         return { response: { type: "ACK", requestId, command: "SET_SPEED" }, transfer: [] };
+
+      case "ANALYZE_DAY": {
+        // P2 Gate เดียวกับ START: วิเคราะห์ได้เฉพาะผังที่ sync และผ่านการตรวจแล้ว
+        if (!this.synced) return this.error(requestId, "NOT_SYNCED", "ยังไม่ได้ส่งผังที่ผ่านการตรวจ");
+        if (message.layoutRevision !== this.synced.revision) {
+          return this.error(requestId, "STALE_VALIDATION", "ผังเปลี่ยนหลังการตรวจ กรุณาตรวจผังใหม่");
+        }
+        const analysis = analyzeDay(this.synced.layout, message.input);
+        return { response: { type: "ANALYSIS", requestId, layoutRevision: this.synced.revision, analysis }, transfer: [] };
+      }
     }
   }
 
   /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
-    this.simulation.step((realMs / 1000) * this.speed);
+    let seconds = (realMs / 1000) * this.speed;
+    let finished = false;
+    if (this.stopAt !== null) {
+      const left = this.stopAt - this.simulation.getMetrics().time;
+      if (left <= seconds) {
+        seconds = Math.max(0, left);
+        finished = true;
+      }
+    }
+    this.simulation.step(seconds);
+    if (finished) this.running = false;
     const agents = this.simulation.agentBuffer();
     const tick: TickMessage = { type: "TICK", agents, metrics: this.simulation.getMetrics() };
+    if (finished) tick.finished = true;
     const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer];
-    if (this.ticks++ % HEATMAP_EVERY === 0) {
+    if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {
       const heatmap = this.simulation.heatmap.slice();
       let max = 0;
       for (const v of heatmap) if (v > max) max = v;
@@ -138,6 +211,7 @@ export class SimulationWorkerRuntime {
 
   private reset() {
     this.simulation = null;
+    this.stopAt = null;
     this.running = false;
     this.ticks = 0;
   }

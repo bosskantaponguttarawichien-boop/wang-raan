@@ -4,12 +4,13 @@
  */
 import { useStore } from "zustand";
 import { createStore } from "zustand/vanilla";
-import type { SimulationMetrics } from "@/core/simulation";
+import type { DayAnalysis, SimulationMetrics } from "@/core/simulation";
+import { DEFAULT_DAY_CONFIG, type DayConfig } from "@/lib/day-config";
 
 export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 
-export interface SimulationConfigState {
-  customersPerHour: number;
+/** ค่าฟอร์มจำลองร้าน 1 วัน (feat-094) + ความเร็วเล่นภาพ */
+export interface SimulationConfigState extends DayConfig {
   /** วินาทีจำลองต่อวินาทีจริง */
   speed: number;
 }
@@ -22,11 +23,12 @@ export interface SimulationStoreState {
   seats: number;
   config: SimulationConfigState;
   showHeatmap: boolean;
+  /** ผลวิเคราะห์ทั้งวันรอบล่าสุด (feat-093/094) */
+  analysis: DayAnalysis | null;
   setConfig: (patch: Partial<SimulationConfigState>) => void;
   setShowHeatmap: (show: boolean) => void;
 }
 
-export const CUSTOMER_RATE_OPTIONS = [10, 20, 40, 80] as const;
 export const SPEED_OPTIONS = [10, 30, 60, 120] as const;
 
 export function createSimulationStore() {
@@ -35,8 +37,9 @@ export function createSimulationStore() {
     message: null,
     metrics: null,
     seats: 0,
-    config: { customersPerHour: 20, speed: 60 },
+    config: { ...DEFAULT_DAY_CONFIG, speed: 60 },
     showHeatmap: true,
+    analysis: null,
     setConfig: (patch) => set({ config: { ...get().config, ...patch } }),
     setShowHeatmap: (showHeatmap) => set({ showHeatmap }),
   }));

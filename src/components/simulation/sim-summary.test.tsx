@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
+import { emptyMetrics } from "@/core/simulation";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SimulationPanel } from "./simulation-panel";
@@ -31,6 +32,7 @@ describe("feat-057: สรุปผลจบรอบ + ใช้ผลรอบ
   it("เมื่อมีผลรอบล่าสุดใน store: แสดงการ์ดสรุปผลและคำแนะนำ 1 ประโยค", () => {
     simulationStore.setState({
       metrics: {
+        ...emptyMetrics(),
         time: 3600,
         arrived: 25,
         served: 20,
@@ -54,15 +56,16 @@ describe("feat-057: สรุปผลจบรอบ + ใช้ผลรอบ
     expect(card).toHaveTextContent("3 คน"); // ไม่มีที่นั่ง
     expect(card).toHaveTextContent("ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ");
 
-    // ปุ่มเริ่มกลายเป็น "เริ่มจำลองรอบใหม่"
+    // ปุ่มเริ่มกลายเป็น "จำลองร้านอีกครั้ง"
     const startBtn = screen.getByTestId("start-simulation");
-    expect(startBtn).toHaveTextContent("เริ่มจำลองรอบใหม่");
+    expect(startBtn).toHaveTextContent("จำลองร้านอีกครั้ง");
   });
 
   it("สลับเช็กบ็อกซ์แสดงจุดหนาแน่นบนผัง (จาง): เปลี่ยนค่า showHeatmap ใน store", async () => {
     const user = userEvent.setup();
     simulationStore.setState({
       metrics: {
+        ...emptyMetrics(),
         time: 1800,
         arrived: 10,
         served: 8,
@@ -90,6 +93,7 @@ describe("feat-057: สรุปผลจบรอบ + ใช้ผลรอบ
   it("ผลรอบล่าสุดคงอยู่เมื่อสลับแท็บ และไม่หายไปเองจนกว่าจะเริ่มใหม่", () => {
     simulationStore.setState({
       metrics: {
+        ...emptyMetrics(),
         time: 1200,
         arrived: 8,
         served: 6,

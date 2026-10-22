@@ -4,7 +4,8 @@
  * แผงจำลองลูกค้า P2 + Validation Gate (PRD C-05/C-06, §9 ข้อ 9–10, SKILL กฎข้อ 7, feat-055)
  * แท็บเดียว 2 ขั้น:
  * (1) ตรวจผัง: ผ่านแสดงกล่องเขียวสั้น, ติดแสดงรายการ "ต้องแก้ก่อนจำลอง" กดแล้วเลือกวัตถุ, คำแนะนำพับไว้
- * (2) ตั้งค่าจำลอง: ลูกค้าต่อชั่วโมง, ความเร็ว 1×/2×/4×, แสดง Heatmap, ปุ่มเริ่ม
+ * (2) จำลองร้าน 1 วัน (feat-094): ร้าน / พนักงานตามผัง / ลูกค้าวันนี้, ความเร็ว, Heatmap, ปุ่มเริ่ม
+ *     กดเริ่ม → คำนวณทั้งวันเบื้องหลัง → การ์ดคำตอบ 3 ข้อ (DayAnswers) + ดูภาพช่วงคนเยอะ (หยุดเองตอนจบ)
  *
  * ตอน Blocked: ปุ่มเริ่มใช้ aria-disabled="true" (ไม่ disabled เงียบๆ), ข้อความ "แก้อีก N ข้อก่อนเริ่ม",
  * กดแล้วพาไปโฟกัสข้อแรกที่ต้องแก้ และไม่เริ่มจำลองเด็ดขาด
@@ -18,6 +19,10 @@ import {
   SPEED_OPTIONS,
   useSimulationStore,
 } from "@/store/use-simulation-store";
+import { formatClock, formatNumber } from "@/lib/day-config";
+import { parseClock } from "@/core/simulation";
+import { DayAnswers } from "./day-answers";
+import { DaySetupForm } from "./day-setup-form";
 import { getSimulationController } from "./simulation-controller";
 import { AGENT_LEGEND } from "./simulation-overlay";
 
@@ -31,7 +36,7 @@ export function formatSimTime(seconds: number): string {
 /** เริ่มจำลอง (ใช้ร่วมกันระหว่างแผงจำลองและแถบสถานะ) — สลับกลับมุมมอง 2D ก่อน */
 export async function startSimulation() {
   if (layoutStore.getState().is3DView) layoutStore.getState().set3DView(false);
-  await getSimulationController().start();
+  return getSimulationController().start();
 }
 
 export interface SimulationPanelProps {
@@ -49,13 +54,13 @@ export function SimulationPanel({
   const metrics = useSimulationStore((s) => s.metrics);
   const seats = useSimulationStore((s) => s.seats);
   const config = useSimulationStore((s) => s.config);
-  const setConfig = useSimulationStore((s) => s.setConfig);
+  const analysis = useSimulationStore((s) => s.analysis);
   const showHeatmap = useSimulationStore((s) => s.showHeatmap);
   const setShowHeatmap = useSimulationStore((s) => s.setShowHeatmap);
   const reasonId = React.useId();
 
   const blocked = live.result.status === "blocked";
-  const idle = status === "idle" || status === "starting";
+  const openMinute = parseClock(config.openTime) ?? 0;
   const isRunningOrPaused = status === "running" || status === "paused";
   const controller = () => getSimulationController();
 
@@ -82,7 +87,9 @@ export function SimulationPanel({
       return;
     }
     if (status === "starting") return;
-    await startSimulation();
+    const result = await startSimulation();
+    // เริ่มไม่ได้ (เช่น คำนวณทั้งวันไม่สำเร็จ) ต้องบอกผู้ใช้ ไม่ใช่เงียบ — ยกเลิกเองไม่ต้องแจ้ง
+    if (!result.ok && result.reason !== "ยกเลิกการเริ่มจำลอง") onToast(result.reason);
   };
 
   return (
@@ -116,12 +123,12 @@ export function SimulationPanel({
               data-testid="simulation-metrics"
             >
               {[
-                ["เวลาจำลอง", formatSimTime(metrics.time)],
+                ["เวลาในร้าน", analysis ? `${formatClock(openMinute + metrics.time / 60)} น.` : formatSimTime(metrics.time)],
                 ["ลูกค้าในร้าน", `${metrics.inStore} คน`],
-                ["นั่งทาน", `${metrics.seated} / ${seats} ที่`],
-                ["ทานเสร็จแล้ว", `${metrics.served} คน`],
+                ["นั่งที่โต๊ะ", `${metrics.seated} / ${seats} ที่`],
+                ["รออาหารเฉลี่ย", metrics.fed > 0 ? `${formatNumber(metrics.avgFoodWaitMinutes)} นาที` : "—"],
                 ["ไม่มีที่นั่ง", `${metrics.noSeat} คน`],
-                ["เวลาเฉลี่ยในร้าน", metrics.avgVisitMinutes > 0 ? `${metrics.avgVisitMinutes.toFixed(1)} นาที` : "—"],
+                ["จ่ายเงินแล้ว", `${metrics.served} คน`],
               ].map(([term, value]) => (
                 <div key={term} className="min-w-0">
                   {/* secondary บน bg-surface ได้ 4.45:1 (ไม่ถึง AA) — ใช้ secondary-strong 4.77:1 */}
@@ -166,6 +173,14 @@ export function SimulationPanel({
             </label>
           </div>
 
+          {analysis?.plan.peak && (
+            <p className="mb-3 text-[11.5px] leading-[1.7] text-secondary-strong">
+              กำลังดูช่วงคนเยอะ {formatClock(openMinute + analysis.plan.peak.startSeconds / 60)}–
+              {formatClock(openMinute + analysis.plan.peak.endSeconds / 60)} น. · ภาพจะหยุดเองเมื่อจบช่วงนี้
+            </p>
+          )}
+          {analysis && <DayAnswers analysis={analysis} openMinute={openMinute} />}
+
           {/* blue บน blue-soft ได้ 4.39:1 — ใช้ blue-hover ให้ผ่าน AA เหมือนจุดอื่น */}
           <div className="mt-3 rounded-[10px] bg-blue-soft p-2.5 text-[12px] text-blue-hover">
             <div className="flex items-center gap-2">
@@ -201,7 +216,9 @@ export function SimulationPanel({
       ) : (
         /* ── โหมดเตรียมการจัดร้าน & ตรวจผัง (Edit / Idle) ─────────── */
         <div>
-          {/* สรุปผลจำลองรอบล่าสุด (feat-057) */}
+          {analysis && <DayAnswers analysis={analysis} openMinute={openMinute} />}
+
+          {/* สรุปผลจำลองรอบล่าสุด (feat-057) — ภาพช่วงที่ดู */}
           {metrics && (
             <div className="mb-4 rounded-[12px] border border-line bg-surface p-3 text-[12px]" data-testid="latest-sim-summary">
               <div className="mb-2 flex items-center justify-between">
@@ -211,7 +228,11 @@ export function SimulationPanel({
                   </svg>
                   สรุปผลจำลองรอบล่าสุด
                 </b>
-                <span className="text-[11px] text-secondary tabular-nums">{formatSimTime(metrics.time)}</span>
+                <span className="text-[11px] text-secondary tabular-nums">
+                  {analysis?.plan.peak
+                    ? `ช่วง ${formatClock(openMinute + analysis.plan.peak.startSeconds / 60)}–${formatClock(openMinute + metrics.time / 60)} น.`
+                    : formatSimTime(metrics.time)}
+                </span>
               </div>
 
               <dl className="grid grid-cols-2 gap-x-2 gap-y-1.5 rounded-[8px] bg-white p-2.5 text-[11.5px] border border-line">
@@ -349,30 +370,14 @@ export function SimulationPanel({
               <span className={cn("flex size-5 items-center justify-center rounded-full text-[11px] font-bold text-white", blocked ? "bg-[#94a3b8]" : "bg-blue")}>
                 2
               </span>
-              ตั้งค่าการจำลอง
+              จำลองร้าน 1 วัน
             </div>
 
             <div className="space-y-3">
-              <div>
-                <label htmlFor="sim-rate" className="flex items-center justify-between text-[12px] text-secondary">
-                  <span>ลูกค้าต่อชั่วโมง</span>
-                  <b className="font-semibold text-ink">{config.customersPerHour} คน</b>
-                </label>
-                <input
-                  id="sim-rate"
-                  type="range"
-                  min="10"
-                  max="80"
-                  step="5"
-                  value={config.customersPerHour}
-                  disabled={!idle}
-                  onChange={(e) => setConfig({ customersPerHour: Number(e.target.value) })}
-                  className="mt-1.5 h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-line accent-blue"
-                />
-              </div>
+              <DaySetupForm disabled={status !== "idle"} />
 
-              <div>
-                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วจำลอง</label>
+              <div className="border-t border-line pt-3.5">
+                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วภาพจำลอง</label>
                 <div className="flex rounded-[8px] border border-line bg-surface p-0.5" role="group" aria-label="ความเร็วจำลอง">
                   {SPEED_OPTIONS.map((spd) => (
                     <button
@@ -429,7 +434,7 @@ export function SimulationPanel({
                     <svg viewBox="0 0 24 24" className="size-4 fill-current">
                       <polygon points="5 3 19 12 5 21 5 3" />
                     </svg>
-                    <span>{metrics ? "เริ่มจำลองรอบใหม่" : "เริ่มจำลองลูกค้า"}</span>
+                    <span>{status === "starting" ? "กำลังคำนวณทั้งวัน…" : analysis || metrics ? "จำลองร้านอีกครั้ง" : "จำลองร้าน 1 วัน"}</span>
                   </>
                 )}
               </button>
@@ -437,7 +442,9 @@ export function SimulationPanel({
           </div>
 
           <p id={reasonId} className="sr-only">
-            {blocked ? `ต้องแก้ผัง ${live.blockedCount} ข้อก่อน ปุ่มเริ่มจำลองจะกดได้เมื่อผังพร้อม` : "ผังพร้อมจำลอง"}
+            {blocked
+              ? `ต้องแก้ผัง ${live.blockedCount} ข้อก่อน ปุ่มเริ่มจำลองจะกดได้เมื่อผังพร้อม`
+              : "ผังพร้อมจำลอง กดแล้วระบบจะคำนวณทั้งวันก่อน แล้วแสดงภาพช่วงคนเยอะ"}
           </p>
         </div>
       )}

@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { MessageChannel } from "node:worker_threads";
+import { emptyMetrics } from "@/core/simulation";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -64,7 +65,7 @@ afterEach(() => {
 });
 
 describe("P2 Gate ใน SimulationController", () => {
-  it("ผัง Ready → ตรวจซ้ำ → SYNC → START → รับ TICK แล้วมีลูกค้า + heatmap", async () => {
+  it("ผัง Ready → ตรวจซ้ำ → SYNC → ANALYZE_DAY → START ช่วงคนเยอะ → รับ TICK แล้วมีลูกค้า + heatmap", async () => {
     const { fake, layoutState, sim, controller } = setup();
     disposers.push(() => controller.dispose());
     expect(layoutState.getState().validation).toBeNull();
@@ -72,12 +73,41 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(result).toEqual({ ok: true });
     expect(layoutState.getState().validation?.status).toBe("ready"); // ตรวจผังทางการก่อนเริ่มเสมอ
     expect(sim.getState()).toMatchObject({ status: "running", seats: 6 });
-    expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "START"]);
+    expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "ANALYZE_DAY", "START"]);
+    // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มที่ 1.5 ชม. หลังเปิดร้าน
+    expect(sim.getState().analysis?.staffing.recommended).not.toBeNull();
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2 } });
     for (let i = 0; i < 40; i++) fake.tick(250);
     await flush();
     expect(controller.current).not.toBeNull();
     expect(controller.heatmap).toMatchObject({ cols: 32, rows: 24 });
-    expect(sim.getState().metrics!.time).toBeGreaterThan(0);
+    expect(sim.getState().metrics!.time).toBeGreaterThan(5400);
+  });
+
+  it("จบช่วงคนเยอะ → หยุดเอง กลับโหมดแก้ผัง เก็บผลและ heatmap ไว้", async () => {
+    const { fake, sim, controller } = setup();
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    sim.getState().setConfig({ speed: 600 });
+    await controller.setSpeed(600);
+    for (let i = 0; i < 40; i++) fake.tick(250); // 40 × 0.25 วิ × 600 = 6000 วิ > ช่วงพีค 5400 วิ
+    await flush();
+    await flush();
+    expect(sim.getState()).toMatchObject({ status: "idle", message: "ดูช่วงคนเยอะจบแล้ว" });
+    expect(sim.getState().metrics!.time).toBeCloseTo(10_800, 5);
+    expect(sim.getState().analysis).not.toBeNull();
+    expect(controller.heatmap).not.toBeNull();
+    expect(controller.current).toBeNull();
+  });
+
+  it("ค่าฟอร์มผิด (ช่วงคนเยอะนอกเวลาเปิด) → ไม่ส่งอะไรไป Worker และแจ้งเหตุผล", async () => {
+    const { fake, sim, controller } = setup();
+    disposers.push(() => controller.dispose());
+    sim.getState().setConfig({ peakStart: "21:00", peakEnd: "22:00" });
+    const result = await controller.start();
+    expect(result.ok).toBe(false);
+    expect(sim.getState().message).toMatch(/ช่วงคนเยอะ/);
+    expect(fake.posted).toEqual([]);
   });
 
   it("ผัง Blocked → ไม่ส่งอะไรไป Worker เลย และแจ้งเหตุผล", async () => {
@@ -117,7 +147,7 @@ describe("P2 Gate ใน SimulationController", () => {
     await flush();
     await controller.stop();
     expect(sim.getState().status).toBe("idle");
-    expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "START", "PAUSE", "RESUME", "SET_SPEED", "STOP"]);
+    expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "ANALYZE_DAY", "START", "PAUSE", "RESUME", "SET_SPEED", "STOP"]);
     // หยุดแล้วกดซ้ำได้อีกครั้ง
     expect(await controller.start()).toEqual({ ok: true });
   });
@@ -189,7 +219,7 @@ describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () =
     simulationStore.setState({
       status: "running",
       seats: 6,
-      metrics: { time: 3900, arrived: 10, served: 4, noSeat: 1, inStore: 5, queuing: 1, seated: 3, maxQueue: 2, avgVisitMinutes: 22.5 },
+      metrics: { ...emptyMetrics(), time: 3900, arrived: 10, served: 4, noSeat: 1, inStore: 5, queuing: 1, seated: 3, maxQueue: 2, avgVisitMinutes: 22.5 },
     });
     render(<Panel />);
     expect(screen.getByRole("button", { name: "⏸ หยุดชั่วคราว" })).toBeInTheDocument();

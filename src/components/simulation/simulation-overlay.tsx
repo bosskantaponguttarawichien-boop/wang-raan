@@ -16,10 +16,10 @@ import { getSimulationController, type HeatmapFrame, type SimulationFrame } from
 /** สีจุดลูกค้าตาม stateCode (engine.AGENT_STATE_CODE) */
 export const AGENT_COLORS = ["#3b62f4", "#a87410", "#1e2b40", "#3b62f4", "#2e9b78", "#66758a"] as const;
 export const AGENT_LEGEND = [
-  { label: "เดินเข้า / ไปที่นั่ง", color: AGENT_COLORS[0] },
-  { label: "รอคิว", color: AGENT_COLORS[1] },
-  { label: "สั่งที่เคาน์เตอร์", color: AGENT_COLORS[2] },
-  { label: "นั่งทาน", color: AGENT_COLORS[4] },
+  { label: "เดินเข้า / ไปที่นั่ง / ไปจ่ายเงิน", color: AGENT_COLORS[0] },
+  { label: "รอคิวจ่ายเงิน", color: AGENT_COLORS[1] },
+  { label: "จ่ายเงินที่เคาน์เตอร์", color: AGENT_COLORS[2] },
+  { label: "นั่งที่โต๊ะ (รอสั่ง / รออาหาร / ทาน)", color: AGENT_COLORS[4] },
   { label: "เดินออก", color: AGENT_COLORS[5] },
 ] as const;
 
