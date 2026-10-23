@@ -145,11 +145,11 @@ export function PlaygroundEditor() {
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 
-          {/* มือถือซูมด้วยสองนิ้วแทนปุ่ม */}
-          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:hidden" />
+          {/* มือถือ: ซูมด้วยสองนิ้วได้ด้วย แต่ยังมีปุ่มพอดี/หมุนมุมมองครบเหมือนเดสก์ท็อป */}
+          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:bottom-2 max-[767px]:left-2" />
         </main>
 
-        <PlaygroundStatusBar live={live} onFocusIssue={focusIssue} />
+        <PlaygroundStatusBar live={live} onFocusIssue={focusIssue} onRevealPanel={() => setSheetOpen(true)} />
       </div>
 
       {/* Toast Notification */}
@@ -158,7 +158,7 @@ export function PlaygroundEditor() {
           role="status"
           aria-live="polite"
           data-testid="toast"
-          className="fixed bottom-[76px] left-1/2 z-50 max-[767px]:bottom-auto max-[767px]:top-[60px] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
+          className="fixed bottom-[76px] left-1/2 z-50 max-[767px]:bottom-auto max-[767px]:top-[calc(60px+env(safe-area-inset-top))] max-w-[calc(100%-32px)] -translate-x-1/2 rounded-[10px] bg-ink px-3.5 py-2 text-center text-[13px] text-white shadow-card transition-opacity duration-200"
         >
           {toastMsg}
         </div>

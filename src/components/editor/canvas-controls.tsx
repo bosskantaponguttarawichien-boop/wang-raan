@@ -10,7 +10,7 @@ import { ViewSwitch } from "@/components/ui";
 import { ZOOM_MAX, ZOOM_MIN, layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 
 const ZOOM_BUTTON =
-  "grid size-9 place-items-center rounded-[9px] text-[#3d4f66] transition-colors duration-[180ms] hover:bg-blue-soft hover:text-blue disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#3d4f66] motion-reduce:transition-none focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus";
+  "grid size-9 max-[767px]:size-8 place-items-center rounded-[9px] text-[#3d4f66] transition-colors duration-[180ms] hover:bg-blue-soft hover:text-blue disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-[#3d4f66] motion-reduce:transition-none focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus";
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
 
 /** สลับ 2D/3D + ขนาดร้าน — อยู่บนแถบหัว */
