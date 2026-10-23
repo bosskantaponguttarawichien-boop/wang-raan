@@ -14,6 +14,8 @@ html:has(.landing){scroll-behavior:smooth;scroll-padding-top:24px}
 .landing{--blue:#3b62f4;--ink:#1e2b40;--secondary:#66758a;--line:#e8ecf3;--surface:#f7f9fc;--font:"Noto Sans Thai",system-ui,-apple-system,"Tahoma",sans-serif}
 .landing *{box-sizing:border-box}
 .landing{margin:0;font-family:var(--font);color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased}
+/* viewport-fit=cover: เว้นแถบสถานะ/แถบโฮมของ iPhone (เบราว์เซอร์อื่นได้ 0) — ขอบซ้าย/ขวาเว้นที่ body แล้ว */
+.landing{padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
 .landing button,.landing a{-webkit-tap-highlight-color:transparent}
 .landing button{font:inherit}
 .landing a{color:inherit;text-decoration:none}
@@ -72,7 +74,7 @@ html:has(.landing){scroll-behavior:smooth;scroll-padding-top:24px}
 .landing .steps .active{color:#526685}
 .landing .steps .separator{width:20px;height:1px;background:#d5dce7}
 .landing .steps b{font-weight:500;font-size:11px;margin-right:5px}
-.landing .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#233a57;color:#fff;border-radius:10px;padding:10px 17px;font-size:14px;display:none;max-width:calc(100% - 32px);z-index:20}
+.landing .toast{position:fixed;bottom:calc(22px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:#233a57;color:#fff;border-radius:10px;padding:10px 17px;font-size:14px;display:none;max-width:calc(100% - 32px);z-index:20}
 .landing .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(prefers-reduced-motion:reduce){.landing *{transition:none!important}}
 .landing .navigation a{color:#697689;white-space:nowrap;transition:color .15s}
