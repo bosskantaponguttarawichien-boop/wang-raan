@@ -1,13 +1,18 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-import { FlatCompat } from "@eslint/eslintrc";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const compat = new FlatCompat({ baseDirectory: __dirname });
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
 
 const eslintConfig = [
   { ignores: [".next/**", ".claude/**", "node_modules/**", "design-html/**", "coverage/**", "next-env.d.ts", "packages/*/dist/**", "mock-backend/dist/**", ".open-next/**", ".wrangler/**", "e2e/.report/**", "playwright-report/**", "test-results/**"] },
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
+  ...nextVitals,
+  ...nextTypescript,
+  {
+    // กฎใหม่ของ React Compiler ที่มากับ eslint-config-next 16 — โค้ดเดิมยังไม่ได้ปรับตาม จึงแจ้งเตือนไว้ก่อน (ไม่ทำให้ lint ล้ม)
+    rules: {
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/refs": "warn",
+      "react-hooks/preserve-manual-memoization": "warn",
+    },
+  },
   {
     // Boundary: src/core ต้องเป็น Pure TypeScript (architecture.md §5, AGENTS.md)
     files: ["src/core/**/*.ts"],

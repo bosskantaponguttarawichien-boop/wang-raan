@@ -7,7 +7,10 @@
 ## [2026-10-22] แก้ build บน Cloudflare ล้มเพราะ Next 15 หมดระยะดูแล
 
 - อาการ: CI `E2E (Cloudflare Workers runtime)` ล้มตั้งแต่ 2026-10-21 — `opennextjs-cloudflare build` ไม่ยอม build Next 15.5.27 (`@opennextjs/aws` ถือว่ารุ่นหลักหมดระยะดูแล 2 ปีหลังออก: Next 15 = 2024-10-21)
-- แก้ชั่วคราว: `cf:build` ใส่ `--dangerouslyUseUnsupportedNextVersion` — ต้องอัปเกรดเป็น Next 16 แล้วเอา flag ออก (Next 15 อาจไม่ได้แพตช์ความปลอดภัยแล้ว)
+- แก้ชั่วคราว: `cf:build` ใส่ `--dangerouslyUseUnsupportedNextVersion` แล้วอัปเกรดตามใน PR เดียวกัน (เอา flag ออกแล้ว)
+- อัปเกรด: next + eslint-config-next 16.4.2, @opennextjs/cloudflare 1.20.13 (รองรับ Next ≥16.4.1); build ใช้ Turbopack (ค่าเริ่มต้นของ Next 16)
+- `eslint.config.mjs`: eslint-config-next 16 เป็น flat config แล้ว — import ตรงแทน FlatCompat; กฎใหม่ของ React Compiler (`react-hooks/set-state-in-effect`, `refs`, `preserve-manual-memoization`) ตั้งเป็น warn ไว้ก่อน — โค้ดเดิม 12 ไฟล์ยังไม่ผ่าน (16 warnings) ควรทยอยแก้
+- `tsconfig.json`: Next 16 เปลี่ยน `jsx` → `react-jsx` และ include `.next/dev/types/**/*.ts`
 - ยังค้าง: check `Workers Builds: wang-raan` ล้มภายใน 0 วินาทีมาตั้งแต่ PR #12 (ก่อนเริ่ม build) — ต้องดู log ใน Cloudflare dashboard
 
 ## [2026-10-21] 30 fps ตอนหยุดจำลอง + ปรับคุณภาพอัตโนมัติ

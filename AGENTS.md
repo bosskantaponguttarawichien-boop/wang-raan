@@ -121,7 +121,7 @@ wang-raan/
 │   │   ├── ui/                 # UI Primitives
 │   │   └── simulation/         # Canvas overlay & Heatmap
 │   └── workers/                # Web Worker สำหรับ P2 Flow-field simulation
-├── app/                        # Next.js 15 App Router
+├── app/                        # Next.js 16 App Router
 │   ├── (marketing)/            # Landing page
 │   ├── (app)/                  # Editor workspace (/playground)
 │   └── api/                    # BFF Route Handlers (/api/layouts)
