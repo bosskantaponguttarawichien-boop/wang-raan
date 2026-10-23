@@ -11,6 +11,7 @@
 - `viewport-fit=cover` + safe-area: body เว้นซ้าย/ขวา, `.playground-shell` เว้นบน/ล่าง (width เปลี่ยน 100vw → 100%)
 - `sw.js` ห้ามแคช: `next.config.ts` headers + `public/_headers` (Cloudflare static assets)
 - ตรวจ: `make test` 918, `make lint` ผ่าน; next build/start + Chromium มือถือ: ตัดเน็ตแล้วเปิด /playground ได้พร้อมร่าง
+- ตรวจรอบ 2: เปิด 3D ตอนออฟไลน์ (ยังไม่เคยโหลดโค้ด Three.js) ทำทั้งหน้าพัง → `isometric-view` ใช้ SVG แทนเมื่อโหลด chunk ไม่ได้; SW v2 จำกัดแคช static 300 ไฟล์ (ไม่โตตามจำนวน deploy) และไม่เก็บ response ที่ผ่าน redirect; ไม่โชว์ "ติดตั้งแอป" ในเบราว์เซอร์ของ LINE/Facebook/Instagram บน iOS; e2e `responsive.spec.ts` เปลี่ยนเป็นตรวจว่าแถบสถานะ + ปุ่มหมุนแสดงทุกขนาดจอ — `make e2e` 97 ผ่าน, axe เมนูไม่มีปัญหา
 
 ## [2026-10-22] แก้ build บน Cloudflare ล้มเพราะ Next 15 หมดระยะดูแล
 

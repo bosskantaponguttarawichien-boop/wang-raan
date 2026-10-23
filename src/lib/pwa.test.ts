@@ -19,6 +19,8 @@ describe("PWA", () => {
     expect(isIosSafari("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/18.0 Safari/605.1.15", 5)).toBe(true);
     expect(isIosSafari("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Version/18.0 Safari/605.1.15", 0)).toBe(false);
     expect(isIosSafari("Mozilla/5.0 (Linux; Android 15) Chrome/130.0 Mobile Safari/537.36")).toBe(false);
+    expect(isIosSafari("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 Safari Line/14.16.0")).toBe(false);
+    expect(isIosSafari("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/FBIOS;FBAV/480.0]")).toBe(false);
   });
 
   it("promptInstall เรียกหน้าติดตั้งครั้งเดียวแล้วล้าง event", async () => {

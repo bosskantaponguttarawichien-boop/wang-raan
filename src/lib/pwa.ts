@@ -34,7 +34,8 @@ export function isIosSafari(ua: string, maxTouchPoints = 0): boolean {
   // iPadOS 13+ รายงานตัวเองเป็น Macintosh แต่มีจอสัมผัส
   const ios = /iPad|iPhone|iPod/.test(ua) || (/Macintosh/.test(ua) && maxTouchPoints > 1);
   // Chrome/Firefox/Edge บน iOS ใส่ CriOS/FxiOS/EdgiOS — ติดตั้งผ่านปุ่มแชร์ได้เฉพาะ Safari (iOS < 16.4)
-  return ios && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  // เบราว์เซอร์ในแอป LINE/Facebook/Instagram ไม่มีปุ่ม "เพิ่มไปยังหน้าจอโฮม" เลย
+  return ios && !/CriOS|FxiOS|EdgiOS|Line\/|FBAN|FBAV|Instagram/.test(ua);
 }
 
 /** เปิดหน้าติดตั้ง — คืน true เมื่อผู้ใช้กดติดตั้ง */

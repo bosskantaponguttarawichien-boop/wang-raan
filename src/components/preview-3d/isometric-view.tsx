@@ -15,9 +15,21 @@ import { SelectionToolbar } from "@/components/editor-2d/selection-toolbar";
 import { IsoHeatmapLayer, IsoSimulationOverlay } from "@/components/simulation/iso-simulation-overlay";
 import { layoutActions as actions, useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
+import type { ThreeViewProps } from "./three-view";
 
 const SELECTION_BLUE = "#3b62f4";
-const ThreeView = dynamic(() => import("./three-view").then((module) => module.ThreeView), { ssr: false });
+/** โหลดโค้ด Three.js ไม่ได้ (เช่น เปิดแอปออฟไลน์แต่ยังไม่เคยเปิด 3D) → ใช้ SVG แทน ไม่ให้ทั้งหน้าพัง */
+function ThreeViewUnavailable({ onUnavailable }: ThreeViewProps) {
+  React.useEffect(() => onUnavailable(), [onUnavailable]);
+  return null;
+}
+const ThreeView = dynamic(
+  () =>
+    import("./three-view")
+      .then((module) => module.ThreeView)
+      .catch(() => ThreeViewUnavailable),
+  { ssr: false },
+);
 
 export interface IsometricViewProps {
   onToast?: (message: string) => void;

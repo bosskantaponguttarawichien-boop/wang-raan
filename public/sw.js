@@ -5,11 +5,13 @@
  * - /api และคำขอ RSC ไม่แคช (ข้อมูลบัญชีต้องสดเสมอ)
  * เปลี่ยน VERSION เมื่อแก้ไฟล์นี้ เพื่อล้างแคชเก่า
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const STATIC_CACHE = `wangraan-static-${VERSION}`;
 const PAGE_CACHE = `wangraan-pages-${VERSION}`;
 const OFFLINE_URL = "/offline";
 const PRECACHE = [OFFLINE_URL, "/playground", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
+/** ไฟล์ build มี hash ใหม่ทุก deploy — เก็บแค่ล่าสุดเท่านี้ ลบตัวเก่าสุดก่อน (Cache เรียงตามลำดับที่ใส่) */
+const STATIC_MAX = 300;
 /** หน้าที่เก็บไว้เปิดออฟไลน์ได้ — หน้าอื่น (เช่น ผังของฉัน) มีข้อมูลบัญชี จึงไม่เก็บ */
 const OFFLINE_PAGES = new Set(["/", "/playground", OFFLINE_URL]);
 
@@ -34,12 +36,19 @@ self.addEventListener("activate", (event) => {
 const isStatic = (url) =>
   url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/");
 
-async function cacheFirst(request) {
+async function trimStatic(cache) {
+  const keys = await cache.keys();
+  await Promise.all(keys.slice(0, Math.max(0, keys.length - STATIC_MAX)).map((key) => cache.delete(key)));
+}
+
+async function cacheFirst(event, request) {
   const cache = await caches.open(STATIC_CACHE);
   const hit = await cache.match(request);
   if (hit) return hit;
   const response = await fetch(request);
-  if (response.ok) cache.put(request, response.clone());
+  if (response.ok && response.status === 200) {
+    event.waitUntil(cache.put(request, response.clone()).then(() => trimStatic(cache)));
+  }
   return response;
 }
 
@@ -48,7 +57,8 @@ async function networkFirstPage(request, url) {
   const keep = OFFLINE_PAGES.has(url.pathname);
   try {
     const response = await fetch(request);
-    if (keep && response.ok) cache.put(url.pathname, response.clone());
+    // response ที่ผ่าน redirect ส่งให้ navigation ซ้ำไม่ได้ (เบราว์เซอร์ปฏิเสธ) จึงไม่เก็บ
+    if (keep && response.ok && !response.redirected) cache.put(url.pathname, response.clone());
     return response;
   } catch (error) {
     const cached = (keep && (await cache.match(url.pathname))) || (await cache.match(OFFLINE_URL));
@@ -69,7 +79,7 @@ self.addEventListener("fetch", (event) => {
   if (request.mode === "navigate") {
     event.respondWith(networkFirstPage(request, url));
   } else if (isStatic(url)) {
-    event.respondWith(cacheFirst(request));
+    event.respondWith(cacheFirst(event, request));
   }
 });
 
@@ -84,7 +94,7 @@ self.addEventListener("message", (event) => {
           .map((u) => new URL(u, self.location.origin))
           .filter((u) => u.origin === self.location.origin && isStatic(u))
           .map((u) => cache.match(u.href).then((hit) => hit || cache.add(u.href).catch(() => {}))),
-      ),
+      ).then(() => trimStatic(cache)),
     ),
   );
 });
