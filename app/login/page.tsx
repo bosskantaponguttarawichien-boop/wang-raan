@@ -25,7 +25,7 @@ const FOCUS = "focus-visible:outline-3 focus-visible:outline-[#a4b6ff] focus-vis
 export default function LoginPage() {
   return (
     <AppProviders>
-      <div className="min-h-dvh bg-[#f7f9fc] text-[#1e2b40] flex flex-col font-sans">
+      <div className="min-h-dvh pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] bg-[#f7f9fc] text-[#1e2b40] flex flex-col font-sans">
         <header className="w-full max-w-[1280px] mx-auto flex items-center justify-between gap-3 px-4 sm:px-8 md:px-10 py-3">
           <Link
             href="/"
