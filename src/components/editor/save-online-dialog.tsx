@@ -24,11 +24,12 @@ export function SaveOnlineDialog({ open, onOpenChange }: SaveOnlineDialogProps) 
   const [name, setName] = React.useState(currentName);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (open) {
-      setName(currentName);
-    }
-  }, [open, currentName]);
+  // เปิด dialog (หรือชื่อผังเปลี่ยนระหว่างเปิด) → เริ่มจากชื่อปัจจุบัน
+  const [shownFor, setShownFor] = React.useState({ open, currentName });
+  if (shownFor.open !== open || shownFor.currentName !== currentName) {
+    setShownFor({ open, currentName });
+    if (open) setName(currentName);
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

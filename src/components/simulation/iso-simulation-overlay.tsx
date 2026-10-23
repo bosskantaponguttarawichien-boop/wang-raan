@@ -89,9 +89,11 @@ export function IsoSimulationOverlay({
   const active = status === "running" || status === "paused";
   // อ่านผังผ่าน ref — ไม่ใส่ใน deps ของ effect ข้างล่าง (ผังล็อกระหว่างจำลองอยู่แล้ว และไม่อยากเริ่ม loop/สถานะท่าเดินใหม่)
   const layoutRef = React.useRef(layout);
-  layoutRef.current = layout;
   const viewRef = React.useRef({ rotation: viewRotation, plan: planSize ?? layout });
-  viewRef.current = { rotation: viewRotation, plan: planSize ?? layout };
+  React.useLayoutEffect(() => {
+    layoutRef.current = layout;
+    viewRef.current = { rotation: viewRotation, plan: planSize ?? layout };
+  });
 
   React.useEffect(() => {
     const canvas = canvasRef.current;

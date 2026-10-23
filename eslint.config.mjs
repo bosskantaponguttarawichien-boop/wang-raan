@@ -6,14 +6,6 @@ const eslintConfig = [
   ...nextVitals,
   ...nextTypescript,
   {
-    // กฎใหม่ของ React Compiler ที่มากับ eslint-config-next 16 — โค้ดเดิมยังไม่ได้ปรับตาม จึงแจ้งเตือนไว้ก่อน (ไม่ทำให้ lint ล้ม)
-    rules: {
-      "react-hooks/set-state-in-effect": "warn",
-      "react-hooks/refs": "warn",
-      "react-hooks/preserve-manual-memoization": "warn",
-    },
-  },
-  {
     // Boundary: src/core ต้องเป็น Pure TypeScript (architecture.md §5, AGENTS.md)
     files: ["src/core/**/*.ts"],
     rules: {

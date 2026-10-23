@@ -44,10 +44,13 @@ export function CounterStyleControls({ counter }: { counter: Counter }) {
 export function CounterSizeFields({ counter }: { counter: Counter }) {
   const [width, setWidth] = React.useState(String(counter.width));
   const [depth, setDepth] = React.useState(String(counter.depth));
-  React.useEffect(() => {
+  // ขนาดในผังเปลี่ยน (undo, ลากปรับ) → แสดงค่าใหม่ทันทีระหว่าง render
+  const [shown, setShown] = React.useState({ width: counter.width, depth: counter.depth });
+  if (shown.width !== counter.width || shown.depth !== counter.depth) {
+    setShown({ width: counter.width, depth: counter.depth });
     setWidth(String(counter.width));
     setDepth(String(counter.depth));
-  }, [counter.width, counter.depth]);
+  }
   const apply = () => {
     const w = Number.parseFloat(width);
     const d = Number.parseFloat(depth);
