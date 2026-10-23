@@ -1273,6 +1273,18 @@
       "summary": "หมุนมุมมองผัง 2D/3D ทีละ 90° และผนัง 3D เปลี่ยนเป็นด้านไกลกล้องเสมอ",
       "sprint": 4,
       "evidence": "src/core/preview/view-rotation.ts (Pure TS) + tests 5; store rotateView; artboard/isometric tests; make test 67 files / 896 tests, make lint (boundary/ESLint/TypeScript/API contract) ผ่าน; ตรวจเบราว์เซอร์ localhost:3123/playground: 2D หมุน 90° (ผัง 6×8, ลากขวาบนจอ = y ลด), 3D ครบ 4 มุม ผนังไกลกล้องพร้อมช่องทางเข้า/ประตูครัวถูกด้าน"
+    },
+    {
+      "id": "feat-092",
+      "name": "มือถือมีเครื่องมือครบเท่าเดสก์ท็อป + PWA ติดตั้งได้/ใช้ออฟไลน์",
+      "description": "มือถือ: แสดงการ์ดซูม/พอดี/หมุนมุมมอง, แถบสถานะผัง (พาไปข้อที่ต้องแก้ + ปุ่มเริ่มจำลอง) ตลอด, สถานะบันทึกร่างในเมนู. PWA: manifest (standalone, ไอคอน 192/512/maskable, apple-touch-icon), Service Worker แคชไฟล์ build/รูป/โมเดล และหน้า /playground ให้เปิดออฟไลน์ได้ (ไม่แคช /api), หน้า /offline, เมนู 'ติดตั้งแอปวางร้าน' (beforeinstallprompt / คำแนะนำ iOS), safe-area สำหรับ iPhone",
+      "dependencies": [],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "มือถือใช้ปุ่มซูม/หมุน/สถานะได้ครบ และติดตั้งเป็นแอปที่เปิดออฟไลน์ได้",
+      "sprint": 4,
+      "evidence": "src/lib/pwa.ts + pwa.test.ts 3 tests; make test 71 files / 918 tests, make lint ผ่าน; next build + next start: SW ลงทะเบียน, แคช static 24 ไฟล์, ตัดเน็ตแล้ว reload /playground เปิดได้พร้อมร่างผัง; ไม่มี horizontal scroll ที่ 320/375/768/1440"
     }
   ]
 }

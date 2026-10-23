@@ -4,6 +4,15 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
+## [2026-10-23] มือถือเท่าเดสก์ท็อป + PWA (feat-092)
+
+- มือถือ: การ์ดซูม/พอดี/หมุนมุมมองแสดงแล้ว (ปุ่ม 32px มุมล่างซ้าย), แถบสถานะแสดงตลอด (สูง 44px) — กด "พาไปดู"/"ไปตั้งค่าจำลอง" แล้วกางแผงล่างให้ด้วย (`onRevealPanel`), สถานะบันทึกร่างอยู่บนสุดของเมนูเมื่อจอ < 1024px
+- PWA: `app/manifest.ts`, ไอคอน `public/icons/*` (สร้างจากโลโก้ SVG), `public/sw.js` (static = cache-first, หน้า `/`, `/playground`, `/offline` = network-first, ไม่แตะ `/api` และคำขอ RSC), `src/lib/pwa.ts` ลงทะเบียน SW เฉพาะ production + ส่งรายชื่อไฟล์ที่โหลดแล้วให้ SW แคช, เมนู "ติดตั้งแอปวางร้าน"
+- `viewport-fit=cover` + safe-area: body เว้นซ้าย/ขวา, `.playground-shell` เว้นบน/ล่าง (width เปลี่ยน 100vw → 100%)
+- `sw.js` ห้ามแคช: `next.config.ts` headers + `public/_headers` (Cloudflare static assets)
+- ตรวจ: `make test` 918, `make lint` ผ่าน; next build/start + Chromium มือถือ: ตัดเน็ตแล้วเปิด /playground ได้พร้อมร่าง
+- ตรวจรอบ 2: เปิด 3D ตอนออฟไลน์ (ยังไม่เคยโหลดโค้ด Three.js) ทำทั้งหน้าพัง → `isometric-view` ใช้ SVG แทนเมื่อโหลด chunk ไม่ได้; SW v2 จำกัดแคช static 300 ไฟล์ (ไม่โตตามจำนวน deploy) และไม่เก็บ response ที่ผ่าน redirect; ไม่โชว์ "ติดตั้งแอป" ในเบราว์เซอร์ของ LINE/Facebook/Instagram บน iOS; e2e `responsive.spec.ts` เปลี่ยนเป็นตรวจว่าแถบสถานะ + ปุ่มหมุนแสดงทุกขนาดจอ — `make e2e` 97 ผ่าน, axe เมนูไม่มีปัญหา
+
 ## [2026-10-22] แก้ build บน Cloudflare ล้มเพราะ Next 15 หมดระยะดูแล
 
 - อาการ: CI `E2E (Cloudflare Workers runtime)` ล้มตั้งแต่ 2026-10-21 — `opennextjs-cloudflare build` ไม่ยอม build Next 15.5.27 (`@opennextjs/aws` ถือว่ารุ่นหลักหมดระยะดูแล 2 ปีหลังออก: Next 15 = 2024-10-21)
