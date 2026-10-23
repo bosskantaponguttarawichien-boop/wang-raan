@@ -349,6 +349,8 @@
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
+  /* สีส่วนที่เว้นให้กลืนกับแถบหัว/แถบเมนูล่างสีขาว (ไม่งั้นเห็น bg-surface สีเทาของ layout) */
+  background: #fff;
   grid-template-columns: 72px 288px minmax(0, 1fr);
   grid-template-rows: 56px minmax(0, 1fr) 52px;
   grid-template-areas:
