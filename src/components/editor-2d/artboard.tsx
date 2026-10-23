@@ -151,14 +151,14 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const hintId = React.useId();
 
   const selected = layout.objects.find((o) => o.id === selectedId) ?? null;
-  const groupTableId = selected?.type === "table" ? selected.id : selected?.type === "chair" ? selected.tableId : null;
+  const objects = layout.objects;
   const groupRect = React.useMemo(() => {
+    const picked = objects.find((o) => o.id === selectedId);
+    const groupTableId = picked?.type === "table" ? picked.id : picked?.type === "chair" ? picked.tableId : null;
     if (!groupTableId) return null;
-    const members = layout.objects.filter(
-      (o) => o.id === groupTableId || (o.type === "chair" && o.tableId === groupTableId),
-    );
+    const members = objects.filter((o) => o.id === groupTableId || (o.type === "chair" && o.tableId === groupTableId));
     return members.length > 1 ? union(members.map(footprint)) : null;
-  }, [layout.objects, groupTableId]);
+  }, [objects, selectedId]);
 
   const room = { width: layout.width, depth: layout.depth };
   const tableNumbers = React.useMemo(() => getTableNumbers(layout), [layout]);
@@ -220,11 +220,10 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   };
 
   // นิ้วที่สองแตะที่ใดก็ได้บนหน้าจอระหว่างลาก = เริ่ม pinch ซูม → หยุดลากทันที เพื่อไม่ให้วัตถุเลื่อนตามนิ้วแรก
-  const finishDragRef = React.useRef(finishDrag);
-  finishDragRef.current = finishDrag;
+  const onSecondPointer = React.useEffectEvent(finishDrag);
   React.useEffect(() => {
     const onPointerDown = (event: PointerEvent) => {
-      if (event.pointerType === "touch" && !event.isPrimary && drag.current) finishDragRef.current();
+      if (event.pointerType === "touch" && !event.isPrimary && drag.current) onSecondPointer();
     };
     window.addEventListener("pointerdown", onPointerDown, true);
     return () => window.removeEventListener("pointerdown", onPointerDown, true);

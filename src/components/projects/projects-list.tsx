@@ -61,25 +61,33 @@ export function ProjectsList() {
   }, [sessionStatus, router]);
 
   // โหลดรายการผัง
-  const fetchLayouts = React.useCallback(async () => {
+  // ตั้ง state เฉพาะเมื่อคำขอเสร็จ — ครั้งแรกเริ่มจาก loading = true อยู่แล้ว
+  const loadLayouts = React.useCallback(
+    () =>
+      api
+        .listLayoutsPage()
+        .then(
+          (page) => {
+            setLayouts(page.layouts);
+            setNextCursor(page.nextCursor);
+          },
+          () => setError("โหลดรายการผังไม่ได้ ระบบจัดเก็บขัดข้องชั่วคราว ผังของคุณไม่หาย ลองใหม่อีกครั้ง"),
+        )
+        .finally(() => setLoading(false)),
+    [],
+  );
+
+  const fetchLayouts = async () => {
     setLoading(true);
     setError(null);
-    try {
-      const page = await api.listLayoutsPage();
-      setLayouts(page.layouts);
-      setNextCursor(page.nextCursor);
-    } catch {
-      setError("โหลดรายการผังไม่ได้ ระบบจัดเก็บขัดข้องชั่วคราว ผังของคุณไม่หาย ลองใหม่อีกครั้ง");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    await loadLayouts();
+  };
 
   React.useEffect(() => {
     if (sessionStatus === "authenticated") {
-      fetchLayouts();
+      void loadLayouts();
     }
-  }, [sessionStatus, fetchLayouts]);
+  }, [sessionStatus, loadLayouts]);
 
   // โหลดหน้าถัดไป — cursor หมดอายุ (400) ให้โหลดรายการใหม่ทั้งหมด
   const loadMore = async () => {

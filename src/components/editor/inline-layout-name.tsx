@@ -22,12 +22,6 @@ export function InlineLayoutName({ onToast, className = "" }: InlineLayoutNamePr
 
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  React.useEffect(() => {
-    if (!isEditing) {
-      setDraftName(layoutName);
-    }
-  }, [layoutName, isEditing]);
-
   const handleStartEdit = () => {
     setDraftName(layoutName);
     setIsEditing(true);

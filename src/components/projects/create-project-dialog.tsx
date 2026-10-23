@@ -47,8 +47,10 @@ export function CreateProjectDialog({
   const widthInputRef = React.useRef<HTMLInputElement>(null);
   const depthInputRef = React.useRef<HTMLInputElement>(null);
 
-  // รีเซ็ตค่าเมื่อเปิด dialog ใหม่
-  React.useEffect(() => {
+  // รีเซ็ตค่าเมื่อเปิด dialog ใหม่ (ทำระหว่าง render — ไม่ต้องรอ effect แล้ว render ซ้ำ)
+  const [resetFor, setResetFor] = React.useState({ open, defaultName });
+  if (resetFor.open !== open || resetFor.defaultName !== defaultName) {
+    setResetFor({ open, defaultName });
     if (open) {
       setName(defaultName);
       setWidthStr("8");
@@ -57,7 +59,7 @@ export function CreateProjectDialog({
       setNameError(null);
       setSizeError(null);
     }
-  }, [open, defaultName]);
+  }
 
   const validate = (): { ok: true; cleanName: string; validW: number; validD: number } | { ok: false } => {
     const cleanName = name.trim();

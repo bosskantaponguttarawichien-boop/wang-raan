@@ -17,26 +17,36 @@ import { useLayoutStore } from "@/store/use-layout-store";
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { formatSimTime } from "@/components/simulation/simulation-panel";
 
+/** true ระหว่าง beforeprint → afterprint (Ctrl+P / window.print) */
+let printEventActive = false;
+
+function subscribePrinting(onChange: () => void) {
+  const media = window.matchMedia?.("print");
+  // ต้อง render ให้เสร็จก่อนเบราว์เซอร์ถ่ายหน้าไปพิมพ์ จึงใช้ flushSync
+  const start = () => {
+    printEventActive = true;
+    flushSync(onChange);
+  };
+  const end = () => {
+    printEventActive = false;
+    onChange();
+  };
+  const onMedia = (e: MediaQueryListEvent) => (e.matches ? flushSync(onChange) : onChange());
+  window.addEventListener("beforeprint", start);
+  window.addEventListener("afterprint", end);
+  media?.addEventListener?.("change", onMedia);
+  return () => {
+    window.removeEventListener("beforeprint", start);
+    window.removeEventListener("afterprint", end);
+    media?.removeEventListener?.("change", onMedia);
+  };
+}
+
+const isPrinting = () => printEventActive || (window.matchMedia?.("print").matches ?? false);
+
 /** true ระหว่างพิมพ์: beforeprint (Ctrl+P / window.print) และ media query "print" (การจำลองสื่อสิ่งพิมพ์) */
 function usePrinting(): boolean {
-  const [printing, setPrinting] = React.useState(false);
-  React.useEffect(() => {
-    const media = window.matchMedia?.("print");
-    // ต้อง render ให้เสร็จก่อนเบราว์เซอร์ถ่ายหน้าไปพิมพ์ จึงใช้ flushSync
-    const start = () => flushSync(() => setPrinting(true));
-    const end = () => setPrinting(media?.matches ?? false);
-    const onMedia = (e: MediaQueryListEvent) => (e.matches ? start() : end());
-    window.addEventListener("beforeprint", start);
-    window.addEventListener("afterprint", end);
-    media?.addEventListener?.("change", onMedia);
-    if (media?.matches) setPrinting(true);
-    return () => {
-      window.removeEventListener("beforeprint", start);
-      window.removeEventListener("afterprint", end);
-      media?.removeEventListener?.("change", onMedia);
-    };
-  }, []);
-  return printing;
+  return React.useSyncExternalStore(subscribePrinting, isPrinting, () => false);
 }
 
 export function PrintReport({ live }: { live: LiveValidation }) {

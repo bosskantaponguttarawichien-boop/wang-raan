@@ -1,6 +1,6 @@
 ---
 name: wangraan-dev
-description: ใช้เมื่อทำงานกับโปรเจกต์ "วางร้าน" (Store Designer & Customer Flow Simulation — Next.js 15, BFF, Zustand, Dual-Tier Validation และ POC ใน design-html/) — แก้ UI, เพิ่มฟีเจอร์ผังร้าน, จัดการ Table Set Hierarchy, พัฒนา Validation Engine, ตรวจ Responsive หรือเขียนเนื้อหาภาษาไทย ครอบคลุมกติกาดีไซน์ โครงสร้างไฟล์ และขั้นตอนตรวจงาน
+description: ใช้เมื่อทำงานกับโปรเจกต์ "วางร้าน" (Store Designer & Customer Flow Simulation — Next.js 16, BFF, Zustand, Dual-Tier Validation และ POC ใน design-html/) — แก้ UI, เพิ่มฟีเจอร์ผังร้าน, จัดการ Table Set Hierarchy, พัฒนา Validation Engine, ตรวจ Responsive หรือเขียนเนื้อหาภาษาไทย ครอบคลุมกติกาดีไซน์ โครงสร้างไฟล์ และขั้นตอนตรวจงาน
 ---
 
 # วางร้าน — Development Skill

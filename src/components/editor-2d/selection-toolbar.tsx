@@ -118,10 +118,13 @@ export function SelectionToolbar({
   const [inputX, setInputX] = React.useState(String(target.x));
   const [inputY, setInputY] = React.useState(String(target.y));
 
-  React.useEffect(() => {
+  // ตำแหน่งในผังเปลี่ยน (ลาก, undo) → แสดงค่าใหม่ทันทีระหว่าง render
+  const [shownAt, setShownAt] = React.useState({ x: target.x, y: target.y });
+  if (shownAt.x !== target.x || shownAt.y !== target.y) {
+    setShownAt({ x: target.x, y: target.y });
     setInputX(String(target.x));
     setInputY(String(target.y));
-  }, [target.x, target.y]);
+  }
 
   React.useLayoutEffect(() => {
     const box = boxRef.current;

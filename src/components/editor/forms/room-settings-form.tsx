@@ -7,7 +7,7 @@
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { ENTRANCE_DEFAULT_WIDTH, KITCHEN_DOOR_DEFAULT_WIDTH, type Wall } from "@/core/layout";
 import { WALL_LABEL } from "@/components/editor-2d/stage-math";
 import { layoutStore, useLayoutStore } from "@/store/use-layout-store";
@@ -78,7 +78,9 @@ function RoomSettingsFormInner() {
   };
 
   const numberProps = { type: "number", inputMode: "decimal" as const, step: 0.25, className: inputClass };
-  const hasKitchen = form.watch("hasKitchenDoor");
+  const hasKitchen = useWatch({ control: form.control, name: "hasKitchenDoor" });
+  const entranceWall = useWatch({ control: form.control, name: "entranceWall" });
+  const kitchenDoorWall = useWatch({ control: form.control, name: "kitchenDoorWall" });
 
   return (
     <form
@@ -108,7 +110,7 @@ function RoomSettingsFormInner() {
         </Field>
         <Field id={`${formId}-wall`} label="ผนังทางเข้า" className="col-span-2" error={errors.entranceWall?.message}>
           {(aria) => {
-            const currentWall = form.watch("entranceWall");
+            const currentWall = entranceWall;
             return (
               <div>
                 <select
@@ -191,7 +193,7 @@ function RoomSettingsFormInner() {
             <div className="grid grid-cols-2 gap-x-2 gap-y-3">
               <Field id={`${formId}-kwall`} label="ผนังประตูครัว" className="col-span-2" error={errors.kitchenDoorWall?.message}>
                 {(aria) => {
-                  const currentWall = form.watch("kitchenDoorWall");
+                  const currentWall = kitchenDoorWall;
                   return (
                     <div>
                       <select {...aria} className="sr-only" {...register("kitchenDoorWall")}>
