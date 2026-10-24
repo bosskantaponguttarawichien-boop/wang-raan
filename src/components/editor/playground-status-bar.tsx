@@ -152,8 +152,10 @@ export function PlaygroundStatusBar({ live, onFocusIssue, onRevealPanel }: Playg
       data-testid="validation-status-bar"
       data-status={result.status}
       className={cn(
-        // มือถือ: แสดงตลอดเหมือนเดสก์ท็อป (สถานะผัง + ปุ่มพาไปข้อที่ต้องแก้ + เริ่มจำลอง) แต่เตี้ยลงเพื่อเหลือที่ให้ผัง
         "[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:h-11 max-[767px]:gap-2 max-[767px]:px-3 max-[767px]:[&_#stMsg]:text-[12px]",
+        // มือถือตอนจัดผัง: ซ่อนเพื่อเหลือที่ให้ผัง — สถานะดูได้จาก badge แท็บ "จำลอง" และกดแท็บนั้นไปจำลองได้
+        // ตอนจำลองยังแสดง เพราะแถบเมนูล่างถูกซ่อน เหลือแค่ตรงนี้ที่มีเวลาจำลองและปุ่ม "กลับไปแก้ผัง"
+        !isSim && "max-[767px]:hidden",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-ink" id="stMsg">

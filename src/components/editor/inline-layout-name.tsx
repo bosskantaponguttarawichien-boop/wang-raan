@@ -75,7 +75,8 @@ export function InlineLayoutName({ onToast, className = "" }: InlineLayoutNamePr
 
   if (isEditing) {
     return (
-      <div className={`inline-flex items-center ${className}`}>
+      // min-w-0 + max-w-full: จอแคบให้ช่องหดตามพื้นที่ ไม่ล้นไปทับปุ่ม 2D/3D
+      <div className={`inline-flex min-w-0 items-center ${className}`}>
         <input
           ref={inputRef}
           id="inlineLayoutNameInput"
@@ -86,7 +87,7 @@ export function InlineLayoutName({ onToast, className = "" }: InlineLayoutNamePr
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
           aria-label="แก้ไขชื่อผัง"
-          className="h-8 w-44 sm:w-56 rounded-[6px] border border-[#3b62f4] bg-white px-2 text-[13px] font-medium text-[#1e2b40] shadow-sm outline-none focus-visible:outline-2 focus-visible:outline-[#a4b6ff]"
+          className="h-8 w-44 min-w-0 max-w-full sm:w-56 rounded-[6px] border border-[#3b62f4] bg-white px-2 text-[13px] font-medium text-[#1e2b40] shadow-sm outline-none focus-visible:outline-2 focus-visible:outline-[#a4b6ff]"
         />
       </div>
     );
