@@ -342,7 +342,7 @@
 /* ── Playground App Shell Grid (feat-050) ──────────────────────────────── */
 .playground-shell {
   display: grid;
-  height: 100dvh;
+  height: 100%; /* เต็มกรอบ fixed ของ layout — 100dvh บน iPhone PWA บางรุ่นสูงเกินจอ */
   width: 100%;
   overflow: hidden;
   /* แอปที่ติดตั้ง (PWA) บน iPhone: เว้นแถบสถานะและแถบโฮม (viewport-fit=cover) — ขอบซ้าย/ขวาเว้นที่ body แล้ว */
