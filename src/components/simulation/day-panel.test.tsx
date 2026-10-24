@@ -17,7 +17,7 @@ function Harness() {
 
 afterEach(cleanup);
 
-describe("แผงจำลองร้าน 1 วัน (feat-094)", () => {
+describe("แผงจำลองร้าน 1 วัน (feat-095)", () => {
   beforeEach(() => {
     layoutStore.getState().loadLayout(cafeLayout());
     simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 60 } });
@@ -78,7 +78,7 @@ describe("แผงจำลองร้าน 1 วัน (feat-094)", () => {
   });
 });
 
-describe("ปุ่มจำลองร้าน 1 วัน: เริ่มไม่ได้ต้องแจ้งผู้ใช้ (feat-094)", () => {
+describe("ปุ่มจำลองร้าน 1 วัน: เริ่มไม่ได้ต้องแจ้งผู้ใช้ (feat-095)", () => {
   beforeEach(() => {
     layoutStore.getState().loadLayout(cafeLayout());
     simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 60 } });

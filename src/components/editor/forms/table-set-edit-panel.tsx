@@ -16,10 +16,12 @@ export function TableSetEditPanel({ table, onBack, onToast = () => {} }: TableSe
   const chairCount = table.chairIds.length;
   const capacity = tableSeatCapacity(table.width, table.depth);
   const [position, setPosition] = React.useState({ x: String(table.x), y: String(table.y) });
-
-  React.useEffect(() => {
+  // ตำแหน่งในผังเปลี่ยน (ลาก, undo) → แสดงค่าใหม่ทันทีระหว่าง render
+  const [shownAt, setShownAt] = React.useState({ x: table.x, y: table.y });
+  if (shownAt.x !== table.x || shownAt.y !== table.y) {
+    setShownAt({ x: table.x, y: table.y });
     setPosition({ x: String(table.x), y: String(table.y) });
-  }, [table.x, table.y]);
+  }
 
   const setCount = (next: number) => {
     if (actions().setTableSetChairCount(table.id, next)) {

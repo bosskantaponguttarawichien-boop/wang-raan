@@ -63,8 +63,8 @@ export function LegalPage({
   const toc = collectToc(children);
 
   return (
-    <div className="min-h-dvh bg-[#f7f9fc] text-[#1e2b40] flex flex-col font-sans">
-      <header className="sticky top-0 z-10 bg-[#f7f9fc]/90 backdrop-blur border-b border-[#e2e8f1]">
+    <div className="min-h-dvh pb-[env(safe-area-inset-bottom)] bg-[#f7f9fc] text-[#1e2b40] flex flex-col font-sans">
+      <header className="sticky top-0 z-10 pt-[env(safe-area-inset-top)] bg-[#f7f9fc]/90 backdrop-blur border-b border-[#e2e8f1]">
         <div className="w-full max-w-[1120px] mx-auto flex items-center justify-between gap-3 px-4 sm:px-8 h-14 sm:h-16">
           <Link
             href="/"

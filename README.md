@@ -12,7 +12,7 @@
 | เอกสาร | รายละเอียด | บทบาทหลัก |
 | :--- | :--- | :--- |
 | 📄 [PRD.md](PRD.md) | **Product Requirements Document (Playground P1 V1)** | ขอบเขตฟังก์ชัน, โมเดลข้อมูล, กฎ Validation 4 ด้าน, และสัญญาส่งต่อ P1 → P2 |
-| 🏗️ [architecture.md](architecture.md) | **Frontend Architecture (Next.js + BFF v2.0)** | โครงสร้างระบบ Next.js 15, Tech Stack, Zustand State, Dual-Tier Validation, และ P2 Simulation |
+| 🏗️ [architecture.md](architecture.md) | **Frontend Architecture (Next.js + BFF v2.0)** | โครงสร้างระบบ Next.js 16, Tech Stack, Zustand State, Dual-Tier Validation, และ P2 Simulation |
 | 🎨 [design-system.md](design-system.md) | **Living Design System Specification v2.0** | โทเค็นสี, ระบบตัวอักษรภาษาไทย, สเปก 2D/3D Isometric, คอมโพเนนต์ และ Tailwind v4 Theme |
 | 🛠️ [SKILL.md](SKILL.md) | **Development Guidelines & Agent Skill** | กฎเหล็กที่ห้ามละเมิด, ลำดับขั้นตอนการพัฒนา, และเช็กลิสต์ตรวจสอบงานก่อนส่งมอบ |
 
@@ -22,7 +22,7 @@
 
 สถาปัตยกรรมของ **วางร้าน** ยึดหลักการเบา คมชัด ไม่พึ่งพา Engine 3D ขนาดใหญ่โดยไม่จำเป็น:
 
-- **Core Framework:** Next.js 15+ (App Router, React 19)
+- **Core Framework:** Next.js 16+ (App Router, React 19)
 - **Styling:** Tailwind CSS v4 + Design Tokens ตาม [design-system.md](design-system.md)
 - **UI Components:** Shadcn UI + Radix UI Primitives (WCAG 2.1 AA / ARIA ภาษาไทย)
 - **Editor State:** Zustand (รองรับ Undo/Redo 40 ขั้น, Auto-save, และ Group Transformation)

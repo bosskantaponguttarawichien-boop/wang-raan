@@ -52,10 +52,9 @@ for (const width of BREAKPOINTS) {
           await expect(side.locator(`[data-section-toggle="${key}"]`)).toBeVisible();
         }
       }
-      // มือถือ (< 768px) ซ่อนแถบสถานะตอนแก้ผัง — สถานะดูจาก badge ที่แท็บ "จำลอง" แทน (แถบกลับมาตอนจำลอง)
-      const statusBar = page.getByTestId("validation-status-bar");
-      if (width < 768) await expect(statusBar).toBeHidden();
-      else await expect(statusBar).toBeVisible();
+      // แถบสถานะและการ์ดซูม/หมุนมุมมองแสดงทุกขนาดจอ (มือถือมีเครื่องมือเท่าเดสก์ท็อป — feat-092)
+      await expect(page.getByTestId("validation-status-bar")).toBeVisible();
+      await expect(page.getByTestId("rotate-view-right")).toBeVisible();
       await page.screenshot({ path: `e2e/.results/screens/playground-${width}.png`, fullPage: true });
     });
 

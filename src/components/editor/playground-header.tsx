@@ -18,6 +18,7 @@ import { useSimulationStore } from "@/store/use-simulation-store";
 import { summarizeIssues } from "@/components/validation/use-live-validation";
 import { createEmptyLayout, createEntrance, randomId, type Wall } from "@/core/layout";
 import { useSession } from "next-auth/react";
+import { promptInstall, useInstallState } from "@/lib/pwa";
 import { DraftStatusText } from "./header-actions";
 import { CloudModal } from "./cloud-modal";
 import { OnboardingModal } from "./onboarding-modal";
@@ -82,6 +83,8 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
   const simStatus = useSimulationStore((s) => s.status);
   const simActive = simStatus === "running" || simStatus === "paused";
 
+  const canPromptInstall = useInstallState((s) => s.promptEvent !== null);
+  const showInstall = useInstallState((s) => !s.installed && (s.promptEvent !== null || s.iosManual));
   const [projOpen, setProjOpen] = React.useState(false);
   const [cloudOpen, setCloudOpen] = React.useState(false);
   const [onboardingOpen, setOnboardingOpen] = React.useState(false);
@@ -205,6 +208,15 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
   const handleOpenCloud = () => {
     closeMenus();
     setCloudOpen(true);
+  };
+
+  const handleInstall = async () => {
+    closeMenus();
+    if (canPromptInstall) {
+      if (await promptInstall()) onToast("ติดตั้งแล้ว เปิดวางร้านจากหน้าจอโฮมได้เลย");
+    } else {
+      onToast("แตะปุ่มแชร์ของ Safari แล้วเลือก \"เพิ่มไปยังหน้าจอโฮม\"");
+    }
   };
 
   return (
@@ -333,8 +345,12 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
                 role="menu"
                 aria-label="เมนูโปรเจกต์"
                 // จอ < 768px ยึดเต็มความกว้างจอ (ขอบ 8px) — กว้าง 264px ชิดปุ่มแล้วอาจล้นขอบซ้ายบนจอแคบ
-                className="absolute right-0 top-[calc(100%+6px)] z-40 w-[264px] max-h-[calc(100dvh-72px)] max-[767px]:fixed max-[767px]:inset-x-2 max-[767px]:top-[58px] max-[767px]:w-auto overflow-y-auto overscroll-contain rounded-[12px] border border-line bg-white p-1.5 shadow-[0_10px_30px_rgba(30,43,64,0.12)]"
+                className="absolute right-0 top-[calc(100%+6px)] z-40 w-[264px] max-h-[calc(100dvh-72px)] max-[767px]:fixed max-[767px]:inset-x-2 max-[767px]:top-[calc(58px+env(safe-area-inset-top))] max-[767px]:w-auto overflow-y-auto overscroll-contain rounded-[12px] border border-line bg-white p-1.5 shadow-[0_10px_30px_rgba(30,43,64,0.12)]"
               >
+                {/* จอ < 1024px ไม่มีที่บนแถบหัว — แสดงสถานะการบันทึกในเมนูแทน */}
+                <div role="none" className="hidden px-2 pb-1.5 pt-1 text-[12px] text-secondary max-[1023px]:block">
+                  <DraftStatusText />
+                </div>
                 {isLoggedIn ? (
                   <Link href="/projects" role="menuitem" data-act="projects" onClick={closeMenus} className={`${MENU_ITEM} no-underline`}>
                     <MenuIcon tone="text-blue">
@@ -424,6 +440,18 @@ export function PlaygroundHeader({ onToast = () => {} }: PlaygroundHeaderProps) 
                     <MenuText title="แชร์ลิงก์ผัง" hint="สร้างลิงก์สำหรับส่งต่อ" />
                   </MenuButton>
                 </MenuSection>
+
+                {showInstall && (
+                  <MenuSection label="แอป">
+                    <MenuButton act="install" onClick={handleInstall}>
+                      <MenuIcon tone="text-blue">
+                        <rect x="6" y="2" width="12" height="20" rx="2.5" />
+                        <path d="M12 7v7M9 11l3 3 3-3M10 18h4" />
+                      </MenuIcon>
+                      <MenuText title="ติดตั้งแอปวางร้าน" hint="เปิดจากหน้าจอโฮม ใช้จัดผังได้แม้ออฟไลน์" />
+                    </MenuButton>
+                  </MenuSection>
+                )}
 
                 <MenuSection label="ร้าน">
                   <MenuButton act="shop" onClick={handleOpenShop}>

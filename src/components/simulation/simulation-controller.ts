@@ -5,7 +5,7 @@
  *   1. ตรวจผังล่าสุดซ้ำ (store.runValidation) — ผลตรวจบน UI ไม่ถูกเชื่อถือ
  *   2. Blocked → ไม่เริ่ม
  *   3. สร้าง P1 → P2 contract แล้วตรวจด้วย Zod (P1LayoutContractSchema)
- *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-094)
+ *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
  *   5. START ช่วงคนเยอะ (worker เดินเวลาถึงต้นพีคเอง) → หยุดเองเมื่อจบพีค (TICK finished)
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */

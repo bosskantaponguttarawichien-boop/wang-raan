@@ -11,7 +11,7 @@ function restaurant(config: Partial<SimulationConfig> = {}) {
   return new Simulation(cafeLayout(), { serviceStyle: "table-service", customersPerHour: 12, seed: 4, ...config });
 }
 
-describe("แผนลูกค้าทั้งวัน (feat-092)", () => {
+describe("แผนลูกค้าทั้งวัน (feat-093)", () => {
   it("parseClock / openHours", () => {
     expect(parseClock("10:30")).toBe(630);
     expect(parseClock("9:05")).toBe(545);
@@ -37,7 +37,7 @@ describe("แผนลูกค้าทั้งวัน (feat-092)", () => {
   });
 });
 
-describe("ร้านอาหารแบบ A: นั่งก่อน พนักงานมารับออร์เดอร์ (feat-092)", () => {
+describe("ร้านอาหารแบบ A: นั่งก่อน พนักงานมารับออร์เดอร์ (feat-093)", () => {
   it("ครบวงจร: นั่ง → ได้อาหาร → จ่ายเงิน → ออก และเก้าอี้หนึ่งตัวมีคนเดียว", () => {
     const sim = restaurant({ cooks: 2 });
     const seen = new Set<string>();

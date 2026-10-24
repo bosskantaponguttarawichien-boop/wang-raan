@@ -11,7 +11,7 @@ export interface SimulationStartConfig {
   /** วินาทีจำลองต่อวินาทีจริง */
   speed: number;
   seed?: number;
-  /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-092) — ไม่ส่งใช้ค่าตั้งต้นของ engine */
+  /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-093) — ไม่ส่งใช้ค่าตั้งต้นของ engine */
   serviceStyle?: ServiceStyle;
   peak?: PeakWindow | null;
   closeSeconds?: number | null;

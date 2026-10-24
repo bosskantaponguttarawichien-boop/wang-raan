@@ -4,7 +4,7 @@
 > `harness/archive/progress-YYYY-MM.md`
 
 
-## [2026-10-23] แผงจำลองร้าน 1 วัน + การ์ดคำตอบ (feat-094)
+## [2026-10-23] แผงจำลองร้าน 1 วัน + การ์ดคำตอบ (feat-095)
 
 - แผงจำลองขั้นที่ 2 เปลี่ยนเป็น "จำลองร้าน 1 วัน": ร้านของคุณ (เปิด–ปิด → ชั่วโมง) / พนักงาน (ตำแหน่งตามผัง: เคาน์เตอร์ → พนักงานหน้าร้าน, ประตูครัว → พ่อครัว + เวลา 1 คนทำ 1 จาน → จาน/ชม.) / ลูกค้าวันนี้ (ทั้งวัน, ช่วงคนเยอะ → คน/ชม., นั่งกิน ±5 นาที, รอได้ไม่เกิน)
 - `src/lib/day-config.ts`: ค่าตั้งต้น + `toDayInput` (ตรวจเปิด≠ปิด, ช่วงคนเยอะอยู่ในเวลาเปิด) — ค่าผิดแจ้งใต้ช่องทันที (`role="alert"`) และ controller ไม่ส่งอะไรไป worker
@@ -14,7 +14,7 @@
 - ตรวจ: `make test` 943, `make lint` ผ่าน; Playwright chromium (a11y, playground-ux, keyboard, responsive) ผ่าน — axe "ระหว่างจำลอง" 1440px ล้ม 1 ครั้งตอนรันพร้อม responsive รันซ้ำผ่านทั้งหมด (เฝ้าดูใน CI)
 
 
-## [2026-10-23] วิเคราะห์ร้านทั้งวัน + หาจำนวนพนักงาน (feat-093)
+## [2026-10-23] วิเคราะห์ร้านทั้งวัน + หาจำนวนพนักงาน (feat-094)
 
 - Gate ผ่าน: เจ้าของผลิตภัณฑ์ยืนยันเกณฑ์ "กำลังดี" (รอเกิน ≤ 10%), ค่าตั้งต้นร้านอาหาร และเวลารอนับจากนั่งลงจนได้อาหาร
 - `day-analysis.ts`: `simulateDay` (เปิดร้านจนคนสุดท้ายออก เฉลี่ย seed 11, 23) และ `analyzeDay` — (1) ไล่พ่อครัว 1–8 ด้วยพนักงานหน้าร้านเต็มที่ แล้วไล่พนักงานหน้าร้านด้วยพ่อครัวจำนวนนั้น + ตัวเลือก −1/แนะนำ/+1, (2) binary search เวลาต่อจานสูงสุด 0.5–60 นาที ทีละ 0.5 ด้วยพนักงานที่ผู้ใช้ตั้ง, (3) ที่นั่งพอไหม (ลูกค้ากลับ ≤ 10%) ประเมินด้วยพนักงานจำนวนที่แนะนำ ไม่ให้ครัวช้าทำให้ดูเหมือนโต๊ะไม่พอ
@@ -23,7 +23,7 @@
 - ตรวจ: `make test` 936, `make lint` ผ่าน
 
 
-## [2026-10-23] Simulation ร้านอาหารแบบ A (feat-092)
+## [2026-10-23] Simulation ร้านอาหารแบบ A (feat-093)
 
 - เจ้าของผลิตภัณฑ์ตัดสินใจ: MVP1 = ร้านอาหารตามสั่งคนละจาน แบบ A (นั่งก่อน พนักงานมารับออร์เดอร์ที่โต๊ะ จ่ายที่เคาน์เตอร์); แบบ B (สั่งที่เคาน์เตอร์) เก็บไว้ให้เลือกเมื่อมีหลายประเภทร้าน; ช่วงพีคใช้ค่าตั้งต้น 2.5 เท่า; วิเคราะห์ทั้งวันเบื้องหลังแล้วดูภาพเฉพาะช่วงพีค
 - `engine.ts`: `serviceStyle` (`table-service` ค่าตั้งต้น / `counter-order`), พนักงานหน้าร้านทำงานตามลำดับ เสิร์ฟ > รับเงิน > รับออร์เดอร์ (เวลาเดิน = ระยะบนผังจริง ÷ 1.2 ม./วิ ฐานอยู่ที่เคาน์เตอร์), พ่อครัวทำทีละจาน `cookMinutesPerDish` ±20%; อัตราลูกค้าเปลี่ยนตามเวลา (`peak`, `closeSeconds`, thinning); ลูกค้าสุ่มลักษณะตอนเข้าร้านจากสายสุ่มแยกจากการเลือกเก้าอี้ → seed เดียวกันได้ลูกค้าชุดเดิมแม้เปลี่ยนจำนวนพนักงาน
@@ -32,6 +32,28 @@
 - รหัสสถานะใน buffer คงเดิม (นั่งทุกช่วง = 4) จึงไม่ต้องแก้ 2D/3D; คำอธิบายสีบนผังเปลี่ยนเป็น "จ่ายเงินที่เคาน์เตอร์" ฯลฯ
 - ตรวจ: `make test` 927, `make lint` ผ่าน; จำลองทั้งวันใช้ ~20–35 ms; Chromium ผังตัวอย่าง
 
+
+## [2026-10-23] มือถือเท่าเดสก์ท็อป + PWA (feat-092)
+
+- มือถือ: การ์ดซูม/พอดี/หมุนมุมมองแสดงแล้ว (ปุ่ม 32px มุมล่างซ้าย), แถบสถานะแสดงตลอด (สูง 44px) — กด "พาไปดู"/"ไปตั้งค่าจำลอง" แล้วกางแผงล่างให้ด้วย (`onRevealPanel`), สถานะบันทึกร่างอยู่บนสุดของเมนูเมื่อจอ < 1024px
+- PWA: `app/manifest.ts`, ไอคอน `public/icons/*` (สร้างจากโลโก้ SVG), `public/sw.js` (static = cache-first, หน้า `/`, `/playground`, `/offline` = network-first, ไม่แตะ `/api` และคำขอ RSC), `src/lib/pwa.ts` ลงทะเบียน SW เฉพาะ production + ส่งรายชื่อไฟล์ที่โหลดแล้วให้ SW แคช, เมนู "ติดตั้งแอปวางร้าน"
+- `viewport-fit=cover` + safe-area: body เว้นซ้าย/ขวา, `.playground-shell` เว้นบน/ล่าง (width เปลี่ยน 100vw → 100%)
+- `sw.js` ห้ามแคช: `next.config.ts` headers + `public/_headers` (Cloudflare static assets)
+- ตรวจ: `make test` 918, `make lint` ผ่าน; next build/start + Chromium มือถือ: ตัดเน็ตแล้วเปิด /playground ได้พร้อมร่าง
+- ตรวจรอบ 2: เปิด 3D ตอนออฟไลน์ (ยังไม่เคยโหลดโค้ด Three.js) ทำทั้งหน้าพัง → `isometric-view` ใช้ SVG แทนเมื่อโหลด chunk ไม่ได้; SW v2 จำกัดแคช static 300 ไฟล์ (ไม่โตตามจำนวน deploy) และไม่เก็บ response ที่ผ่าน redirect; ไม่โชว์ "ติดตั้งแอป" ในเบราว์เซอร์ของ LINE/Facebook/Instagram บน iOS; e2e `responsive.spec.ts` เปลี่ยนเป็นตรวจว่าแถบสถานะ + ปุ่มหมุนแสดงทุกขนาดจอ — `make e2e` 97 ผ่าน, axe เมนูไม่มีปัญหา
+
+## [2026-10-22] แก้ build บน Cloudflare ล้มเพราะ Next 15 หมดระยะดูแล
+
+- อาการ: CI `E2E (Cloudflare Workers runtime)` ล้มตั้งแต่ 2026-10-21 — `opennextjs-cloudflare build` ไม่ยอม build Next 15.5.27 (`@opennextjs/aws` ถือว่ารุ่นหลักหมดระยะดูแล 2 ปีหลังออก: Next 15 = 2024-10-21)
+- แก้ชั่วคราว: `cf:build` ใส่ `--dangerouslyUseUnsupportedNextVersion` แล้วอัปเกรดตามใน PR เดียวกัน (เอา flag ออกแล้ว)
+- อัปเกรด: next + eslint-config-next 16.4.2, @opennextjs/cloudflare 1.20.13 (รองรับ Next ≥16.4.1); build ใช้ Turbopack (ค่าเริ่มต้นของ Next 16)
+- `eslint.config.mjs`: eslint-config-next 16 เป็น flat config แล้ว — import ตรงแทน FlatCompat; กฎใหม่ของ React Compiler (`react-hooks/set-state-in-effect`, `refs`, `preserve-manual-memoization`) แก้โค้ดให้ผ่านแล้ว (กลับเป็น error ตามค่าเริ่มต้น, lint 0 warning):
+  - คัดลอก props → state ใน effect (ช่องขนาด/พิกัด, dialog ชื่อผัง/สร้างผัง) → เทียบค่าก่อนหน้าระหว่าง render; `inline-layout-name` ลบ effect ที่ซ้ำกับตอนเริ่มแก้ไข
+  - อ่านค่าจากเบราว์เซอร์ (`BrowserSupportNotice`, `usePrinting`, reduced motion ใน Character Lab) → `useSyncExternalStore`
+  - ref ที่ตั้งระหว่าง render → `useEffectEvent` (artboard) / `useLayoutEffect` (iso overlay); `projects-list` ตั้ง state ใน `.then` แทนก่อน await; `room-settings-form` ใช้ `useWatch` แทน `form.watch`
+  - เหลือ eslint-disable 1 จุด: สร้าง WebGL renderer ไม่ได้ใน Character Lab (รู้ได้ตอนสร้างจริงใน effect เท่านั้น)
+- `tsconfig.json`: Next 16 เปลี่ยน `jsx` → `react-jsx` และ include `.next/dev/types/**/*.ts`
+- ยังค้าง: check `Workers Builds: wang-raan` ล้มภายใน 0 วินาทีมาตั้งแต่ PR #12 (ก่อนเริ่ม build) — ต้องดู log ใน Cloudflare dashboard
 
 ## [2026-10-21] 30 fps ตอนหยุดจำลอง + ปรับคุณภาพอัตโนมัติ
 

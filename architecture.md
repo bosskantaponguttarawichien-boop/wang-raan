@@ -19,7 +19,7 @@
 
 | ชั้น (Layer) | เทคโนโลยีที่เลือก | เหตุผลและบทบาทในระบบ |
 | :--- | :--- | :--- |
-| **Core Framework** | **Next.js 15+ (App Router, React 19)** | ผสมผสาน Server Components (RSC) สำหรับ SEO และ Client Components สำหรับ Editor |
+| **Core Framework** | **Next.js 16+ (App Router, React 19)** | ผสมผสาน Server Components (RSC) สำหรับ SEO และ Client Components สำหรับ Editor |
 | **Styling** | **Tailwind CSS (v4)** | ทำ Responsive สะดวก ควบคุมขนาดและสีผ่าน CSS Variables ตาม [design-system.md](design-system.md) |
 | **UI Components** | **Shadcn UI + Radix UI** | Headless Primitives ที่ได้มาตรฐานการเข้าถึง (WCAG 2.1 AA / ARIA) และปรับแต่งสไตล์ได้อิสระ |
 | **Editor State** | **Zustand** | จัดการ State ของผังร้าน, จัดการ Undo/Redo (40 ขั้น), และ Snapshots นอก React Lifecycle |

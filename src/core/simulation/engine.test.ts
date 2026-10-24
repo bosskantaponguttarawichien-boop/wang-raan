@@ -14,7 +14,7 @@ import {
   type TickMessage,
 } from "./index";
 
-/** แบบ B (คาเฟ่ สั่งที่เคาน์เตอร์) — พฤติกรรมเดิมก่อน feat-092 */
+/** แบบ B (คาเฟ่ สั่งที่เคาน์เตอร์) — พฤติกรรมเดิมก่อน feat-093 */
 const cafe = (config: Partial<SimulationConfig> = {}): Partial<SimulationConfig> => ({ serviceStyle: "counter-order", ...config });
 const atChair = (state: keyof typeof AGENT_STATE_CODE) => AGENT_STATE_CODE[state] === 4;
 
@@ -199,7 +199,7 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     expect(rt.handle({ type: "PAUSE", requestId: 9 }).response).toMatchObject({ code: "NOT_RUNNING" });
   });
 
-  it("START ส่งค่าร้านอาหารได้ (feat-092) และค่าผิดช่วงถูกปฏิเสธ", () => {
+  it("START ส่งค่าร้านอาหารได้ (feat-093) และค่าผิดช่วงถูกปฏิเสธ", () => {
     const rt = new SimulationWorkerRuntime();
     rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } });
     const config = {
@@ -236,7 +236,7 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     patienceMinutes: 15,
   };
 
-  it("ANALYZE_DAY ผ่าน P2 gate เดียวกับ START และคืนคำตอบ 3 ข้อ (feat-093)", { timeout: 30_000 }, () => {
+  it("ANALYZE_DAY ผ่าน P2 gate เดียวกับ START และคืนคำตอบ 3 ข้อ (feat-094)", { timeout: 30_000 }, () => {
     const rt = new SimulationWorkerRuntime();
     const ask = (requestId: number, extra: object = {}) =>
       rt.handle({ type: "ANALYZE_DAY", requestId, layoutRevision: validation.layoutRevision, input: { ...dayInput, ...extra } }).response;

@@ -18,14 +18,14 @@ export function isBrowserSupported(css: Pick<typeof CSS, "supports"> | undefined
   return REQUIRED_FEATURES.every(([property, value]) => css.supports(property, value));
 }
 
+const subscribeNever = () => () => {};
+
 export function BrowserSupportNotice() {
-  const [show, setShow] = React.useState(false);
+  // ฝั่ง server ถือว่ารองรับ (ไม่แสดง) — ตรวจจริงหลัง hydrate
+  const unsupported = React.useSyncExternalStore(subscribeNever, () => !isBrowserSupported(), () => false);
+  const [dismissed, setDismissed] = React.useState(false);
 
-  React.useEffect(() => {
-    setShow(!isBrowserSupported());
-  }, []);
-
-  if (!show) return null;
+  if (!unsupported || dismissed) return null;
 
   return (
     <div
@@ -53,7 +53,7 @@ export function BrowserSupportNotice() {
       </p>
       <button
         type="button"
-        onClick={() => setShow(false)}
+        onClick={() => setDismissed(true)}
         aria-label="ปิดคำแจ้งเตือน"
         style={{
           flexShrink: 0,

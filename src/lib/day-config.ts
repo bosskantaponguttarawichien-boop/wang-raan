@@ -1,5 +1,5 @@
 /**
- * ค่าฟอร์ม "จำลองร้าน 1 วัน" (feat-094) → DayInput ของ core + ค่าที่คำนวณโชว์ในฟอร์ม
+ * ค่าฟอร์ม "จำลองร้าน 1 วัน" (feat-095) → DayInput ของ core + ค่าที่คำนวณโชว์ในฟอร์ม
  * ค่าตั้งต้นยืนยันโดยเจ้าของผลิตภัณฑ์ 2026-10-23 (PRD §9 ข้อ 28): ร้านอาหารตามสั่ง แบบ A
  */
 import { openHours, parseClock, planArrivals, type ArrivalPlan, type DayInput } from "@/core/simulation";

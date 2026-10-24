@@ -29,6 +29,18 @@ function disposeModel(model: THREE.Object3D) {
   });
 }
 
+const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void) {
+  const media = window.matchMedia?.(REDUCED_MOTION);
+  media?.addEventListener?.("change", onChange);
+  return () => media?.removeEventListener?.("change", onChange);
+}
+
+function prefersReducedMotion() {
+  return window.matchMedia?.(REDUCED_MOTION).matches ?? false;
+}
+
 function shortestAngle(from: number, to: number) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
@@ -52,7 +64,9 @@ export function CharacterLabScene({
   const targetRotationRef = React.useRef(FACING_RADIANS[facing]);
   const seatedRef = React.useRef(seated);
   const motionChangeRef = React.useRef(onMotionChange);
-  const [unavailable, setUnavailable] = React.useState(false);
+  const reducedMotion = React.useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => false);
+  const [noWebGL, setNoWebGL] = React.useState(false);
+  const unavailable = reducedMotion || noWebGL;
   const [failed, setFailed] = React.useState(false);
 
   React.useEffect(() => {
@@ -69,16 +83,15 @@ export function CharacterLabScene({
 
   React.useEffect(() => {
     const host = hostRef.current;
-    if (!host || window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
-      setUnavailable(true);
-      return;
-    }
+    if (!host || reducedMotion) return;
 
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
     } catch {
-      setUnavailable(true);
+      // สร้าง WebGL context ไม่ได้ (ระบบภายนอก) — รู้ได้ตอนสร้างจริงเท่านั้น จึงต้องตั้ง state ใน effect
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setNoWebGL(true);
       return;
     }
 
@@ -331,7 +344,7 @@ export function CharacterLabScene({
       renderer.domElement.remove();
     };
     // เปลี่ยนบทบาท = สร้างฉากใหม่ด้วยโมเดลของบทบาทนั้น
-  }, [role]);
+  }, [role, reducedMotion]);
 
   if (unavailable || failed) {
     return (

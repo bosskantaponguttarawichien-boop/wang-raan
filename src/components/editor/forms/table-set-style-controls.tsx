@@ -169,10 +169,13 @@ function TableSizeFields({
 }) {
   const [width, setWidth] = React.useState(String(table.width));
   const [depth, setDepth] = React.useState(String(table.depth));
-  React.useEffect(() => {
+  // ขนาดในผังเปลี่ยน (undo, ลากปรับ) → แสดงค่าใหม่ทันทีระหว่าง render
+  const [shown, setShown] = React.useState({ width: table.width, depth: table.depth });
+  if (shown.width !== table.width || shown.depth !== table.depth) {
+    setShown({ width: table.width, depth: table.depth });
     setWidth(String(table.width));
     setDepth(String(table.depth));
-  }, [table.width, table.depth]);
+  }
   const apply = () => {
     const w = Number.parseFloat(width);
     const d = round ? w : Number.parseFloat(depth);

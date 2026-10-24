@@ -261,6 +261,9 @@
     line-height: 1.85;
     -webkit-font-smoothing: antialiased;
     overflow-x: clip; /* กัน horizontal scrollbar ทุก breakpoint */
+    /* viewport-fit=cover: จอแนวนอนของ iPhone มีรอยบากด้านข้าง — เว้นไว้ทุกหน้า (เบราว์เซอร์อื่นได้ 0) */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   h1,
@@ -340,8 +343,14 @@
 .playground-shell {
   display: grid;
   height: 100dvh;
-  width: 100vw;
+  width: 100%;
   overflow: hidden;
+  /* แอปที่ติดตั้ง (PWA) บน iPhone: เว้นแถบสถานะและแถบโฮม (viewport-fit=cover) — ขอบซ้าย/ขวาเว้นที่ body แล้ว */
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  /* สีส่วนที่เว้นให้กลืนกับแถบหัว/แถบเมนูล่างสีขาว (ไม่งั้นเห็น bg-surface สีเทาของ layout) */
+  background: #fff;
   grid-template-columns: 72px 288px minmax(0, 1fr);
   grid-template-rows: 56px minmax(0, 1fr) 52px;
   grid-template-areas:
@@ -371,7 +380,7 @@
 @media (max-width: 767px) {
   .playground-shell {
     grid-template-columns: minmax(0, 1fr);
-    /* แถบสถานะ (auto) ซ่อนบนมือถือตอนแก้ผัง — แสดงเฉพาะตอนจำลองเพื่อปุ่ม "กลับไปแก้ผัง" */
+    /* แถบสถานะ (auto) แสดงตลอดเหมือนเดสก์ท็อป — ตอนจำลองมีปุ่ม "กลับไปแก้ผัง" */
     grid-template-rows: 52px minmax(0, 1fr) auto auto 56px;
     grid-template-areas:
       "hd"

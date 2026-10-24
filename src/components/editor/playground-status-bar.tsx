@@ -15,9 +15,11 @@ const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLin
 export interface PlaygroundStatusBarProps {
   live: LiveValidation;
   onFocusIssue?: (index: number) => void;
+  /** มือถือ: กางแผงด้านล่างขึ้นมาเมื่อพาไปแท็บ "จำลอง" (ถ้าแผงพับอยู่จะมองไม่เห็นข้อที่ต้องแก้) */
+  onRevealPanel?: () => void;
 }
 
-export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarProps) {
+export function PlaygroundStatusBar({ live, onFocusIssue, onRevealPanel }: PlaygroundStatusBarProps) {
   const activeTab = useLayoutStore((s) => s.activeTab);
   const layout = useLayoutStore((s) => s.layout);
   const simStatus = useSimulationStore((s) => s.status);
@@ -32,6 +34,7 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
 
   const handleNextIssue = () => {
     actions().setActiveTab("check");
+    onRevealPanel?.();
     if (onFocusIssue) {
       onFocusIssue(0);
     }
@@ -39,6 +42,7 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
 
   const handleCta = () => {
     actions().setActiveTab("check");
+    onRevealPanel?.();
     if (!isReady && onFocusIssue && result.issues.length > 0) {
       onFocusIssue(0);
     }
@@ -148,9 +152,8 @@ export function PlaygroundStatusBar({ live, onFocusIssue }: PlaygroundStatusBarP
       data-testid="validation-status-bar"
       data-status={result.status}
       className={cn(
-        "[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:gap-2 max-[767px]:px-3",
-        // มือถือ: สถานะดูได้จาก badge ที่แท็บ "จำลอง" แล้ว — เก็บแถบไว้เฉพาะตอนจำลอง
-        !isSim && "max-[767px]:hidden",
+        // มือถือ: แสดงตลอดเหมือนเดสก์ท็อป (สถานะผัง + ปุ่มพาไปข้อที่ต้องแก้ + เริ่มจำลอง) แต่เตี้ยลงเพื่อเหลือที่ให้ผัง
+        "[grid-area:status] flex h-[52px] items-center justify-between gap-3 border-t border-line bg-white px-4 max-[767px]:h-11 max-[767px]:gap-2 max-[767px]:px-3 max-[767px]:[&_#stMsg]:text-[12px]",
       )}
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-ink" id="stMsg">

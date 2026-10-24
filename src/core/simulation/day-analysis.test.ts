@@ -36,7 +36,7 @@ function bigLayout(): StoreLayout {
   return layout;
 }
 
-describe("วิเคราะห์ร้านทั้งวัน (feat-093)", () => {
+describe("วิเคราะห์ร้านทั้งวัน (feat-094)", () => {
   it("simulateDay: ลูกค้าทั้งวันใกล้ค่าที่ตั้ง และทุกคนออกจากร้านหลังปิด", () => {
     const { outcome, seats } = simulateDay(cafeLayout(), day({ cooks: 2 }));
     expect(seats).toBe(6);

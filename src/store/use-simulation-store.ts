@@ -9,7 +9,7 @@ import { DEFAULT_DAY_CONFIG, type DayConfig } from "@/lib/day-config";
 
 export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 
-/** ค่าฟอร์มจำลองร้าน 1 วัน (feat-094) + ความเร็วเล่นภาพ */
+/** ค่าฟอร์มจำลองร้าน 1 วัน (feat-095) + ความเร็วเล่นภาพ */
 export interface SimulationConfigState extends DayConfig {
   /** วินาทีจำลองต่อวินาทีจริง */
   speed: number;
@@ -23,7 +23,7 @@ export interface SimulationStoreState {
   seats: number;
   config: SimulationConfigState;
   showHeatmap: boolean;
-  /** ผลวิเคราะห์ทั้งวันรอบล่าสุด (feat-093/094) */
+  /** ผลวิเคราะห์ทั้งวันรอบล่าสุด (feat-094/094) */
   analysis: DayAnalysis | null;
   setConfig: (patch: Partial<SimulationConfigState>) => void;
   setShowHeatmap: (show: boolean) => void;
