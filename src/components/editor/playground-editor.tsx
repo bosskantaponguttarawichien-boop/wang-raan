@@ -145,8 +145,9 @@ export function PlaygroundEditor() {
             {is3D ? <IsometricView onToast={showToast} /> : <Artboard live={live} onToast={showToast} />}
           </div>
 
-          {/* มือถือ: ซูมด้วยสองนิ้วได้ด้วย แต่ยังมีปุ่มพอดี/หมุนมุมมองครบเหมือนเดสก์ท็อป */}
-          <ZoomControls className="absolute bottom-3 left-4 z-10 max-[767px]:bottom-2 max-[767px]:left-2" />
+          {/* มือถือ: ซูมด้วยสองนิ้วได้ด้วย แต่ยังมีปุ่มพอดี/หมุนมุมมองครบเหมือนเดสก์ท็อป
+              มุมขวาล่าง: มุมซ้ายล่างมักเป็นประตูทางเข้า ถ้าวางซ้ายจะบังบนจอเตี้ย */}
+          <ZoomControls className="absolute bottom-3 right-4 z-10 max-[767px]:bottom-2 max-[767px]:right-2" />
         </main>
 
         <PlaygroundStatusBar live={live} onFocusIssue={focusIssue} onRevealPanel={() => setSheetOpen(true)} />
