@@ -5,11 +5,13 @@
  *   1. ตรวจผังล่าสุดซ้ำ (store.runValidation) — ผลตรวจบน UI ไม่ถูกเชื่อถือ
  *   2. Blocked → ไม่เริ่ม
  *   3. สร้าง P1 → P2 contract แล้วตรวจด้วย Zod (P1LayoutContractSchema)
- *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → START
+ *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
+ *   5. START ช่วงคนเยอะ (worker เดินเวลาถึงต้นพีคเอง) → หยุดเองเมื่อจบพีค (TICK finished)
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */
 import type { StoreApi } from "zustand/vanilla";
-import type { TickMessage } from "@/core/simulation";
+import { ANALYSIS_SEEDS, type TickMessage } from "@/core/simulation";
+import { toDayInput } from "@/lib/day-config";
 import { P1LayoutContractSchema } from "@/core/validation";
 import { SimulationClient, createSimulationWorker, type WorkerLike } from "@/lib/simulation-client";
 import { layoutStore, type LayoutStoreState } from "@/store/use-layout-store";
@@ -29,6 +31,11 @@ export interface HeatmapFrame {
 }
 
 export type StartResult = { ok: true } | { ok: false; reason: string };
+
+/** วิเคราะห์ทั้งวันอาจใช้หลายวินาทีบนเครื่องช้า */
+export const ANALYZE_TIMEOUT_MS = 60_000;
+/** ไม่มีช่วงคนเยอะ → ดูภาพชั่วโมงแรกหลังเปิดร้าน */
+const DEFAULT_PLAYBACK_SECONDS = 3600;
 
 export interface ControllerDeps {
   createWorker: () => WorkerLike;
@@ -102,17 +109,50 @@ export class SimulationController {
       return { ok: false, reason };
     }
 
-    this.setSim({ status: "starting", message: null, metrics: null });
+    const { config } = this.deps.simulation.getState();
+    const day = toDayInput(config);
+    if (!day.ok) {
+      this.setSim({ message: day.reason });
+      return { ok: false, reason: day.reason };
+    }
+
+    this.setSim({ status: "starting", message: null, metrics: null, analysis: null });
     this.clearFrames();
     try {
       const client = this.ensureClient();
       const synced = await client.syncLayout(layout, validation);
       if (synced.type !== "STATUS") throw new Error(synced.type === "ERROR" ? synced.message : "Worker ตอบกลับไม่ถูกต้อง");
-      const { config } = this.deps.simulation.getState();
+      const analyzed = await client.request(
+        { type: "ANALYZE_DAY", layoutRevision: validation.layoutRevision, input: day.input },
+        ANALYZE_TIMEOUT_MS,
+      );
+      if (analyzed.type !== "ANALYSIS") throw new Error(analyzed.type === "ERROR" ? analyzed.message : "คำนวณผลทั้งวันไม่สำเร็จ");
+      if (this.deps.simulation.getState().status !== "starting") return { ok: false, reason: "ยกเลิกการเริ่มจำลอง" };
+      this.setSim({ analysis: analyzed.analysis });
+
+      const { plan } = analyzed.analysis;
+      const startAt = plan.peak?.startSeconds ?? 0;
+      const stopAt = plan.peak?.endSeconds ?? Math.min(plan.closeSeconds, DEFAULT_PLAYBACK_SECONDS);
+      const { input } = day;
       const started = await client.request({
         type: "START",
         layoutRevision: validation.layoutRevision,
-        config: { customersPerHour: config.customersPerHour, speed: config.speed },
+        config: {
+          serviceStyle: "table-service",
+          customersPerHour: plan.customersPerHour,
+          peak: plan.peak,
+          closeSeconds: plan.closeSeconds,
+          frontStaff: input.frontStaff,
+          cooks: input.cooks,
+          cookMinutesPerDish: input.cookMinutesPerDish,
+          dineMinutes: input.dineMinutes,
+          patienceMinutes: input.patienceMinutes,
+          // ลูกค้าชุดเดียวกับที่วิเคราะห์ ภาพจะตรงกับคำตอบ
+          seed: ANALYSIS_SEEDS[0],
+          speed: config.speed,
+          startAtSeconds: startAt,
+          stopAtSeconds: stopAt,
+        },
       });
       if (started.type !== "STARTED") throw new Error(started.type === "ERROR" ? started.message : "เริ่มจำลองไม่สำเร็จ");
       // ระหว่างรอ Worker ผู้ใช้อาจแก้ผัง/กดหยุดไปแล้ว
@@ -173,11 +213,13 @@ export class SimulationController {
     if (tick.heatmap && this.grid) {
       this.heatmap = { values: tick.heatmap, max: tick.heatmapMax ?? 0, ...this.grid };
     }
-    if (now - this.lastMetricsAt >= (this.deps.metricsThrottleMs ?? 250)) {
+    if (tick.finished || now - this.lastMetricsAt >= (this.deps.metricsThrottleMs ?? 250)) {
       this.lastMetricsAt = now;
       this.setSim({ metrics: tick.metrics });
     }
     this.emit();
+    // จบช่วงที่ดูแล้ว — worker หยุดเดินเวลาเอง; กลับสู่โหมดแก้ผัง เก็บผลและ heatmap ไว้
+    if (tick.finished) void this.stop("ดูช่วงคนเยอะจบแล้ว");
   }
 
   dispose() {

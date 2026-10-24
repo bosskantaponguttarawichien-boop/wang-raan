@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, within } from "@testing-library/react";
+import { emptyMetrics } from "@/core/simulation";
+import { DEFAULT_DAY_CONFIG } from "@/lib/day-config";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as React from "react";
@@ -64,7 +66,8 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     simulationStore.setState({
       status: "idle",
       metrics: null,
-      config: { customersPerHour: 20, speed: 60 },
+      config: { ...DEFAULT_DAY_CONFIG, speed: 60 },
+      analysis: null,
     });
   });
 
@@ -344,6 +347,7 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     simulationStore.setState({
       status: "idle",
       metrics: {
+        ...emptyMetrics(),
         time: 120,
         arrived: 25,
         served: 20,

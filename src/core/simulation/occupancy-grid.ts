@@ -1,12 +1,13 @@
 /**
  * Occupancy Grid 0.25 ม. สำหรับ P2 Simulation (architecture.md §6)
  * ช่องที่มีวัตถุทับ (พื้นที่ทับ > 0) = ไม่ว่าง; ช่องแถวติดผนังตรงช่องประตู = ช่องทางเข้า
+ * ช่องแถวติดผนังตรงประตูครัว = จุดรับอาหารของพนักงาน (simulation แบบร้านอาหาร)
  * จุดยืนพนักงานหลังเคาน์เตอร์ก็ไม่ว่าง (ช่องที่จุดกลางอยู่ในพื้นที่ยืน หรือช่องที่พนักงานยืนอยู่) ลูกค้าจะได้ไม่เดินทะลุ
  */
 import { GRID_STEP } from "../layout/constants";
 import { EPSILON } from "../layout/epsilon";
 import { footprint } from "../layout/geometry";
-import type { Meters, StoreLayout } from "../layout/types";
+import type { Meters, StoreLayout, WallDoor } from "../layout/types";
 import { STAFF_RADIUS, staffSpots } from "../preview/staff-spots";
 import { entranceSegment } from "../validation/walk-grid";
 
@@ -22,7 +23,28 @@ export interface OccupancyGrid {
   cells: Uint8Array;
   /** index ของช่องว่างที่ติดช่องประตู (จุดเกิด/ออกของลูกค้า) */
   entranceCells: number[];
+  /** index ของช่องว่างที่ติดประตูครัว (ว่างเมื่อไม่มีประตูครัว) */
+  kitchenCells: number[];
   freeCount: number;
+}
+
+/** ช่องว่างแถวติดผนังตรงช่องประตู */
+function doorCells(layout: StoreLayout, door: WallDoor | null, cells: Uint8Array, cols: number, rows: number, cellSize: Meters): number[] {
+  const result: number[] = [];
+  const opening = door ? entranceSegment(layout, door) : null;
+  if (!opening) return result;
+  const horizontal = opening.a.y === opening.b.y;
+  const from = horizontal ? opening.a.x : opening.a.y;
+  const to = horizontal ? opening.b.x : opening.b.y;
+  const first = Math.max(0, Math.floor(from / cellSize + EPSILON));
+  const last = Math.min((horizontal ? cols : rows) - 1, Math.ceil(to / cellSize - EPSILON) - 1);
+  for (let k = first; k <= last; k++) {
+    const index = horizontal
+      ? (opening.a.y === 0 ? 0 : rows - 1) * cols + k
+      : k * cols + (opening.a.x === 0 ? 0 : cols - 1);
+    if (cells[index] === CELL_FREE) result.push(index);
+  }
+  return result;
 }
 
 export function buildOccupancyGrid(layout: StoreLayout, cellSize: Meters = SIM_CELL_SIZE): OccupancyGrid {
@@ -49,23 +71,10 @@ export function buildOccupancyGrid(layout: StoreLayout, cellSize: Meters = SIM_C
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) cells[row * cols + col] = CELL_BLOCKED;
   }
 
-  const entranceCells: number[] = [];
-  const opening = layout.entrance ? entranceSegment(layout, layout.entrance) : null;
-  if (opening) {
-    const horizontal = opening.a.y === opening.b.y;
-    const from = horizontal ? opening.a.x : opening.a.y;
-    const to = horizontal ? opening.b.x : opening.b.y;
-    const first = Math.max(0, Math.floor(from / cellSize + EPSILON));
-    const last = Math.min((horizontal ? cols : rows) - 1, Math.ceil(to / cellSize - EPSILON) - 1);
-    for (let k = first; k <= last; k++) {
-      const index = horizontal
-        ? (opening.a.y === 0 ? 0 : rows - 1) * cols + k
-        : k * cols + (opening.a.x === 0 ? 0 : cols - 1);
-      if (cells[index] === CELL_FREE) entranceCells.push(index);
-    }
-  }
+  const entranceCells = doorCells(layout, layout.entrance, cells, cols, rows, cellSize);
+  const kitchenCells = doorCells(layout, layout.kitchenDoor, cells, cols, rows, cellSize);
 
   let freeCount = 0;
   for (const cell of cells) if (cell === CELL_FREE) freeCount++;
-  return { cellSize, cols, rows, cells, entranceCells, freeCount };
+  return { cellSize, cols, rows, cells, entranceCells, kitchenCells, freeCount };
 }

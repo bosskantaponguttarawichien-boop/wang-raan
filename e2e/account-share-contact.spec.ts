@@ -250,6 +250,9 @@ test.describe("Backend ล่ม (feat-039)", () => {
 });
 
 test.describe("ฟอร์มติดต่อ (feat-032)", () => {
+  // Service Worker (PWA) รับคำขอแทนหน้าเว็บ ทำให้ page.route บน WebKit ไม่เห็นคำขอ → x-forwarded-for หาย
+  test.use({ serviceWorkers: "block" });
+
   test("ตรวจข้อมูลด้วย Zod → ส่งสำเร็จ → ส่งถี่เกินถูกบล็อก (429)", async ({ page }) => {
     // แยก IP ของเทสต์นี้ (Rate limit เก็บตาม IP ใน server เดียวกัน)
     const ip = `198.51.100.${Math.floor(Math.random() * 200) + 1}`;

@@ -40,13 +40,14 @@ export class SimulationClient {
     worker.addEventListener("message", this.onMessage);
   }
 
-  request(body: RequestBody): Promise<WorkerResponse> {
+  /** `timeoutMs` ยาวขึ้นได้สำหรับงานหนัก เช่น ANALYZE_DAY */
+  request(body: RequestBody, timeoutMs = this.timeoutMs): Promise<WorkerResponse> {
     const requestId = this.nextId++;
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
         reject(new Error("Simulation worker ไม่ตอบสนอง"));
-      }, this.timeoutMs);
+      }, timeoutMs);
       this.pending.set(requestId, { resolve, reject, timer });
       this.worker.postMessage({ ...body, requestId });
     });

@@ -4,7 +4,7 @@ import { CELL_BLOCKED, CELL_FREE, computeFlowField, tracePath, type OccupancyGri
 /** สร้างกริดจากภาพ ASCII: '#' = สิ่งกีดขวาง */
 function gridFrom(rows: string[]): OccupancyGrid {
   const cells = new Uint8Array(rows.join("").split("").map((c) => (c === "#" ? CELL_BLOCKED : CELL_FREE)));
-  return { cellSize: 0.25, cols: rows[0]!.length, rows: rows.length, cells, entranceCells: [], freeCount: 0 };
+  return { cellSize: 0.25, cols: rows[0]!.length, rows: rows.length, cells, entranceCells: [], kitchenCells: [], freeCount: 0 };
 }
 const idx = (g: OccupancyGrid, col: number, row: number) => row * g.cols + col;
 
