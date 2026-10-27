@@ -54,13 +54,18 @@ type AnimatedCustomer = {
   idleOffset: number;
 };
 
-/** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนแค่สร้าง `content` ใหม่ ไม่สร้าง WebGL context ใหม่ */
+/** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนโดยไม่สร้าง WebGL context ใหม่ */
 type Stage = {
   renderer: THREE.WebGLRenderer;
   scene: THREE.Scene;
   camera: THREE.OrthographicCamera;
   key: THREE.DirectionalLight;
-  content: THREE.Group | null;
+  /** พื้นเป็นชั้นคงที่ ไม่ควรเฟดพร้อมกำแพงระหว่างหมุน */
+  floor: THREE.Group | null;
+  /** ผนังและวงกบชุดเดียวตลอดอายุฉาก — ปรับเฉพาะความทึบของแต่ละด้านตอนหมุน */
+  room: THREE.Group | null;
+  /** โต๊ะ เก้าอี้ และเคาน์เตอร์ — คงชุดเดิมไว้ระหว่างหมุนมุมมอง */
+  furniture: THREE.Group | null;
   layout: StoreLayout | null;
   viewRotation: ViewRotation;
   invalidate: () => void;
@@ -68,6 +73,51 @@ type Stage = {
   clearCustomers: () => void;
   /** วางพนักงานหลังเคาน์เตอร์ใหม่ตามผังปัจจุบัน */
   syncStaff: () => void;
+  /** เลื่อนกล้องไปยังมุมมองใหม่ โดยเริ่มจากตำแหน่งที่แสดงอยู่จริง (รองรับการกดหมุนซ้ำระหว่างทาง) */
+  animateCamera: () => void;
+  /** อัปเดต transition ของกล้องหนึ่งเฟรม และบอกว่ายังต้องวาดต่อหรือไม่ */
+  updateCamera: (now: number) => boolean;
+  /** แทนฉากทั้งชุดเมื่อผังแก้ไขจริง (ขนาด/วัตถุ/ประตูเปลี่ยน) */
+  replaceContent: (
+    floor: THREE.Group,
+    room: THREE.Group,
+    furniture: THREE.Group,
+  ) => void;
+  /** เปลี่ยนความทึบรายผนัง/วงกบไปยังมุมใหม่ โดยไม่สร้าง geometry เพิ่ม */
+  animateRoom: (nextView: ViewRotation) => void;
+  /** อัปเดต transition ของกำแพงหนึ่งเฟรม และบอกว่ายังต้องวาดต่อหรือไม่ */
+  updateRoomTransition: (now: number) => boolean;
+};
+
+/** ค่ากล้องที่ต้องเปลี่ยนพร้อมกัน เพื่อไม่ให้ภาพกระโดดเมื่อเปลี่ยนมุม isometric */
+type CameraFrame = {
+  position: THREE.Vector3;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  far: number;
+  zoom: number;
+};
+
+type CameraMotion = {
+  from: CameraFrame;
+  to: CameraFrame;
+  centerX: number;
+  centerZ: number;
+  fromAngle: number;
+  angleDelta: number;
+  fromRadius: number;
+  toRadius: number;
+  startedAt: number;
+};
+
+type RoomOpacity = Map<WallDoor["wall"], number>;
+
+type RoomMotion = {
+  from: RoomOpacity;
+  to: RoomOpacity;
+  startedAt: number;
 };
 
 type StandingStaff = {
@@ -169,6 +219,41 @@ const ANIMATION_FADE_SECONDS = 0.2;
 const STAND_UP_RATE = 1.3;
 /** จำลองเร็ว (เช่น 60×) ตัวละครเลื่อนเร็วมาก — จำกัดจังหวะก้าวไม่ให้ขารัวจนดูสั่น */
 const MAX_WALK_PLAYBACK_RATE = 1.6;
+/** ระยะหมุนที่เห็นเส้นทางชัด แต่ยังตอบสนองทันทีเมื่อกดซ้ำ */
+const VIEW_ROTATION_DURATION_MS = 620;
+
+/** smoothstep อันดับ 5: ความเร็วและความเร่งเป็นศูนย์ที่ต้น/ปลายของ transition */
+function smootherstep(progress: number) {
+  return progress * progress * progress * (progress * (progress * 6 - 15) + 10);
+}
+
+function cameraFrame(camera: THREE.OrthographicCamera): CameraFrame {
+  return {
+    position: camera.position.clone(),
+    left: camera.left,
+    right: camera.right,
+    top: camera.top,
+    bottom: camera.bottom,
+    far: camera.far,
+    zoom: camera.zoom,
+  };
+}
+
+function applyCameraFrame(camera: THREE.OrthographicCamera, frame: CameraFrame) {
+  camera.position.copy(frame.position);
+  camera.left = frame.left;
+  camera.right = frame.right;
+  camera.top = frame.top;
+  camera.bottom = frame.bottom;
+  camera.far = frame.far;
+  camera.zoom = frame.zoom;
+  camera.updateProjectionMatrix();
+}
+
+/** มุมปลายทางที่ใกล้ที่สุด (-π ถึง π) ให้ปุ่มหมุนซ้าย/ขวาไม่อ้อมสามในสี่รอบ */
+function shortestAngleDelta(from: number, to: number) {
+  return Math.atan2(Math.sin(to - from), Math.cos(to - from));
+}
 
 /** คลัง geometry/material ของฉากหนึ่งชุด — ใช้ซ้ำชิ้นที่ขนาดเท่ากัน และคืน GPU memory ได้ในครั้งเดียว */
 class SceneAssets {
@@ -224,7 +309,8 @@ function placeMesh(
   return mesh;
 }
 
-function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets, viewRotation: ViewRotation) {
+/** พื้นไม่เปลี่ยนตามมุมกล้อง จึงอยู่ใน layer คงที่และไม่ร่วม transition กับกำแพง */
+function createFloor(group: THREE.Group, layout: StoreLayout, assets: SceneAssets) {
   const floor = placeMesh(
     assets.geometry(`plane:${layout.width}:${layout.depth}`, () => new THREE.PlaneGeometry(layout.width, layout.depth)),
     assets.material("floor", { color: "#f7f8fa", roughness: 0.94 }),
@@ -235,13 +321,23 @@ function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets
   );
   floor.rotation.x = -Math.PI / 2;
   group.add(floor);
+}
 
-  const wallMaterial = assets.material("wall", { color: "#ffffff", roughness: 0.88 });
+/** กำแพงและวงกบขึ้นกับด้านไกลกล้อง จึงเป็น layer ที่เปลี่ยนตอนหมุน */
+function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets) {
   const entrance = layout.entrance;
   const kitchenDoor = layout.kitchenDoor;
-  // วาดเฉพาะผนัง 2 ด้านที่ไกลกล้องตามมุมมอง (ด้านใกล้จะบังภายในร้าน) — เจาะช่องสำหรับทางเข้าและ/หรือประตูครัว
+  const materials = new Map<WallDoor["wall"], THREE.Material[]>();
+  const materialFor = (wall: WallDoor["wall"]) => {
+    const material = assets.material(`wall:${wall}`, { color: "#ffffff", roughness: 0.88 });
+    materials.set(wall, [material]);
+    return material;
+  };
+  // สร้างครบ 4 ด้านเพียงครั้งเดียว แล้วเปลี่ยน opacity ของแต่ละด้านตามมุมกล้อง
+  // จึงไม่มีผนังหรือวงกบคนละชุดมาซ้อนกันระหว่าง transition
   // north (z=0) / south (z=depth) วางตามแกน x; west (x=0) / east (x=width) วางตามแกน z
   const addWall = (wall: WallDoor["wall"], length: number) => {
+    const wallMaterial = materialFor(wall);
     const alongX = wall === "north" || wall === "south";
     const offset = wall === "south" ? layout.depth : wall === "east" ? layout.width : 0;
     const piece = (from: number, to: number, y0: number, y1: number) => {
@@ -289,15 +385,30 @@ function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets
     }
     piece(cursor, length, 0, WALL_HEIGHT);
   };
-  const visibleWalls = farWalls(viewRotation);
-  for (const wall of visibleWalls) addWall(wall, wall === "north" || wall === "south" ? layout.width : layout.depth);
-  if (entrance) group.add(createDoor(layout, entrance, assets, visibleWalls.includes(entrance.wall), false));
-  if (kitchenDoor) group.add(createDoor(layout, kitchenDoor, assets, visibleWalls.includes(kitchenDoor.wall), true));
+  const walls: WallDoor["wall"][] = ["north", "south", "west", "east"];
+  for (const wall of walls) addWall(wall, wall === "north" || wall === "south" ? layout.width : layout.depth);
+  const addDoor = (door: WallDoor, isKitchen: boolean) => {
+    const frame = createDoorFrame(layout, door, assets, isKitchen, door.wall);
+    // ทางเข้าเป็นช่องเปิด จึงไม่มีธรณี/พรมที่อาจดูเป็นกรอบลอยบนพื้น
+    // ส่วนประตูครัวยังคงมีฐานเพื่อรับบานประตู และใช้ opacity ของผนังด้านเดียวกัน
+    const parts = isKitchen ? [createDoorBase(layout, door, assets, true, door.wall), frame] : [frame];
+    const doorMaterials = materials.get(door.wall)!;
+    for (const part of parts) {
+      part.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        doorMaterials.push(...[object.material].flat());
+      });
+    }
+    group.add(...parts);
+  };
+  if (entrance) addDoor(entrance, false);
+  if (kitchenDoor) addDoor(kitchenDoor, true);
+  return materials;
 }
 
 /**
- * แยกทางเข้ากับประตูครัวด้วยสี: ทางเข้า = วงกบดำ + ช่องเปิดโล่ง + พรมขาว, ประตูครัว = วงกบเทาอมฟ้า + บานปิดสีเข้ม
- * ทั้งสองมีพรมสีประจำประตูบนพื้นด้านในห้อง — ประตูบนผนังด้านใกล้กล้อง (ไม่วาดผนัง จึงไม่มีวงกบ) ยังเห็นได้จากพรมนี้
+ * แยกทางเข้ากับประตูครัวด้วยสี: ทางเข้า = วงกบดำ + ช่องเปิดโล่ง,
+ * ประตูครัว = วงกบเทาอมฟ้า + บานปิดสีเข้ม + ธรณี/พรมด้านในห้อง
  */
 const DOOR_COLORS = {
   entrance: { frame: "#111827", mat: "#ffffff" },
@@ -305,47 +416,16 @@ const DOOR_COLORS = {
 } as const;
 const DOOR_MAT_DEPTH = 0.45;
 
-function createDoor(layout: StoreLayout, doorInfo: WallDoor, assets: SceneAssets, onVisibleWall: boolean, isKitchen = false) {
-  const colors = isKitchen ? DOOR_COLORS.kitchen : DOOR_COLORS.entrance;
-  const kind = isKitchen ? "kitchen" : "entrance";
-  const frameMaterial = assets.material(`door-frame:${kind}`, { color: colors.frame, roughness: 0.5, metalness: 0.2 });
-  const matMaterial = assets.material(`door-mat:${kind}`, { color: colors.mat, roughness: 0.95 });
-  const sillMaterial = assets.material("sill", { color: "#e3e7ee", roughness: 0.9 });
-
+function doorSize(layout: StoreLayout, doorInfo: WallDoor) {
   const wallLength = doorInfo.wall === "north" || doorInfo.wall === "south" ? layout.width : layout.depth;
   const a = doorInfo.position;
   const b = Math.min(wallLength, doorInfo.position + doorInfo.width);
-  const width = b - a;
+  return { a, b, width: b - a };
+}
 
-  // สร้างในพิกัดท้องถิ่น: แกน x ตามแนวผนัง (0 → width), แกน z ชี้เข้าในห้อง แล้วค่อยหมุน/ย้ายไปวางบนผนังจริง
-  const door = new THREE.Group();
-  const frameW = 0.05;
-  const frameD = WALL_THICKNESS + 0.02;
-  const solid = { cast: true, receive: true };
-  door.add(
-    placeMesh(assets.box(width, 0.01, frameD), sillMaterial, width / 2, 0.005, 0, solid),
-    // พรมหน้าประตูด้านในห้อง (บางมาก ไม่บังเฟอร์นิเจอร์)
-    placeMesh(assets.box(width, 0.012, DOOR_MAT_DEPTH), matMaterial, width / 2, 0.006, frameD / 2 + DOOR_MAT_DEPTH / 2, {
-      cast: false,
-      receive: true,
-    }),
-  );
-  if (onVisibleWall) {
-    const post = assets.box(frameW, DOOR_HEIGHT, frameD);
-    door.add(
-      placeMesh(post, frameMaterial, frameW / 2, DOOR_HEIGHT / 2, 0, solid),
-      placeMesh(post, frameMaterial, width - frameW / 2, DOOR_HEIGHT / 2, 0, solid),
-      placeMesh(assets.box(width, frameW, frameD), frameMaterial, width / 2, DOOR_HEIGHT - frameW / 2, 0, solid),
-    );
-    if (isKitchen) {
-      const panelMaterial = assets.material("kitchen-door-panel", { color: DOOR_COLORS.kitchen.panel, roughness: 0.7 });
-      const panelW = Math.max(0.01, width - frameW * 2);
-      const panelH = Math.max(0.01, DOOR_HEIGHT - frameW);
-      door.add(placeMesh(assets.box(panelW, panelH, 0.03), panelMaterial, width / 2, panelH / 2 + 0.005, 0, solid));
-    }
-  }
-
-  // วางบนผนัง: north (z=0, เข้า +z), south (z=depth, เข้า −z), west (x=0, เข้า +x), east (x=width, เข้า −x)
+/** วาง group ที่สร้างในพิกัดท้องถิ่น (แกน x ตามแนวผนัง, z ชี้เข้าในห้อง) ลงบนผนังจริง */
+function placeDoorOnWall(door: THREE.Group, layout: StoreLayout, doorInfo: WallDoor, a: number, b: number) {
+  // north (z=0, เข้า +z), south (z=depth, เข้า −z), west (x=0, เข้า +x), east (x=width, เข้า −x)
   if (doorInfo.wall === "north") {
     door.position.set(a, 0, 0);
   } else if (doorInfo.wall === "south") {
@@ -358,6 +438,68 @@ function createDoor(layout: StoreLayout, doorInfo: WallDoor, assets: SceneAssets
     door.position.set(layout.width, 0, a);
     door.rotation.y = -Math.PI / 2;
   }
+}
+
+/** ธรณีและพรมเป็นส่วนหนึ่งของประตู จึงใช้ opacity เดียวกับผนัง/วงกบด้านนั้น */
+function createDoorBase(
+  layout: StoreLayout,
+  doorInfo: WallDoor,
+  assets: SceneAssets,
+  isKitchen = false,
+  materialSuffix = doorInfo.wall,
+) {
+  const colors = isKitchen ? DOOR_COLORS.kitchen : DOOR_COLORS.entrance;
+  const kind = isKitchen ? "kitchen" : "entrance";
+  const matMaterial = assets.material(`door-mat:${kind}:${materialSuffix}`, { color: colors.mat, roughness: 0.95 });
+  const sillMaterial = assets.material(`sill:${materialSuffix}`, { color: "#e3e7ee", roughness: 0.9 });
+  const { a, b, width } = doorSize(layout, doorInfo);
+  const door = new THREE.Group();
+  const frameD = WALL_THICKNESS + 0.02;
+  const solid = { cast: true, receive: true };
+  door.add(
+    placeMesh(assets.box(width, 0.01, frameD), sillMaterial, width / 2, 0.005, 0, solid),
+    // พรมหน้าประตูด้านในห้อง (บางมาก ไม่บังเฟอร์นิเจอร์)
+    placeMesh(assets.box(width, 0.012, DOOR_MAT_DEPTH), matMaterial, width / 2, 0.006, frameD / 2 + DOOR_MAT_DEPTH / 2, {
+      cast: false,
+      receive: true,
+    }),
+  );
+  placeDoorOnWall(door, layout, doorInfo, a, b);
+  return door;
+}
+
+/** วงกบและบานประตูใช้ opacity ของผนังด้านเดียวกัน จึงไม่ซ้อนหลายชุดระหว่างหมุน */
+function createDoorFrame(
+  layout: StoreLayout,
+  doorInfo: WallDoor,
+  assets: SceneAssets,
+  isKitchen = false,
+  materialSuffix = doorInfo.wall,
+) {
+  const colors = isKitchen ? DOOR_COLORS.kitchen : DOOR_COLORS.entrance;
+  const kind = isKitchen ? "kitchen" : "entrance";
+  const frameMaterial = assets.material(`door-frame:${kind}:${materialSuffix}`, { color: colors.frame, roughness: 0.5, metalness: 0.2 });
+  const { a, b, width } = doorSize(layout, doorInfo);
+  const door = new THREE.Group();
+  const frameW = 0.05;
+  const frameD = WALL_THICKNESS + 0.02;
+  // วงกบจะถูกสลับตามผนังที่อยู่ไกลกล้อง ขณะที่ shadow map ของทั้งฉากเป็นชุดเดียว
+  // หากให้มันทอดเงา เงาของวงกบสูง 2.1 ม. จะพาดพื้นยาวและโผล่/หายตอนเปลี่ยนมุม
+  // จึงคง geometry ของประตูไว้ แต่ไม่ให้เป็นต้นกำเนิดเงา (กำแพงเองก็ไม่ทอดเงา)
+  const solid = { cast: false, receive: true };
+  const post = assets.box(frameW, DOOR_HEIGHT, frameD);
+  door.add(
+    placeMesh(post, frameMaterial, frameW / 2, DOOR_HEIGHT / 2, 0, solid),
+    placeMesh(post, frameMaterial, width - frameW / 2, DOOR_HEIGHT / 2, 0, solid),
+    placeMesh(assets.box(width, frameW, frameD), frameMaterial, width / 2, DOOR_HEIGHT - frameW / 2, 0, solid),
+  );
+  if (isKitchen) {
+    const panelMaterial = assets.material(`kitchen-door-panel:${materialSuffix}`, { color: DOOR_COLORS.kitchen.panel, roughness: 0.7 });
+    const panelW = Math.max(0.01, width - frameW * 2);
+    const panelH = Math.max(0.01, DOOR_HEIGHT - frameW);
+    door.add(placeMesh(assets.box(panelW, panelH, 0.03), panelMaterial, width / 2, panelH / 2 + 0.005, 0, solid));
+  }
+  placeDoorOnWall(door, layout, doorInfo, a, b);
   return door;
 }
 
@@ -709,18 +851,42 @@ function mergeStaticMeshes(group: THREE.Group) {
   return created;
 }
 
-/** ฉากทั้งหมดที่มาจากผัง (พื้น ผนัง ประตู เฟอร์นิเจอร์) — `dispose` คืน GPU memory ของทุกชิ้น */
-function buildLayoutContent(layout: StoreLayout, viewRotation: ViewRotation) {
+/** สร้างชั้น static หนึ่งชั้นแยกกัน เพื่อคืน geometry/material ได้พร้อมกันเมื่อไม่ใช้แล้ว */
+function buildStaticContent(build: (group: THREE.Group, assets: SceneAssets) => void) {
   const assets = new SceneAssets();
   const group = new THREE.Group();
-  createRoom(group, layout, assets, viewRotation);
-  createFurniture(group, layout, assets);
+  build(group, assets);
   const merged = mergeStaticMeshes(group);
   group.userData.dispose = () => {
     for (const geometry of merged) geometry.dispose();
     assets.dispose();
   };
   return group;
+}
+
+/** พื้นคงที่ตลอดการหมุน จึงไม่ถูกนำไป blend กับกำแพง */
+function buildFloorContent(layout: StoreLayout) {
+  return buildStaticContent((group, assets) => createFloor(group, layout, assets));
+}
+
+/** ผนัง/ประตูครบทั้งสี่ด้านใน group เดียว — transition เปลี่ยน material opacity เท่านั้น */
+function buildRoomContent(layout: StoreLayout) {
+  const assets = new SceneAssets();
+  const group = new THREE.Group();
+  const wallMaterials = createRoom(group, layout, assets);
+  const merged = mergeStaticMeshes(group);
+  group.userData.wallMaterials = wallMaterials;
+  group.userData.dispose = () => {
+    for (const geometry of merged) geometry.dispose();
+    assets.dispose();
+  };
+  prepareRoomForTransition(group);
+  return group;
+}
+
+/** เฟอร์นิเจอร์ไม่ขึ้นกับมุมกล้อง จึงไม่ควรถอดแล้วสร้างใหม่เวลาหมุน */
+function buildFurnitureContent(layout: StoreLayout) {
+  return buildStaticContent((group, assets) => createFurniture(group, layout, assets));
 }
 
 function disposeModel(root: THREE.Object3D | null) {
@@ -736,17 +902,57 @@ function disposeContent(group: THREE.Group | null) {
 }
 
 /**
+ * room material อยู่ในโหมด transparent ตั้งแต่สร้าง เพื่อ compile shader แค่ตอนผังเปลี่ยน ไม่ใช่ตอนกดหมุน
+ * ตอนนิ่งยัง depth-write ตามปกติ จึงให้ภาพเหมือน opaque แต่พร้อม fade ได้ทันที
+ */
+function prepareRoomForTransition(group: THREE.Group) {
+  group.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    for (const material of [object.material].flat()) {
+      material.transparent = true;
+      material.depthWrite = true;
+      material.opacity = 1;
+      material.needsUpdate = true;
+    }
+  });
+}
+
+function roomMaterials(group: THREE.Group) {
+  return group.userData.wallMaterials as Map<WallDoor["wall"], THREE.Material[]>;
+}
+
+function roomOpacityForView(viewRotation: ViewRotation): RoomOpacity {
+  const visible = farWalls(viewRotation);
+  return new Map((["north", "south", "west", "east"] as WallDoor["wall"][]).map((wall) => [wall, visible.includes(wall) ? 1 : 0]));
+}
+
+function roomOpacitySnapshot(group: THREE.Group): RoomOpacity {
+  return new Map([...roomMaterials(group)].map(([wall, materials]) => [wall, materials[0]?.opacity ?? 0]));
+}
+
+/** ผนังและวงกบด้านเดียวกันใช้ material ชุดเดียว จึงจางพร้อมกันโดยไม่เกิดกรอบประตูซ้อน */
+function setRoomOpacity(group: THREE.Group, opacityByWall: RoomOpacity) {
+  for (const [wall, materials] of roomMaterials(group)) {
+    const opacity = opacityByWall.get(wall) ?? 0;
+    for (const material of materials) {
+      material.opacity = opacity;
+      material.depthWrite = opacity >= 0.999;
+    }
+  }
+}
+
+/**
  * กล้องเงาค่าเริ่มต้นครอบแค่ ±5 ม. รอบ (0,0,0) = มุมร้าน → เงาวัตถุไกลมุมถูกตัดขาด
  * จึงเล็งไฟไปกลางร้าน และขยาย frustum ให้ครอบทั้งร้าน (2–30 ม.) ตามขนาดผัง
+ * ทิศแสงยึดกับโลกของร้าน ไม่ย้ายตามกล้อง เพื่อให้เงาไม่เปลี่ยนระหว่างหมุนมุมมอง
  */
-function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout, viewRotation: ViewRotation) {
+function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout) {
   const centerX = layout.width / 2;
   const centerZ = layout.depth / 2;
   const span = Math.hypot(layout.width, layout.depth) / 2 + 1;
   const reach = span / 5;
-  // ไฟส่องจากซ้าย-หน้าของมุมมองเสมอ → เงาตกทิศเดิมบนจอไม่ว่าจะหมุนไปด้านไหน
-  const light = vectorFromView({ x: -4, y: 5 }, viewRotation);
-  key.position.set(centerX + light.x * reach, 8 * reach, centerZ + light.y * reach);
+  // world-space light: กล้องหมุนได้ แต่ตำแหน่ง/ทิศเงายังคงเดิมเสมอ
+  key.position.set(centerX - 4 * reach, 8 * reach, centerZ + 5 * reach);
   key.target.position.set(centerX, 0, centerZ);
   key.target.updateMatrixWorld();
   const shadowCamera = key.shadow.camera;
@@ -880,6 +1086,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const staff: StandingStaff[] = [];
     let frame = 0;
     let disposed = false;
+    let cameraMotion: CameraMotion | null = null;
+    let roomMotion: RoomMotion | null = null;
 
     const playClip = (customer: Pick<AnimatedCustomer, "mixer" | "action" | "idleOffset">, name: CustomerAnimation) => {
       const { clips } = customerAsset;
@@ -1134,6 +1342,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       } else quality.reset();
       lastRenderAt = now;
       const delta = Math.min(clock.getDelta(), MAX_FRAME_DELTA);
+      const cameraAnimating = stage.updateCamera(now);
+      const roomAnimating = stage.updateRoomTransition(now);
       if (simulating) syncCustomers();
       const blend = Math.min(1, delta * 14);
       const body = bodyForZoom(customerAsset);
@@ -1174,7 +1384,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         );
       }
       renderer.render(scene, camera);
-      if (simulating || customers.size > 0) {
+      if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
         frame = requestAnimationFrame(tick);
       } else {
         clock.stop();
@@ -1197,7 +1407,125 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       // วาดทันที (ไม่รอ rAF) เพื่อไม่ให้ canvas ว่างกระพริบหลังเปลี่ยนขนาด
       renderer.render(scene, camera);
     };
-    const stage: Stage = { renderer, scene, camera, key, content: null, layout: null, viewRotation: 0, invalidate, resize, clearCustomers, syncStaff };
+    const updateCamera = (now: number) => {
+      if (!cameraMotion || !stage.layout) return false;
+      const progress = Math.min(1, (now - cameraMotion.startedAt) / VIEW_ROTATION_DURATION_MS);
+      // smootherstep: ความเร็วและความเร่งเป็นศูนย์ทั้งต้น/ปลาย จึงไม่เห็นจังหวะสะดุด
+      const eased = smootherstep(progress);
+      const motion = cameraMotion;
+      const angle = motion.fromAngle + motion.angleDelta * eased;
+      const radius = THREE.MathUtils.lerp(motion.fromRadius, motion.toRadius, eased);
+      // เดินตาม arc รอบกึ่งกลางร้าน ไม่ตัดเป็นเส้นตรงผ่านกลางฉาก
+      camera.position.set(
+        motion.centerX + Math.cos(angle) * radius,
+        THREE.MathUtils.lerp(motion.from.position.y, motion.to.position.y, eased),
+        motion.centerZ + Math.sin(angle) * radius,
+      );
+      // กรอบ orthographic ต้องไหลพร้อมตำแหน่งกล้อง มิฉะนั้นภาพจะสะบัดในเฟรมแรก
+      camera.left = THREE.MathUtils.lerp(motion.from.left, motion.to.left, eased);
+      camera.right = THREE.MathUtils.lerp(motion.from.right, motion.to.right, eased);
+      camera.top = THREE.MathUtils.lerp(motion.from.top, motion.to.top, eased);
+      camera.bottom = THREE.MathUtils.lerp(motion.from.bottom, motion.to.bottom, eased);
+      camera.far = THREE.MathUtils.lerp(motion.from.far, motion.to.far, eased);
+      camera.zoom = THREE.MathUtils.lerp(motion.from.zoom, motion.to.zoom, eased);
+      camera.lookAt(stage.layout.width / 2, CAMERA_TARGET_Y, stage.layout.depth / 2);
+      camera.updateProjectionMatrix();
+      camera.updateMatrixWorld();
+      if (progress === 1) cameraMotion = null;
+      return cameraMotion !== null;
+    };
+    const replaceContent = (
+      floor: THREE.Group,
+      room: THREE.Group,
+      furniture: THREE.Group,
+    ) => {
+      roomMotion = null;
+      if (stage.room) scene.remove(stage.room);
+      disposeContent(stage.room);
+      if (stage.floor) {
+        scene.remove(stage.floor);
+        disposeContent(stage.floor);
+      }
+      if (stage.furniture) {
+        scene.remove(stage.furniture);
+        disposeContent(stage.furniture);
+      }
+      scene.add(floor, room, furniture);
+      stage.floor = floor;
+      stage.room = room;
+      stage.furniture = furniture;
+    };
+    const updateRoomTransition = (now: number) => {
+      if (!roomMotion) return false;
+      const progress = Math.min(1, (now - roomMotion.startedAt) / VIEW_ROTATION_DURATION_MS);
+      const eased = smootherstep(progress);
+      const opacity = new Map<WallDoor["wall"], number>();
+      for (const wall of ["north", "south", "west", "east"] as WallDoor["wall"][]) {
+        opacity.set(wall, THREE.MathUtils.lerp(roomMotion.from.get(wall) ?? 0, roomMotion.to.get(wall) ?? 0, eased));
+      }
+      if (stage.room) setRoomOpacity(stage.room, opacity);
+      if (progress < 1) return true;
+      roomMotion = null;
+      return false;
+    };
+    const animateRoom = (nextView: ViewRotation) => {
+      if (!stage.room) return;
+      // กดหมุนซ้ำกลางทางได้: เริ่มจาก opacity จริงของเฟรมปัจจุบัน ไม่ย้อนกลับหรือกระโดด
+      roomMotion = { from: roomOpacitySnapshot(stage.room), to: roomOpacityForView(nextView), startedAt: performance.now() };
+      invalidate();
+    };
+    const animateCamera = () => {
+      if (!stage.layout) return;
+      const from = cameraFrame(camera);
+      const width = Math.max(1, host.clientWidth);
+      const height = Math.max(1, host.clientHeight);
+      // fitCamera คำนวณ camera frame ของมุมใหม่ แล้วคืน frame ที่เห็นอยู่ก่อนรอเฟรมถัดไป
+      fitCamera(camera, stage.layout, stage.viewRotation, width, height);
+      camera.zoom = zoomRef.current;
+      camera.updateProjectionMatrix();
+      const to = cameraFrame(camera);
+      applyCameraFrame(camera, from);
+      camera.lookAt(stage.layout.width / 2, CAMERA_TARGET_Y, stage.layout.depth / 2);
+      camera.updateMatrixWorld();
+      const centerX = stage.layout.width / 2;
+      const centerZ = stage.layout.depth / 2;
+      const fromX = from.position.x - centerX;
+      const fromZ = from.position.z - centerZ;
+      const toX = to.position.x - centerX;
+      const toZ = to.position.z - centerZ;
+      cameraMotion = {
+        from,
+        to,
+        centerX,
+        centerZ,
+        fromAngle: Math.atan2(fromZ, fromX),
+        angleDelta: shortestAngleDelta(Math.atan2(fromZ, fromX), Math.atan2(toZ, toX)),
+        fromRadius: Math.hypot(fromX, fromZ),
+        toRadius: Math.hypot(toX, toZ),
+        startedAt: performance.now(),
+      };
+      invalidate();
+    };
+    const stage: Stage = {
+      renderer,
+      scene,
+      camera,
+      key,
+      floor: null,
+      room: null,
+      furniture: null,
+      layout: null,
+      viewRotation: 0,
+      invalidate,
+      resize,
+      clearCustomers,
+      syncStaff,
+      animateCamera,
+      updateCamera,
+      replaceContent,
+      animateRoom,
+      updateRoomTransition,
+    };
     stageRef.current = stage;
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -1210,7 +1538,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       cancelAnimationFrame(frame);
       observer.disconnect();
       clearCustomers();
-      disposeContent(stage.content);
+      disposeContent(stage.room);
+      disposeContent(stage.floor);
+      disposeContent(stage.furniture);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
       for (const member of staff) member.mixer.stopAllAction();
       for (const asset of [customerAsset, staffAsset]) {
@@ -1224,28 +1554,30 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     };
   }, [onUnavailable]);
 
-  // ผัง/มุมมองเปลี่ยน → สร้างเฉพาะเนื้อหาฉากใหม่ (ผนังตามด้านที่ไกลกล้อง) และคืน GPU memory ของชุดเดิม
+  // ผังเปลี่ยนจริงจึงสร้างฉากใหม่ทั้งชุด; การหมุนเปลี่ยนเพียง opacity ของผนัง/วงกบชุดเดิม
   React.useEffect(() => {
     const stage = stageRef.current;
     if (!stage) return;
-    const content = buildLayoutContent(layout, viewRotation);
-    if (stage.content) {
-      stage.scene.remove(stage.content);
-      disposeContent(stage.content);
-    }
-    stage.scene.add(content);
-    stage.content = content;
-    // เงาฉากนิ่งอาจปิด autoUpdate ไว้ (เครื่องช้า) — ผังเปลี่ยนต้องวาด shadow map ใหม่
-    stage.renderer.shadowMap.needsUpdate = true;
-    const sizeChanged =
-      stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth || stage.viewRotation !== viewRotation;
+    const layoutChanged = stage.layout !== layout;
+    const layoutSizeChanged = stage.layout?.width !== layout.width || stage.layout?.depth !== layout.depth;
+    const viewChanged = stage.layout !== null && stage.viewRotation !== viewRotation;
     stage.layout = layout;
     stage.viewRotation = viewRotation;
-    stage.syncStaff();
-    if (sizeChanged) {
-      fitKeyLight(stage.key, layout, viewRotation);
-      stage.resize();
+    if (layoutChanged || !stage.room || !stage.furniture) {
+      const room = buildRoomContent(layout);
+      setRoomOpacity(room, roomOpacityForView(viewRotation));
+      stage.replaceContent(buildFloorContent(layout), room, buildFurnitureContent(layout));
+      stage.syncStaff();
+      // เงาฉากนิ่งอาจปิด autoUpdate ไว้ (เครื่องช้า) — แก้ผังจริงจึงต้องวาด shadow map ใหม่
+      stage.renderer.shadowMap.needsUpdate = true;
+    } else if (viewChanged) {
+      stage.animateRoom(viewRotation);
     }
+    // การหมุนมุมมองไม่ใช่การเปลี่ยนขนาดร้าน จึงไม่แตะตำแหน่งไฟหรือ shadow camera
+    if (layoutSizeChanged) {
+      fitKeyLight(stage.key, layout);
+      stage.resize();
+    } else if (viewChanged) stage.animateCamera();
     stage.invalidate();
   }, [layout, viewRotation]);
 

@@ -3,6 +3,23 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-27] แก้ Cloudflare Preview Build ของ feat-091
+
+- ตรวจจาก PR #32 พบ Preview Build ของ Cloudflare ล้มทันที; log แบบละเอียดต้องลงชื่อเข้าใช้ Cloudflare จึงไม่เปิดเผยผ่าน GitHub.
+- จำลอง production build ในเครื่องแล้วพบสาเหตุชัดเจน: `zod` ถูกเปลี่ยนจาก v3 เป็น v4 พร้อมงานแอนิเมชัน ทำให้ TypeScript ของ mock backend, form schema และ layout import ใช้ API เดิมไม่ได้.
+- คืน `zod` เป็น `^3.25.76` และ `@opennextjs/cloudflare` เป็น `^1.20.13` พร้อมสร้าง lockfile ใหม่; `npm run build` ผ่านครบ.
+- `npm run lint` และ `git diff --check` ผ่าน. `npm test` ยังล้ม 1 baseline test ใน `src/test/design-tokens.test.ts` ที่ตรวจ token ใน `globals.css`; ไม่เกี่ยวกับ deployment หรือ dependency ที่แก้ครั้งนี้.
+
+## [2026-10-27] ทำให้กำแพงระหว่างหมุนมุมมองลื่นไหล (feat-091 follow-up)
+
+- 2D Artboard เปลี่ยนมุมด้วย CSS transition 480ms แบบ ease-out และปิด transition ทันทีเมื่อระบบเปิด `prefers-reduced-motion`.
+- 3D WebGL: กล้องโคจรเป็น arc รอบกลางร้าน 620ms แบบ smootherstep และไล่ทุกค่า orthographic frame พร้อมกัน จึงไม่มีทั้งเส้นตัดผ่านกลางฉากและอาการกรอบภาพสะบัดตอนเริ่ม.
+- แก้สาเหตุที่ผู้ใช้ระบุ: key light ถูกตรึงใน world-space ของร้าน; การกดหมุนไม่ย้ายไฟหรือ shadow camera อีกต่อไป และจะ fit เงาใหม่เฉพาะเมื่อขนาดร้านเปลี่ยน.
+- แยกพื้นเป็น layer คงที่ และคงโต๊ะ/เก้าอี้/เคาน์เตอร์เป็น object ชุดเดิมระหว่างหมุน; ฐาน/ธรณี/พรมของประตูผูกกับ material ของผนังด้านเดียวกัน จึงจางหรือปรากฏพร้อมวงกบ ไม่ค้างเป็นสี่เหลี่ยมลอยบนพื้น.
+- แก้รอบตรวจภาพจริง: ไม่สร้าง room เก่าและ room ใหม่มา cross-fade อีกแล้ว แต่สร้างผนังและวงกบครบ 4 ด้านเพียงชุดเดียว แล้วไล่ opacity ของแต่ละด้านตามกล้อง 620ms; วงกบและบานประตูใช้ material ของผนังเดียวกัน จึงไม่มี geometry หรือประตูซ้อนและไม่มีจังหวะ render ตามไม่ทัน. วงกบไม่ทอดเงา เพื่อไม่ให้เงายาวพาดพื้นตอนสลับด้าน.
+- ตรวจ targeted tests 4 ไฟล์ / 42 tests ผ่าน, ESLint เฉพาะไฟล์งาน และ `git diff --check` ผ่าน; ตรวจ localhost:3000 ด้วยการจับภาพก่อน/หลังหมุนหลายมุม ไม่มีกรอบประตูซ้อนและไม่มี console error.
+- ข้อจำกัด baseline ปัจจุบัน: `npm test` รวมล่าสุด 940/947 ผ่าน แต่ล้ม 7 ข้อเดิม/นอกขอบเขต (Zod v4/schema ใน mock-backend, forms, core-io; heading design token; timeout UX; mock backend guest-merge ที่เหลือ state จาก quota test); `tsc --noEmit` ล้มจาก Zod v4 เดิม.
+
 
 ## [2026-10-23] แผงจำลองร้าน 1 วัน + การ์ดคำตอบ (feat-095)
 
