@@ -67,7 +67,8 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
       return sim.getMetrics();
     });
     expect(waits[0]!.avgFoodWaitMinutes).toBeGreaterThan(waits[1]!.avgFoodWaitMinutes);
-    expect(waits[1]!.avgFoodWaitMinutes).toBeGreaterThan(waits[2]!.avgFoodWaitMinutes);
+    // มีเพียง 2 โต๊ะ จึงมีเพดานที่พ่อครัวมากกว่า 2 คนอาจไม่ช่วยเพิ่มอีก
+    expect(waits[1]!.avgFoodWaitMinutes).toBeGreaterThanOrEqual(waits[2]!.avgFoodWaitMinutes);
     expect(waits[0]!.waitedTooLong).toBeGreaterThan(waits[2]!.waitedTooLong);
     expect(waits[0]!.kitchenBusy).toBeGreaterThan(waits[2]!.kitchenBusy);
   });
@@ -93,13 +94,35 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
     expect(one.frontStaffBusy).toBeGreaterThan(three.frontStaffBusy);
   });
 
-  it("ไม่มีที่นั่งว่าง → กลับทันที ไม่นับเป็นเวลาในร้าน", () => {
+  it("ไม่มีโต๊ะสะอาดว่าง → ยืนรอหน้าร้าน ไม่เดินกลับทันที", () => {
     const sim = restaurant({ customersPerHour: 300, cooks: 3 });
     run(sim, 3600);
     const m = sim.getMetrics();
-    expect(m.noSeat).toBeGreaterThan(0);
+    expect(m.noSeat).toBe(0);
+    expect(m.maxEntranceQueue).toBeGreaterThan(0);
     expect(m.seated).toBeLessThanOrEqual(sim.seatCount);
     if (m.avgVisitMinutes > 0) expect(m.avgVisitMinutes).toBeGreaterThan(10);
+  });
+
+  it("หนึ่งโต๊ะรองรับได้เพียงหนึ่งกลุ่ม และต้องเก็บก่อนจึงส่งกลุ่มถัดไปเข้า", () => {
+    const sim = restaurant({
+      customersPerHour: 120,
+      cooks: 3,
+      takeOrderSeconds: [1, 1],
+      paySeconds: [1, 1],
+      cookMinutesPerDish: 0.5,
+      dineMinutes: [0.2, 0.2],
+      cleanTableSeconds: [60, 60],
+    });
+    let sawWait = false;
+    for (let t = 0; t < 30 * 60; t++) {
+      sim.step(1);
+      const occupied = sim.debugAgents().filter((agent) => agent.tableId);
+      expect(new Set(occupied.map((agent) => agent.tableId)).size).toBe(occupied.length);
+      sawWait ||= sim.debugAgents().some((agent) => agent.state === "waiting-entrance");
+    }
+    expect(sawWait).toBe(true);
+    expect(sim.getMetrics().served).toBeGreaterThan(0);
   });
 
   it("ช่วงพีคมีคนเข้ามากกว่าช่วงปกติตามสัดส่วน และหลังปิดร้านไม่มีคนเข้าใหม่", () => {

@@ -78,14 +78,15 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
     expect(analysis.cookTime.maxMinutesPerDish).toBeNull();
   });
 
-  it("ที่นั่ง: ร้าน 6 ที่ ลูกค้าเยอะ → ไม่พอ; ร้าน 48 ที่ ลูกค้าเท่ากัน → พอ", { timeout: 30_000 }, () => {
+  it("ที่นั่ง: ร้าน 6 ที่ลูกค้าเยอะมีคิวหน้าเข้า; 48 ที่นั่งแต่มีแค่ 12 โต๊ะก็ยังอาจไม่พอเมื่อห้ามแชร์โต๊ะ", { timeout: 30_000 }, () => {
     const cramped = analyzeDay(cafeLayout(), day({ dailyCustomers: 200 }));
     expect(cramped.seating.enough).toBe(false);
-    expect(cramped.seating.noSeat).toBeGreaterThan(20);
+    expect(cramped.seating.maxEntranceQueue).toBeGreaterThan(20);
     expect(cramped.seating.capacityPerHour).toBeLessThan(cramped.seating.busiestCustomersPerHour);
     const roomy = analyzeDay(bigLayout(), day({ dailyCustomers: 200 }));
     expect(roomy.seating.basedOn).toBe("recommended");
-    expect(roomy.seating.enough).toBe(true);
+    expect(roomy.seating.enough).toBe(false);
+    expect(roomy.seating.maxEntranceQueue).toBeGreaterThan(0);
   });
 
   it("วิเคราะห์ซ้ำได้ผลเดิม", { timeout: 30_000 }, () => {
