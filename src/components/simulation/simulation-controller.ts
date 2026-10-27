@@ -15,7 +15,11 @@ import { toDayInput } from "@/lib/day-config";
 import { P1LayoutContractSchema } from "@/core/validation";
 import { SimulationClient, createSimulationWorker, type WorkerLike } from "@/lib/simulation-client";
 import { layoutStore, type LayoutStoreState } from "@/store/use-layout-store";
-import { simulationStore, type SimulationStoreState } from "@/store/use-simulation-store";
+import {
+  REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X,
+  simulationStore,
+  type SimulationStoreState,
+} from "@/store/use-simulation-store";
 
 export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
@@ -36,6 +40,11 @@ export type StartResult = { ok: true } | { ok: false; reason: string };
 export const ANALYZE_TIMEOUT_MS = 60_000;
 /** ไม่มีช่วงคนเยอะ → ดูภาพชั่วโมงแรกหลังเปิดร้าน */
 const DEFAULT_PLAYBACK_SECONDS = 3600;
+
+/** แปลงตัวคูณที่ผู้ใช้เลือกให้เป็นหน่วยที่ Simulation Worker ใช้ */
+export function playbackSpeedToWorkerSpeed(multiplier: number): number {
+  return multiplier * REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X;
+}
 
 export interface ControllerDeps {
   createWorker: () => WorkerLike;
@@ -149,7 +158,7 @@ export class SimulationController {
           patienceMinutes: input.patienceMinutes,
           // ลูกค้าชุดเดียวกับที่วิเคราะห์ ภาพจะตรงกับคำตอบ
           seed: ANALYSIS_SEEDS[0],
-          speed: config.speed,
+          speed: playbackSpeedToWorkerSpeed(config.speed),
           startAtSeconds: startAt,
           stopAtSeconds: stopAt,
         },
@@ -182,9 +191,11 @@ export class SimulationController {
     this.setSim({ status: "running" });
   }
 
-  async setSpeed(speed: number) {
-    this.deps.simulation.getState().setConfig({ speed });
-    if (this.client && this.deps.simulation.getState().status !== "idle") await this.client.request({ type: "SET_SPEED", speed });
+  async setSpeed(multiplier: number) {
+    this.deps.simulation.getState().setConfig({ speed: multiplier });
+    if (this.client && this.deps.simulation.getState().status !== "idle") {
+      await this.client.request({ type: "SET_SPEED", speed: playbackSpeedToWorkerSpeed(multiplier) });
+    }
   }
 
   async stop(message: string | null = null) {
