@@ -19,6 +19,17 @@ import { AGENT_STRIDE, STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation"
 import { STAFF_KITCHEN_CODE } from "@/components/simulation/staff-pacer";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
+import {
+  CHAIR_PULL,
+  createChairSlide,
+  releaseChair,
+  startRise,
+  startSeat,
+  stepChair,
+  stepSeat,
+  type ChairSlide,
+  type SeatMotion,
+} from "./seat-motion";
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
 import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
@@ -54,6 +65,18 @@ type AnimatedCustomer = {
   still: number;
   /** เหลื่อมจังหวะท่ายืนรอ ไม่ให้ลูกค้าที่ต่อคิวขยับพร้อมกัน (วินาที) */
   idleOffset: number;
+  /** กำลังนั่ง/ลุกจากเก้าอี้ (ดึงเก้าอี้ออก–เข้า) — ระหว่างนี้ตำแหน่งตามเก้าอี้ ไม่ตามจุดจำลอง */
+  seat: { motion: SeatMotion; chair: ChairRig } | null;
+};
+
+/** เก้าอี้ในฉาก 3D ที่เลื่อนออก/เข้าได้ */
+type ChairRig = {
+  object: THREE.Object3D;
+  /** ตำแหน่งในผัง */
+  home: THREE.Vector3;
+  /** ทิศออกจากโต๊ะ (ฝั่งพนักพิง) ความยาว 1 */
+  out: THREE.Vector3;
+  slide: ChairSlide;
 };
 
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนโดยไม่สร้าง WebGL context ใหม่ */
@@ -520,6 +543,7 @@ function createDoorFrame(
 }
 
 function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneAssets) {
+  group.userData.movableGeometries = [];
   const metal = assets.material("metal", { color: "#3f4650", roughness: 0.5, metalness: 0.35 });
   const furniture = (color: FurnitureColor) =>
     assets.material(`furniture:${color}`, {
@@ -549,8 +573,6 @@ function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneA
   for (const item of layout.objects) {
     const object = new THREE.Group();
     const center = objectCenter(item);
-    object.position.set(center.x, 0, center.y);
-    object.rotation.y = THREE.MathUtils.degToRad(-item.rotation);
 
     if (item.type === "table") {
       const style = tableStyleOf(item);
@@ -582,6 +604,13 @@ function createFurniture(group: THREE.Group, layout: StoreLayout, assets: SceneA
     } else if (item.type === "counter") {
       object.add(createCounter(item.width, item.depth, counterStyleOf(item), assets));
     }
+    if (item.type === "chair") {
+      // เก้าอี้เลื่อนออก/เข้าตอนลูกค้านั่ง/ลุก — รวม mesh เฉพาะในตัวเก้าอี้ (ยังอยู่ที่จุดกำเนิด) ไม่รวมกับเฟอร์นิเจอร์อื่น
+      (group.userData.movableGeometries as THREE.BufferGeometry[]).push(...mergeStaticMeshes(object));
+      object.userData.chairId = item.id;
+    }
+    object.position.set(center.x, 0, center.y);
+    object.rotation.y = THREE.MathUtils.degToRad(-item.rotation);
     group.add(object);
   }
 }
@@ -831,7 +860,10 @@ function mergeStaticMeshes(group: THREE.Group) {
   group.updateMatrixWorld(true);
   const buckets = new Map<string, { source: THREE.Mesh; geometries: THREE.BufferGeometry[] }>();
   const merged: THREE.Mesh[] = [];
-  group.traverse((object) => {
+  const visit = (object: THREE.Object3D) => {
+    // เก้าอี้ (มี chairId) ขยับได้ — รวม mesh ของตัวเองไว้แล้ว ห้ามอบเข้ากลุ่มรวม
+    if (object !== group && object.userData.chairId !== undefined) return;
+    for (const child of object.children) visit(child);
     if (!(object instanceof THREE.Mesh) || Array.isArray(object.material)) return;
     const material = object.material as THREE.Material;
     if (material.transparent || object.renderOrder !== 0 || object.matrixWorld.determinant() <= 0) return;
@@ -850,7 +882,8 @@ function mergeStaticMeshes(group: THREE.Group) {
     baked.clearGroups();
     bucket.geometries.push(baked);
     merged.push(object);
-  });
+  };
+  visit(group);
 
   const created: THREE.BufferGeometry[] = [];
   for (const { source, geometries } of buckets.values()) {
@@ -873,8 +906,9 @@ function buildStaticContent(build: (group: THREE.Group, assets: SceneAssets) => 
   const group = new THREE.Group();
   build(group, assets);
   const merged = mergeStaticMeshes(group);
+  const movable = (group.userData.movableGeometries as THREE.BufferGeometry[] | undefined) ?? [];
   group.userData.dispose = () => {
-    for (const geometry of merged) geometry.dispose();
+    for (const geometry of [...merged, ...movable]) geometry.dispose();
     assets.dispose();
   };
   return group;
@@ -1105,6 +1139,36 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
 
     const clock = new THREE.Clock(false);
     const customers = new Map<number, AnimatedCustomer>();
+    /** เก้าอี้ของผังปัจจุบันตาม id — สร้างใหม่ทุกครั้งที่เปลี่ยนชุดเฟอร์นิเจอร์ */
+    let chairRigs = new Map<string, ChairRig>();
+    const collectChairRigs = (furniture: THREE.Group) => {
+      chairRigs = new Map();
+      for (const object of furniture.children) {
+        const id = object.userData.chairId as string | undefined;
+        if (id === undefined) continue;
+        const out = new THREE.Vector3(0, 0, 1).applyAxisAngle(THREE.Object3D.DEFAULT_UP, object.rotation.y);
+        chairRigs.set(id, { object, home: object.position.clone(), out, slide: createChairSlide() });
+      }
+    };
+    /** เก้าอี้ทุกตัวกลับเข้าที่ทันที (จบการจำลอง) */
+    const resetChairs = () => {
+      for (const rig of chairRigs.values()) {
+        rig.slide = createChairSlide();
+        rig.object.position.copy(rig.home);
+      }
+      renderer.shadowMap.needsUpdate = true;
+    };
+    /** เลื่อนเก้าอี้ที่กำลังถูกดึงออก/ดันเข้าหนึ่งเฟรม */
+    const stepChairs = (delta: number) => {
+      let moved = false;
+      for (const rig of chairRigs.values()) {
+        if (!stepChair(rig.slide, delta)) continue;
+        rig.object.position.copy(rig.home).addScaledVector(rig.out, rig.slide.pull * CHAIR_PULL);
+        moved = true;
+      }
+      // เงาเฟอร์นิเจอร์อาจไม่อัปเดตเองบนเครื่องช้า (shadowMap.autoUpdate ปิด)
+      if (moved) renderer.shadowMap.needsUpdate = true;
+    };
     const controller = getSimulationController();
     let templateMaterial: THREE.MeshStandardMaterial | null = null;
     const quality = new AdaptiveQuality();
@@ -1143,6 +1207,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       customer.standingUp = action.time / STAND_UP_RATE;
     };
     const removeCustomer = (id: number, customer: AnimatedCustomer) => {
+      if (customer.seat) releaseChair(customer.seat.chair.slide);
       customer.mixer.stopAllAction();
       customer.mixer.uncacheRoot(customer.model);
       scene.remove(customer.model);
@@ -1152,6 +1217,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     };
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
+      resetChairs();
     };
 
     const loader = createCharacterLoader();
@@ -1394,6 +1460,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
             targetRotation: 0,
             still: 0,
             idleOffset: (id * 1.37) % 6,
+            seat: null,
           };
           playClip(customer, animation);
           customers.set(id, customer);
@@ -1410,7 +1477,20 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
         const standing = animation === "Walk" && customer.animation === "Idle";
         if (animation !== customer.animation && !standing) {
-          if (customer.animation === "Sit") standUp(customer);
+          const rig = animation === "Sit" && seatedChair ? chairRigs.get(seatedChair.id) : undefined;
+          if (customer.seat) {
+            // ลุก: เลื่อนเก้าอี้ออกก่อน (ท่าลุกเริ่มใน stepSeat) — ยังไม่ทันนั่งก็เดินต่อได้เลย
+            if (!startRise(customer.seat.motion, customer.seat.chair.slide)) {
+              customer.seat = null;
+              playClip(customer, animation);
+            }
+          } else if (rig && rig.slide.occupant === null) {
+            // นั่ง: ยืนรอให้ดึงเก้าอี้ออกก่อน แล้วค่อยนั่ง (ท่านั่งเริ่มใน stepSeat)
+            const sitSeconds = THREE.AnimationClip.findByName(customerAsset.clips, "Sit")?.duration ?? 1;
+            customer.seat = { motion: startSeat(rig.slide, id, sitSeconds, sitSeconds / STAND_UP_RATE), chair: rig };
+            customer.standingUp = 0;
+            playClip(customer, "Idle");
+          } else if (customer.animation === "Sit") standUp(customer);
           else {
             customer.standingUp = 0;
             playClip(customer, animation);
@@ -1420,6 +1500,31 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
       for (const [id, customer] of customers) {
         if (!liveIds.has(id)) removeCustomer(id, customer);
+      }
+    };
+
+    /** ตำแหน่ง/ท่าของลูกค้าระหว่างดึงเก้าอี้ นั่ง ดันเก้าอี้ และลุก — ตามเก้าอี้แทนจุดจำลอง */
+    const updateSeat = (customer: AnimatedCustomer, seat: NonNullable<AnimatedCustomer["seat"]>, delta: number) => {
+      const { chair, motion } = seat;
+      const { offset, seated, event } = stepSeat(motion, chair.slide, delta);
+      if (event === "sit") playClip(customer, "Sit");
+      else if (event === "rise") {
+        standUp(customer);
+        motion.riseSeconds = Math.max(customer.standingUp, 1e-3);
+        customer.standingUp = 0;
+      }
+      // บนเก้าอี้: ถอยสะโพกชิดพนักพิง (SEATED_FRONT_OFFSET วัดไปทางหน้าเก้าอี้ = ตรงข้ามกับ out)
+      const back = offset - (seated ? SEATED_FRONT_OFFSET : 0);
+      const spot = new THREE.Vector3().copy(chair.home).addScaledVector(chair.out, back);
+      if (motion.phase === "pull") customer.model.position.lerp(spot, Math.min(1, delta * 14));
+      else customer.model.position.copy(spot);
+      const turn = customer.targetRotation - customer.model.rotation.y;
+      customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+      customer.mixer.update(delta);
+      if (event === "done") {
+        customer.seat = null;
+        customer.still = 0;
+        playClip(customer, customer.animation);
       }
     };
 
@@ -1498,8 +1603,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           member.animation === "Walk" ? Math.min(distance / staffAsset.walkSpeed, delta * MAX_WALK_PLAYBACK_RATE) : delta,
         );
       }
+      stepChairs(delta);
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
+        if (customer.seat) {
+          updateSeat(customer, customer.seat, delta);
+          continue;
+        }
         if (customer.standingUp > 0) {
           // ลุกให้เสร็จที่เก้าอี้ก่อน แล้วค่อยผสมเข้าท่าเดินไปหาจุดจำลอง
           customer.mixer.update(delta);
@@ -1597,6 +1707,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         disposeContent(stage.furniture);
       }
       scene.add(floor, room, furniture);
+      // ลูกค้าที่จองเก้าอี้ชุดเดิมไว้ — ปล่อยให้เดินตามจุดจำลองต่อ
+      for (const customer of customers.values()) customer.seat = null;
+      collectChairRigs(furniture);
       stage.floor = floor;
       stage.room = room;
       stage.furniture = furniture;
