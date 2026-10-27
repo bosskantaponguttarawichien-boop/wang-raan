@@ -8,7 +8,7 @@ import type { PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
 
 export interface SimulationStartConfig {
   customersPerHour: number;
-  /** วินาทีจำลองต่อวินาทีจริง */
+  /** วินาทีจำลองต่อวินาทีจริง — รับเฉพาะค่าที่ SimulationController แปลงแล้ว */
   speed: number;
   seed?: number;
   /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-093) — ไม่ส่งใช้ค่าตั้งต้นของ engine */

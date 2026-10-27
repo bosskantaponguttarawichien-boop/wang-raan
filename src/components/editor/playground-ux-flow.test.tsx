@@ -66,7 +66,7 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     simulationStore.setState({
       status: "idle",
       metrics: null,
-      config: { ...DEFAULT_DAY_CONFIG, speed: 60 },
+      config: { ...DEFAULT_DAY_CONFIG, speed: 1 },
       analysis: null,
     });
   });

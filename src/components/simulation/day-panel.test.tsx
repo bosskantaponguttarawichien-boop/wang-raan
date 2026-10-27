@@ -20,7 +20,7 @@ afterEach(cleanup);
 describe("แผงจำลองร้าน 1 วัน (feat-095)", () => {
   beforeEach(() => {
     layoutStore.getState().loadLayout(cafeLayout());
-    simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 60 } });
+    simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 1 } });
   });
 
   it("3 ส่วน: ร้าน / พนักงาน / ลูกค้า พร้อมค่าที่คำนวณให้", () => {
@@ -81,7 +81,7 @@ describe("แผงจำลองร้าน 1 วัน (feat-095)", () => {
 describe("ปุ่มจำลองร้าน 1 วัน: เริ่มไม่ได้ต้องแจ้งผู้ใช้ (feat-095)", () => {
   beforeEach(() => {
     layoutStore.getState().loadLayout(cafeLayout());
-    simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 60 } });
+    simulationStore.setState({ status: "idle", message: null, metrics: null, analysis: null, config: { ...DEFAULT_DAY_CONFIG, speed: 1 } });
   });
 
   it("ค่าฟอร์มผิด → toast บอกเหตุผล และไม่เริ่ม", async () => {
