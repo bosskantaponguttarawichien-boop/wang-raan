@@ -180,7 +180,7 @@ export class SimulationWorkerRuntime {
     }
   }
 
-  /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
+  /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
     let seconds = (realMs / 1000) * this.speed;

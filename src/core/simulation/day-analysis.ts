@@ -36,6 +36,8 @@ export interface DayOutcome {
   arrived: number;
   fed: number;
   noSeat: number;
+  /** จำนวนคนสูงสุดที่ยืนรอโต๊ะสะอาดหน้าร้าน */
+  maxEntranceQueue: number;
   avgFoodWaitMinutes: number;
   /** สัดส่วนคนที่รออาหารเกินเวลาที่ยอมได้ (ของคนที่ได้อาหาร) */
   tooLongRate: number;
@@ -77,6 +79,7 @@ export interface DayAnalysis {
     basedOn: "recommended" | "current";
     noSeat: number;
     noSeatRate: number;
+    maxEntranceQueue: number;
     /** เวลาเฉลี่ยในร้าน (นาที) ที่ใช้คำนวณ */
     avgVisitMinutes: number;
     /** ที่นั่งรับลูกค้าได้ราวกี่คน/ชม. (ที่นั่ง × 60 ÷ เวลาเฉลี่ยในร้าน) */
@@ -123,6 +126,7 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
       arrived: mean((m) => m.arrived),
       fed: mean((m) => m.fed),
       noSeat: mean((m) => m.noSeat),
+      maxEntranceQueue: mean((m) => m.maxEntranceQueue),
       avgFoodWaitMinutes: mean((m) => m.avgFoodWaitMinutes),
       tooLongRate: rate((m) => [m.waitedTooLong, m.fed]),
       noSeatRate: rate((m) => [m.noSeat, m.arrived]),
@@ -205,10 +209,13 @@ export function analyzeDay(layout: StoreLayout, input: DayInput): DayAnalysis {
       basedOn,
       noSeat: seatingOutcome.noSeat,
       noSeatRate: seatingOutcome.noSeatRate,
+      maxEntranceQueue: seatingOutcome.maxEntranceQueue,
       avgVisitMinutes: visit,
       capacityPerHour,
       busiestCustomersPerHour: plan.peak?.customersPerHour ?? plan.customersPerHour,
-      enough: seatingOutcome.noSeatRate <= GOOD_NO_SEAT_RATE,
+      // คิวสั้นชั่วคราวระหว่างพนักงานเก็บโต๊ะไม่ใช่สัญญาณว่าโต๊ะไม่พอ;
+      // เกิน 10% ของที่นั่งจึงถือว่าเป็นคิวที่มีนัยสำคัญ
+      enough: seatingOutcome.maxEntranceQueue <= Math.max(1, seats * GOOD_NO_SEAT_RATE),
     },
   };
 }

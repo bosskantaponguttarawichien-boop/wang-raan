@@ -126,8 +126,9 @@ export function SimulationPanel({
                 ["เวลาในร้าน", analysis ? `${formatClock(openMinute + metrics.time / 60)} น.` : formatSimTime(metrics.time)],
                 ["ลูกค้าในร้าน", `${metrics.inStore} คน`],
                 ["นั่งที่โต๊ะ", `${metrics.seated} / ${seats} ที่`],
+                ["รอหน้าเข้า", `${metrics.waitingEntrance} คน`],
                 ["รออาหารเฉลี่ย", metrics.fed > 0 ? `${formatNumber(metrics.avgFoodWaitMinutes)} นาที` : "—"],
-                ["ไม่มีที่นั่ง", `${metrics.noSeat} คน`],
+                ["รอโต๊ะเฉลี่ย", metrics.avgEntranceWaitMinutes > 0 ? `${formatNumber(metrics.avgEntranceWaitMinutes)} นาที` : "—"],
                 ["จ่ายเงินแล้ว", `${metrics.served} คน`],
               ].map(([term, value]) => (
                 <div key={term} className="min-w-0">
@@ -141,7 +142,7 @@ export function SimulationPanel({
 
           <div className="mb-3.5 space-y-2.5">
             <div>
-              <label className="mb-1 block text-[11.5px] text-secondary">ความเร็วจำลอง</label>
+              <label className="mb-1 block text-[11.5px] text-secondary">ความเร็วจำลอง <span className="text-secondary">(x1 = 1 วินาทีจริง : 1 นาทีในร้าน)</span></label>
               <div className="flex rounded-[8px] border border-line bg-surface p-0.5" role="group" aria-label="ความเร็วจำลอง">
                 {SPEED_OPTIONS.map((spd) => (
                   <button
@@ -263,7 +264,9 @@ export function SimulationPanel({
                   {(controller().heatmap?.max ?? 0) > 0
                     ? "บริเวณสีแดงบนผังคือทางที่คนเดินผ่านหนาแน่น ลองขยายทางเดินตรงนั้นหรือย้ายเคาน์เตอร์ให้ห่างประตู"
                     : "การสัญจรลื่นไหลดี ไม่พบจุดที่คนเดินแออัด"}
-                  {metrics.noSeat > 0 && " · ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ"}
+                  {metrics.maxEntranceQueue > 0
+                    ? " · มีคิวรอหน้าเข้า ลองเพิ่มโต๊ะหรือเพิ่มพนักงานเก็บโต๊ะ"
+                    : metrics.noSeat > 0 && " · ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ"}
                 </span>
               </div>
 
@@ -377,7 +380,7 @@ export function SimulationPanel({
               <DaySetupForm disabled={status !== "idle"} />
 
               <div className="border-t border-line pt-3.5">
-                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วภาพจำลอง</label>
+                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วภาพจำลอง <span className="text-secondary">(x1 = 1 วินาทีจริง : 1 นาทีในร้าน)</span></label>
                 <div className="flex rounded-[8px] border border-line bg-surface p-0.5" role="group" aria-label="ความเร็วจำลอง">
                   {SPEED_OPTIONS.map((spd) => (
                     <button
