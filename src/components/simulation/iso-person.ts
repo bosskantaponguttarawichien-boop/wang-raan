@@ -36,6 +36,7 @@ export type PersonBehavior = "walking" | "queueing" | "ordering" | "dining" | "l
 export function behaviorFromState(state: number): PersonBehavior {
   switch (state) {
     case 1:
+    case 6:
       return "queueing";
     case 2:
       return "ordering";

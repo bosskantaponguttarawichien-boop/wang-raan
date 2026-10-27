@@ -65,6 +65,7 @@ const RequestSchema = z.discriminatedUnion("type", [
       patienceMinutes: z.number().finite().min(1).max(240).optional(),
       startAtSeconds: z.number().finite().min(0).max(DAY_SECONDS).optional(),
       stopAtSeconds: z.number().finite().positive().max(DAY_SECONDS + 6 * 3600).optional(),
+      skipQuiet: z.boolean().optional(),
     }),
   }),
   z.object({
@@ -88,6 +89,11 @@ export interface HandledMessage<T = WorkerResponse> {
 /** ส่ง heatmap ทุก ๆ N tick */
 export const HEATMAP_EVERY = 5;
 
+/** ช่วงเงียบ (ไม่มีใครเดิน) เล่นเร็วอย่างน้อยเท่านี้ (วินาทีจำลอง/วินาทีจริง) — ไม่ต้องนั่งดูร้านนิ่ง ๆ */
+export const QUIET_SPEED = 60;
+/** ร้านว่างทั้งร้าน: ข้ามไปถึงลูกค้ากลุ่มถัดไปได้ในครั้งเดียว ไม่เกินเท่านี้ (วินาทีจำลอง) */
+export const EMPTY_SKIP_SECONDS = 2 * 3600;
+
 export class SimulationWorkerRuntime {
   private synced: { layout: StoreLayout; revision: string } | null = null;
   private simulation: Simulation | null = null;
@@ -95,6 +101,7 @@ export class SimulationWorkerRuntime {
   private speed = 30;
   private ticks = 0;
   private stopAt: number | null = null;
+  private skipQuiet = false;
 
   get isRunning() {
     return this.running;
@@ -138,15 +145,18 @@ export class SimulationWorkerRuntime {
         if (message.layoutRevision !== this.synced.revision) {
           return this.error(requestId, "STALE_VALIDATION", "ผังเปลี่ยนหลังการตรวจ กรุณาตรวจผังใหม่");
         }
-        const { speed, seed, startAtSeconds, stopAtSeconds, ...options } = message.config;
+        const { speed, seed, startAtSeconds, stopAtSeconds, skipQuiet, ...options } = message.config;
         const defined = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined));
         this.simulation = new Simulation(this.synced.layout, { ...defined, seed: seed ?? Date.now() % 2 ** 31 });
+        this.stopAt = stopAtSeconds ?? null;
         // เดินเวลาเบื้องหลังถึงจุดเริ่มดู (เช่น ต้นช่วงคนเยอะ) แล้วล้าง heatmap ให้เห็นเฉพาะช่วงที่ดู
         if (startAtSeconds) {
           this.simulation.step(startAtSeconds);
           this.simulation.heatmap.fill(0);
         }
-        this.stopAt = stopAtSeconds ?? null;
+        // เก็บทางเดินลูกค้าและพนักงานเฉพาะช่วงที่เล่นภาพ (ช่วงเดินเวลาเบื้องหลังไม่ต้องใช้)
+        this.simulation.trackPaths();
+        this.skipQuiet = skipQuiet ?? false;
         this.speed = speed;
         this.running = true;
         this.ticks = 0;
@@ -180,24 +190,26 @@ export class SimulationWorkerRuntime {
     }
   }
 
-  /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
+  /**
+   * เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่
+   * skipQuiet: ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเป็น QUIET_SPEED และกลับมาความเร็วปกติทันทีที่มีคนเริ่มเดิน
+   * ร้านว่างทั้งร้านข้ามไปถึงตอนลูกค้ากลุ่มถัดไปเดินเข้าประตูเลย
+   */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
-    let seconds = (realMs / 1000) * this.speed;
-    let finished = false;
-    if (this.stopAt !== null) {
-      const left = this.stopAt - this.simulation.getMetrics().time;
-      if (left <= seconds) {
-        seconds = Math.max(0, left);
-        finished = true;
-      }
-    }
-    this.simulation.step(seconds);
+    const quiet = this.skipQuiet && this.speed < QUIET_SPEED && this.simulation.isQuiet();
+    let seconds = quiet && this.simulation.isEmpty() ? EMPTY_SKIP_SECONDS : (realMs / 1000) * (quiet ? QUIET_SPEED : this.speed);
+    if (this.stopAt !== null) seconds = Math.max(0, Math.min(seconds, this.stopAt - this.simulation.getMetrics().time));
+    if (quiet) this.simulation.stepWhileQuiet(seconds);
+    else this.simulation.step(seconds);
+    const finished = this.stopAt !== null && this.simulation.getMetrics().time >= this.stopAt - 1e-9;
     if (finished) this.running = false;
     const agents = this.simulation.agentBuffer();
-    const tick: TickMessage = { type: "TICK", agents, metrics: this.simulation.getMetrics() };
+    const paths = this.simulation.drainPaths();
+    const staff = this.simulation.staffBuffer();
+    const tick: TickMessage = { type: "TICK", agents, paths, staff, metrics: this.simulation.getMetrics() };
     if (finished) tick.finished = true;
-    const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer];
+    const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer, paths.buffer as ArrayBuffer, staff.buffer as ArrayBuffer];
     if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {
       const heatmap = this.simulation.heatmap.slice();
       let max = 0;
@@ -212,6 +224,7 @@ export class SimulationWorkerRuntime {
   private reset() {
     this.simulation = null;
     this.stopAt = null;
+    this.skipQuiet = false;
     this.running = false;
     this.ticks = 0;
   }

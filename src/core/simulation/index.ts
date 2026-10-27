@@ -5,3 +5,4 @@ export type * from "./protocol";
 export * from "./worker-runtime";
 export * from "./day-plan";
 export * from "./day-analysis";
+export * from "./staff-visual";

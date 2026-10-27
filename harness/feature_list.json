@@ -1325,6 +1325,62 @@
       "summary": "เจ้าของร้านกรอกสิ่งที่รู้ แล้วได้คำตอบเป็นภาษาคน",
       "sprint": 4,
       "evidence": "src/components/simulation/{day-setup-form,day-answers}.tsx + src/lib/day-config.ts; store config = DayConfig + analysis; controller SYNC → ANALYZE_DAY (timeout 60 วิ) → START ช่วงคนเยอะ (seed เดียวกับวิเคราะห์) → TICK finished หยุดเอง; แถบสถานะ/การ์ดสรุปแสดงเวลาในร้าน (นาฬิกา); day-panel.test.tsx 5 tests + gate tests 2 ใหม่; make test 73 files / 944 tests (+ toast เมื่อเริ่มไม่ได้), make lint ผ่าน; Playwright chromium a11y/playground-ux/keyboard/responsive 44 tests ผ่าน (a11y \"ระหว่างจำลอง\" 1440px ล้ม 1 ครั้งในรอบแรก รันซ้ำ 8/8 + 26/26 ผ่าน จับรายละเอียดไม่ได้); เบราว์เซอร์ localhost:3001/playground: แผง 3 ส่วน, คำตอบ 3 ข้อ, เล่น 11:30–13:00 แล้วหยุดเอง, 320px ไม่มี horizontal scroll"
+    },
+    {
+      "id": "feat-097",
+      "name": "เริ่มเล่นภาพจำลองแบบค่อย ๆ เร่ง (ลูกค้าเดินเข้าร้านช้า ๆ)",
+      "description": "x1 = 1 วินาทีจริงต่อ 1 นาทีในร้าน ทำให้ลูกค้าดูวิ่งเข้าร้าน (~70 ม./วิ) ตั้งแต่เริ่ม — ตอนเริ่มเล่นภาพให้ worker เดินเวลาเบื้องหลังถึงตอนที่ลูกค้ากลุ่มถัดไปเพิ่งถึงประตู แล้วเล่นเท่าเวลาจริง 6 วินาที และค่อย ๆ เร่งถึงความเร็วที่เลือกใน 4 วินาที; ผลวิเคราะห์ทั้งวันไม่เปลี่ยน",
+      "dependencies": [
+        "feat-095"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "กดเริ่มแล้วเห็นลูกค้าเดินเข้าร้านแบบคนจริงก่อน แล้วค่อยเร่งเวลา",
+      "sprint": 4,
+      "evidence": "worker-runtime.ts easedSpeed + START easeIn (EASE_IN_HOLD_MS 6000 / EASE_IN_RAMP_MS 4000 / lookahead 10 นาทีจำลอง ไม่เกินครึ่งช่วงที่ดู); engine.ts advanceToNextArrival; controller ส่ง easeIn: true; engine.test.ts +2 tests, simulation-gate.test.tsx ปรับตามช่วงเร่ง; npm test 74 files / 951 tests, make lint ผ่าน; Chromium localhost:3123/playground: นาฬิกาค้าง 11:34 ราว 8 วิแรก แล้วเร่งเป็นนาทีละวินาที"
+    },
+    {
+      "id": "feat-098",
+      "name": "ภาพลูกค้าเดินเท่าคนจริงตลอดการจำลอง",
+      "description": "ต่อจาก feat-097: หลังเร่งเวลาแล้วลูกค้ายังเคลื่อนที่เร็วกว่าคนเดิน 60 เท่า — ให้ภาพเดิน 1.4 ม./วินาทีจริง (× ความเร็วเล่นภาพ) ตามทางที่ engine เดินจริง โดยเวลาจำลองไม่เปลี่ยน; ภาพตามหลังได้ราว 4 วินาทีแล้วเร่งให้ทัน",
+      "dependencies": [
+        "feat-097"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ลูกค้าเดินบนจอเหมือนคนเดินจริง ไม่พุ่งไปมา",
+      "sprint": 4,
+      "evidence": "engine.ts trackPaths/drainPaths (เก็บจุดเลี้ยวตาม flow field + จุดนั่ง/ลุก), TICK.paths; src/components/simulation/walk-pacer.ts (WalkPacer) ใช้ใน SimulationController.onTick จึงมีผลทั้ง 2D / isometric / 3D; walk-pacer.test.ts 7 tests + engine path test; npm test 75 files / 959 tests, make lint ผ่าน; Chromium playground: ภาพทุก 0.5 วิ ลูกค้าลุก → เดินไปเคาน์เตอร์ → เดินออก และคนใหม่เดินจากประตูช้า ๆ"
+    },
+    {
+      "id": "feat-099",
+      "name": "เล่นภาพจำลองตามพฤติกรรมที่ตั้งไว้: เริ่มร้านว่าง, พนักงานเดินรับออร์เดอร์/เสิร์ฟ/เก็บโต๊ะ, เวลาจริง",
+      "description": "ผู้ใช้แจ้ง 5 ข้อ: เริ่มมาลูกค้าอยู่ที่โต๊ะแล้ว, พนักงานไม่เดินมารับออร์เดอร์, ไม่มีเสิร์ฟ, ไม่มีเก็บโต๊ะ, ลูกค้าเดินเร็ว — เล่นภาพตั้งแต่เปิดร้าน; พนักงานหน้าร้านเดินตามงานจริงใน engine (StaffVisuals แบ่งเวลางานเดิมลงเส้นทางบนกริด ไม่เปลี่ยนผล); x1 = เวลาจริง และช่วงที่ไม่มีใครเดินเล่นเร็วเอง (ร้านว่างข้ามไปถึงลูกค้ากลุ่มถัดไป)",
+      "dependencies": [
+        "feat-098"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ดูร้านทำงานเหมือนจริง: ลูกค้าเข้า พนักงานรับออร์เดอร์ ไปรับอาหารที่ประตูครัวมาเสิร์ฟ เก็บโต๊ะ",
+      "sprint": 4,
+      "evidence": "src/core/simulation/staff-visual.ts (StaffVisuals, STAFF_STATE_CODE) + engine staffBuffer/isQuiet/isEmpty/stepWhileQuiet; TICK.staff; worker skipQuiet (QUIET_SPEED 60, EMPTY_SKIP_SECONDS 2 ชม.) แทน easeIn; controller เริ่ม startAtSeconds 0; speed x1 = 1 วินาทีจำลอง/วินาทีจริง, ตัวเลือก 1/2/5/10/30; 2D จุดเหลี่ยมม่วง (จุดขาว = ถืออาหาร), isometric คนเสื้อเขียว, 3D โมเดลพนักงานเดิน (Walk/Work) + จานอาหาร; engine tests: พนักงานครบทุกสถานะ ไม่ทะลุโต๊ะ, trackPaths ไม่เปลี่ยน metrics, skipQuiet; npm test 75 files / 961 tests, make lint ผ่าน; Chromium 2D + 3D (SwiftShader) เห็นลูกค้าเดินเข้า พนักงานเดินไปรับออร์เดอร์และเสิร์ฟ"
+    },
+    {
+      "id": "feat-100",
+      "name": "ลูกค้าเดินมาจากนอกร้าน และต่อแถวรอโต๊ะนอกประตู",
+      "description": "ผู้ใช้: ให้ลูกค้าเกิดนอกร้านแล้วค่อย ๆ เดินเข้าประตู และคนที่รอโต๊ะยืนเข้าแถวนอกร้าน (เดิมยืนบนพรมหน้าประตูในร้าน) — เฉพาะภาพ engine ไม่เปลี่ยน",
+      "dependencies": [
+        "feat-099"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ลูกค้าเดินมาจากข้างนอก รอโต๊ะเป็นแถวนอกร้าน และเดินออกไปนอกร้านก่อนหายไป",
+      "sprint": 4,
+      "evidence": "walk-pacer.ts doorFrame + setDoor (เกิดห่างประตู 3 ม., แถวคนแรก 0.8 ม. ห่างกัน 0.7 ม., กลับเดินออกไป 3 ม.); AGENT_STATE_CODE waiting-entrance 1 → 6 (แยกจากรอคิวจ่ายเงิน) + สี/ท่าใน 2D/isometric; walk-pacer.test.ts +4 tests; npm test 965, make lint ผ่าน; Chromium 3D เห็นเดินจากนอกร้าน/ยืนแถวนอกประตู/เดินเข้าเมื่อโต๊ะว่าง"
     }
   ]
 }

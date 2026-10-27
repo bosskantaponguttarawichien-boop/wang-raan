@@ -8,7 +8,7 @@ import { SimulationWorkerRuntime } from "@/core/simulation";
 import { useLiveValidation } from "@/components/validation/use-live-validation";
 import type { WorkerLike } from "@/lib/simulation-client";
 import { createLayoutStore, layoutStore } from "@/store/use-layout-store";
-import { createSimulationStore, simulationStore } from "@/store/use-simulation-store";
+import { SPEED_OPTIONS, createSimulationStore, simulationStore } from "@/store/use-simulation-store";
 import { cafeLayout, withoutType } from "@/test/fixtures/layouts";
 import { playbackSpeedToWorkerSpeed, SimulationController } from "./simulation-controller";
 import { interpolateAgents, paintHeatmap } from "./simulation-overlay";
@@ -74,23 +74,25 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(layoutState.getState().validation?.status).toBe("ready"); // ตรวจผังทางการก่อนเริ่มเสมอ
     expect(sim.getState()).toMatchObject({ status: "running", seats: 6 });
     expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "ANALYZE_DAY", "START"]);
-    // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มที่ 1.5 ชม. หลังเปิดร้าน
+    // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มตอนเปิดร้าน (ร้านว่าง) แล้วจบเมื่อจบช่วงคนเยอะ
     expect(sim.getState().analysis?.staffing.recommended).not.toBeNull();
-    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 60 } });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 0, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 1, skipQuiet: true } });
     for (let i = 0; i < 40; i++) fake.tick(250);
     await flush();
     expect(controller.current).not.toBeNull();
+    expect(controller.current!.staff.length).toBe(2 * 4); // พนักงานหน้าร้าน 2 คน
     expect(controller.heatmap).toMatchObject({ cols: 32, rows: 24 });
-    expect(sim.getState().metrics!.time).toBeGreaterThan(5400);
+    expect(sim.getState().metrics!.time).toBeGreaterThan(0);
   });
 
   it("จบช่วงคนเยอะ → หยุดเอง กลับโหมดแก้ผัง เก็บผลและ heatmap ไว้", async () => {
     const { fake, sim, controller } = setup();
     disposers.push(() => controller.dispose());
     await controller.start();
-    sim.getState().setConfig({ speed: 10 });
-    await controller.setSpeed(10);
-    for (let i = 0; i < 40; i++) fake.tick(250); // 40 × 0.25 วิ × (x10 × 60) = 6000 วิ > ช่วงพีค 5400 วิ
+    sim.getState().setConfig({ speed: 30 });
+    await controller.setSpeed(30);
+    // 1500 × 0.25 วิ × x30 = 11250 วิ > เปิดร้านถึงจบพีค 10800 วิ
+    for (let i = 0; i < 1500; i++) fake.tick(250);
     await flush();
     await flush();
     expect(sim.getState()).toMatchObject({ status: "idle", message: "ดูช่วงคนเยอะจบแล้ว" });
@@ -143,7 +145,7 @@ describe("P2 Gate ใน SimulationController", () => {
     await controller.resume();
     await controller.setSpeed(2);
     expect(sim.getState().config.speed).toBe(2);
-    expect(fake.posted.at(-1)).toMatchObject({ type: "SET_SPEED", speed: 120 });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "SET_SPEED", speed: 2 });
     fake.tick(100);
     await flush();
     await controller.stop();
@@ -162,12 +164,8 @@ describe("P2 Gate ใน SimulationController", () => {
 });
 
 describe("สเกลเวลาเล่นภาพ", () => {
-  it("x1 = 1 วินาทีจริงต่อ 1 นาทีในร้าน และทุกตัวเลือกแปลงเป็นหน่วย Worker ถูกต้อง", () => {
-    expect(playbackSpeedToWorkerSpeed(1)).toBe(60);
-    expect(playbackSpeedToWorkerSpeed(1.5)).toBe(90);
-    expect(playbackSpeedToWorkerSpeed(2)).toBe(120);
-    expect(playbackSpeedToWorkerSpeed(5)).toBe(300);
-    expect(playbackSpeedToWorkerSpeed(10)).toBe(600);
+  it("x1 = เวลาจริง และทุกตัวเลือกแปลงเป็นหน่วย Worker ถูกต้อง", () => {
+    expect(SPEED_OPTIONS.map(playbackSpeedToWorkerSpeed)).toEqual([1, 2, 5, 10, 30]);
   });
 });
 
@@ -247,8 +245,9 @@ describe("Overlay helpers", () => {
   });
 
   it("interpolateAgents: เลื่อนระหว่าง 2 tick ตาม id และไม่ interpolate เมื่อกระโดดไกล", () => {
-    const prev = { at: 0, agents: new Float32Array([1, 0, 0, 0, 2, 5, 5, 4]) };
-    const curr = { at: 50, agents: new Float32Array([1, 0.5, 0, 0, 2, 1, 1, 5, 3, 2, 2, 0]) };
+    const staff = new Float32Array(0);
+    const prev = { at: 0, agents: new Float32Array([1, 0, 0, 0, 2, 5, 5, 4]), staff };
+    const curr = { at: 50, agents: new Float32Array([1, 0.5, 0, 0, 2, 1, 1, 5, 3, 2, 2, 0]), staff };
     expect(interpolateAgents(prev, curr, 0.5)).toEqual([
       [0.25, 0, 0],
       [1, 1, 5],

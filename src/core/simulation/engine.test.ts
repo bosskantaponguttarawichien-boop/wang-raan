@@ -5,6 +5,9 @@ import { block, cafeLayout } from "@/test/fixtures/layouts";
 import {
   AGENT_STRIDE,
   CELL_FREE,
+  QUIET_SPEED,
+  STAFF_STATE_CODE,
+  STAFF_STRIDE,
   HEATMAP_EVERY,
   Simulation,
   SimulationWorkerRuntime,
@@ -137,6 +140,73 @@ describe("Customer flow simulation แบบ B สั่งที่เคาน
     const cells = touchingCells(sim.grid, footprint(counter));
     expect(cells.length).toBeGreaterThan(10);
     for (const c of cells) expect(sim.grid.cells[c]).toBe(CELL_FREE);
+  });
+
+  it("trackPaths: ทางเดินเริ่มที่ประตู ไม่ทะลุโต๊ะ และ drainPaths ล้างทุกครั้ง", () => {
+    const untracked = new Simulation(cafeLayout(), { customersPerHour: 120, seed: 5 });
+    run(untracked, 120);
+    expect(untracked.drainPaths()).toHaveLength(0);
+
+    const sim = new Simulation(cafeLayout(), { customersPerHour: 120, seed: 5 });
+    const tables = cafeLayout().objects.filter((o) => o.type === "table").map((o) => footprint(o));
+    sim.trackPaths();
+    let firstPoint: [number, number] | null = null;
+    let points = 0;
+    for (let t = 0; t < 600; t += 0.25) {
+      sim.step(0.25);
+      const paths = sim.drainPaths();
+      for (let o = 0; o < paths.length; ) {
+        const count = paths[o + 1]!;
+        for (let i = 0; i < count; i++) {
+          const x = paths[o + 2 + i * 2]!;
+          const y = paths[o + 3 + i * 2]!;
+          firstPoint ??= [x, y];
+          // ทางเดินไม่ทะลุโต๊ะ (จุดนั่งอยู่บนเก้าอี้ได้)
+          for (const r of tables) expect(x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.depth).toBe(false);
+          points++;
+        }
+        o += 2 + count * 2;
+      }
+    }
+    expect(points).toBeGreaterThan(10);
+    expect(firstPoint![1]).toBeGreaterThan(cafeLayout().depth - 0.5); // ลูกค้าคนแรกเริ่มที่ประตูผนังทิศใต้
+    expect(sim.drainPaths()).toHaveLength(0);
+  });
+
+  it("พนักงานหน้าร้านเดินไปรับออร์เดอร์ ไปรับอาหารที่ประตูครัวมาเสิร์ฟ และไปเก็บโต๊ะ ไม่เดินทะลุโต๊ะ", () => {
+    const layout = cafeLayout();
+    const tables = layout.objects.filter((o) => o.type === "table").map((o) => footprint(o));
+    const sim = new Simulation(layout, { customersPerHour: 30, seed: 3 });
+    sim.trackPaths();
+    const home = Array.from(sim.staffBuffer().subarray(1, 3));
+    const seen = new Set<number>();
+    let nearKitchen = false;
+    for (let t = 0; t < 3 * 3600; t += 1) {
+      sim.step(1);
+      const staff = sim.staffBuffer();
+      for (let o = 0; o < staff.length; o += STAFF_STRIDE) {
+        const [x, y, code] = [staff[o + 1]!, staff[o + 2]!, staff[o + 3]!];
+        seen.add(code);
+        for (const r of tables) expect(x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.depth).toBe(false);
+        if (code === STAFF_STATE_CODE.serving && y < 0.6) nearKitchen = true; // ประตูครัวอยู่ผนังทิศเหนือ
+      }
+    }
+    expect([...seen].sort()).toEqual(Object.values(STAFF_STATE_CODE).sort());
+    expect(nearKitchen).toBe(true);
+    expect(home[0]).toBeGreaterThan(0);
+  });
+
+  it("trackPaths ไม่เปลี่ยนผลจำลอง (ภาพพนักงานไม่สุ่มเพิ่ม)", () => {
+    const plain = new Simulation(cafeLayout(), { customersPerHour: 40, seed: 8 });
+    const tracked = new Simulation(cafeLayout(), { customersPerHour: 40, seed: 8 });
+    tracked.trackPaths();
+    for (let t = 0; t < 4 * 3600; t += 5) {
+      plain.step(5);
+      tracked.step(5);
+      tracked.drainPaths();
+      tracked.staffBuffer();
+    }
+    expect(tracked.getMetrics()).toEqual(plain.getMetrics());
   });
 
   it("agentBuffer เรียง id, x, y, state", () => {
@@ -272,6 +342,27 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     expect(last.heatmap).toBeDefined();
     expect(rt.isRunning).toBe(false);
     expect(rt.tick(100)).toBeNull();
+  });
+
+  it("START skipQuiet: ช่วงไม่มีใครเดินเล่นเร็วเป็น QUIET_SPEED และกลับเวลาจริงเมื่อมีคนเดิน", () => {
+    const rt = new SimulationWorkerRuntime();
+    rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } });
+    const config = { customersPerHour: 30, speed: 1, seed: 4, serviceStyle: "table-service", stopAtSeconds: 7200, skipQuiet: true };
+    rt.handle({ type: "START", requestId: 2, layoutRevision: validation.layoutRevision, config });
+    const steps: number[] = [];
+    let time = 0;
+    let tick: TickMessage | null = null;
+    for (let i = 0; i < 400; i++) {
+      tick = rt.tick(50)!.response;
+      steps.push(tick.metrics.time - time);
+      time = tick.metrics.time;
+    }
+    expect(tick!.staff).toHaveLength(2 * STAFF_STRIDE);
+    expect(steps.some((d) => d > 0.05 * 2 && d <= 0.05 * QUIET_SPEED + 1e-9)).toBe(true); // ร้านว่าง → เร่ง
+    expect(steps.filter((d) => Math.abs(d - 0.05) < 1e-9).length).toBeGreaterThan(20); // มีคนเดิน → เวลาจริง
+    // ไม่ส่ง skipQuiet → เวลาจริงตลอด
+    rt.handle({ type: "START", requestId: 3, layoutRevision: validation.layoutRevision, config: { ...config, skipQuiet: undefined } });
+    expect(rt.tick(50)!.response.metrics.time).toBeCloseTo(0.05, 9);
   });
 
   it("ค่าคอนฟิกนอกช่วง → INVALID_MESSAGE", () => {
