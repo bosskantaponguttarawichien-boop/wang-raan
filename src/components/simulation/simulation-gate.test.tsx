@@ -76,7 +76,7 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "ANALYZE_DAY", "START"]);
     // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มที่ 1.5 ชม. หลังเปิดร้าน
     expect(sim.getState().analysis?.staffing.recommended).not.toBeNull();
-    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 60 } });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 60, easeIn: true } });
     for (let i = 0; i < 40; i++) fake.tick(250);
     await flush();
     expect(controller.current).not.toBeNull();
@@ -90,7 +90,8 @@ describe("P2 Gate ใน SimulationController", () => {
     await controller.start();
     sim.getState().setConfig({ speed: 10 });
     await controller.setSpeed(10);
-    for (let i = 0; i < 40; i++) fake.tick(250); // 40 × 0.25 วิ × (x10 × 60) = 6000 วิ > ช่วงพีค 5400 วิ
+    // 40 tick แรก (10 วิ) คือช่วงค่อย ๆ เร่ง แล้วอีก 40 × 0.25 วิ × (x10 × 60) = 6000 วิ > ช่วงพีค 5400 วิ
+    for (let i = 0; i < 80; i++) fake.tick(250);
     await flush();
     await flush();
     expect(sim.getState()).toMatchObject({ status: "idle", message: "ดูช่วงคนเยอะจบแล้ว" });

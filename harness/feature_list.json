@@ -1325,6 +1325,20 @@
       "summary": "เจ้าของร้านกรอกสิ่งที่รู้ แล้วได้คำตอบเป็นภาษาคน",
       "sprint": 4,
       "evidence": "src/components/simulation/{day-setup-form,day-answers}.tsx + src/lib/day-config.ts; store config = DayConfig + analysis; controller SYNC → ANALYZE_DAY (timeout 60 วิ) → START ช่วงคนเยอะ (seed เดียวกับวิเคราะห์) → TICK finished หยุดเอง; แถบสถานะ/การ์ดสรุปแสดงเวลาในร้าน (นาฬิกา); day-panel.test.tsx 5 tests + gate tests 2 ใหม่; make test 73 files / 944 tests (+ toast เมื่อเริ่มไม่ได้), make lint ผ่าน; Playwright chromium a11y/playground-ux/keyboard/responsive 44 tests ผ่าน (a11y \"ระหว่างจำลอง\" 1440px ล้ม 1 ครั้งในรอบแรก รันซ้ำ 8/8 + 26/26 ผ่าน จับรายละเอียดไม่ได้); เบราว์เซอร์ localhost:3001/playground: แผง 3 ส่วน, คำตอบ 3 ข้อ, เล่น 11:30–13:00 แล้วหยุดเอง, 320px ไม่มี horizontal scroll"
+    },
+    {
+      "id": "feat-097",
+      "name": "เริ่มเล่นภาพจำลองแบบค่อย ๆ เร่ง (ลูกค้าเดินเข้าร้านช้า ๆ)",
+      "description": "x1 = 1 วินาทีจริงต่อ 1 นาทีในร้าน ทำให้ลูกค้าดูวิ่งเข้าร้าน (~70 ม./วิ) ตั้งแต่เริ่ม — ตอนเริ่มเล่นภาพให้ worker เดินเวลาเบื้องหลังถึงตอนที่ลูกค้ากลุ่มถัดไปเพิ่งถึงประตู แล้วเล่นเท่าเวลาจริง 6 วินาที และค่อย ๆ เร่งถึงความเร็วที่เลือกใน 4 วินาที; ผลวิเคราะห์ทั้งวันไม่เปลี่ยน",
+      "dependencies": [
+        "feat-095"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "กดเริ่มแล้วเห็นลูกค้าเดินเข้าร้านแบบคนจริงก่อน แล้วค่อยเร่งเวลา",
+      "sprint": 4,
+      "evidence": "worker-runtime.ts easedSpeed + START easeIn (EASE_IN_HOLD_MS 6000 / EASE_IN_RAMP_MS 4000 / lookahead 10 นาทีจำลอง ไม่เกินครึ่งช่วงที่ดู); engine.ts advanceToNextArrival; controller ส่ง easeIn: true; engine.test.ts +2 tests, simulation-gate.test.tsx ปรับตามช่วงเร่ง; npm test 74 files / 951 tests, make lint ผ่าน; Chromium localhost:3123/playground: นาฬิกาค้าง 11:34 ราว 8 วิแรก แล้วเร่งเป็นนาทีละวินาที"
     }
   ]
 }

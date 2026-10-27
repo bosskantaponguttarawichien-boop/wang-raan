@@ -65,6 +65,7 @@ const RequestSchema = z.discriminatedUnion("type", [
       patienceMinutes: z.number().finite().min(1).max(240).optional(),
       startAtSeconds: z.number().finite().min(0).max(DAY_SECONDS).optional(),
       stopAtSeconds: z.number().finite().positive().max(DAY_SECONDS + 6 * 3600).optional(),
+      easeIn: z.boolean().optional(),
     }),
   }),
   z.object({
@@ -88,6 +89,20 @@ export interface HandledMessage<T = WorkerResponse> {
 /** ส่ง heatmap ทุก ๆ N tick */
 export const HEATMAP_EVERY = 5;
 
+/** เริ่มเล่นภาพแบบค่อย ๆ เร่ง: เดินเวลาเท่าของจริงช่วงนี้ (ลูกค้าเดินเข้าร้านให้เห็น) */
+export const EASE_IN_HOLD_MS = 6000;
+/** แล้วค่อย ๆ เร่งจากเวลาจริงถึงความเร็วที่เลือกภายในช่วงนี้ */
+export const EASE_IN_RAMP_MS = 4000;
+/** ก่อนเริ่มเล่นภาพ เดินเวลาเบื้องหลังหาลูกค้ากลุ่มถัดไปได้ไม่เกินเท่านี้ (วินาทีจำลอง) */
+export const EASE_IN_LOOKAHEAD_SECONDS = 10 * 60;
+
+/** ความเร็ว (วินาทีจำลอง/วินาทีจริง) หลังเริ่มเล่นภาพไป `elapsedMs`: 1 → target แบบทวีคูณ ไม่กระชาก */
+export function easedSpeed(target: number, elapsedMs: number): number {
+  if (elapsedMs <= EASE_IN_HOLD_MS) return Math.min(1, target);
+  const p = Math.min(1, (elapsedMs - EASE_IN_HOLD_MS) / EASE_IN_RAMP_MS);
+  return target ** (p * p * (3 - 2 * p));
+}
+
 export class SimulationWorkerRuntime {
   private synced: { layout: StoreLayout; revision: string } | null = null;
   private simulation: Simulation | null = null;
@@ -95,6 +110,8 @@ export class SimulationWorkerRuntime {
   private speed = 30;
   private ticks = 0;
   private stopAt: number | null = null;
+  /** มิลลิวินาทีจริงที่เล่นไปแล้วช่วงค่อย ๆ เร่ง; null = ไม่อยู่ในช่วงนี้ */
+  private easeInMs: number | null = null;
 
   get isRunning() {
     return this.running;
@@ -138,15 +155,19 @@ export class SimulationWorkerRuntime {
         if (message.layoutRevision !== this.synced.revision) {
           return this.error(requestId, "STALE_VALIDATION", "ผังเปลี่ยนหลังการตรวจ กรุณาตรวจผังใหม่");
         }
-        const { speed, seed, startAtSeconds, stopAtSeconds, ...options } = message.config;
+        const { speed, seed, startAtSeconds, stopAtSeconds, easeIn, ...options } = message.config;
         const defined = Object.fromEntries(Object.entries(options).filter(([, v]) => v !== undefined));
         this.simulation = new Simulation(this.synced.layout, { ...defined, seed: seed ?? Date.now() % 2 ** 31 });
-        // เดินเวลาเบื้องหลังถึงจุดเริ่มดู (เช่น ต้นช่วงคนเยอะ) แล้วล้าง heatmap ให้เห็นเฉพาะช่วงที่ดู
-        if (startAtSeconds) {
-          this.simulation.step(startAtSeconds);
-          this.simulation.heatmap.fill(0);
-        }
         this.stopAt = stopAtSeconds ?? null;
+        // เดินเวลาเบื้องหลังถึงจุดเริ่มดู (เช่น ต้นช่วงคนเยอะ) แล้วล้าง heatmap ให้เห็นเฉพาะช่วงที่ดู
+        if (startAtSeconds) this.simulation.step(startAtSeconds);
+        // ค่อย ๆ เร่ง: เริ่มภาพตอนลูกค้ากลุ่มถัดไปเพิ่งถึงประตู (ไม่กินเกินครึ่งช่วงที่ดู)
+        if (easeIn) {
+          const left = this.stopAt === null ? Infinity : (this.stopAt - this.simulation.getMetrics().time) / 2;
+          this.simulation.advanceToNextArrival(Math.min(EASE_IN_LOOKAHEAD_SECONDS, Math.max(0, left)));
+        }
+        if (startAtSeconds || easeIn) this.simulation.heatmap.fill(0);
+        this.easeInMs = easeIn ? 0 : null;
         this.speed = speed;
         this.running = true;
         this.ticks = 0;
@@ -180,10 +201,16 @@ export class SimulationWorkerRuntime {
     }
   }
 
-  /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
+  /** เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง, ช่วงค่อย ๆ เร่งใช้ easedSpeed) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่ */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
-    let seconds = (realMs / 1000) * this.speed;
+    let speed = this.speed;
+    if (this.easeInMs !== null) {
+      this.easeInMs += realMs;
+      speed = easedSpeed(this.speed, this.easeInMs);
+      if (this.easeInMs >= EASE_IN_HOLD_MS + EASE_IN_RAMP_MS) this.easeInMs = null;
+    }
+    let seconds = (realMs / 1000) * speed;
     let finished = false;
     if (this.stopAt !== null) {
       const left = this.stopAt - this.simulation.getMetrics().time;
@@ -212,6 +239,7 @@ export class SimulationWorkerRuntime {
   private reset() {
     this.simulation = null;
     this.stopAt = null;
+    this.easeInMs = null;
     this.running = false;
     this.ticks = 0;
   }

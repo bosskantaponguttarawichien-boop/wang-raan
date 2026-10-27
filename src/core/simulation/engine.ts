@@ -569,6 +569,22 @@ export class Simulation {
     }
   }
 
+  /**
+   * เดินเวลาจนลูกค้ากลุ่มถัดไปเพิ่งเข้าประตู (ไม่เกิน maxSeconds) แล้วคืนวินาทีที่เดินไป
+   * ช่วงสุดท้ายเดินทีละนิดเพื่อให้ลูกค้าที่เพิ่งมายังยืนอยู่ที่ประตู
+   */
+  advanceToNextArrival(maxSeconds: number): number {
+    const arrived = this.metrics.arrived;
+    let elapsed = 0;
+    while (this.metrics.arrived === arrived && elapsed < maxSeconds) {
+      const gap = this.nextArrival > 0.05 ? this.nextArrival - 0.05 : this.nextArrival;
+      const h = Math.min(1, gap, maxSeconds - elapsed);
+      this.advance(h);
+      elapsed += h;
+    }
+    return elapsed;
+  }
+
   private advance(dt: number) {
     this.metrics.time += dt;
     this.nextArrival -= dt;

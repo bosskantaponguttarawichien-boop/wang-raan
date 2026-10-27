@@ -7,6 +7,7 @@
  *   3. สร้าง P1 → P2 contract แล้วตรวจด้วย Zod (P1LayoutContractSchema)
  *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
  *   5. START ช่วงคนเยอะ (worker เดินเวลาถึงต้นพีคเอง) → หยุดเองเมื่อจบพีค (TICK finished)
+ *      เริ่มภาพตอนลูกค้ากลุ่มถัดไปถึงประตู เดินเวลาเท่าของจริงสักครู่ แล้วค่อย ๆ เร่งถึงความเร็วที่เลือก (easeIn)
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */
 import type { StoreApi } from "zustand/vanilla";
@@ -161,6 +162,8 @@ export class SimulationController {
           speed: playbackSpeedToWorkerSpeed(config.speed),
           startAtSeconds: startAt,
           stopAtSeconds: stopAt,
+          // ลูกค้าเดินเข้าร้านช้า ๆ ให้เห็นก่อน แล้วค่อยเร่งถึงความเร็วที่เลือก
+          easeIn: true,
         },
       });
       if (started.type !== "STARTED") throw new Error(started.type === "ERROR" ? started.message : "เริ่มจำลองไม่สำเร็จ");

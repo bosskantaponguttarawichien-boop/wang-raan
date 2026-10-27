@@ -24,6 +24,8 @@ export interface SimulationStartConfig {
   startAtSeconds?: number;
   /** หยุดเองเมื่อถึงวินาทีนี้ (เช่น จบช่วงคนเยอะ) แล้วส่ง TICK สุดท้ายที่มี finished: true */
   stopAtSeconds?: number;
+  /** เริ่มเล่นภาพแบบค่อย ๆ เร่ง: รอลูกค้ากลุ่มถัดไปเข้าประตู → เดินเวลาเท่าของจริง → เร่งถึง speed */
+  easeIn?: boolean;
 }
 
 export type WorkerRequest =
