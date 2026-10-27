@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-27 ICT — แก้ Cloudflare Preview Build (feat-091)
+
+- **สาเหตุและผลลัพธ์**: dependency ที่ไม่เกี่ยวกับงาน UI ถูกติดไปกับ commit `aa5030a`: `zod` 3 → 4 และ OpenNext Cloudflare 1.20.13 → 1.20.9. Zod v4 ทำให้ `next build` ล้มตอน TypeScript ใน mock backend, form schema และ layout import. คืนสอง package และ lockfile แล้ว `npm run build` ผ่านครบ.
+- **การตรวจ**: `npm run lint`, `git diff --check` ผ่าน. `npm test` ยังมี baseline failure 1 ข้อที่ design-token assertion (`globals.css`) ซึ่งไม่เกี่ยวกับ CI failure ครั้งนี้. `npm run cf:build` บน Windows ทำซ้ำไม่ได้เพราะ OpenNext อ่าน parent directory ไม่ได้ตามข้อจำกัด Windows; Cloudflare จะใช้ Linux.
+- **Cloudflare log**: GitHub เปิดเผย Build ID `f2a6995b-7b58-4b96-a0b1-3b888156c1b7`; dashboard ต้อง login จึงอ่านรายละเอียดเพิ่มไม่ได้. ให้ผลของ `npm run build` เป็นหลักฐานยืนยันก่อน rerun preview.
+
 ## 2026-10-27 ICT — หมุนมุมมองแบบ smooth (feat-091 follow-up)
 
 - **ผลลัพธ์**: ปุ่มหมุนของ Playground มีแอนิเมชัน 480 ms ใน 2D และ 620 ms ใน 3D; 3D กล้องโคจรเป็น arc รอบร้านพร้อมไล่ orthographic frame ทุกค่า และ key light ถูกตรึงใน world-space (ไม่ย้าย/fit ใหม่เมื่อเปลี่ยนมุมมอง). พื้นและเฟอร์นิเจอร์เป็นชั้นคงที่; ผนัง วงกบ บาน ธรณี และพรมประตูใช้ material ของผนังด้านเดียวกัน สร้างครบ 4 ด้านเพียงชุดเดียวเมื่อผังเปลี่ยน แล้วไล่ opacity รายด้านพร้อมกล้อง แทนการ cross-fade room สองชุด. จึงไม่มีฐานประตูลอยค้างบนพื้น กรอบประตู หรือเงาซ้อน/โผล่ตามหลังระหว่างหมุน. reduced motion ยังใช้ SVG fallback ที่ไม่เคลื่อนไหว.

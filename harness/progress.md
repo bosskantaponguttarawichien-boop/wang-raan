@@ -3,6 +3,13 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-27] แก้ Cloudflare Preview Build ของ feat-091
+
+- ตรวจจาก PR #32 พบ Preview Build ของ Cloudflare ล้มทันที; log แบบละเอียดต้องลงชื่อเข้าใช้ Cloudflare จึงไม่เปิดเผยผ่าน GitHub.
+- จำลอง production build ในเครื่องแล้วพบสาเหตุชัดเจน: `zod` ถูกเปลี่ยนจาก v3 เป็น v4 พร้อมงานแอนิเมชัน ทำให้ TypeScript ของ mock backend, form schema และ layout import ใช้ API เดิมไม่ได้.
+- คืน `zod` เป็น `^3.25.76` และ `@opennextjs/cloudflare` เป็น `^1.20.13` พร้อมสร้าง lockfile ใหม่; `npm run build` ผ่านครบ.
+- `npm run lint` และ `git diff --check` ผ่าน. `npm test` ยังล้ม 1 baseline test ใน `src/test/design-tokens.test.ts` ที่ตรวจ token ใน `globals.css`; ไม่เกี่ยวกับ deployment หรือ dependency ที่แก้ครั้งนี้.
+
 ## [2026-10-27] ทำให้กำแพงระหว่างหมุนมุมมองลื่นไหล (feat-091 follow-up)
 
 - 2D Artboard เปลี่ยนมุมด้วย CSS transition 480ms แบบ ease-out และปิด transition ทันทีเมื่อระบบเปิด `prefers-reduced-motion`.
