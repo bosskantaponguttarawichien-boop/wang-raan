@@ -10,6 +10,7 @@
  */
 import * as React from "react";
 import { AGENT_STRIDE, STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation";
+import { STAFF_KITCHEN_CODE } from "./staff-pacer";
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController, type HeatmapFrame, type SimulationFrame } from "./simulation-controller";
 
@@ -161,8 +162,9 @@ export function SimulationOverlay({ width, depth }: { width: number; depth: numb
         ctx.strokeStyle = "#ffffff";
         ctx.stroke();
       }
-      // พนักงาน: สี่เหลี่ยมมุมมน; จุดขาวตรงกลาง = กำลังถืออาหารไปเสิร์ฟ
+      // พนักงาน: สี่เหลี่ยมมุมมน; จุดขาวตรงกลาง = กำลังถือถาดอาหารไปเสิร์ฟ (คนที่อยู่ในครัวไม่ต้องวาด)
       for (const [x, y, state] of interpolateStaff(previous, current, t)) {
+        if (state === STAFF_KITCHEN_CODE) continue;
         const half = radius * 1.1;
         ctx.beginPath();
         ctx.roundRect(x * sx - half, y * sy - half, half * 2, half * 2, half * 0.4);

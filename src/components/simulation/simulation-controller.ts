@@ -8,7 +8,8 @@
  *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
  *   5. START ตั้งแต่เปิดร้าน (ร้านว่าง) → หยุดเองเมื่อจบช่วงคนเยอะ (TICK finished)
  *      ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเอง (skipQuiet) จึงไม่ต้องนั่งดูร้านนิ่ง
- * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer ก่อน — ภาพเดินตามทางจริงด้วยความเร็วคนเดิน
+ * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer และพนักงานผ่าน StaffPacer ก่อน — ภาพเดินตามทางจริงด้วยความเร็วคนเดิน
+ * (พนักงานแวะเข้าครัวก่อนเสิร์ฟด้วย)
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */
 import type { StoreApi } from "zustand/vanilla";
@@ -22,7 +23,8 @@ import {
   simulationStore,
   type SimulationStoreState,
 } from "@/store/use-simulation-store";
-import { VISUAL_WALK_SPEED, WalkPacer, doorFrame } from "./walk-pacer";
+import { StaffPacer } from "./staff-pacer";
+import { VISUAL_WALK_SPEED, WalkPacer, doorFrame, wallDoorFrame } from "./walk-pacer";
 
 export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
@@ -69,6 +71,8 @@ export class SimulationController {
   private grid: { cols: number; rows: number } | null = null;
   /** ภาพลูกค้าเดินเท่าคนจริง — current/previous เป็นตำแหน่งที่ผ่าน pacer แล้ว */
   private readonly pacer = new WalkPacer();
+  /** ภาพพนักงานเดินเท่าคนจริง และแวะเข้าครัวก่อนเสิร์ฟ */
+  private readonly staffPacer = new StaffPacer();
   private lastTickAt: number | null = null;
   previous: SimulationFrame | null = null;
   current: SimulationFrame | null = null;
@@ -139,6 +143,8 @@ export class SimulationController {
     this.clearFrames();
     // ลูกค้าเดินมาจากนอกร้าน / ต่อแถวรอโต๊ะนอกประตู (เฉพาะภาพ)
     this.pacer.setDoor(doorFrame(layout));
+    // พนักงานเดินเข้าประตูครัวไปรับอาหาร (เฉพาะภาพ — engine รับอาหารที่ช่องติดผนัง)
+    this.staffPacer.setKitchenDoor(wallDoorFrame(layout, layout.kitchenDoor));
     try {
       const client = this.ensureClient();
       const synced = await client.syncLayout(layout, validation);
@@ -233,6 +239,7 @@ export class SimulationController {
 
   private resetPacer() {
     this.pacer.reset();
+    this.staffPacer.reset();
     this.lastTickAt = null;
   }
 
@@ -242,9 +249,14 @@ export class SimulationController {
     const now = this.deps.now();
     const dt = this.lastTickAt === null ? 0 : Math.min(MAX_TICK_GAP_SECONDS, (now - this.lastTickAt) / 1000);
     this.lastTickAt = now;
-    const walkSpeed = VISUAL_WALK_SPEED * this.deps.simulation.getState().config.speed;
+    const playback = this.deps.simulation.getState().config.speed;
+    const walkSpeed = VISUAL_WALK_SPEED * playback;
     this.previous = this.current;
-    this.current = { at: now, agents: this.pacer.update(tick.agents, tick.paths, dt, walkSpeed), staff: tick.staff ?? new Float32Array(0) };
+    this.current = {
+      at: now,
+      agents: this.pacer.update(tick.agents, tick.paths, dt, walkSpeed),
+      staff: this.staffPacer.update(tick.staff ?? new Float32Array(0), dt, walkSpeed, playback),
+    };
     if (tick.heatmap && this.grid) {
       this.heatmap = { values: tick.heatmap, max: tick.heatmapMax ?? 0, ...this.grid };
     }
