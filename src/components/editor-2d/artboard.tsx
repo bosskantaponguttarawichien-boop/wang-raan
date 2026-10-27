@@ -332,7 +332,7 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
           role="application"
           aria-label={`ผังร้านขนาด ${layout.width} × ${layout.depth} เมตร${viewRotation ? ` (มุมมองหมุน ${viewRotation} องศา)` : ""}`}
           aria-describedby={hintId}
-          className="absolute inset-0"
+          className="absolute inset-0 transition-[transform,width,height] duration-[480ms] ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
           style={stageStyle}
           data-testid="artboard-stage"
           data-view-rotation={viewRotation}

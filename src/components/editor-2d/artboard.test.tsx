@@ -121,7 +121,9 @@ describe("Keyboard", () => {
     state().rotateView(1);
     try {
       render(<Harness />);
-      expect(screen.getByTestId("artboard-stage")).toHaveStyle({ transform: "translate(-50%, -50%) rotate(90deg)" });
+      const stage = screen.getByTestId("artboard-stage");
+      expect(stage).toHaveStyle({ transform: "translate(-50%, -50%) rotate(90deg)" });
+      expect(stage).toHaveClass("transition-[transform,width,height]", "motion-reduce:transition-none");
       const table = state().layout.objects.find((o) => o.type === "table")!;
       document.querySelector<HTMLButtonElement>(`[data-id="${table.id}"]`)!.focus();
       await user.keyboard("{ArrowRight}");

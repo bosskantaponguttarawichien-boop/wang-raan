@@ -1272,7 +1272,7 @@
       "role": "frontend",
       "summary": "หมุนมุมมองผัง 2D/3D ทีละ 90° และผนัง 3D เปลี่ยนเป็นด้านไกลกล้องเสมอ",
       "sprint": 4,
-      "evidence": "src/core/preview/view-rotation.ts (Pure TS) + tests 5; store rotateView; artboard/isometric tests; make test 67 files / 896 tests, make lint (boundary/ESLint/TypeScript/API contract) ผ่าน; ตรวจเบราว์เซอร์ localhost:3123/playground: 2D หมุน 90° (ผัง 6×8, ลากขวาบนจอ = y ลด), 3D ครบ 4 มุม ผนังไกลกล้องพร้อมช่องทางเข้า/ประตูครัวถูกด้าน"
+      "evidence": "src/core/preview/view-rotation.ts (Pure TS) + tests 5; store rotateView; artboard/isometric tests; 2026-10-26/27: 2D transition 480ms; 3D camera orbit 620ms แบบ smootherstep พร้อม interpolate orthographic frame ทั้งชุด และตรึง key light ใน world-space (ไม่คำนวณตำแหน่งไฟ/Shadow Camera ใหม่เมื่อ viewRotation เปลี่ยน, ทำเฉพาะร้านเปลี่ยนขนาด). แยก floor / room / furniture: พื้นเป็นชั้นคงที่ ส่วนผนัง วงกบ บาน ธรณี และพรมประตูใช้ material ของผนังด้านเดียวกัน แล้วปรับ opacity พร้อมกันตามกล้อง จึงไม่ทิ้งฐานประตูลอยเมื่อผนังหายและไม่สร้าง geometry หรือ cross-fade room เก่า↔ใหม่ที่ทำให้กรอบประตูซ้อน. วงกบไม่ทอดเงาเพื่อไม่ให้เงายาวเปลี่ยนกะทันหัน. targeted tests 4 files / 42 tests, ESLint และ diff check ผ่าน; ตรวจ localhost:3000/playground กดหมุนหลายมุมและจับภาพก่อน/หลัง/ระหว่างแอนิเมชัน ยืนยันไม่มีประตูหรือฐานประตูจากฉากเก่าซ้อนและ console error = 0. npm test รวมยังมี baseline failures นอกขอบเขต (Zod v4 schema ของ mock-backend/forms/core-io, design token heading, timeout UX และ mock backend guest-merge); tsc ล้มเฉพาะ Zod v4 errors เดิม"
     },
     {
       "id": "feat-092",
