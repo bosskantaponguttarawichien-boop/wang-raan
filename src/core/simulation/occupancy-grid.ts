@@ -47,7 +47,12 @@ function doorCells(layout: StoreLayout, door: WallDoor | null, cells: Uint8Array
   return result;
 }
 
-export function buildOccupancyGrid(layout: StoreLayout, cellSize: Meters = SIM_CELL_SIZE): OccupancyGrid {
+/** blockStaffSpots: false = กันเฉพาะวัตถุ (ทางเดินของพนักงานเอง ที่ต้องเดินออกจากหลังเคาน์เตอร์) */
+export function buildOccupancyGrid(
+  layout: StoreLayout,
+  cellSize: Meters = SIM_CELL_SIZE,
+  { blockStaffSpots = true }: { blockStaffSpots?: boolean } = {},
+): OccupancyGrid {
   const cols = Math.ceil(layout.width / cellSize - EPSILON);
   const rows = Math.ceil(layout.depth / cellSize - EPSILON);
   const cells = new Uint8Array(cols * rows);
@@ -61,7 +66,7 @@ export function buildOccupancyGrid(layout: StoreLayout, cellSize: Meters = SIM_C
     for (let row = r0; row <= r1; row++) for (let col = c0; col <= c1; col++) cells[row * cols + col] = CELL_BLOCKED;
   }
 
-  for (const { position } of staffSpots(layout)) {
+  for (const { position } of blockStaffSpots ? staffSpots(layout) : []) {
     const own = Math.min(rows - 1, Math.floor(position.y / cellSize)) * cols + Math.min(cols - 1, Math.floor(position.x / cellSize));
     cells[own] = CELL_BLOCKED;
     const c0 = Math.max(0, Math.ceil((position.x - STAFF_RADIUS) / cellSize - 0.5));

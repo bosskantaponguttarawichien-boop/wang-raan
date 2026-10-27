@@ -24,8 +24,8 @@ export interface SimulationStartConfig {
   startAtSeconds?: number;
   /** หยุดเองเมื่อถึงวินาทีนี้ (เช่น จบช่วงคนเยอะ) แล้วส่ง TICK สุดท้ายที่มี finished: true */
   stopAtSeconds?: number;
-  /** เริ่มเล่นภาพแบบค่อย ๆ เร่ง: รอลูกค้ากลุ่มถัดไปเข้าประตู → เดินเวลาเท่าของจริง → เร่งถึง speed */
-  easeIn?: boolean;
+  /** ช่วงที่ไม่มีใครเดิน เล่นเร็วขึ้นเอง (QUIET_SPEED) แล้วกลับความเร็วปกติเมื่อมีคนเริ่มเดิน */
+  skipQuiet?: boolean;
 }
 
 export type WorkerRequest =
@@ -55,6 +55,8 @@ export interface TickMessage {
   agents: Float32Array;
   /** ทางเดินตั้งแต่ tick ก่อน: [id, จำนวนจุด, x1, y1, ...] ต่อคน (ดู Simulation.drainPaths) */
   paths?: Float32Array;
+  /** พนักงานหน้าร้าน: index, x, y, STAFF_STATE_CODE (ดู STAFF_STRIDE) */
+  staff?: Float32Array;
   metrics: SimulationMetrics;
   /** ส่งเป็นระยะ (ไม่ใช่ทุก tick) เพื่อลดปริมาณข้อมูล */
   heatmap?: Float32Array;

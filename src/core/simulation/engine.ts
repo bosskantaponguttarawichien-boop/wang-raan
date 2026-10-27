@@ -19,6 +19,7 @@ import { footprint, objectCenter } from "../layout/geometry";
 import type { Chair, Point, Rect, StoreLayout, Table } from "../layout/types";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
+import { STAFF_STRIDE, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
 
 export type ServiceStyle = "table-service" | "counter-order";
 
@@ -180,8 +181,6 @@ export function emptyMetrics(): SimulationMetrics {
   };
 }
 
-type StaffTaskKind = "deliver" | "pay" | "clean" | "take-order";
-
 interface StaffTask {
   kind: StaffTaskKind;
   agent: Agent | null;
@@ -193,7 +192,12 @@ interface Worker {
   /** วินาทีที่เหลือของงานปัจจุบัน; 0 = ว่าง */
   remaining: number;
   task: StaffTask | null;
+  /** เส้นทางเดินของงานปัจจุบัน (เฉพาะตอนเล่นภาพ) */
+  plan: StaffPlan | null;
 }
+
+/** สถานะลูกค้าที่กำลังเดิน — ไม่มีใครเดินเลยถือเป็นช่วงเงียบ */
+const WALKING_STATES: ReadonlySet<AgentState> = new Set(["to-counter", "to-seat", "leaving"]);
 
 interface Agent {
   id: number;
@@ -269,6 +273,7 @@ function chairDistance(grid: OccupancyGrid, field: FlowField, chair: Chair): num
  * ได้หลายรอบ (การวิเคราะห์ทั้งวันจำลองผังเดียวกันหลายสิบรอบ); ห้ามแก้ไขหลังสร้าง
  */
 export interface PreparedStore {
+  readonly layout: StoreLayout;
   readonly grid: OccupancyGrid;
   readonly counterCount: number;
   readonly counterField: FlowField;
@@ -317,7 +322,7 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const tables = layout.objects.filter((o): o is Table => o.type === "table").filter((table) =>
     table.chairIds.some((id) => seatFields.has(id)),
   );
-  return { grid, counterCount: counters.length, counterField, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
+  return { layout, grid, counterCount: counters.length, counterField, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
 }
 
 export class Simulation {
@@ -340,6 +345,8 @@ export class Simulation {
   private readonly takeOrderWalk: ReadonlyMap<string, number>;
   private readonly deliverWalk: ReadonlyMap<string, number>;
   private readonly frontStaff: Worker[];
+  private readonly layout: StoreLayout;
+  private staffVisuals: StaffVisuals | null = null;
   private readonly cooks: Worker[];
   private readonly staffTasks: StaffTask[] = [];
   private readonly queuedCleanTables = new Set<string>();
@@ -366,6 +373,7 @@ export class Simulation {
     this.seatRandom = mulberry32(this.config.seed ^ 0x5bd1e995);
     const prepared = "grid" in store ? store : prepareStore(store);
     this.grid = prepared.grid;
+    this.layout = prepared.layout;
     this.heatmap = new Float32Array(this.grid.cells.length);
     this.counterField = prepared.counterField;
     this.exitField = prepared.exitField;
@@ -380,7 +388,7 @@ export class Simulation {
     this.deliverWalk = prepared.deliverWalk;
     this.servingSlots = Math.max(1, prepared.counterCount * this.config.servingSlotsPerCounter);
 
-    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null }));
+    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null }));
     this.frontStaff = team(this.config.frontStaff);
     this.cooks = team(this.config.cooks);
 
@@ -562,6 +570,42 @@ export class Simulation {
   /** เริ่มเก็บทางเดินของลูกค้า ให้ภาพเดินตามทางจริงได้ (ไม่ตัดผ่านโต๊ะ) แม้ tick ห่างกันหลายเมตร */
   trackPaths() {
     this.paths ??= new Map();
+    if (this.tableService) this.staffVisuals ??= new StaffVisuals(this.layout, this.frontStaff.length);
+  }
+
+  /** ตำแหน่งพนักงานหน้าร้าน (index, x, y, STAFF_STATE_CODE) — ว่างเมื่อไม่ได้ trackPaths */
+  staffBuffer(): Float32Array {
+    const visuals = this.staffVisuals;
+    if (!visuals) return new Float32Array(0);
+    const buffer = new Float32Array(this.frontStaff.length * STAFF_STRIDE);
+    this.frontStaff.forEach((staff, i) => {
+      const p = visuals.sample(i, staff.plan, staff.plan ? staff.plan.total - staff.remaining : 0);
+      buffer.set([i, p.x, p.y, p.code], i * STAFF_STRIDE);
+    });
+    return buffer;
+  }
+
+  /** ไม่มีลูกค้าหรือพนักงานคนไหนกำลังเดิน (ทุกคนนั่ง/ยืนรอ/ทำงานอยู่กับที่) */
+  isQuiet(): boolean {
+    if (this.agents.some((agent) => WALKING_STATES.has(agent.state))) return false;
+    const visuals = this.staffVisuals;
+    return !visuals || !this.frontStaff.some((staff) => visuals.isWalking(staff.plan, staff.plan ? staff.plan.total - staff.remaining : 0));
+  }
+
+  /** ร้านว่าง: ไม่มีลูกค้าในร้านและพนักงานไม่มีงาน */
+  isEmpty(): boolean {
+    return this.agents.length === 0 && this.frontStaff.every((staff) => !staff.task) && this.cooks.every((cook) => !cook.task);
+  }
+
+  /** เดินเวลาต่อได้ไม่เกิน maxSeconds ระหว่างที่ยังเงียบอยู่ — หยุดทันทีที่มีคนเริ่มเดิน คืนวินาทีที่เดินไป */
+  stepWhileQuiet(maxSeconds: number): number {
+    let elapsed = 0;
+    while (elapsed < maxSeconds - 1e-9 && this.isQuiet()) {
+      const h = Math.min(1, maxSeconds - elapsed);
+      this.advance(h);
+      elapsed += h;
+    }
+    return elapsed;
   }
 
   /** ทางเดินตั้งแต่ครั้งก่อน: [id, จำนวนจุด, x1, y1, x2, y2, ...] ต่อกันทุกคน (รวมคนที่เพิ่งออกจากร้าน) */
@@ -607,22 +651,6 @@ export class Simulation {
       this.advance(h);
       remaining -= h;
     }
-  }
-
-  /**
-   * เดินเวลาจนลูกค้ากลุ่มถัดไปเพิ่งเข้าประตู (ไม่เกิน maxSeconds) แล้วคืนวินาทีที่เดินไป
-   * ช่วงสุดท้ายเดินทีละนิดเพื่อให้ลูกค้าที่เพิ่งมายังยืนอยู่ที่ประตู
-   */
-  advanceToNextArrival(maxSeconds: number): number {
-    const arrived = this.metrics.arrived;
-    let elapsed = 0;
-    while (this.metrics.arrived === arrived && elapsed < maxSeconds) {
-      const gap = this.nextArrival > 0.05 ? this.nextArrival - 0.05 : this.nextArrival;
-      const h = Math.min(1, gap, maxSeconds - elapsed);
-      this.advance(h);
-      elapsed += h;
-    }
-    return elapsed;
   }
 
   private advance(dt: number) {
@@ -781,6 +809,7 @@ export class Simulation {
       if (staff.remaining <= 0) {
         this.finishTask(staff.task);
         staff.task = null;
+        staff.plan = null;
       }
     }
 
@@ -793,11 +822,12 @@ export class Simulation {
 
     if (this.staffTasks.length === 0) return;
     this.staffTasks.sort((a, b) => this.taskPriority(a) - this.taskPriority(b) || a.createdAt - b.createdAt);
-    for (const staff of this.frontStaff) {
+    for (const [index, staff] of this.frontStaff.entries()) {
       if (staff.task || this.staffTasks.length === 0) continue;
       const task = this.staffTasks.shift()!;
       staff.task = task;
       staff.remaining = this.taskSeconds(task);
+      staff.plan = this.staffVisuals?.plan(index, task.kind, task.tableId ?? task.agent?.tableId ?? null, staff.remaining, this.walkSeconds(task)) ?? null;
       if (task.kind === "pay" && task.agent) task.agent.state = "ordering";
       if (task.kind === "clean" && task.tableId) this.tableById.get(task.tableId)!.status = "cleaning";
     }
@@ -816,6 +846,20 @@ export class Simulation {
         const chairId = this.tableById.get(task.tableId!)!.chairIds[0]!;
         return (this.takeOrderWalk.get(chairId) ?? 0) + this.between(this.config.cleanTableSeconds);
       }
+    }
+  }
+
+  /** ส่วนที่เป็นการเดินของเวลางาน (taskSeconds) — ใช้แบ่งเวลาในภาพเท่านั้น */
+  private walkSeconds(task: StaffTask): number {
+    switch (task.kind) {
+      case "take-order":
+        return this.takeOrderWalk.get(task.agent!.chairId!) ?? 0;
+      case "clean":
+        return this.takeOrderWalk.get(this.tableById.get(task.tableId!)!.chairIds[0]!) ?? 0;
+      case "deliver":
+        return this.deliverWalk.get(task.agent!.chairId!) ?? 0;
+      case "pay":
+        return 0;
     }
   }
 

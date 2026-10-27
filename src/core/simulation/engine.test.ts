@@ -5,11 +5,10 @@ import { block, cafeLayout } from "@/test/fixtures/layouts";
 import {
   AGENT_STRIDE,
   CELL_FREE,
-  EASE_IN_HOLD_MS,
-  EASE_IN_LOOKAHEAD_SECONDS,
-  EASE_IN_RAMP_MS,
+  QUIET_SPEED,
+  STAFF_STATE_CODE,
+  STAFF_STRIDE,
   HEATMAP_EVERY,
-  easedSpeed,
   Simulation,
   SimulationWorkerRuntime,
   AGENT_STATE_CODE,
@@ -174,6 +173,42 @@ describe("Customer flow simulation แบบ B สั่งที่เคาน
     expect(sim.drainPaths()).toHaveLength(0);
   });
 
+  it("พนักงานหน้าร้านเดินไปรับออร์เดอร์ ไปรับอาหารที่ประตูครัวมาเสิร์ฟ และไปเก็บโต๊ะ ไม่เดินทะลุโต๊ะ", () => {
+    const layout = cafeLayout();
+    const tables = layout.objects.filter((o) => o.type === "table").map((o) => footprint(o));
+    const sim = new Simulation(layout, { customersPerHour: 30, seed: 3 });
+    sim.trackPaths();
+    const home = Array.from(sim.staffBuffer().subarray(1, 3));
+    const seen = new Set<number>();
+    let nearKitchen = false;
+    for (let t = 0; t < 3 * 3600; t += 1) {
+      sim.step(1);
+      const staff = sim.staffBuffer();
+      for (let o = 0; o < staff.length; o += STAFF_STRIDE) {
+        const [x, y, code] = [staff[o + 1]!, staff[o + 2]!, staff[o + 3]!];
+        seen.add(code);
+        for (const r of tables) expect(x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.depth).toBe(false);
+        if (code === STAFF_STATE_CODE.serving && y < 0.6) nearKitchen = true; // ประตูครัวอยู่ผนังทิศเหนือ
+      }
+    }
+    expect([...seen].sort()).toEqual(Object.values(STAFF_STATE_CODE).sort());
+    expect(nearKitchen).toBe(true);
+    expect(home[0]).toBeGreaterThan(0);
+  });
+
+  it("trackPaths ไม่เปลี่ยนผลจำลอง (ภาพพนักงานไม่สุ่มเพิ่ม)", () => {
+    const plain = new Simulation(cafeLayout(), { customersPerHour: 40, seed: 8 });
+    const tracked = new Simulation(cafeLayout(), { customersPerHour: 40, seed: 8 });
+    tracked.trackPaths();
+    for (let t = 0; t < 4 * 3600; t += 5) {
+      plain.step(5);
+      tracked.step(5);
+      tracked.drainPaths();
+      tracked.staffBuffer();
+    }
+    expect(tracked.getMetrics()).toEqual(plain.getMetrics());
+  });
+
   it("agentBuffer เรียง id, x, y, state", () => {
     const sim = new Simulation(cafeLayout(), cafe({ customersPerHour: 600, seed: 1 }));
     run(sim, 60);
@@ -309,37 +344,25 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     expect(rt.tick(100)).toBeNull();
   });
 
-  it("easedSpeed: เวลาจริงช่วงแรก แล้วเร่งต่อเนื่องถึงความเร็วที่เลือก", () => {
-    expect(easedSpeed(60, 0)).toBe(1);
-    expect(easedSpeed(60, EASE_IN_HOLD_MS)).toBe(1);
-    const mid = easedSpeed(60, EASE_IN_HOLD_MS + EASE_IN_RAMP_MS / 2);
-    expect(mid).toBeGreaterThan(1);
-    expect(mid).toBeLessThan(60);
-    expect(easedSpeed(60, EASE_IN_HOLD_MS + EASE_IN_RAMP_MS)).toBeCloseTo(60, 9);
-    expect(easedSpeed(60, 60_000)).toBeCloseTo(60, 9);
-  });
-
-  it("START easeIn: เริ่มตอนลูกค้าเพิ่งถึงประตู เดินเท่าของจริง แล้วเร่งถึง speed", () => {
+  it("START skipQuiet: ช่วงไม่มีใครเดินเล่นเร็วเป็น QUIET_SPEED และกลับเวลาจริงเมื่อมีคนเดิน", () => {
     const rt = new SimulationWorkerRuntime();
     rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } });
-    const config = { customersPerHour: 60, speed: 60, seed: 4, serviceStyle: "table-service", startAtSeconds: 1800, stopAtSeconds: 7200, easeIn: true };
+    const config = { customersPerHour: 30, speed: 1, seed: 4, serviceStyle: "table-service", stopAtSeconds: 7200, skipQuiet: true };
     rt.handle({ type: "START", requestId: 2, layoutRevision: validation.layoutRevision, config });
-    const first = rt.tick(50)!.response;
-    const start = first.metrics.time - 0.05;
-    expect(start).toBeGreaterThanOrEqual(1800);
-    expect(start).toBeLessThanOrEqual(1800 + EASE_IN_LOOKAHEAD_SECONDS);
-    // ลูกค้ากลุ่มล่าสุดเพิ่งถึงประตู (ผนังทิศใต้)
-    let newest = 0;
-    for (let o = 0; o < first.agents.length; o += AGENT_STRIDE) if (first.agents[o]! > first.agents[newest]!) newest = o;
-    expect(first.agents[newest + 2]).toBeGreaterThan(layout.depth - 0.5);
-    // ช่วงแรกเวลาเดินเท่าของจริง
-    let last = first;
-    for (let ms = 50; ms < EASE_IN_HOLD_MS; ms += 50) last = rt.tick(50)!.response;
-    expect(last.metrics.time - start).toBeCloseTo(EASE_IN_HOLD_MS / 1000, 5);
-    // ผ่านช่วงเร่งแล้วกลับไปเท่ากับ speed ที่เลือก
-    for (let ms = 0; ms < EASE_IN_RAMP_MS; ms += 50) last = rt.tick(50)!.response;
-    const before = last.metrics.time;
-    expect(rt.tick(100)!.response.metrics.time - before).toBeCloseTo(6, 5);
+    const steps: number[] = [];
+    let time = 0;
+    let tick: TickMessage | null = null;
+    for (let i = 0; i < 400; i++) {
+      tick = rt.tick(50)!.response;
+      steps.push(tick.metrics.time - time);
+      time = tick.metrics.time;
+    }
+    expect(tick!.staff).toHaveLength(2 * STAFF_STRIDE);
+    expect(steps.some((d) => d > 0.05 * 2 && d <= 0.05 * QUIET_SPEED + 1e-9)).toBe(true); // ร้านว่าง → เร่ง
+    expect(steps.filter((d) => Math.abs(d - 0.05) < 1e-9).length).toBeGreaterThan(20); // มีคนเดิน → เวลาจริง
+    // ไม่ส่ง skipQuiet → เวลาจริงตลอด
+    rt.handle({ type: "START", requestId: 3, layoutRevision: validation.layoutRevision, config: { ...config, skipQuiet: undefined } });
+    expect(rt.tick(50)!.response.metrics.time).toBeCloseTo(0.05, 9);
   });
 
   it("ค่าคอนฟิกนอกช่วง → INVALID_MESSAGE", () => {

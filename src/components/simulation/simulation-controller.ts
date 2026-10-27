@@ -6,9 +6,9 @@
  *   2. Blocked → ไม่เริ่ม
  *   3. สร้าง P1 → P2 contract แล้วตรวจด้วย Zod (P1LayoutContractSchema)
  *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
- *   5. START ช่วงคนเยอะ (worker เดินเวลาถึงต้นพีคเอง) → หยุดเองเมื่อจบพีค (TICK finished)
- *      เริ่มภาพตอนลูกค้ากลุ่มถัดไปถึงประตู เดินเวลาเท่าของจริงสักครู่ แล้วค่อย ๆ เร่งถึงความเร็วที่เลือก (easeIn)
- * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer ก่อน — ภาพเดินเท่าคนจริงแม้เวลาในร้านเร็วกว่าหลายสิบเท่า
+ *   5. START ตั้งแต่เปิดร้าน (ร้านว่าง) → หยุดเองเมื่อจบช่วงคนเยอะ (TICK finished)
+ *      ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเอง (skipQuiet) จึงไม่ต้องนั่งดูร้านนิ่ง
+ * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer ก่อน — ภาพเดินตามทางจริงด้วยความเร็วคนเดิน
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */
 import type { StoreApi } from "zustand/vanilla";
@@ -28,6 +28,8 @@ export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
   at: number;
   agents: Float32Array;
+  /** พนักงานหน้าร้าน: index, x, y, STAFF_STATE_CODE */
+  staff: Float32Array;
 }
 
 export interface HeatmapFrame {
@@ -148,7 +150,8 @@ export class SimulationController {
       this.setSim({ analysis: analyzed.analysis });
 
       const { plan } = analyzed.analysis;
-      const startAt = plan.peak?.startSeconds ?? 0;
+      // เริ่มตั้งแต่เปิดร้าน ร้านยังว่าง แล้วดูลูกค้าทยอยเข้าจนจบช่วงคนเยอะ
+      const startAt = 0;
       const stopAt = plan.peak?.endSeconds ?? Math.min(plan.closeSeconds, DEFAULT_PLAYBACK_SECONDS);
       const { input } = day;
       const started = await client.request({
@@ -169,8 +172,7 @@ export class SimulationController {
           speed: playbackSpeedToWorkerSpeed(config.speed),
           startAtSeconds: startAt,
           stopAtSeconds: stopAt,
-          // ลูกค้าเดินเข้าร้านช้า ๆ ให้เห็นก่อน แล้วค่อยเร่งถึงความเร็วที่เลือก
-          easeIn: true,
+          skipQuiet: true,
         },
       });
       if (started.type !== "STARTED") throw new Error(started.type === "ERROR" ? started.message : "เริ่มจำลองไม่สำเร็จ");
@@ -240,7 +242,7 @@ export class SimulationController {
     this.lastTickAt = now;
     const walkSpeed = VISUAL_WALK_SPEED * this.deps.simulation.getState().config.speed;
     this.previous = this.current;
-    this.current = { at: now, agents: this.pacer.update(tick.agents, tick.paths, dt, walkSpeed) };
+    this.current = { at: now, agents: this.pacer.update(tick.agents, tick.paths, dt, walkSpeed), staff: tick.staff ?? new Float32Array(0) };
     if (tick.heatmap && this.grid) {
       this.heatmap = { values: tick.heatmap, max: tick.heatmapMax ?? 0, ...this.grid };
     }

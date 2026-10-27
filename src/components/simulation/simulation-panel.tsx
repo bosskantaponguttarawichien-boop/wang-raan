@@ -142,7 +142,7 @@ export function SimulationPanel({
 
           <div className="mb-3.5 space-y-2.5">
             <div>
-              <label className="mb-1 block text-[11.5px] text-secondary">ความเร็วจำลอง <span className="text-secondary">(x1 = 1 วินาทีจริง : 1 นาทีในร้าน)</span></label>
+              <label className="mb-1 block text-[11.5px] text-secondary">ความเร็วจำลอง <span className="text-secondary">(x1 = เวลาจริง · ช่วงที่ไม่มีใครเดินจะเร็วขึ้นเอง)</span></label>
               <div className="flex rounded-[8px] border border-line bg-surface p-0.5" role="group" aria-label="ความเร็วจำลอง">
                 {SPEED_OPTIONS.map((spd) => (
                   <button
@@ -380,7 +380,7 @@ export function SimulationPanel({
               <DaySetupForm disabled={status !== "idle"} />
 
               <div className="border-t border-line pt-3.5">
-                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วภาพจำลอง <span className="text-secondary">(x1 = 1 วินาทีจริง : 1 นาทีในร้าน)</span></label>
+                <label className="mb-1.5 block text-[12px] text-secondary">ความเร็วภาพจำลอง <span className="text-secondary">(x1 = เวลาจริง · ช่วงที่ไม่มีใครเดินจะเร็วขึ้นเอง)</span></label>
                 <div className="flex rounded-[8px] border border-line bg-surface p-0.5" role="group" aria-label="ความเร็วจำลอง">
                   {SPEED_OPTIONS.map((spd) => (
                     <button

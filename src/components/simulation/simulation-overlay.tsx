@@ -9,7 +9,7 @@
  * - feat-057: แสดง Heatmap รอบล่าสุดแบบจาง (globalAlpha = 0.35) บนผังตอนกลับมาแก้ผัง (สลับเปิด/ปิดได้)
  */
 import * as React from "react";
-import { AGENT_STRIDE } from "@/core/simulation";
+import { AGENT_STRIDE, STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation";
 import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController, type HeatmapFrame, type SimulationFrame } from "./simulation-controller";
 
@@ -21,7 +21,10 @@ export const AGENT_LEGEND = [
   { label: "จ่ายเงินที่เคาน์เตอร์", color: AGENT_COLORS[2] },
   { label: "นั่งที่โต๊ะ (รอสั่ง / รออาหาร / ทาน)", color: AGENT_COLORS[4] },
   { label: "เดินออก", color: AGENT_COLORS[5] },
+  { label: "พนักงาน (จุดเหลี่ยม · จุดขาว = ถืออาหาร)", color: "#7c3aed" },
 ] as const;
+/** สีจุดพนักงานหน้าร้าน */
+export const STAFF_COLOR = "#7c3aed";
 
 const TICK_MS = 50;
 
@@ -43,30 +46,40 @@ export function paintHeatmap(frame: HeatmapFrame, image: ImageData) {
   }
 }
 
+/** interpolate buffer แบบ [id, x, y, stateCode] ต่อคน ระหว่าง 2 tick */
+function interpolateBuffer(previous: Float32Array | undefined, current: Float32Array, stride: number, t: number) {
+  const before = new Map<number, [number, number]>();
+  if (previous) {
+    for (let o = 0; o < previous.length; o += stride) before.set(previous[o]!, [previous[o + 1]!, previous[o + 2]!]);
+  }
+  const out: Array<[number, number, number]> = [];
+  for (let o = 0; o < current.length; o += stride) {
+    const x = current[o + 1]!;
+    const y = current[o + 2]!;
+    const p = before.get(current[o]!);
+    // กระโดดไกล (เช่นลุกจากเก้าอี้) ไม่ interpolate
+    if (p && Math.hypot(x - p[0], y - p[1]) < 1) out.push([p[0] + (x - p[0]) * t, p[1] + (y - p[1]) * t, current[o + 3]!]);
+    else out.push([x, y, current[o + 3]!]);
+  }
+  return out;
+}
+
 /** ตำแหน่งลูกค้าที่ interpolate แล้ว: [x, y, stateCode] ต่อคน */
 export function interpolateAgents(
   previous: SimulationFrame | null,
   current: SimulationFrame | null,
   t: number,
 ): Array<[number, number, number]> {
-  if (!current) return [];
-  const before = new Map<number, [number, number]>();
-  if (previous) {
-    for (let o = 0; o < previous.agents.length; o += AGENT_STRIDE) {
-      before.set(previous.agents[o]!, [previous.agents[o + 1]!, previous.agents[o + 2]!]);
-    }
-  }
-  const out: Array<[number, number, number]> = [];
-  for (let o = 0; o < current.agents.length; o += AGENT_STRIDE) {
-    const id = current.agents[o]!;
-    const x = current.agents[o + 1]!;
-    const y = current.agents[o + 2]!;
-    const p = before.get(id);
-    // กระโดดไกล (เช่นลุกจากเก้าอี้) ไม่ interpolate
-    if (p && Math.hypot(x - p[0], y - p[1]) < 1) out.push([p[0] + (x - p[0]) * t, p[1] + (y - p[1]) * t, current.agents[o + 3]!]);
-    else out.push([x, y, current.agents[o + 3]!]);
-  }
-  return out;
+  return current ? interpolateBuffer(previous?.agents, current.agents, AGENT_STRIDE, t) : [];
+}
+
+/** ตำแหน่งพนักงานที่ interpolate แล้ว: [x, y, STAFF_STATE_CODE] ต่อคน (เรียงตาม index พนักงาน) */
+export function interpolateStaff(
+  previous: SimulationFrame | null,
+  current: SimulationFrame | null,
+  t: number,
+): Array<[number, number, number]> {
+  return current ? interpolateBuffer(previous?.staff, current.staff, STAFF_STRIDE, t) : [];
 }
 
 export function SimulationOverlay({ width, depth }: { width: number; depth: number }) {
@@ -147,6 +160,23 @@ export function SimulationOverlay({ width, depth }: { width: number; depth: numb
         ctx.lineWidth = Math.max(1, radius * 0.3);
         ctx.strokeStyle = "#ffffff";
         ctx.stroke();
+      }
+      // พนักงาน: สี่เหลี่ยมมุมมน; จุดขาวตรงกลาง = กำลังถืออาหารไปเสิร์ฟ
+      for (const [x, y, state] of interpolateStaff(previous, current, t)) {
+        const half = radius * 1.1;
+        ctx.beginPath();
+        ctx.roundRect(x * sx - half, y * sy - half, half * 2, half * 2, half * 0.4);
+        ctx.fillStyle = STAFF_COLOR;
+        ctx.fill();
+        ctx.lineWidth = Math.max(1, radius * 0.3);
+        ctx.strokeStyle = "#ffffff";
+        ctx.stroke();
+        if (state === STAFF_STATE_CODE.serving) {
+          ctx.beginPath();
+          ctx.arc(x * sx, y * sy, half * 0.45, 0, Math.PI * 2);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        }
       }
     };
     frame = requestAnimationFrame(draw);

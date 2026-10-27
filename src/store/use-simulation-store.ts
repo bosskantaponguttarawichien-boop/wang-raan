@@ -12,7 +12,7 @@ export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 /** ค่าฟอร์มจำลองร้าน 1 วัน (feat-095) + ความเร็วเล่นภาพ */
 export interface SimulationConfigState extends DayConfig {
   /**
-   * ตัวคูณเวลาเล่นภาพ: x1 = 1 วินาทีจริง ต่อ 1 นาทีในร้าน
+   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง (ช่วงที่ไม่มีใครเดิน worker เล่นเร็วขึ้นเอง)
    * แปลงเป็นวินาทีจำลองต่อวินาทีจริงที่ SimulationController ก่อนส่ง Worker
    */
   speed: number;
@@ -32,9 +32,9 @@ export interface SimulationStoreState {
   setShowHeatmap: (show: boolean) => void;
 }
 
-/** ฐานเวลา x1 = 1 วินาทีจริง ต่อ 1 นาทีในร้าน */
-export const REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X = 60;
-export const SPEED_OPTIONS = [1, 1.5, 2, 5, 10] as const;
+/** ฐานเวลา x1 = เวลาจริง — ลูกค้าและพนักงานเดินเท่าคนจริง */
+export const REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X = 1;
+export const SPEED_OPTIONS = [1, 2, 5, 10, 30] as const;
 
 export function createSimulationStore() {
   return createStore<SimulationStoreState>()((set, get) => ({
