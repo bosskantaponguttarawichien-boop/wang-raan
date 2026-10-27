@@ -3,6 +3,13 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-28] Code Review: คืนทรัพยากรถาด 3D และแก้ CRLF ใน test design tokens
+
+- ตรวจทานโค้ดบน branch `fix/staff-walk-kitchen` (commit `1e6a8fc`): สถาปัตยกรรม Pure TypeScript ใน `src/core/simulation/` ปราศจากการ import React/DOM ถูกต้องตาม Architectural Boundary.
+- `src/components/preview-3d/three-view.tsx`: เพิ่มการคืนค่า `trayGeometry`, `trayRimGeometry`, `trayMaterial` ใน dispose cleanup เมื่อ unmount เพื่อป้องกัน memory leak ใน WebGL.
+- `src/test/design-tokens.test.ts`: normalize CRLF เป็น `\n` เพื่อรองรับการรันเทสต์บน Windows ให้ผ่าน 100%.
+- QA: `src/test/design-tokens.test.ts`, `staff-pacer.test.ts`, `staff-visual.test.ts` ผ่าน 100%, `npm run lint` ผ่าน, `python scripts/validate_harness.py` ผ่าน.
+
 ## [2026-10-28] พนักงาน: เดินเท่าคนจริง ไม่ชิดผนัง ถือถาด และแวะครัว 5 วิ
 
 - `StaffPacer` ใหม่ (`src/components/simulation/staff-pacer.ts`) — ตำแหน่งพนักงานจาก worker ผ่าน pacer เหมือนลูกค้า: เดิน 1.4 ม./วินาทีจริงที่ x1 ตามทางเดิมของ engine, ตามหลังเกิน 8 วินาทีเดินค่อยเร่งให้ทัน (เวลาและผลจำลองไม่เปลี่ยน).

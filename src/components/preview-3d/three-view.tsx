@@ -1689,7 +1689,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       disposeContent(stage.furniture);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
       for (const member of staff) member.mixer.stopAllAction();
-      for (const resource of [plateGeometry, plateMaterial, foodGeometry, foodMaterial]) resource.dispose();
+      for (const resource of [plateGeometry, plateMaterial, foodGeometry, foodMaterial, trayGeometry, trayRimGeometry, trayMaterial]) resource.dispose();
       for (const asset of [customerAsset, staffAsset]) {
         disposeModel(asset.template);
         disposeModel(asset.fullScene);
