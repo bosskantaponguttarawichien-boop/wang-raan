@@ -10,7 +10,7 @@ import type { WorkerLike } from "@/lib/simulation-client";
 import { createLayoutStore, layoutStore } from "@/store/use-layout-store";
 import { createSimulationStore, simulationStore } from "@/store/use-simulation-store";
 import { cafeLayout, withoutType } from "@/test/fixtures/layouts";
-import { SimulationController } from "./simulation-controller";
+import { playbackSpeedToWorkerSpeed, SimulationController } from "./simulation-controller";
 import { interpolateAgents, paintHeatmap } from "./simulation-overlay";
 import { SimulationPanel, formatSimTime } from "./simulation-panel";
 
@@ -76,7 +76,7 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(fake.posted.map((m) => (m as { type: string }).type)).toEqual(["SYNC_LAYOUT", "ANALYZE_DAY", "START"]);
     // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มที่ 1.5 ชม. หลังเปิดร้าน
     expect(sim.getState().analysis?.staffing.recommended).not.toBeNull();
-    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2 } });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 5400, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 60 } });
     for (let i = 0; i < 40; i++) fake.tick(250);
     await flush();
     expect(controller.current).not.toBeNull();
@@ -88,9 +88,9 @@ describe("P2 Gate ใน SimulationController", () => {
     const { fake, sim, controller } = setup();
     disposers.push(() => controller.dispose());
     await controller.start();
-    sim.getState().setConfig({ speed: 600 });
-    await controller.setSpeed(600);
-    for (let i = 0; i < 40; i++) fake.tick(250); // 40 × 0.25 วิ × 600 = 6000 วิ > ช่วงพีค 5400 วิ
+    sim.getState().setConfig({ speed: 10 });
+    await controller.setSpeed(10);
+    for (let i = 0; i < 40; i++) fake.tick(250); // 40 × 0.25 วิ × (x10 × 60) = 6000 วิ > ช่วงพีค 5400 วิ
     await flush();
     await flush();
     expect(sim.getState()).toMatchObject({ status: "idle", message: "ดูช่วงคนเยอะจบแล้ว" });
@@ -141,8 +141,9 @@ describe("P2 Gate ใน SimulationController", () => {
     await controller.pause();
     expect(sim.getState().status).toBe("paused");
     await controller.resume();
-    await controller.setSpeed(120);
-    expect(sim.getState().config.speed).toBe(120);
+    await controller.setSpeed(2);
+    expect(sim.getState().config.speed).toBe(2);
+    expect(fake.posted.at(-1)).toMatchObject({ type: "SET_SPEED", speed: 120 });
     fake.tick(100);
     await flush();
     await controller.stop();
@@ -157,6 +158,16 @@ describe("P2 Gate ใน SimulationController", () => {
     disposers.push(() => controller.dispose());
     await controller.start();
     expect(await controller.start()).toEqual({ ok: false, reason: "กำลังจำลองอยู่แล้ว" });
+  });
+});
+
+describe("สเกลเวลาเล่นภาพ", () => {
+  it("x1 = 1 วินาทีจริงต่อ 1 นาทีในร้าน และทุกตัวเลือกแปลงเป็นหน่วย Worker ถูกต้อง", () => {
+    expect(playbackSpeedToWorkerSpeed(1)).toBe(60);
+    expect(playbackSpeedToWorkerSpeed(1.5)).toBe(90);
+    expect(playbackSpeedToWorkerSpeed(2)).toBe(120);
+    expect(playbackSpeedToWorkerSpeed(5)).toBe(300);
+    expect(playbackSpeedToWorkerSpeed(10)).toBe(600);
   });
 });
 
