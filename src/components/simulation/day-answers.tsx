@@ -123,7 +123,7 @@ export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; op
           <p className="m-0">
             อยู่ในร้านเฉลี่ย {minutes(seating.avgVisitMinutes)} ร้านนี้รับได้ราว {formatNumber(seating.capacityPerHour)} คน/ชม. · ช่วงคนเยอะเข้า{" "}
             {formatNumber(seating.busiestCustomersPerHour)} คน/ชม.
-            {seating.noSeat >= 1 && ` · ลูกค้าเดินกลับเพราะไม่มีที่นั่ง ${people(seating.noSeat)} คน`}
+            {seating.maxEntranceQueue >= 1 && ` · คิวรอหน้าเข้าสูงสุด ${people(seating.maxEntranceQueue)} คน`}
           </p>
           {!seating.enough && <p className="m-0">ควรเพิ่มโต๊ะ หรือเน้นขายกลับบ้านช่วงคนเยอะ</p>}
         </Question>
