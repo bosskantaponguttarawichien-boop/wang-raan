@@ -22,6 +22,7 @@ import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } fro
 import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
+import { OUTSIDE_DISTANCE, doorFrame } from "@/components/simulation/walk-pacer";
 
 export interface ThreeViewProps {
   layout: StoreLayout;
@@ -223,6 +224,8 @@ const CAMERA_TARGET_Y = 0.45;
 const CUSTOMER_SCALE = CHARACTER_SCALE;
 /** state ของ agent ที่นั่งรอ/กิน (ดู AGENT_STRIDE ใน core/simulation) → ใช้ท่านั่งของมาสคอต */
 const AGENT_STATE_SEATED = 4;
+/** รอโต๊ะนอกร้าน (AGENT_STATE_CODE["waiting-entrance"]) — ยืนหันหน้าเข้าประตู */
+const AGENT_STATE_WAITING_ENTRANCE = 6;
 /** กัน animation กระโดดเมื่อ loop หยุดไปนาน (แท็บถูกซ่อน/หยุดวาดตอนไม่มีอะไรขยับ) */
 const MAX_FRAME_DELTA = 1 / 30;
 /** ผสมท่าเดิมกับท่าใหม่ (เดิน ↔ นั่ง) แทนการตัดท่าทันที */
@@ -994,15 +997,26 @@ function fitCamera(camera: THREE.OrthographicCamera, layout: StoreLayout, viewRo
 
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   const corner = new THREE.Vector3();
+  const include = (x: number, y: number, z: number) => {
+    corner.set(x, y, z).applyMatrix4(camera.matrixWorldInverse);
+    minX = Math.min(minX, corner.x);
+    maxX = Math.max(maxX, corner.x);
+    minY = Math.min(minY, corner.y);
+    maxY = Math.max(maxY, corner.y);
+  };
   for (const x of [0, layout.width]) {
     for (const z of [0, layout.depth]) {
-      for (const y of [0, WALL_HEIGHT]) {
-        corner.set(x, y, z).applyMatrix4(camera.matrixWorldInverse);
-        minX = Math.min(minX, corner.x);
-        maxX = Math.max(maxX, corner.x);
-        minY = Math.min(minY, corner.y);
-        maxY = Math.max(maxY, corner.y);
-      }
+      for (const y of [0, WALL_HEIGHT]) include(x, y, z);
+    }
+  }
+  // พื้นที่หน้าประตูนอกร้าน (ลูกค้าเดินมา/ยืนต่อแถวรอโต๊ะ) ต้องอยู่ในภาพด้วย
+  const door = doorFrame(layout);
+  if (door) {
+    for (const lateral of [-1, 1]) {
+      const side = door.width / 2 + 1;
+      const x = door.center.x + door.outward.x * OUTSIDE_DISTANCE + door.along.x * side * lateral;
+      const z = door.center.y + door.outward.y * OUTSIDE_DISTANCE + door.along.y * side * lateral;
+      for (const y of [0, CHARACTER_HEIGHT]) include(x, y, z);
     }
   }
   const pad = 0.06;
@@ -1320,6 +1334,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const liveIds = new Set<number>();
       const { agents } = current;
       const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
+      const door = stageRef.current?.layout ? doorFrame(stageRef.current.layout) : null;
       for (let offset = 0; offset < agents.length; offset += AGENT_STRIDE) {
         const id = agents[offset]!;
         const x = agents[offset + 1]!;
@@ -1371,6 +1386,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const dz = targetZ - customer.target.z;
         if (dx * dx + dz * dz > 0.0001) customer.targetRotation = Math.atan2(dx, dz);
         if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
+        if (state === AGENT_STATE_WAITING_ENTRANCE && door) {
+          // ยืนต่อแถวนอกร้าน: หันหน้าเข้าประตูเสมอ (ไม่ใช่ทิศที่เดินมาล่าสุด)
+          customer.targetRotation = Math.atan2(door.center.x - targetX, door.center.y - targetZ);
+        }
         customer.target.set(targetX, 0, targetZ);
         // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
         const standing = animation === "Walk" && customer.animation === "Idle";

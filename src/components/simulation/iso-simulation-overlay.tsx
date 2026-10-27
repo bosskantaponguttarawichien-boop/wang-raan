@@ -17,10 +17,13 @@ import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController, type HeatmapFrame } from "./simulation-controller";
 import { behaviorFromState, drawPerson, facingFrom, personLook, type Facing, type PersonLook } from "./iso-person";
 import { AGENT_COLORS, STAFF_COLOR, interpolateAgents, interpolateStaff, paintHeatmap } from "./simulation-overlay";
+import { doorFrame } from "./walk-pacer";
 
 const TICK_MS = 50;
 const HEAT_CELL = 0.25;
 const SEATED = 4;
+/** รอโต๊ะนอกร้าน (AGENT_STATE_CODE["waiting-entrance"]) */
+const WAITING_ENTRANCE = 6;
 /** ระยะเดิน (เมตร) ต่อหนึ่งรอบก้าว (ซ้าย + ขวา) */
 const STRIDE_M = 0.7;
 /** พนักงานหน้าร้าน: เสื้อเขียว หมวกแก๊ป (เหมือนโมเดล 3D) */
@@ -158,6 +161,8 @@ export function IsoSimulationOverlay({
         const p = rotation ? pointToView({ x, y }, plan, rotation) : { x, y };
         withIds.push([-(i + 1), p.x, p.y, state]);
       });
+      const door = doorFrame(layoutRef.current);
+      const doorView = door ? (rotation ? pointToView(door.center, plan, rotation) : door.center) : null;
       const seen = new Set<number>();
       for (const sprite of projectAgents(withIds, scene.scale)) {
         seen.add(sprite.id);
@@ -177,6 +182,10 @@ export function IsoSimulationOverlay({
         }
         w.walking = dist > 1e-3 && dist < 0.5;
         if (!isStaff && sprite.state === SEATED) w.facing = seatedFacing(layoutRef.current, sprite.mx, sprite.my, w.facing);
+        if (!isStaff && sprite.state === WAITING_ENTRANCE && doorView) {
+          // ยืนต่อแถวนอกร้าน: หันหน้าเข้าประตูเสมอ
+          w.facing = facingFrom(doorView.x - sprite.mx, doorView.y - sprite.my, w.facing);
+        }
         w.mx = sprite.mx;
         w.my = sprite.my;
         drawPerson(ctx, sprite.x, sprite.y, {
