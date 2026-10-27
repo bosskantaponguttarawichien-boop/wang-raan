@@ -5,9 +5,10 @@
  * ผลจำลองจึงเท่าเดิม และใช้เฉพาะตอนเล่นภาพ (การวิเคราะห์ทั้งวันไม่สร้าง)
  * - พนักงานยืนประจำหลังเคาน์เตอร์ (staffSpots) — คนเกินจำนวนจุดยืนข้างเคาน์เตอร์
  * - เดินบนกริดที่ไม่กันจุดยืนพนักงาน (กันเฉพาะวัตถุ) จึงเดินออกจากหลังเคาน์เตอร์ได้
+ * - จุดบนเส้นทางถูกดึงให้ห่างผนัง WALL_CLEARANCE ถ้ายังเป็นช่องว่าง จึงไม่เดินซ้อนผนัง (จุดยืนประจำไม่ขยับ)
  */
 import { footprint } from "../layout/geometry";
-import type { Point, Rect, StoreLayout } from "../layout/types";
+import type { Meters, Point, Rect, StoreLayout } from "../layout/types";
 import { staffSpots } from "../preview/staff-spots";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
@@ -25,6 +26,12 @@ export const STAFF_STATE_CODE = {
 
 /** ค่าต่อพนักงานใน buffer: index, x, y, stateCode */
 export const STAFF_STRIDE = 4;
+
+/**
+ * กลางตัวพนักงานห่างผนังร้านอย่างน้อยเท่านี้ (ม.) ตอนเดิน — ไหล่กว้างราว 0.46 ม. และผนังล้ำเข้ามา 0.07 ม.
+ * จึงไม่เดินจมผนัง; ยังอยู่ในช่องกริดแถวที่สอง (0.25–0.50 ม.) ที่ตรวจแล้วว่าว่าง
+ */
+export const WALL_CLEARANCE: Meters = 0.35;
 
 export type StaffTaskKind = "deliver" | "pay" | "clean" | "take-order";
 
@@ -77,8 +84,10 @@ export class StaffVisuals {
   private readonly kitchenField: FlowField;
   private readonly homeFields = new Map<number, FlowField>();
   private readonly tableRects = new Map<string, Rect>();
+  private readonly room: { width: Meters; depth: Meters };
 
   constructor(layout: StoreLayout, workers: number) {
+    this.room = { width: layout.width, depth: layout.depth };
     this.grid = buildOccupancyGrid(layout, undefined, { blockStaffSpots: false });
     this.kitchenField = computeFlowField(this.grid, this.grid.kitchenCells);
     for (const o of layout.objects) if (o.type === "table") this.tableRects.set(o.id, footprint(o));
@@ -96,6 +105,15 @@ export class StaffVisuals {
     const s = this.grid.cellSize;
     const col = cell % this.grid.cols;
     return { x: (col + 0.5) * s, y: ((cell - col) / this.grid.cols + 0.5) * s };
+  }
+
+  /** จุดเดียวกันแต่ห่างผนังอย่างน้อย WALL_CLEARANCE — ขยับแล้วช่องไม่ว่างก็คงจุดเดิม */
+  private offWall(p: Point): Point {
+    const clamp = (value: number, size: Meters) =>
+      Math.min(Math.max(value, WALL_CLEARANCE), Math.max(WALL_CLEARANCE, size - WALL_CLEARANCE));
+    const moved = { x: clamp(p.x, this.room.width), y: clamp(p.y, this.room.depth) };
+    if (moved.x === p.x && moved.y === p.y) return p;
+    return this.grid.cells[this.cellOf(moved)] === CELL_FREE ? moved : p;
   }
 
   /** จุดยืนหลังเคาน์เตอร์ก่อน คนที่เกินยืนช่องว่างรอบเคาน์เตอร์ (ห่างกันอย่างน้อย 0.5 ม.) */
@@ -137,12 +155,12 @@ export class StaffVisuals {
   /** ช่องตามทางเดินจาก `from` ถึงเป้าหมายของ field (ไปไม่ถึง = []) */
   private trace(field: FlowField, from: number): Point[] {
     if (!Number.isFinite(field.distance[from]!)) return [];
-    const points = [this.center(from)];
+    const points = [this.offWall(this.center(from))];
     let cell = from;
     for (let guard = 0; guard < this.grid.cells.length && field.distance[cell] !== 0; guard++) {
       cell = field.next[cell]!;
       if (cell < 0) break;
-      points.push(this.center(cell));
+      points.push(this.offWall(this.center(cell)));
     }
     return points;
   }
@@ -176,7 +194,7 @@ export class StaffVisuals {
 
     const back = this.toHome(worker, stand);
     const out = [...back].reverse();
-    const at = this.center(stand);
+    const at = this.offWall(this.center(stand));
     let legs: { points: Point[]; code: number }[];
     let work: Phase | null = null;
     if (kind === "deliver") {

@@ -16,6 +16,7 @@ import {
   type WallDoor,
 } from "@/core/layout";
 import { AGENT_STRIDE, STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation";
+import { STAFF_KITCHEN_CODE } from "@/components/simulation/staff-pacer";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
 import { staffSpots } from "@/core/preview/staff-spots";
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
@@ -130,8 +131,8 @@ type StandingStaff = {
   targetRotation: number;
   animation: "Walk" | "Work";
   action: THREE.AnimationAction | null;
-  /** จานอาหารในมือ — แสดงตอนเดินจากประตูครัวไปเสิร์ฟ */
-  plate: THREE.Object3D | null;
+  /** ถาดอาหาร (ถาด + จาน) ในมือ — แสดงตอนเดินจากครัวไปเสิร์ฟ */
+  tray: THREE.Object3D | null;
 };
 
 /**
@@ -194,9 +195,9 @@ const characterAsset = (urls: { full: string; lite: string }): CharacterAsset =>
 
 /** พนักงานเคลื่อนเร็วกว่านี้ (ม./วิ) เล่นท่าเดิน ไม่งั้นเล่นท่าทำงาน (รับออร์เดอร์/เก็บโต๊ะ/ที่เคาน์เตอร์) */
 const STAFF_WALK_MIN_SPEED = 0.15;
-/** จานที่พนักงานถือไปเสิร์ฟ: สูงจากพื้นและยื่นออกหน้าตัว (ม.) */
-const PLATE_HEIGHT = CHARACTER_HEIGHT * 0.6;
-const PLATE_FORWARD = 0.28;
+/** ถาดที่พนักงานถือไปเสิร์ฟ: สูงจากพื้นและยื่นออกหน้าตัว (ม.) */
+const TRAY_HEIGHT = CHARACTER_HEIGHT * 0.6;
+const TRAY_FORWARD = 0.3;
 /** เหลื่อมจังหวะท่ายืนของพนักงานแต่ละคน ไม่ให้ขยับพร้อมกันทั้งร้าน (วินาที) */
 const STAFF_IDLE_PHASE = 0.83;
 /** ลูกค้าเคลื่อนช้ากว่านี้ (ม./วิ) นานกว่า IDLE_AFTER_SECONDS ถือว่ายืนรอ → เล่น Idle; เร็วกว่า IDLE_EXIT_SPEED กลับไปเดิน */
@@ -1222,6 +1223,26 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const plateMaterial = new THREE.MeshStandardMaterial({ color: 0xfaf7f0, roughness: 0.5 });
     const foodGeometry = new THREE.SphereGeometry(0.08, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
     const foodMaterial = new THREE.MeshStandardMaterial({ color: 0xe0a23a, roughness: 0.8 });
+    // ถาดเสิร์ฟ: แผ่นถาดกับขอบถาดบาง ๆ ใต้แผ่น (ใช้ geometry/material ชุดเดียวทั้งร้าน)
+    const trayGeometry = new THREE.BoxGeometry(0.42, 0.022, 0.3);
+    const trayRimGeometry = new THREE.BoxGeometry(0.46, 0.012, 0.34);
+    const trayMaterial = new THREE.MeshStandardMaterial({ color: 0x3c4150, roughness: 0.65 });
+    /** ถาดพร้อมจานอาหาร วางไว้ระดับมือหน้าตัวพนักงาน (ซ่อนไว้จนถึงตอนเสิร์ฟ) */
+    const createTray = () => {
+      const tray = new THREE.Group();
+      const board = new THREE.Mesh(trayGeometry, trayMaterial);
+      const rim = new THREE.Mesh(trayRimGeometry, trayMaterial);
+      rim.position.y = -0.014;
+      const plate = new THREE.Mesh(plateGeometry, plateMaterial);
+      plate.position.y = 0.024;
+      const food = new THREE.Mesh(foodGeometry, foodMaterial);
+      food.position.y = 0.036;
+      tray.add(board, rim, plate, food);
+      tray.position.set(0, TRAY_HEIGHT / CUSTOMER_SCALE, TRAY_FORWARD / CUSTOMER_SCALE);
+      tray.scale.setScalar(1 / CUSTOMER_SCALE);
+      tray.visible = false;
+      return tray;
+    };
     /** พนักงานหนึ่งคน (ท่าทำงานที่เคาน์เตอร์) — ระหว่างจำลองจะเดินตาม simulation */
     const addStaffMember = (x: number, z: number, rotation: number, index: number): StandingStaff => {
       const model = cloneSkinned(staffAsset.template!);
@@ -1242,7 +1263,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       if (cap) cap.castShadow = quality.current.characterShadows;
       const member: StandingStaff = {
         mixer, model, body: body instanceof THREE.SkinnedMesh ? body : null,
-        target: null, targetRotation: rotation, animation: "Work", action, plate: null,
+        target: null, targetRotation: rotation, animation: "Work", action, tray: null,
       };
       staff.push(member);
       return member;
@@ -1288,16 +1309,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         for (let i = 0; i < count; i++) {
           const member = addStaffMember(frame[i * STAFF_STRIDE + 1]!, frame[i * STAFF_STRIDE + 2]!, 0, i);
           member.target = member.model.position.clone();
-          const plate = new THREE.Group();
-          plate.add(new THREE.Mesh(plateGeometry, plateMaterial));
-          const food = new THREE.Mesh(foodGeometry, foodMaterial);
-          food.position.y = 0.012;
-          plate.add(food);
-          plate.position.set(0, PLATE_HEIGHT / CUSTOMER_SCALE, PLATE_FORWARD / CUSTOMER_SCALE);
-          plate.scale.setScalar(1 / CUSTOMER_SCALE);
-          plate.visible = false;
-          member.model.add(plate);
-          member.plate = plate;
+          const tray = createTray();
+          member.model.add(tray);
+          member.tray = tray;
         }
       }
       const tables = layout?.objects.filter((o) => o.type === "table") ?? [];
@@ -1324,7 +1338,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           if (Math.hypot(spot.position.x - x, spot.position.y - z) < 0.05) member.targetRotation = Math.atan2(spot.facing.x, spot.facing.y);
         }
         target.set(x, 0, z);
-        if (member.plate) member.plate.visible = code === STAFF_STATE_CODE.serving;
+        if (member.tray) member.tray.visible = code === STAFF_STATE_CODE.serving;
+        // อยู่ในครัว (หลังผนัง) — ไม่ต้องวาดจนกว่าจะเดินออกมา
+        member.model.visible = code !== STAFF_KITCHEN_CODE;
       });
     };
 
@@ -1673,7 +1689,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       disposeContent(stage.furniture);
       // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
       for (const member of staff) member.mixer.stopAllAction();
-      for (const resource of [plateGeometry, plateMaterial, foodGeometry, foodMaterial]) resource.dispose();
+      for (const resource of [plateGeometry, plateMaterial, foodGeometry, foodMaterial, trayGeometry, trayRimGeometry, trayMaterial]) resource.dispose();
       for (const asset of [customerAsset, staffAsset]) {
         disposeModel(asset.template);
         disposeModel(asset.fullScene);

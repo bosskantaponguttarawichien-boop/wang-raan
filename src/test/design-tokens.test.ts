@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 // Gate feat-002: โทเคนใน app/globals.css ต้องตรงกับ design-system.md 100%
 const root = resolve(__dirname, "../..");
-const spec = readFileSync(resolve(root, "design-system.md"), "utf8");
+const spec = readFileSync(resolve(root, "design-system.md"), "utf8").replace(/\r\n/g, "\n");
 const css = readFileSync(resolve(root, "app/globals.css"), "utf8").toLowerCase();
 
 function section(start: string, end: string): string {

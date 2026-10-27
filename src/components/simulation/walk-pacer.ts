@@ -6,7 +6,7 @@
  *   คนที่ยังไม่มีโต๊ะยืนต่อแถวนอกประตู, คนที่กลับเดินออกประตูไปจนพ้นร้านก่อนหายไป
  * ผลลัพธ์อยู่ในรูปแบบเดียวกับ TickMessage.agents เพื่อให้ overlay 2D / isometric / 3D ใช้ได้เหมือนเดิม
  */
-import type { Point, StoreLayout } from "@/core/layout";
+import type { Point, StoreLayout, WallDoor } from "@/core/layout";
 import { AGENT_STATE_CODE, AGENT_STRIDE } from "@/core/simulation";
 import { entranceSegment } from "@/core/validation";
 
@@ -35,14 +35,20 @@ export interface DoorFrame {
   width: number;
 }
 
-export function doorFrame(layout: StoreLayout): DoorFrame | null {
-  const segment = layout.entrance ? entranceSegment(layout, layout.entrance) : null;
+/** กรอบของช่องประตูบนผนัง (ทางเข้า หรือประตูครัว) — null เมื่อไม่มีประตูนั้น */
+export function wallDoorFrame(layout: StoreLayout, door: WallDoor | null): DoorFrame | null {
+  const segment = door ? entranceSegment(layout, door) : null;
   if (!segment) return null;
   const { a, b } = segment;
   const center = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
   const horizontal = a.y === b.y;
   const outward = horizontal ? { x: 0, y: a.y === 0 ? -1 : 1 } : { x: a.x === 0 ? -1 : 1, y: 0 };
   return { center, outward, along: horizontal ? { x: 1, y: 0 } : { x: 0, y: 1 }, width: Math.hypot(b.x - a.x, b.y - a.y) };
+}
+
+/** กรอบประตูทางเข้าร้าน */
+export function doorFrame(layout: StoreLayout): DoorFrame | null {
+  return wallDoorFrame(layout, layout.entrance);
 }
 
 interface Walker {

@@ -3,6 +3,21 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-28] Code Review: คืนทรัพยากรถาด 3D และแก้ CRLF ใน test design tokens
+
+- ตรวจทานโค้ดบน branch `fix/staff-walk-kitchen` (commit `1e6a8fc`): สถาปัตยกรรม Pure TypeScript ใน `src/core/simulation/` ปราศจากการ import React/DOM ถูกต้องตาม Architectural Boundary.
+- `src/components/preview-3d/three-view.tsx`: เพิ่มการคืนค่า `trayGeometry`, `trayRimGeometry`, `trayMaterial` ใน dispose cleanup เมื่อ unmount เพื่อป้องกัน memory leak ใน WebGL.
+- `src/test/design-tokens.test.ts`: normalize CRLF เป็น `\n` เพื่อรองรับการรันเทสต์บน Windows ให้ผ่าน 100%.
+- QA: `src/test/design-tokens.test.ts`, `staff-pacer.test.ts`, `staff-visual.test.ts` ผ่าน 100%, `npm run lint` ผ่าน, `python scripts/validate_harness.py` ผ่าน.
+
+## [2026-10-28] พนักงาน: เดินเท่าคนจริง ไม่ชิดผนัง ถือถาด และแวะครัว 5 วิ
+
+- `StaffPacer` ใหม่ (`src/components/simulation/staff-pacer.ts`) — ตำแหน่งพนักงานจาก worker ผ่าน pacer เหมือนลูกค้า: เดิน 1.4 ม./วินาทีจริงที่ x1 ตามทางเดิมของ engine, ตามหลังเกิน 8 วินาทีเดินค่อยเร่งให้ทัน (เวลาและผลจำลองไม่เปลี่ยน).
+- `WALL_CLEARANCE` 0.35 ม. ใน `staff-visual.ts` — จุดบนเส้นทางถูกดึงออกจากผนังถ้าช่องนั้นยังว่าง จึงไม่เดินจมผนัง (จุดยืนประจำหลังเคาน์เตอร์ไม่ขยับ).
+- รับอาหาร = เดินผ่านประตูครัวเข้าไปหลังผนัง หายตัว 5 วินาที (รหัสภาพ `STAFF_KITCHEN_CODE` = 5) แล้วโผล่ที่ประตูพร้อมถาด — 3D และ overlay 2D ไม่วาดคนที่อยู่ในครัว.
+- 3D เปลี่ยนจานลอยเป็น "ถาด + จาน + อาหาร" (`createTray` ใน `three-view.tsx`) แสดงตอนสถานะ serving.
+- QA: `npm test` 978 ผ่าน (ล้มเหลว 3 ข้อเดิมนอกขอบเขต: design token, mock-backend quota, playground-ux timeout), ESLint ไฟล์งานผ่าน, `tsc --noEmit` ผ่าน. ยังไม่ได้ดูของจริงใน Chromium.
+
 ## [2026-10-27] feat-100 follow-up: กล้องเห็นหน้าร้าน + คนรอหันเข้าประตู
 
 - `fitCamera` รวมพื้นที่นอกประตู (ห่าง OUTSIDE_DISTANCE, กว้างกว่าประตูข้างละ 1 ม.) ในกรอบภาพ 3D — คนที่เดินมา/ต่อแถวไม่หลุดจอ.
