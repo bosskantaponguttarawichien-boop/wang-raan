@@ -8,6 +8,7 @@
  *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
  *   5. START ช่วงคนเยอะ (worker เดินเวลาถึงต้นพีคเอง) → หยุดเองเมื่อจบพีค (TICK finished)
  *      เริ่มภาพตอนลูกค้ากลุ่มถัดไปถึงประตู เดินเวลาเท่าของจริงสักครู่ แล้วค่อย ๆ เร่งถึงความเร็วที่เลือก (easeIn)
+ * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer ก่อน — ภาพเดินเท่าคนจริงแม้เวลาในร้านเร็วกว่าหลายสิบเท่า
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
  */
 import type { StoreApi } from "zustand/vanilla";
@@ -21,6 +22,7 @@ import {
   simulationStore,
   type SimulationStoreState,
 } from "@/store/use-simulation-store";
+import { VISUAL_WALK_SPEED, WalkPacer } from "./walk-pacer";
 
 export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
@@ -39,6 +41,8 @@ export type StartResult = { ok: true } | { ok: false; reason: string };
 
 /** วิเคราะห์ทั้งวันอาจใช้หลายวินาทีบนเครื่องช้า */
 export const ANALYZE_TIMEOUT_MS = 60_000;
+/** tick ห่างกันเกินนี้ (แท็บถูกพัก) ไม่ให้ภาพเดินกระโดด */
+const MAX_TICK_GAP_SECONDS = 0.25;
 /** ไม่มีช่วงคนเยอะ → ดูภาพชั่วโมงแรกหลังเปิดร้าน */
 const DEFAULT_PLAYBACK_SECONDS = 3600;
 
@@ -61,6 +65,9 @@ export class SimulationController {
   private unsubscribeTick: (() => void) | null = null;
   private lastMetricsAt = -Infinity;
   private grid: { cols: number; rows: number } | null = null;
+  /** ภาพลูกค้าเดินเท่าคนจริง — current/previous เป็นตำแหน่งที่ผ่าน pacer แล้ว */
+  private readonly pacer = new WalkPacer();
+  private lastTickAt: number | null = null;
   previous: SimulationFrame | null = null;
   current: SimulationFrame | null = null;
   heatmap: HeatmapFrame | null = null;
@@ -207,6 +214,7 @@ export class SimulationController {
     // เก็บ heatmap ล่าสุดไว้ดูต่อ แต่ล้างจุดลูกค้า
     this.previous = null;
     this.current = null;
+    this.resetPacer();
     this.emit();
     if (wasActive && this.client) await this.client.request({ type: "STOP" }).catch(() => undefined);
   }
@@ -215,15 +223,24 @@ export class SimulationController {
     this.previous = null;
     this.current = null;
     this.heatmap = null;
+    this.resetPacer();
     this.emit();
+  }
+
+  private resetPacer() {
+    this.pacer.reset();
+    this.lastTickAt = null;
   }
 
   private onTick(tick: TickMessage) {
     const status = this.deps.simulation.getState().status;
     if (status !== "running" && status !== "paused") return;
     const now = this.deps.now();
+    const dt = this.lastTickAt === null ? 0 : Math.min(MAX_TICK_GAP_SECONDS, (now - this.lastTickAt) / 1000);
+    this.lastTickAt = now;
+    const walkSpeed = VISUAL_WALK_SPEED * this.deps.simulation.getState().config.speed;
     this.previous = this.current;
-    this.current = { at: now, agents: tick.agents };
+    this.current = { at: now, agents: this.pacer.update(tick.agents, tick.paths, dt, walkSpeed) };
     if (tick.heatmap && this.grid) {
       this.heatmap = { values: tick.heatmap, max: tick.heatmapMax ?? 0, ...this.grid };
     }

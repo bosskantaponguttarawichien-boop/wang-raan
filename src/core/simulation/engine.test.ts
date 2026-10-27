@@ -143,6 +143,37 @@ describe("Customer flow simulation แบบ B สั่งที่เคาน
     for (const c of cells) expect(sim.grid.cells[c]).toBe(CELL_FREE);
   });
 
+  it("trackPaths: ทางเดินเริ่มที่ประตู ไม่ทะลุโต๊ะ และ drainPaths ล้างทุกครั้ง", () => {
+    const untracked = new Simulation(cafeLayout(), { customersPerHour: 120, seed: 5 });
+    run(untracked, 120);
+    expect(untracked.drainPaths()).toHaveLength(0);
+
+    const sim = new Simulation(cafeLayout(), { customersPerHour: 120, seed: 5 });
+    const tables = cafeLayout().objects.filter((o) => o.type === "table").map((o) => footprint(o));
+    sim.trackPaths();
+    let firstPoint: [number, number] | null = null;
+    let points = 0;
+    for (let t = 0; t < 600; t += 0.25) {
+      sim.step(0.25);
+      const paths = sim.drainPaths();
+      for (let o = 0; o < paths.length; ) {
+        const count = paths[o + 1]!;
+        for (let i = 0; i < count; i++) {
+          const x = paths[o + 2 + i * 2]!;
+          const y = paths[o + 3 + i * 2]!;
+          firstPoint ??= [x, y];
+          // ทางเดินไม่ทะลุโต๊ะ (จุดนั่งอยู่บนเก้าอี้ได้)
+          for (const r of tables) expect(x > r.x && x < r.x + r.width && y > r.y && y < r.y + r.depth).toBe(false);
+          points++;
+        }
+        o += 2 + count * 2;
+      }
+    }
+    expect(points).toBeGreaterThan(10);
+    expect(firstPoint![1]).toBeGreaterThan(cafeLayout().depth - 0.5); // ลูกค้าคนแรกเริ่มที่ประตูผนังทิศใต้
+    expect(sim.drainPaths()).toHaveLength(0);
+  });
+
   it("agentBuffer เรียง id, x, y, state", () => {
     const sim = new Simulation(cafeLayout(), cafe({ customersPerHour: 600, seed: 1 }));
     run(sim, 60);

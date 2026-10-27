@@ -347,6 +347,8 @@ export class Simulation {
   private agents: Agent[] = [];
   private nextId = 1;
   private nextArrival: number;
+  /** จุดที่ลูกค้าเดินผ่านตั้งแต่ drainPaths() ครั้งก่อน (x, y ต่อจุด) — null = ไม่เก็บ */
+  private paths: Map<number, number[]> | null = null;
   private readonly maxPartyRate: number;
   private metrics: SimulationMetrics = emptyMetrics();
   private totalVisitSeconds = 0;
@@ -460,6 +462,7 @@ export class Simulation {
       },
     };
     this.agents.push(agent);
+    this.markPath(agent);
     this.metrics.arrived += agent.partySize;
     // ร้านอาหาร: ไม่มีโต๊ะสะอาดที่พอสำหรับทั้งกลุ่ม ให้ยืนรอที่ทางเข้า
     if (this.tableService && !this.goToChair(agent)) {
@@ -514,6 +517,7 @@ export class Simulation {
       if (dist <= budget) {
         agent.x = target.x;
         agent.y = target.y;
+        this.markPath(agent);
         budget -= dist;
         if (atGoal) return true;
       } else {
@@ -542,6 +546,7 @@ export class Simulation {
     agent.x = center.x;
     agent.y = center.y;
     agent.jitter = { x: 0, y: 0 };
+    this.markPath(agent);
   }
 
   /** ลุกจากเก้าอี้ ออกมายืนที่ช่องว่างข้างเก้าอี้ */
@@ -551,6 +556,41 @@ export class Simulation {
     const chair = this.chairById.get(agent.chairId!)!;
     const standCell = touchingCells(this.grid, footprint(chair)).find((c) => field.distance[c] === 0);
     if (standCell !== undefined) Object.assign(agent, this.cellCenter(standCell));
+    this.markPath(agent);
+  }
+
+  /** เริ่มเก็บทางเดินของลูกค้า ให้ภาพเดินตามทางจริงได้ (ไม่ตัดผ่านโต๊ะ) แม้ tick ห่างกันหลายเมตร */
+  trackPaths() {
+    this.paths ??= new Map();
+  }
+
+  /** ทางเดินตั้งแต่ครั้งก่อน: [id, จำนวนจุด, x1, y1, x2, y2, ...] ต่อกันทุกคน (รวมคนที่เพิ่งออกจากร้าน) */
+  drainPaths(): Float32Array {
+    const out: number[] = [];
+    for (const [id, points] of this.paths ?? []) out.push(id, points.length / 2, ...points);
+    this.paths?.clear();
+    return new Float32Array(out);
+  }
+
+  private markPath(agent: Agent) {
+    if (!this.paths) return;
+    const x = agent.x + agent.jitter.x;
+    const y = agent.y + agent.jitter.y;
+    let points = this.paths.get(agent.id);
+    if (!points) this.paths.set(agent.id, (points = []));
+    const n = points.length;
+    // จุดที่อยู่แนวเดียวกับสองจุดก่อนหน้า แทนที่จุดท้ายแทนการต่อเพิ่ม
+    if (n >= 4) {
+      const ax = points[n - 4]!, ay = points[n - 3]!, bx = points[n - 2]!, by = points[n - 1]!;
+      const cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+      const dot = (bx - ax) * (x - bx) + (by - ay) * (y - by);
+      if (Math.abs(cross) < 1e-6 && dot >= 0) {
+        points[n - 2] = x;
+        points[n - 1] = y;
+        return;
+      }
+    }
+    points.push(x, y);
   }
 
   private leave(agent: Agent) {

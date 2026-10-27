@@ -53,6 +53,8 @@ export interface TickMessage {
   type: "TICK";
   /** ค่าต่อ agent: id, x, y, stateCode (ดู AGENT_STRIDE) */
   agents: Float32Array;
+  /** ทางเดินตั้งแต่ tick ก่อน: [id, จำนวนจุด, x1, y1, ...] ต่อคน (ดู Simulation.drainPaths) */
+  paths?: Float32Array;
   metrics: SimulationMetrics;
   /** ส่งเป็นระยะ (ไม่ใช่ทุก tick) เพื่อลดปริมาณข้อมูล */
   heatmap?: Float32Array;

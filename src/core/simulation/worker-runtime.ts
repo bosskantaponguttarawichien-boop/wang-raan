@@ -167,6 +167,8 @@ export class SimulationWorkerRuntime {
           this.simulation.advanceToNextArrival(Math.min(EASE_IN_LOOKAHEAD_SECONDS, Math.max(0, left)));
         }
         if (startAtSeconds || easeIn) this.simulation.heatmap.fill(0);
+        // เก็บทางเดินเฉพาะช่วงที่เล่นภาพ (ช่วงเดินเวลาเบื้องหลังไม่ต้องใช้)
+        this.simulation.trackPaths();
         this.easeInMs = easeIn ? 0 : null;
         this.speed = speed;
         this.running = true;
@@ -222,9 +224,10 @@ export class SimulationWorkerRuntime {
     this.simulation.step(seconds);
     if (finished) this.running = false;
     const agents = this.simulation.agentBuffer();
-    const tick: TickMessage = { type: "TICK", agents, metrics: this.simulation.getMetrics() };
+    const paths = this.simulation.drainPaths();
+    const tick: TickMessage = { type: "TICK", agents, paths, metrics: this.simulation.getMetrics() };
     if (finished) tick.finished = true;
-    const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer];
+    const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer, paths.buffer as ArrayBuffer];
     if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {
       const heatmap = this.simulation.heatmap.slice();
       let max = 0;

@@ -1339,6 +1339,20 @@
       "summary": "กดเริ่มแล้วเห็นลูกค้าเดินเข้าร้านแบบคนจริงก่อน แล้วค่อยเร่งเวลา",
       "sprint": 4,
       "evidence": "worker-runtime.ts easedSpeed + START easeIn (EASE_IN_HOLD_MS 6000 / EASE_IN_RAMP_MS 4000 / lookahead 10 นาทีจำลอง ไม่เกินครึ่งช่วงที่ดู); engine.ts advanceToNextArrival; controller ส่ง easeIn: true; engine.test.ts +2 tests, simulation-gate.test.tsx ปรับตามช่วงเร่ง; npm test 74 files / 951 tests, make lint ผ่าน; Chromium localhost:3123/playground: นาฬิกาค้าง 11:34 ราว 8 วิแรก แล้วเร่งเป็นนาทีละวินาที"
+    },
+    {
+      "id": "feat-098",
+      "name": "ภาพลูกค้าเดินเท่าคนจริงตลอดการจำลอง",
+      "description": "ต่อจาก feat-097: หลังเร่งเวลาแล้วลูกค้ายังเคลื่อนที่เร็วกว่าคนเดิน 60 เท่า — ให้ภาพเดิน 1.4 ม./วินาทีจริง (× ความเร็วเล่นภาพ) ตามทางที่ engine เดินจริง โดยเวลาจำลองไม่เปลี่ยน; ภาพตามหลังได้ราว 4 วินาทีแล้วเร่งให้ทัน",
+      "dependencies": [
+        "feat-097"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ลูกค้าเดินบนจอเหมือนคนเดินจริง ไม่พุ่งไปมา",
+      "sprint": 4,
+      "evidence": "engine.ts trackPaths/drainPaths (เก็บจุดเลี้ยวตาม flow field + จุดนั่ง/ลุก), TICK.paths; src/components/simulation/walk-pacer.ts (WalkPacer) ใช้ใน SimulationController.onTick จึงมีผลทั้ง 2D / isometric / 3D; walk-pacer.test.ts 7 tests + engine path test; npm test 75 files / 959 tests, make lint ผ่าน; Chromium playground: ภาพทุก 0.5 วิ ลูกค้าลุก → เดินไปเคาน์เตอร์ → เดินออก และคนใหม่เดินจากประตูช้า ๆ"
     }
   ]
 }
