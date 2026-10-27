@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_STATE_CODE, AGENT_STRIDE } from "@/core/simulation";
-import { MAX_VISUAL_LAG_SECONDS, WalkPacer } from "./walk-pacer";
+import { cafeLayout } from "@/test/fixtures/layouts";
+import { MAX_VISUAL_LAG_SECONDS, OUTSIDE_DISTANCE, QUEUE_FIRST, QUEUE_GAP, WalkPacer, doorFrame } from "./walk-pacer";
 
 const TO_SEAT = AGENT_STATE_CODE["to-seat"];
 const SEATED = AGENT_STATE_CODE.seated;
 const LEAVING = AGENT_STATE_CODE.leaving;
+const WAITING = AGENT_STATE_CODE["waiting-entrance"];
 
 const agents = (...rows: [number, number, number, number][]) => new Float32Array(rows.flat());
 const paths = (...rows: [number, number[]][]) => new Float32Array(rows.flatMap(([id, pts]) => [id, pts.length / 2, ...pts]));
@@ -80,5 +82,69 @@ describe("WalkPacer — ภาพเดินเท่าคนจริง", ()
     pacer.update(agents([7, 1, 1, SEATED]), undefined, 0, 1.4);
     pacer.reset();
     expect(pacer.update(agents(), undefined, 0.05, 1.4)).toHaveLength(0);
+  });
+});
+
+describe("WalkPacer — นอกร้าน (ประตูผนังทิศใต้ของร้านตัวอย่าง)", () => {
+  const layout = cafeLayout();
+  const door = doorFrame(layout)!;
+  const doorX = door.center.x;
+  const depth = layout.depth;
+  const run = (pacer: WalkPacer, frame: Float32Array, seconds: number) => {
+    let out: Float32Array = new Float32Array();
+    for (let t = 0; t < seconds; t += 0.05) out = pacer.update(frame, undefined, 0.05, 1.4);
+    return out;
+  };
+  const started = () => {
+    const pacer = new WalkPacer();
+    pacer.setDoor(door);
+    pacer.update(agents(), undefined, 0, 1.4);
+    return pacer;
+  };
+
+  it("doorFrame: กลางช่องประตูบนผนังทิศใต้ ทิศออกนอกร้าน = +y", () => {
+    expect(door.center.y).toBe(depth);
+    expect(door.outward).toEqual({ x: 0, y: 1 });
+  });
+
+  it("ลูกค้าใหม่เกิดนอกร้าน แล้วเดินเข้าประตูก่อนเดินตามทางในร้าน", () => {
+    const pacer = started();
+    let out = pacer.update(agents([1, doorX, 3, TO_SEAT]), paths([1, [doorX, depth - 0.125, doorX, 3]]), 0, 1.4);
+    expect(row(out, 1)![1]).toBeCloseTo(depth + OUTSIDE_DISTANCE, 5);
+    const ys: number[] = [];
+    for (let i = 0; i < 80; i++) {
+      out = pacer.update(agents([1, doorX, 3, TO_SEAT]), undefined, 0.05, 1.4);
+      ys.push(row(out, 1)![1]!);
+    }
+    // เดินเข้าหาประตูต่อเนื่อง (y ลดลงเรื่อย ๆ) และผ่านประตูเข้ามาในร้านแล้ว
+    for (let i = 1; i < ys.length; i++) expect(ys[i]!).toBeLessThanOrEqual(ys[i - 1]! + 1e-9);
+    expect(ys.at(-1)!).toBeLessThan(depth);
+  });
+
+  it("คนที่ยังไม่มีโต๊ะยืนต่อแถวนอกร้านตามลำดับที่มา และขยับขึ้นเมื่อคนหน้าได้โต๊ะ", () => {
+    const pacer = started();
+    const inDoor = depth - 0.125;
+    let out = run(pacer, agents([2, doorX, inDoor, WAITING], [3, doorX, inDoor, WAITING]), 8);
+    expect(row(out, 2)).toEqual([doorX, depth + QUEUE_FIRST, WAITING].map((v) => expect.closeTo(v, 4)));
+    expect(row(out, 3)).toEqual([doorX, depth + QUEUE_FIRST + QUEUE_GAP, WAITING].map((v) => expect.closeTo(v, 4)));
+    // คนแรกได้โต๊ะ → เดินเข้าร้าน, คนที่สองขยับมาหัวแถว
+    out = pacer.update(agents([2, doorX, 3, TO_SEAT], [3, doorX, inDoor, WAITING]), paths([2, [doorX, inDoor, doorX, 3]]), 0, 1.4);
+    out = run(pacer, agents([2, doorX, 3, TO_SEAT], [3, doorX, inDoor, WAITING]), 8);
+    expect(row(out, 2)![1]).toBeCloseTo(3, 4);
+    expect(row(out, 3)![1]).toBeCloseTo(depth + QUEUE_FIRST, 4);
+  });
+
+  it("กลับแล้วเดินออกประตูไปจนพ้นร้านก่อนหายไป", () => {
+    const pacer = new WalkPacer();
+    pacer.setDoor(door);
+    pacer.update(agents([4, doorX, 3, LEAVING]), undefined, 0, 1.4);
+    let out = pacer.update(agents(), paths([4, [doorX, depth - 0.125]]), 0.05, 1.4);
+    let maxY = 0;
+    for (let i = 0; i < 200 && row(out, 4); i++) {
+      maxY = Math.max(maxY, row(out, 4)![1]!);
+      out = pacer.update(agents(), undefined, 0.05, 1.4);
+    }
+    expect(row(out, 4)).toBeNull();
+    expect(maxY).toBeGreaterThan(depth + OUTSIDE_DISTANCE - 0.2);
   });
 });

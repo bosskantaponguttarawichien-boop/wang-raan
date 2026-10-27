@@ -36,10 +36,10 @@ export type AgentState =
 
 /**
  * รหัสสถานะใน buffer ที่ส่งข้าม thread — ทุกช่วงที่นั่งอยู่ที่เก้าอี้ใช้รหัส 4 (ท่านั่ง)
- * table-service: 0 = เดินไปจ่ายเงิน, 1 = รอคิวจ่าย, 2 = กำลังจ่าย
+ * table-service: 0 = เดินไปจ่ายเงิน, 1 = รอคิวจ่าย, 2 = กำลังจ่าย, 6 = รอโต๊ะหน้าร้าน (ภาพแสดงเป็นแถวนอกร้าน)
  */
 export const AGENT_STATE_CODE: Record<AgentState, number> = {
-  "waiting-entrance": 1,
+  "waiting-entrance": 6,
   "to-counter": 0,
   queuing: 1,
   ordering: 2,

@@ -22,7 +22,7 @@ import {
   simulationStore,
   type SimulationStoreState,
 } from "@/store/use-simulation-store";
-import { VISUAL_WALK_SPEED, WalkPacer } from "./walk-pacer";
+import { VISUAL_WALK_SPEED, WalkPacer, doorFrame } from "./walk-pacer";
 
 export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
@@ -137,6 +137,8 @@ export class SimulationController {
 
     this.setSim({ status: "starting", message: null, metrics: null, analysis: null });
     this.clearFrames();
+    // ลูกค้าเดินมาจากนอกร้าน / ต่อแถวรอโต๊ะนอกประตู (เฉพาะภาพ)
+    this.pacer.setDoor(doorFrame(layout));
     try {
       const client = this.ensureClient();
       const synced = await client.syncLayout(layout, validation);

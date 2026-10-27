@@ -1367,6 +1367,20 @@
       "summary": "ดูร้านทำงานเหมือนจริง: ลูกค้าเข้า พนักงานรับออร์เดอร์ ไปรับอาหารที่ประตูครัวมาเสิร์ฟ เก็บโต๊ะ",
       "sprint": 4,
       "evidence": "src/core/simulation/staff-visual.ts (StaffVisuals, STAFF_STATE_CODE) + engine staffBuffer/isQuiet/isEmpty/stepWhileQuiet; TICK.staff; worker skipQuiet (QUIET_SPEED 60, EMPTY_SKIP_SECONDS 2 ชม.) แทน easeIn; controller เริ่ม startAtSeconds 0; speed x1 = 1 วินาทีจำลอง/วินาทีจริง, ตัวเลือก 1/2/5/10/30; 2D จุดเหลี่ยมม่วง (จุดขาว = ถืออาหาร), isometric คนเสื้อเขียว, 3D โมเดลพนักงานเดิน (Walk/Work) + จานอาหาร; engine tests: พนักงานครบทุกสถานะ ไม่ทะลุโต๊ะ, trackPaths ไม่เปลี่ยน metrics, skipQuiet; npm test 75 files / 961 tests, make lint ผ่าน; Chromium 2D + 3D (SwiftShader) เห็นลูกค้าเดินเข้า พนักงานเดินไปรับออร์เดอร์และเสิร์ฟ"
+    },
+    {
+      "id": "feat-100",
+      "name": "ลูกค้าเดินมาจากนอกร้าน และต่อแถวรอโต๊ะนอกประตู",
+      "description": "ผู้ใช้: ให้ลูกค้าเกิดนอกร้านแล้วค่อย ๆ เดินเข้าประตู และคนที่รอโต๊ะยืนเข้าแถวนอกร้าน (เดิมยืนบนพรมหน้าประตูในร้าน) — เฉพาะภาพ engine ไม่เปลี่ยน",
+      "dependencies": [
+        "feat-099"
+      ],
+      "gate": "ไม่มี",
+      "status": "done",
+      "role": "frontend",
+      "summary": "ลูกค้าเดินมาจากข้างนอก รอโต๊ะเป็นแถวนอกร้าน และเดินออกไปนอกร้านก่อนหายไป",
+      "sprint": 4,
+      "evidence": "walk-pacer.ts doorFrame + setDoor (เกิดห่างประตู 3 ม., แถวคนแรก 0.8 ม. ห่างกัน 0.7 ม., กลับเดินออกไป 3 ม.); AGENT_STATE_CODE waiting-entrance 1 → 6 (แยกจากรอคิวจ่ายเงิน) + สี/ท่าใน 2D/isometric; walk-pacer.test.ts +4 tests; npm test 965, make lint ผ่าน; Chromium 3D เห็นเดินจากนอกร้าน/ยืนแถวนอกประตู/เดินเข้าเมื่อโต๊ะว่าง"
     }
   ]
 }
