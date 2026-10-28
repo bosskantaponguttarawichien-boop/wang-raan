@@ -42,7 +42,8 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
     expect(seats).toBe(6);
     expect(outcome.arrived).toBeGreaterThan(90);
     expect(outcome.arrived).toBeLessThan(150);
-    expect(outcome.fed + outcome.noSeat).toBeCloseTo(outcome.arrived, 6);
+    expect(outcome.fed + outcome.noSeat + outcome.abandoned).toBeCloseTo(outcome.arrived, 6);
+    expect(outcome.unfinished).toBe(0);
   });
 
   it("ลูกค้าเยอะ → ต้องใช้พ่อครัวมากกว่าลูกค้าน้อย และจำนวนที่แนะนำผ่านเกณฑ์ ส่วนน้อยกว่า 1 คนไม่ผ่าน", { timeout: 30_000 }, () => {
