@@ -222,7 +222,9 @@ export function analyzeDay(layout: StoreLayout, input: DayInput): DayAnalysis {
       busiestCustomersPerHour: plan.peak?.customersPerHour ?? plan.customersPerHour,
       // คิวสั้นชั่วคราวระหว่างพนักงานเก็บโต๊ะไม่ใช่สัญญาณว่าโต๊ะไม่พอ;
       // เกิน 10% ของที่นั่งจึงถือว่าเป็นคิวที่มีนัยสำคัญ
-      enough: seatingOutcome.maxEntranceQueue <= Math.max(1, seats * GOOD_NO_SEAT_RATE),
+      enough:
+        seatingOutcome.maxEntranceQueue <= Math.max(1, seats * GOOD_NO_SEAT_RATE) &&
+        seatingOutcome.noSeatRate <= GOOD_NO_SEAT_RATE,
     },
   };
 }
