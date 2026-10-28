@@ -1831,7 +1831,7 @@
     {
       "id": "feat-111",
       "name": "Staff clips: เช็ดโต๊ะด้วยผ้าและเก็บจาน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -1869,7 +1869,8 @@
         "คราบหายก่อนงานเช็ดเสร็จถ้าใช้markerผิด"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-111/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "scripts/character-clips/staff-clean.mjs → WipeTable (4 วิ, markers hand-contact 0.12 / wipe-contact 0.30 / clear-complete 0.82 พร้อม stainWindow ให้ลดคราบระหว่างสองจุดหลัง จึงไม่หายก่อนเช็ดเสร็จ). ผ้าในมือแนบผิวโต๊ะ 0.746 ม. ตลอดช่วงเช็ด (ลอยไม่เกิน 0.002 ม.) กวาดซ้าย-ขวา 2.5 รอบ กว้าง 0.37 ม. รูดเข้าหาตัว 0.24 ม.; มือซ้ายเก็บจานที่ 0.765 ม. แล้วถือไว้จนจบคลิป (drift 0). ไม่มีลำตัว/แขนจมผิวโต๊ะ เท้าไม่ไถล (0) เริ่ม-จบด้วยท่ายืนจึง cross-fade กับ Idle/Work ได้. ประกาศ WIPE_FOOTPRINT bounds [-0.055,0.366]×[0.360,0.600] พร้อม fallback ให้เช็ดจาก service point อื่นเมื่อโต๊ะเกินระยะเอื้อม; ตรวจกับโต๊ะ 0.70/0.74/0.76 ม. และโต๊ะลึก. 8 เทสต์ใน src/components/preview-3d/staff-actions/staff-clean-clips.test.ts ผ่าน; หลักฐานใน harness/evidence/feat-111/; public/assets/models ไม่เปลี่ยน"
     },
     {
       "id": "feat-112",

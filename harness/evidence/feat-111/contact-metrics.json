@@ -1,0 +1,222 @@
+{
+  "task": "feat-111",
+  "generatedAt": "2026-10-28T18:41:01.040Z",
+  "provider": "scripts/character-clips/staff-clean.mjs",
+  "profile": {
+    "tableSurfaceY": 0.76,
+    "clothThickness": 0.006,
+    "wipeContactY": 0.766,
+    "plateThickness": 0.025,
+    "plateForward": 0.42,
+    "carriedPlate": [
+      -0.21,
+      1,
+      0.2
+    ],
+    "palmLocal": [
+      -0.0099,
+      -0.0864,
+      -0.0253
+    ],
+    "markerTimes": {
+      "handContact": 0.12,
+      "wipeContact": 0.3,
+      "clearComplete": 0.82
+    },
+    "stainWindow": [
+      0.3,
+      0.82
+    ],
+    "durations": {
+      "WipeTable": 4
+    }
+  },
+  "footprint": {
+    "pivot": [
+      0.175,
+      0,
+      0.16
+    ],
+    "sweepCenter": -0.05,
+    "sweepHalfAngle": 0.5,
+    "radiusFar": 0.44,
+    "radiusNear": 0.2,
+    "strokes": 2.5,
+    "bounds": [
+      -0.055,
+      0.3664,
+      0.3598,
+      0.6
+    ],
+    "fallback": "โต๊ะที่ลึก/กว้างเกิน bounds ให้ 117 เล่นซ้ำจาก service point ด้านอื่นของโต๊ะเดียวกัน"
+  },
+  "tableCases": [
+    {
+      "label": "scene-0.76",
+      "surfaceY": 0.76,
+      "halfDepth": 0.35
+    },
+    {
+      "label": "contract-label-0.74",
+      "surfaceY": 0.74,
+      "halfDepth": 0.35
+    },
+    {
+      "label": "low-0.72",
+      "surfaceY": 0.72,
+      "halfDepth": 0.3
+    },
+    {
+      "label": "deep-0.76x0.6",
+      "surfaceY": 0.76,
+      "halfDepth": 0.6
+    }
+  ],
+  "markers": {
+    "WipeTable": [
+      {
+        "name": "hand-contact",
+        "time": 0.12
+      },
+      {
+        "name": "wipe-contact",
+        "time": 0.3
+      },
+      {
+        "name": "clear-complete",
+        "time": 0.82
+      }
+    ]
+  },
+  "metrics": {
+    "full": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "WipeTable",
+          "duration": 4,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "WipeTable",
+          "duration": 4,
+          "frames": 72,
+          "clothLift": 0.0014,
+          "strokeReversals": 5,
+          "wipeBand": {
+            "x": [
+              -0.0157,
+              0.3539
+            ],
+            "z": [
+              0.3602,
+              0.598
+            ]
+          },
+          "ankleSlip": 0,
+          "carriedPlateDrift": 0.0013,
+          "bodyLowestOverTable": 0.7628,
+          "standEndHipsY": 0.92,
+          "tableClearance": {
+            "scene-0.76": -0.2599,
+            "contract-label-0.74": -0.2399,
+            "low-0.72": -0.2199,
+            "deep-0.76x0.6": -0.2599
+          }
+        }
+      ]
+    },
+    "lite": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "WipeTable",
+          "duration": 4,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "WipeTable",
+          "duration": 4,
+          "frames": 72,
+          "clothLift": 0.0014,
+          "strokeReversals": 5,
+          "wipeBand": {
+            "x": [
+              -0.0157,
+              0.3539
+            ],
+            "z": [
+              0.3602,
+              0.598
+            ]
+          },
+          "ankleSlip": 0,
+          "carriedPlateDrift": 0.0013,
+          "bodyLowestOverTable": 0.7647,
+          "standEndHipsY": 0.92,
+          "tableClearance": {
+            "scene-0.76": -0.2597,
+            "contract-label-0.74": -0.2397,
+            "low-0.72": -0.2197,
+            "deep-0.76x0.6": -0.2597
+          }
+        }
+      ]
+    }
+  },
+  "temporaryBuild": {
+    "full": {
+      "files": [
+        "cafe-staff.glb"
+      ],
+      "bytes": 339816,
+      "sha256": "6e0ef94c86496dd6bc847161d2c16722f7c54bb17df1e4b4147bd23669a4e7c0",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat111-OZui6A\\full\\cafe-staff.glb",
+        "bytes": 339816,
+        "vertices": 13879,
+        "triangles": 27568,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Work",
+          "WipeTable"
+        ]
+      }
+    },
+    "lite": {
+      "files": [
+        "cafe-staff-lite.glb"
+      ],
+      "bytes": 136244,
+      "sha256": "bb7db933944377d2efef416f619cf350ae8d5123c56236dbd9e660c54c21bd74",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat111-OZui6A\\lite\\cafe-staff-lite.glb",
+        "bytes": 136244,
+        "vertices": 3517,
+        "triangles": 6892,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Work",
+          "WipeTable"
+        ]
+      }
+    }
+  },
+  "publicAssetsUnchanged": true,
+  "publicAssetsSha256": {
+    "cafe-customer-lite.glb": "51b6b44c558e18f8a455cb828fc18614ac9f3aa9f59a42738df1c679b7fdbdf8",
+    "cafe-customer.glb": "12f1715ec32e6269f23957751f6c3e5463a53c757bae45049b019f5be7c349e4",
+    "cafe-staff-lite.glb": "648b8637907cb187b7bb3fca57111d795424a396389fe1a9af93b2691db352cb",
+    "cafe-staff.glb": "5f0c60fa474f523128d6d4b2d048fa78a18a1b05d973d8c508c5baf4350b42a0"
+  }
+}
