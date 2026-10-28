@@ -3,6 +3,18 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — Agent 3: feat-109 → feat-112 เสร็จครบสายคลิปตัวละคร (ยังไม่ export GLB กลาง)
+
+- **ส่งมอบ**: `scripts/character-clips/staff-carry.mjs` (CarryIdle/CarryWalk/PickUp/PutDown), `customer-eat.mjs` (Eat), `staff-clean.mjs` (WipeTable), `customer-seat.mjs` (PullChair/SitDown/PushChair/StandUp) — ชื่อคลิปและชื่อ marker ตรงตารางสัญญา v1 §3 ทุกตัว ไม่มีคลิป/marker ชื่ออื่นเพิ่ม
+- **สิ่งที่ 117/118/119 ต้องอ่านต่อ** (export ชื่อจริงจาก provider แต่ละไฟล์): `STAFF_CARRY_PROFILE` (grip ถาด/ระดับรับถาด/จุดวางจาน), `CUSTOMER_EAT_PROFILE` + `EAT_UTENSILS` + `utensilGripOffset()` + `eatPhaseOffset()`, `STAFF_CLEAN_PROFILE` (`stainWindow`) + `WIPE_FOOTPRINT`, `SEAT_MOTION_PROFILE` (`gripWindow`/`gripTravel`/`rootMotion`/`fallback`) — ค่าสัมผัสทั้งหมดอยู่ใน `harness/evidence/feat-109..112/contact-metrics.json` และภาพโครงกระดูกใน `preview.svg`
+- **ยังไม่ได้ export GLB กลาง** ตามกฎ ownership: ทุกการ build ลง OS temp แล้วลบ `public/assets/models/*.glb` ไม่เปลี่ยนแม้ไบต์เดียว (sha256 ตรงก่อน-หลัง) — 117 เป็นผู้ export staff สองรุ่น และ 118 เป็นผู้ export customer สองรุ่น โดยส่ง `--clips` ของ lane ที่เกี่ยวข้องพร้อมกัน (build ปัจจุบันทดสอบไฟล์ละ provider เดียว ควรทดสอบรวม staff-carry + staff-clean และ customer-eat + customer-seat ตอน export จริง)
+- **ต้องแก้ที่ระดับทีม — ผิวโต๊ะ 0.76 ไม่ใช่ 0.74**: `three-view.tsx` วางกล่องโต๊ะหนา 0.04 ม. โดยให้จุดกลางอยู่ที่ 0.74 (`placeMesh` ตั้ง `mesh.position.y`) ผิวสัมผัสจริงจึงเป็น 0.76 ม. เท่ากับที่ feat-116 ใช้ ขณะที่สัญญา v1 §3 เขียน "tabletop 0.74" — คลิปสายนี้ปรับมาใช้ 0.76 แล้วทั้งหมด เสนอให้ 122 แก้ถ้อยคำในสัญญาให้ตรงของจริง
+- **ข้อจำกัดที่ยกมาจากคลิปเดิม ไม่ได้เพิ่มใหม่**: SitDown/StandUp ใช้ท่อนล่างของ Sit เดิมทุกค่า ซึ่งตัวมันเองเลื่อนข้อเท้าไปหน้า 0.407 ม. ระหว่างพับขา (เท้าไถล) — คลิปใหม่ไม่ได้ทำให้แย่ลง แต่ถ้า 119/122 ต้องการเท้านิ่ง ต้องเขียนท่อนล่างของ Sit ใหม่ ซึ่งอยู่นอก write_scope ของ 112
+- **จุดเชื่อมที่ต้องระวัง**: ถาดของฉากติด root ของโมเดล คลิป carry จึงตรึงฝ่ามือไว้ที่พิกัดคงที่ให้ถาดอยู่กับที่ — ถ้า 117 เปลี่ยนไปผูกถาดกับกระดูกมือ ต้องถอดการตรึงนี้ออกพร้อมกัน; `PullChair` ปล่อยมือหลังเก้าอี้เคลื่อน 0.16 ม. ดังนั้น 119 ต้องตั้งจังหวะเลื่อนเก้าอี้ให้เคลื่อนเท่านี้พอดีภายใน `gripWindow`
+- **แก้สองข้อที่ Agent 1 รายงานค้างไว้ใน feat-115**: ชื่อ attribute ที่ GLTFLoader ตั้งคือ `_part` (ไม่ใช่ `part`) และพารามิเตอร์ `Buffer<ArrayBuffer>` แก้ typecheck `ArrayBuffer | SharedArrayBuffer` — ตอนนี้ `npx vitest run` ทั้ง workspace ผ่าน 100 files / 1117 tests
+- **การตรวจ**: เทสต์ใหม่ 4 ไฟล์ / 42 tests ผ่าน, `eslint` บนไฟล์ของ Agent 3 ผ่าน 0 warning/error, `tsc --noEmit` ไม่มี error ในไฟล์ของ Agent 3, `validate_harness.py` ผ่าน (Done 110/123); **ข้อควรรู้**: `tsc --noEmit` และ `eslint` ของ workspace รวมยังล้มในไฟล์ของ Agent 2 (`lighting/clock.test.ts`, `lighting/scene-lighting.test.ts`, `lighting/shadow-fit.test.ts`, `lighting/settings-panel.tsx`, `table-service/table-service.test.ts`) ซึ่ง Agent 3 ไม่ได้แก้เพราะอยู่นอก write_scope
+- **ขอบเขต**: ไม่แตะ `three-view.tsx`, `scripts/create-cafe-customer-model.mjs`, `scripts/model-generation/*`, `runtime/contracts.ts`, GLB ตัวละคร หรือไฟล์ของ Agent 1/2; แก้เฉพาะ write_scope ของ 109–112 บวก `harness/feature_list.json` (สถานะ+หลักฐาน 4 งาน), `harness/progress.md`, `harness/session-handoff.md`
+- **ถัดไปของ Agent 3**: `117` (staff-actions + export staff GLB, รอ 114), `118` (customer-actions + export customer GLB, รอ 114 และอาหาร), `119` (seating, รอ 115 ซึ่งเสร็จแล้ว)
 ## 2026-10-29 ICT — Agent1:113→114→115 พร้อมส่งต่อ
 
 - Commits113=`516f7f8`,114=`6a37025`;115ดูcommitล่าสุดบนcodex/animation-foundation หลังบันทึกชุดนี้ ใช้ฐานรวมเหล่านี้ก่อนงาน116–119/122;ไม่ต้องเริ่ม122ในturnนี้

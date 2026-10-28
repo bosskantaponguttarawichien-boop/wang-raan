@@ -1875,7 +1875,7 @@
     {
       "id": "feat-112",
       "name": "Customer clips: ดึงเก้าอี้ นั่ง ดันเข้า และลุกอย่างสัมพันธ์มือเท้า",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -1912,7 +1912,8 @@
         "roottranslationกับchairtranslationถูกคูณซ้ำ"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-112/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "scripts/character-clips/customer-seat.mjs → PullChair/SitDown/PushChair/StandUp (markers hand-contact/seated ครบทุกคลิป). SitDown/StandUp ยืม track ท่อนล่างของ Sit เดิมทุกค่า (StandUp = ย้อนเวลา) เฟรมแรก/ท้ายจึงตรงท่ายืน 0.92 ม. และท่านั่ง 0.58 ม. เป๊ะและต่อกันสนิททั้งสองทาง. ไม่มี root translation: สะโพกเลื่อนไม่เกิน 0.04 ม. ระยะถอยไปนั่ง 0.30 ม. ยังเป็นของ seat-motion. PullChair เกาะพนักพิงที่ 0.84 ม. (คลาด 0.0004 ม.) และดึงเก้าอี้ไป gripTravel 0.16 ม. แล้วปล่อย จึงถูกทั้งที่ระยะดึง 0.30 และ 0.16 ม. โดยเท้าไม่ยก/ไม่ไถล (0.0002 ม.); PushChair ยันขอบเบาะ 0.45 ม. โดยสะโพก/ขาคาที่เดิม. ไม่มีผิวตัวแทรกแผ่นโต๊ะ 0.70–0.74 ม. ตรวจกับเก้าอี้ 2 แบบ+สตูลและ 3 scale. 11 เทสต์ใน src/components/preview-3d/seating/customer-seat-clips.test.ts ผ่าน; หลักฐานใน harness/evidence/feat-112/; public/assets/models ไม่เปลี่ยน"
     },
     {
       "id": "feat-113",
