@@ -3,6 +3,27 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-116, feat-120, feat-121 — Table Service Visuals, Solar Foundation และ Scene Lighting Runtime (Agent 2)
+
+- **feat-116 (Table visuals — จานอาหาร 5 แบบ การกิน คราบ และการล้างคราบ)**:
+  - สร้าง `src/components/preview-3d/table-service/table-service.ts` และ `index.ts` ตามสัญญา `SceneFeatureFactory` (`createTableServiceFeature`)
+  - ผูกตำแหน่งจานอาหารบนผิวโต๊ะ (`y = 0.76m`) จาก `chairId` และรูปร่างโต๊ะ (`round`/`rectangle`, ขนาด `0.60×0.60m` ถึงใหญ่, หมุน `0/90/180/270` องศา, กลุ่มลูกค้า 1/2/4 คน) ไม่ซ้อนทับ ไม่จม และไม่ลอย
+  - โหลดโมเดลอาหารทั้ง 5 เมนู (`full`/`lite`) แบบ lazy พร้อมแคชร่วมและ procedural fallback ทันที; สลับ `FoodFull → FoodPartial → FoodEmpty` โดยคง `Vessel` และ `Utensil` ไว้เสมอ
+  - สร้างคราบบนโต๊ะแบบ deterministic ต่อ `(tableId, serviceCycleId)` ที่ `y = 0.7616m` (`polygonOffset` กัน z-fighting) แยก material รายโต๊ะ/รอบบริการ คงจานและคราบไว้หลังลูกค้าลุก (`dirty/used`) จางลงตาม `wipeProgress` เฉพาะโต๊ะที่กำลังเช็ด และลบสะอาดเมื่อจบงานเช็ดหรือเปลี่ยนรอบบริการ
+  - ยืนยันด้วย `src/components/preview-3d/table-service/table-service.test.ts` (4/4 ผ่าน รวมทดสอบ 10 รอบบริการไม่รั่วทรัพยากร) และภาพเรนเดอร์ WebGL ใน `harness/evidence/feat-116/`
+- **feat-120 (Solar foundation — คำนวณทิศแดด นาฬิกาจริง และตั้งค่าพิกัด/ทิศเหนือ)**:
+  - สร้าง `src/components/preview-3d/lighting/solar-position.ts` คำนวณมุมเงย (`elevationDegrees`), มุมทิศ (`azimuthDegrees`, `layoutAzimuthDegrees`), เวกเตอร์ดวงอาทิตย์ในพิกัดโลก (`+X=East, +Y=Up, +Z=South`), และ `phase` (`day`, `civil-twilight`, `nautical-twilight`, `night`) ตามสมการดาราศาสตร์ NOAA โดยไม่ผูกกับมุมกล้อง (`viewRotation`)
+  - สร้าง `settings.ts`, `clock.ts`, `src/store/use-lighting-store.ts`, และ `settings-panel.tsx` ใช้ค่าอ้างอิงเริ่มต้นกรุงเทพฯ (`13.7563°N, 100.5018°E`, `Asia/Bangkok`) พร้อมข้อความระบุชัดว่าไม่ได้ตรวจพบตำแหน่งจริงและไม่เรียก `navigator.geolocation`
+  - นาฬิกาโหมด `realtime` อัปเดตทุก 60 วินาทีจากเวลาเครื่องจริง (ไม่คูณ `playbackRate` ของการจำลอง) หยุดเมื่อแท็บซ่อน (`visibilityState === "hidden"`) หรือ `prefers-reduced-motion` / `print` และมีโหมด `fixed` สำหรับทดสอบซ้ำได้; ยืนยันด้วยยูนิตเทสต์ 3 ไฟล์ (`solar-position.test.ts`, `clock.test.ts`, `settings-panel.test.tsx` รวม 8/8 ผ่าน) และรายงานใน `harness/evidence/feat-120/report.json`
+- **feat-121 (Lighting runtime — แสงกลางวัน กลางคืน และ shadow camera ตามเวลาจริง)**:
+  - สร้าง `src/components/preview-3d/lighting/shadow-fit.ts` และ `scene-lighting.ts` คำนวณขอบเขตกล้องเงา orthographic และการ snap เข้าขนาด shadow texel (`stabilizeShadowFrustum`) รองรับร้านขนาด `2×2m` ถึง `30×30m` รวมถึงจุดยืนคิวนอกประตู (`OUTSIDE_DISTANCE = 3m`) และนโยบายเงาผนัง cutaway (`castShadow = false`)
+  - ควบคุมไฟ `DirectionalLight` (ดวงอาทิตย์), `HemisphereLight` (ฟ้า/พื้น), และ `indoorFillLight` (ไฟอบอุ่นในร้านยามค่ำคืน) ให้ตอนเช้า/เที่ยง/เย็นทอดเงาตรงข้ามดวงอาทิตย์ และตอนกลางคืนปิดเงาแดดตรง (`sunIntensity = 0`, `castShadow = false`) แต่ยังเห็นภายในร้านชัดเจน ไม่สร้าง shadow map ใหม่ทุกเฟรม และสั่ง `invalidateShadows()` เมื่อแดดหรือผังเปลี่ยนแม้ `autoUpdate = false`
+  - ยืนยันด้วย `shadow-fit.test.ts` และ `scene-lighting.test.ts` (5/5 ผ่าน) พร้อมภาพเรนเดอร์ WebGL 4 ช่วงเวลา / 4 มุมกล้อง / ขนาดร้าน 2m–30m ใน `harness/evidence/feat-121/`
+- **Code Review & Fixes**:
+  - `src/components/preview-3d/lighting/settings-panel.tsx`: ปรับสีพื้นหลัง ขอบ และตัวอักษรจากโทนสีเบจอบอุ่นมาใช้ Design Tokens น้ำเงิน–ขาว (`bg-white`, `bg-surface`, `bg-blue-soft`, `border-line`, `text-ink`, `text-secondary-strong`, `border-blue`, `text-blue-hover`) และ `leading-[1.5]` / `leading-[1.85]` ตาม `SKILL.md` กฎข้อ 2–3
+  - `src/components/preview-3d/table-service/table-service.ts`: แก้การบันทึก `usedLiteVariant` ให้ตรวจจาก `templateScene === cache.lite` จริง เพื่อให้อัปเกรดโมเดลจาก `lite` เป็น `full` ได้ครบเมื่อ `lite` โหลดเสร็จก่อน `full`
+  - `src/components/preview-3d/lighting/scene-lighting.ts`: ซิงก์เวลาจาก `clock` (ทุก 60 วินาทีในโหมด `realtime`) เข้า `use-lighting-store.ts` เพื่อให้ UI `LightingSettingsPanel` แสดงเวลาและมุมแดดตรงกับฉาก 3D เสมอ
+
 ## [2026-10-29] feat-115 — เดินตามความเร็วจริงและใช้เวลาเดียวกัน
 
 - Controllerต่อbridge114,ใช้ความเร็วลูกค้าแต่ละคนจากengineและstaff1.2ม./วิ ยกเลิกcatchup,คูณplaybackครั้งเดียว,คิวไม่เกิน1024จุดต่อคน/เก็บมุมทางเดิน;เปิดAPI current.presentation/current.timingสำหรับ122

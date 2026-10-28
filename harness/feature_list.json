@@ -1480,7 +1480,7 @@
     {
       "id": "feat-103",
       "name": "Food foundation: แคตตาล็อก อุปกรณ์ ภาชนะ และมาตรฐาน export อาหาร",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -1519,12 +1519,13 @@
         "sharedhelpersเปลี่ยนหลังfan-outทำให้5assetใช้สัญญาต่างกัน"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-103/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "src/components/preview-3d/food/catalog.ts + catalog.test.ts (5/5 passed); scripts/food-models/shared/index.mjs + export-one.mjs + harness/food-asset-spec.md; deterministic avalanche hash chooseFoodKind(seed,partyId,memberIndex) isolated from simulation RNG; tray and small-table placement fixtures verified; exporter import has zero side effects and writes only requested <id>[-lite].glb. Evidence: harness/evidence/feat-103/catalog-verification.json."
     },
     {
       "id": "feat-104",
       "name": "Food asset: โมเดลข้าวผัด full/lite + สถานะกิน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-103"
       ],
@@ -1563,12 +1564,13 @@
         "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-104/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "public/assets/models/food/fried-rice/fried-rice.glb (64.3 KB, 2524 tris) & fried-rice-lite.glb (32.6 KB, 976 tris), footprint 0.24m, origin y=0; Vessel/FoodFull/FoodPartial/FoodEmpty/Utensil verified by src/components/preview-3d/food/assets/fried-rice.test.ts; 3D screenshots and report in harness/evidence/feat-104/."
     },
     {
       "id": "feat-105",
       "name": "Food asset: โมเดลก๋วยเตี๋ยว full/lite + สถานะกิน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-103"
       ],
@@ -1607,12 +1609,13 @@
         "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-105/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "public/assets/models/food/noodles/noodles.glb (131.7 KB, 5932 tris) & noodles-lite.glb (51.8 KB, 1828 tris), footprint 0.22m, origin y=0; Vessel/FoodFull/FoodPartial/FoodEmpty/Utensil verified by src/components/preview-3d/food/assets/noodles.test.ts; 3D screenshots and report in harness/evidence/feat-105/."
     },
     {
       "id": "feat-106",
       "name": "Food asset: โมเดลสเต๊ก full/lite + สถานะกิน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-103"
       ],
@@ -1651,12 +1654,13 @@
         "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-106/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "public/assets/models/food/steak/steak.glb (42.8 KB, 1444 tris) & steak-lite.glb (29.7 KB, 776 tris), footprint 0.25m, origin y=0; Vessel/FoodFull/FoodPartial/FoodEmpty/Utensil verified by src/components/preview-3d/food/assets/steak.test.ts; 3D screenshots and report in harness/evidence/feat-106/."
     },
     {
       "id": "feat-107",
       "name": "Food asset: โมเดลสลัด full/lite + สถานะกิน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-103"
       ],
@@ -1695,12 +1699,13 @@
         "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-107/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "public/assets/models/food/salad/salad.glb (98.5 KB, 3992 tris) & salad-lite.glb (40.8 KB, 1276 tris), footprint 0.22m, origin y=0; Vessel/FoodFull/FoodPartial/FoodEmpty/Utensil verified by src/components/preview-3d/food/assets/salad.test.ts; 3D screenshots and report in harness/evidence/feat-107/."
     },
     {
       "id": "feat-108",
       "name": "Food asset: โมเดลเค้ก full/lite + สถานะกิน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-103"
       ],
@@ -1739,7 +1744,8 @@
         "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-108/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "public/assets/models/food/cake/cake.glb (32.8 KB, 1012 tris) & cake-lite.glb (23.6 KB, 536 tris), footprint 0.19m, origin y=0; Vessel/FoodFull/FoodPartial/FoodEmpty/Utensil verified by src/components/preview-3d/food/assets/cake.test.ts; 3D screenshots and report in harness/evidence/feat-108/."
     },
     {
       "id": "feat-109",
@@ -2063,7 +2069,7 @@
     {
       "id": "feat-116",
       "name": "Table visuals: จานอาหาร 5 แบบ การกิน คราบ และการล้างคราบ",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-104",
         "feat-105",
@@ -2105,7 +2111,8 @@
         "จานเหลื่อมสมาชิกเพราะchairbindingผิด"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-116/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "src/components/preview-3d/table-service/table-service.ts & index.ts implementing createTableServiceFeature with chair-bound tabletop placement (y=0.76m), lazy GLB caching + procedural fallback, full->partial->empty progress visibility, deterministic per-cycle stain decals (y=0.7616m, isolated materials), and 10-cycle leak-free cleanup; verified by src/components/preview-3d/table-service/table-service.test.ts (4/4 pass) and WebGL screenshots in harness/evidence/feat-116/."
     },
     {
       "id": "feat-117",
@@ -2248,7 +2255,7 @@
     {
       "id": "feat-120",
       "name": "Solar foundation: คำนวณทิศแดด นาฬิกาจริง และตั้งค่าพิกัด/ทิศเหนือ",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -2291,12 +2298,13 @@
         "ค่าnorth0กับแกนlayoutyต้องนิยามตรงกัน"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-120/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "NOAA solar position calculator (solar-position.ts), injectable 60s wall-clock & fixed-time controller (clock.ts), Bangkok reference defaults & Zustand store (settings.ts, use-lighting-store.ts), and accessible Thai UI panel (settings-panel.tsx); verified by solar-position.test.ts, clock.test.ts, and settings-panel.test.tsx (8/8 pass) and harness/evidence/feat-120/report.json."
     },
     {
       "id": "feat-121",
       "name": "Lighting runtime: แสงกลางวัน กลางคืน และ shadow camera ตามเวลาจริง",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-120"
       ],
@@ -2336,7 +2344,8 @@
         "shadowmapกว้างทั้ง30ม.ทำรายละเอียดหาย"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-121/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "src/components/preview-3d/lighting/shadow-fit.ts & scene-lighting.ts implementing orthographic shadow frustum fitting/texel stabilization for 2m-30m rooms, cutaway wall shadow policy (castShadow=false), daytime directional shadows + nighttime indoor warm fill, and quality-aware shadow invalidation; verified by shadow-fit.test.ts & scene-lighting.test.ts (5/5 pass) and WebGL screenshots in harness/evidence/feat-121/."
     },
     {
       "id": "feat-122",

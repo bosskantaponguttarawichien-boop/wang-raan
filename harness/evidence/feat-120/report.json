@@ -1,0 +1,28 @@
+{
+  "featureId": "feat-120",
+  "verifiedAt": "2026-10-29T01:32:00+07:00",
+  "referenceDefaults": {
+    "mode": "realtime",
+    "latitude": 13.7563,
+    "longitude": 100.5018,
+    "timezone": "Asia/Bangkok",
+    "northOffsetDegrees": 0,
+    "referenceLabel": "ค่าอ้างอิงเริ่มต้น: กรุงเทพฯ (ไม่ได้ตรวจพบตำแหน่งของคุณ)"
+  },
+  "clockCadenceMs": 60000,
+  "verifiedScenarios": [
+    "Bangkok (13.7563N, 100.5018E) morning 08:00, solar noon 12:25, evening 17:00, midnight 00:00",
+    "Tokyo (35.6762N, 139.6503E) summer solstice noon 11:45",
+    "Leap day 2024-02-29 and year boundary 2026-12-31T23:59",
+    "northOffsetDegrees rotation (+90 deg) and camera viewRotation (0/90/180/270) invariance",
+    "60s realtime cadence independent of simulation playbackRate",
+    "Document visibility pause/resume and prefers-reduced-motion / print freeze",
+    "Accessible Thai settings panel with focus ring and coordinate clamping"
+  ],
+  "unitTests": [
+    "src/components/preview-3d/lighting/solar-position.test.ts",
+    "src/components/preview-3d/lighting/clock.test.ts",
+    "src/components/preview-3d/lighting/settings-panel.test.tsx"
+  ]
+}
+

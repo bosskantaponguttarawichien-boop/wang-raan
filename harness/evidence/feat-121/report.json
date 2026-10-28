@@ -1,0 +1,33 @@
+{
+  "featureId": "feat-121",
+  "verifiedAt": "2026-10-28T18:35:50.856Z",
+  "cutawayWallShadowPolicy": "castShadow=false, receiveShadow=true (invariant across 0/90/180/270 camera rotations)",
+  "verifiedTimesOfDay": [
+    "morning (08:00)",
+    "solar noon (12:25)",
+    "evening (17:00)",
+    "night (22:00)"
+  ],
+  "verifiedCameraRotations": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "verifiedRoomSizesMeters": [
+    "2x2",
+    "8x6",
+    "30x30"
+  ],
+  "verifiedQualityLevels": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "screenshots": [
+    "harness/evidence/feat-121/4-times-of-day.png",
+    "harness/evidence/feat-121/4-camera-rotations.png",
+    "harness/evidence/feat-121/room-sizes-and-quality.png"
+  ]
+}
