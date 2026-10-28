@@ -36,6 +36,10 @@ export interface DayOutcome {
   arrived: number;
   fed: number;
   noSeat: number;
+  /** ออกจากร้านเพราะรออาหารนานเกินกำหนด */
+  abandoned: number;
+  /** คนที่ยังอยู่ในระบบเมื่อครบเวลาระบายคิวหลังร้านปิด */
+  unfinished: number;
   /** จำนวนคนสูงสุดที่ยืนรอโต๊ะสะอาดหน้าร้าน */
   maxEntranceQueue: number;
   avgFoodWaitMinutes: number;
@@ -109,7 +113,7 @@ function runOnce(store: PreparedStore, input: DayInput, plan: ArrivalPlan, seed:
   return { metrics: sim.getMetrics(), seats: sim.seatCount };
 }
 
-/** จำลองทั้งวัน (เปิดร้านจนลูกค้าคนสุดท้ายออก) เฉลี่ยจาก ANALYSIS_SEEDS */
+/** จำลองทั้งวัน (เปิดร้านจนลูกค้าคนสุดท้ายออก หรือครบเวลาระบายคิว) เฉลี่ยจาก ANALYSIS_SEEDS */
 export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput): { outcome: DayOutcome; seats: number } {
   const prepared = "grid" in store ? store : prepareStore(store);
   const plan = planArrivals(input);
@@ -126,9 +130,12 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
       arrived: mean((m) => m.arrived),
       fed: mean((m) => m.fed),
       noSeat: mean((m) => m.noSeat),
+      abandoned: mean((m) => m.abandoned),
+      unfinished: mean((m) => m.inStore),
       maxEntranceQueue: mean((m) => m.maxEntranceQueue),
       avgFoodWaitMinutes: mean((m) => m.avgFoodWaitMinutes),
-      tooLongRate: rate((m) => [m.waitedTooLong, m.fed]),
+      // นับทั้งคนที่รอนานแล้วได้อาหาร, ยกเลิกเพราะรอ, และยังค้างหลังเวลาระบายคิว
+      tooLongRate: rate((m) => [m.waitedTooLong + m.abandoned + m.inStore, m.arrived]),
       noSeatRate: rate((m) => [m.noSeat, m.arrived]),
       avgVisitMinutes: mean((m) => m.avgVisitMinutes),
       frontStaffBusy: mean((m) => m.frontStaffBusy),
@@ -137,7 +144,7 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
   };
 }
 
-export const isGood = (outcome: DayOutcome) => outcome.tooLongRate <= GOOD_TOO_LONG_RATE;
+export const isGood = (outcome: DayOutcome) => outcome.tooLongRate <= GOOD_TOO_LONG_RATE && outcome.unfinished === 0;
 
 export function analyzeDay(layout: StoreLayout, input: DayInput): DayAnalysis {
   const store = prepareStore(layout);
