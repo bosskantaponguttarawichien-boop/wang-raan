@@ -15,14 +15,20 @@ import { interpolateAgents, paintHeatmap } from "./simulation-overlay";
 import { SimulationPanel, formatSimTime } from "./simulation-panel";
 
 /** Worker จำลองบน MessageChannel + SimulationWorkerRuntime จริง (tick ด้วยมือ) */
-function fakeWorker() {
+function fakeWorker(legacyStarted = false) {
   const { port1, port2 } = new MessageChannel();
   const runtime = new SimulationWorkerRuntime();
   const posted: unknown[] = [];
   port2.on("message", (data) => {
     posted.push(data);
     const { response, transfer } = runtime.handle(data);
-    port2.postMessage(response, transfer);
+    // จำลอง tab ที่ยังใช้ Worker bundle รุ่นเก่าในช่วง deploy rollout
+    if (legacyStarted && response.type === "STARTED") {
+      const { initial: _initial, ...legacyResponse } = response;
+      port2.postMessage(legacyResponse);
+    } else {
+      port2.postMessage(response, transfer);
+    }
   });
   const listeners = new Set<(e: MessageEvent) => void>();
   port1.on("message", (data) => listeners.forEach((l) => l({ data } as MessageEvent)));
@@ -44,8 +50,8 @@ function fakeWorker() {
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
-function setup(layout = cafeLayout()) {
-  const fake = fakeWorker();
+function setup(layout = cafeLayout(), legacyStarted = false) {
+  const fake = fakeWorker(legacyStarted);
   const layoutState = createLayoutStore({ initialLayout: layout });
   const sim = createSimulationStore();
   const controller = new SimulationController({
@@ -87,6 +93,14 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(controller.current!.staff.length).toBe(2 * 4); // พนักงานหน้าร้าน 2 คน
     expect(controller.heatmap).toMatchObject({ cols: 32, rows: 24 });
     expect(sim.getState().metrics!.time).toBeGreaterThan(0);
+  });
+
+  it("Worker รุ่นเก่าที่ไม่มี initial frame ยังเริ่มจำลองได้", async () => {
+    const { controller, sim } = setup(cafeLayout(), true);
+    disposers.push(() => controller.dispose());
+    await expect(controller.start()).resolves.toEqual({ ok: true });
+    expect(sim.getState().status).toBe("running");
+    expect(controller.current).toBeNull(); // รอ TICK แรกตามพฤติกรรมเดิม
   });
 
   it("จบช่วงคนเยอะ → หยุดเอง กลับโหมดแก้ผัง เก็บผลและ heatmap ไว้", async () => {
