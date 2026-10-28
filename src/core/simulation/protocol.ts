@@ -77,7 +77,8 @@ export type WorkerResponse =
       requestId: number;
       seats: number;
       grid: { cols: number; rows: number; cellSize: number };
-      initial: { agents: Float32Array; staff: Float32Array };
+      /** Worker เวอร์ชันเก่าอาจยังไม่มี field นี้ระหว่าง rollout */
+      initial?: { agents: Float32Array; staff: Float32Array };
     }
   | { type: "ACK"; requestId: number; command: "PAUSE" | "RESUME" | "STOP" | "SET_SPEED" }
   | { type: "ANALYSIS"; requestId: number; layoutRevision: string; analysis: DayAnalysis }
