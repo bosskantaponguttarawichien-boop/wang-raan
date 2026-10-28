@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationWorkerRuntime } from "@/core/simulation";
 import { useLiveValidation } from "@/components/validation/use-live-validation";
+import { formatClockSeconds } from "@/lib/day-config";
 import type { WorkerLike } from "@/lib/simulation-client";
 import { createLayoutStore, layoutStore } from "@/store/use-layout-store";
 import { SPEED_OPTIONS, createSimulationStore, simulationStore } from "@/store/use-simulation-store";
@@ -257,9 +258,12 @@ describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () =
 });
 
 describe("Overlay helpers", () => {
-  it("formatSimTime", () => {
+  it("formatSimTime และ formatClockSeconds", () => {
     expect(formatSimTime(59)).toBe("0 นาที");
     expect(formatSimTime(125 * 60)).toBe("2 ชม. 05 นาที");
+    expect(formatClockSeconds(600, 0)).toBe("10:00:00");
+    expect(formatClockSeconds(600, 5)).toBe("10:00:05");
+    expect(formatClockSeconds(600, 65)).toBe("10:01:05");
   });
 
   it("interpolateAgents: เลื่อนระหว่าง 2 tick ตาม id และไม่ interpolate เมื่อกระโดดไกล", () => {

@@ -51,6 +51,15 @@ export function formatClock(minute: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
 }
 
+/** นาทีเปิดร้าน + เวลาจำลอง (วินาที) → "HH:MM:SS" (เกินวันวนกลับ) */
+export function formatClockSeconds(openMinute: number, elapsedSeconds: number): string {
+  const totalSeconds = ((Math.floor(openMinute * 60 + elapsedSeconds + 1e-6) % 86400) + 86400) % 86400;
+  const h = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
 /** 1 ทศนิยม ตัด .0 ทิ้ง */
 export const formatNumber = (value: number) => (Math.round(value * 10) / 10).toLocaleString("th-TH");
 

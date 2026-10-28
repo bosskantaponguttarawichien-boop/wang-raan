@@ -1381,6 +1381,1063 @@
       "summary": "ลูกค้าเดินมาจากข้างนอก รอโต๊ะเป็นแถวนอกร้าน และเดินออกไปนอกร้านก่อนหายไป",
       "sprint": 4,
       "evidence": "walk-pacer.ts doorFrame + setDoor (เกิดห่างประตู 3 ม., แถวคนแรก 0.8 ม. ห่างกัน 0.7 ม., กลับเดินออกไป 3 ม.); AGENT_STATE_CODE waiting-entrance 1 → 6 (แยกจากรอคิวจ่ายเงิน) + สี/ท่าใน 2D/isometric; walk-pacer.test.ts +4 tests; npm test 965, make lint ผ่าน; Chromium 3D เห็นเดินจากนอกร้าน/ยืนแถวนอกประตู/เดินเข้าเมื่อโต๊ะว่าง"
+    },
+    {
+      "id": "feat-101",
+      "name": "Foundation: ล็อกฐานร่วม สัญญาสถานะ เวลา identity และ asset budget",
+      "status": "done",
+      "dependencies": [
+        "feat-100"
+      ],
+      "role": "core",
+      "summary": "เตรียม base ที่รวม timing/party working changes ล่าสุด, แก้ baseline tests 2 ข้ออย่างมีหลักฐาน และ freeze contract ก่อนแยก agent",
+      "sprint": 5,
+      "priority": "P0",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "foundation",
+      "branch": "codex/feat-101",
+      "write_scope": [
+        "harness/animation-contract-v1.md",
+        "src/core/simulation/presentation-contract.ts",
+        "src/components/preview-3d/runtime/contracts.ts",
+        "harness/evidence/feat-101/",
+        "src/core/simulation/day-analysis.test.ts (เฉพาะ baseline failure ที่มีเหตุผลพิสูจน์ได้)",
+        "src/core/simulation/restaurant.test.ts (เฉพาะ baseline failure ที่มีเหตุผลพิสูจน์ได้)",
+        "src/core/simulation/engine.ts / day-analysis.ts (เฉพาะสาเหตุ baseline หากจำเป็น)"
+      ],
+      "gate": "ยังไม่เริ่ม implementation ใน session วางแผน; ก่อนทำงานจริงต้องเลือกฐานที่รวม working changes ล่าสุดและตรวจ failure baseline ที่ระบุในแผน §2",
+      "steps": [
+        "ตรวจ diff ที่มีอยู่กับ HEAD 7d5b122; ระบุการแก้เวลา/party ที่ต้องรวมเป็น base โดยไม่ทับงานเดิม; บันทึก base commit และผล tests",
+        "วิเคราะห์ failure day-analysis:89 และ restaurant:91; แก้สาเหตุหรือ fixture/expectation ตามพฤติกรรมที่พิสูจน์ได้ ไม่ลดเกณฑ์เพื่อผ่าน",
+        "นิยาม clock/runId/sequence, per-member path+chair binding, table/task/meal snapshots, optional worker compatibility, module API และ action priority",
+        "ยืนยัน5เมนู, clip names/markers/anchors, food budgets, timezone/location/north defaults, reference device และนโยบาย realtime/reduced motion; ส่งสัญญา version1"
+      ],
+      "acceptance_criteria": [
+        "ฐานร่วมรวม working changes ที่อนุมัติแล้ว ไม่ใช่ main ที่ขาด timing/party fixes และ npm test ผ่าน100%",
+        "renderAgentId map ไป party/member/table/chair ได้ครบ; state waiting-food/eating ต่างกันโดยไม่เปลี่ยน buffer strideเดิม",
+        "contract ระบุเวลา pickup/put-down/clean-complete รวมกรณี engine taskจบหลังเดินกลับ และไม่เปลี่ยน business metrics เงียบ ๆ",
+        "มีตัวอย่าง snapshot ปกติ/ไม่มีmetadata/ยกเลิก/หลายสมาชิก/เริ่มรอบใหม่ และตาราง ownership ที่แต่ละ lane ใช้งานได้"
+      ],
+      "verification": [
+        "ตรวจ diff ฐานร่วมและบันทึกผล baseline จริง",
+        "ตรวจ contract ด้วยตัวอย่าง event/state ของวงจรเต็มและการคัดรอบเก่า",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "มี working changes ไม่อยู่ใน HEAD; worktree ไม่คัดลอกให้อัตโนมัติ",
+        "การแก้ baseline อาจเกี่ยวกับ patience และ party semantics ต้องตรวจเหตุผลก่อนแตะ expectation"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-101/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/animation-contract-v1.md; presentation-contract.ts + runtime/contracts.ts; baseline scenarios prove fixture bottlenecks and preserve simulation formulas; npm test 78 files / 984 tests passed; lint exit0 (one existing warning), typecheck passed; boundary scan + Harness passed; Chrome 156 / GTX1050Ti baseline screenshots and zero browser errors in harness/evidence/feat-101/. Existing timing changes preserved for shared base."
+    },
+    {
+      "id": "feat-102",
+      "name": "Foundation: แยกฉาก 3D และ model generator เป็น module สำหรับงานคู่ขนาน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-101"
+      ],
+      "role": "frontend",
+      "summary": "แยก shared entry points ให้แต่ละ lane เขียนไฟล์ของตนโดยไม่เปลี่ยนภาพ/พฤติกรรมเดิม",
+      "sprint": 5,
+      "priority": "P0",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "foundation",
+      "branch": "codex/feat-102",
+      "write_scope": [
+        "src/components/preview-3d/three-view.tsx",
+        "src/components/preview-3d/runtime/ (shell/context/no-op feature slots เท่านั้น)",
+        "scripts/create-cafe-customer-model.mjs",
+        "scripts/model-generation/ (rig/export helpers เท่านั้น)",
+        "harness/animation-module-map.md"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "แยก runtime context และ slots ของ food/table-service/staff-actions/customer-actions/seating/lighting พร้อม create/update/dispose",
+        "แยก rig/build/export จาก generator เป็น helper ที่รับclip provider; เลือก role/output directory ได้และไม่ export roleอื่นโดยอัตโนมัติ",
+        "คง placeholder/no-op ของฟีเจอร์ใหม่ ตรวจภาพและการคืนทรัพยากรของเดิม; บันทึก module imports/API ที่ freeze แล้ว"
+      ],
+      "acceptance_criteria": [
+        "2D/3D/fallback และการถือถาด/นั่งเดิมยังทำงานเท่าเดิม ไม่มีฟีเจอร์คำขอใหม่ถูกปะปนใน refactor",
+        "109–112 สร้างclipแยกได้โดยไม่แก้ generator/rig/GLB กลาง",
+        "shared files ถูก freeze หลังส่งงาน; laneปลายทางได้ directory/API ตามscopeที่ตกลง",
+        "การเลือก build staff/customer ไม่เขียนทับอีกrole และ skeleton/_part/meshopt loader ยังถูกต้อง"
+      ],
+      "verification": [
+        "เทียบภาพฐานก่อน/หลัง refactor, Character Lab และ playground",
+        "ตรวจ character-models/seat-motion/walk/staff regression tests; build ไป temporary output ของแต่ละ role",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "refactorไฟล์ใหญ่ทำให้ cleanup/subscription เปลี่ยนโดยไม่ตั้งใจ",
+        "exporthelperต้องไม่ทำ side effect ตอนถูกimport"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-102/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-103",
+      "name": "Food foundation: แคตตาล็อก อุปกรณ์ ภาชนะ และมาตรฐาน export อาหาร",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "design",
+      "summary": "กำหนด5food ids และช่องโหลดตามURLคงที่ให้agentสร้างชิ้นงานแยกกัน",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-catalogue",
+      "branch": "codex/feat-103",
+      "write_scope": [
+        "src/components/preview-3d/food/catalog.ts",
+        "src/components/preview-3d/food/catalog.test.ts",
+        "scripts/food-models/shared/",
+        "scripts/food-models/export-one.mjs",
+        "harness/food-asset-spec.md"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "กำหนดidข้าวผัด/ก๋วยเตี๋ยว/สเต๊ก/สลัด/เค้ก, node/variant/anchor contract และfood choiceแบบhashแยกsimulationRNG",
+        "ทำ shared material/ภาชนะ/export helpers และ exporter ที่เขียนได้เฉพาะ output folder ของfoodidที่เลือก",
+        "กำหนด budget/ตรวจ bounds/geometry/bytes/full-lite พร้อมfixtureบนถาดและโต๊ะเล็ก"
+      ],
+      "acceptance_criteria": [
+        "catalogueระบุ URL ของทั้ง5ชนิดอย่างชัดเจนโดยไม่มีrequireให้ไฟล์ทั้งหมดมีทันที; runtimeใช้fallbackระหว่างพัฒนา",
+        "ทุกfoodใช้เมตร +Yขึ้น originฐานจาน และ full/partial/emptyตามcontract",
+        "แต่ละชนิดมีfolder/testเฉพาะ ไม่มีagentแก้manifestกลางพร้อมกัน",
+        "ตั้งเป้าfull≤8k/lite≤2ktriangles และ300/100KBต่อasset พร้อมวิธีวัดจริง"
+      ],
+      "verification": [
+        "ทดสอบdeterministicfoodhashไม่เปลี่ยน simulation RNG",
+        "ตรวจ exporter fixture และ output-role/id isolation",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "sharedhelpersเปลี่ยนหลังfan-outทำให้5assetใช้สัญญาต่างกัน"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-103/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-104",
+      "name": "Food asset: โมเดลข้าวผัด full/lite + สถานะกิน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-103"
+      ],
+      "role": "design",
+      "summary": "สร้างข้าวเป็นกองพร้อมส่วนประกอบและช้อนตามสัญญาอาหารโดยทำแยกจากอีก4ชนิดได้",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-fried-rice",
+      "branch": "codex/feat-104",
+      "write_scope": [
+        "scripts/food-models/fried-rice/",
+        "public/assets/models/food/fried-rice/",
+        "src/components/preview-3d/food/assets/fried-rice.test.ts",
+        "harness/evidence/feat-104/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ใช้sharedhelpersที่freezeแล้วสร้างgeometry/material/full/partial/empty; แยกข้าว/เครื่อง/จานให้ลดปริมาณได้",
+        "export full/lite เฉพาะfolderของตน, รายงานbounds/triangles/bytesและตรวจanchor; สีและทรงยังอ่านออกในมุมร้าน",
+        "จัดภาพ3มุมของทุกstate พร้อมวางบนถาดและโต๊ะเล็ก ส่งasset/source/หลักฐานโดยไม่แก้catalogue"
+      ],
+      "acceptance_criteria": [
+        "มีอาหารของตนครบ full/lite และเต็ม/บางส่วน/หมด ภาชนะคงอยู่หลังอาหารหมด",
+        "โหลดด้วยtrustedGLB loaderเดิมได้ ไม่มีexternalURL/texture และไม่เกินbudgetที่103ยืนยัน",
+        "ฐานไม่ลอย/จม โต๊ะ/ถาดวางได้จริง อุปกรณ์และanchorตรงcontract",
+        "ไม่แก้assetอื่น ไม่เขียนGLBลูกค้า/พนักงาน และผลbuildทำซ้ำได้ในเชิงsemantic"
+      ],
+      "verification": [
+        "โหลดGLBfried-riceและตรวจbounds/variant/material/anchor",
+        "ตรวจภาพ3มุม+full/lite+ขนาดบนถาดและโต๊ะเล็ก",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "อาหารเล็กบนฉากอาจอ่านไม่ออก",
+        "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-104/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-105",
+      "name": "Food asset: โมเดลก๋วยเตี๋ยว full/lite + สถานะกิน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-103"
+      ],
+      "role": "design",
+      "summary": "สร้างชาม เส้น น้ำซุป และช้อน/ตะเกียบตามสัญญาอาหารโดยทำแยกจากอีก4ชนิดได้",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-noodles",
+      "branch": "codex/feat-105",
+      "write_scope": [
+        "scripts/food-models/noodles/",
+        "public/assets/models/food/noodles/",
+        "src/components/preview-3d/food/assets/noodles.test.ts",
+        "harness/evidence/feat-105/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ใช้sharedhelpersที่freezeแล้วสร้างgeometry/material/full/partial/empty; ลดเส้น/เครื่องโดยไม่ยุบชามหรือน้ำซุปผิดรูป",
+        "export full/lite เฉพาะfolderของตน, รายงานbounds/triangles/bytesและตรวจanchor; ตรวจมือ/อุปกรณ์เหนือชามไม่ทะลุขอบ",
+        "จัดภาพ3มุมของทุกstate พร้อมวางบนถาดและโต๊ะเล็ก ส่งasset/source/หลักฐานโดยไม่แก้catalogue"
+      ],
+      "acceptance_criteria": [
+        "มีอาหารของตนครบ full/lite และเต็ม/บางส่วน/หมด ภาชนะคงอยู่หลังอาหารหมด",
+        "โหลดด้วยtrustedGLB loaderเดิมได้ ไม่มีexternalURL/texture และไม่เกินbudgetที่103ยืนยัน",
+        "ฐานไม่ลอย/จม โต๊ะ/ถาดวางได้จริง อุปกรณ์และanchorตรงcontract",
+        "ไม่แก้assetอื่น ไม่เขียนGLBลูกค้า/พนักงาน และผลbuildทำซ้ำได้ในเชิงsemantic"
+      ],
+      "verification": [
+        "โหลดGLBnoodlesและตรวจbounds/variant/material/anchor",
+        "ตรวจภาพ3มุม+full/lite+ขนาดบนถาดและโต๊ะเล็ก",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "อาหารเล็กบนฉากอาจอ่านไม่ออก",
+        "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-105/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-106",
+      "name": "Food asset: โมเดลสเต๊ก full/lite + สถานะกิน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-103"
+      ],
+      "role": "design",
+      "summary": "สร้างจานสเต๊ก เครื่องเคียง และส้อม/มีดตามสัญญาอาหารโดยทำแยกจากอีก4ชนิดได้",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-steak",
+      "branch": "codex/feat-106",
+      "write_scope": [
+        "scripts/food-models/steak/",
+        "public/assets/models/food/steak/",
+        "src/components/preview-3d/food/assets/steak.test.ts",
+        "harness/evidence/feat-106/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ใช้sharedhelpersที่freezeแล้วสร้างgeometry/material/full/partial/empty; แยกชิ้นเนื้อให้เห็นกินไปบางส่วน",
+        "export full/lite เฉพาะfolderของตน, รายงานbounds/triangles/bytesและตรวจanchor; อุปกรณ์ไม่เกินfootprintจานและไม่ชนจานข้างกัน",
+        "จัดภาพ3มุมของทุกstate พร้อมวางบนถาดและโต๊ะเล็ก ส่งasset/source/หลักฐานโดยไม่แก้catalogue"
+      ],
+      "acceptance_criteria": [
+        "มีอาหารของตนครบ full/lite และเต็ม/บางส่วน/หมด ภาชนะคงอยู่หลังอาหารหมด",
+        "โหลดด้วยtrustedGLB loaderเดิมได้ ไม่มีexternalURL/texture และไม่เกินbudgetที่103ยืนยัน",
+        "ฐานไม่ลอย/จม โต๊ะ/ถาดวางได้จริง อุปกรณ์และanchorตรงcontract",
+        "ไม่แก้assetอื่น ไม่เขียนGLBลูกค้า/พนักงาน และผลbuildทำซ้ำได้ในเชิงsemantic"
+      ],
+      "verification": [
+        "โหลดGLBsteakและตรวจbounds/variant/material/anchor",
+        "ตรวจภาพ3มุม+full/lite+ขนาดบนถาดและโต๊ะเล็ก",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "อาหารเล็กบนฉากอาจอ่านไม่ออก",
+        "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-106/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-107",
+      "name": "Food asset: โมเดลสลัด full/lite + สถานะกิน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-103"
+      ],
+      "role": "design",
+      "summary": "สร้างชาม/จานผักหลากสีและส้อมตามสัญญาอาหารโดยทำแยกจากอีก4ชนิดได้",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-salad",
+      "branch": "codex/feat-107",
+      "write_scope": [
+        "scripts/food-models/salad/",
+        "public/assets/models/food/salad/",
+        "src/components/preview-3d/food/assets/salad.test.ts",
+        "harness/evidence/feat-107/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ใช้sharedhelpersที่freezeแล้วสร้างgeometry/material/full/partial/empty; ใช้ผักเป็นกลุ่มลดจำนวนตามstateแทนเพิ่มmeshมาก",
+        "export full/lite เฉพาะfolderของตน, รายงานbounds/triangles/bytesและตรวจanchor; ตรวจnormal/backfaceและสีผักในlite",
+        "จัดภาพ3มุมของทุกstate พร้อมวางบนถาดและโต๊ะเล็ก ส่งasset/source/หลักฐานโดยไม่แก้catalogue"
+      ],
+      "acceptance_criteria": [
+        "มีอาหารของตนครบ full/lite และเต็ม/บางส่วน/หมด ภาชนะคงอยู่หลังอาหารหมด",
+        "โหลดด้วยtrustedGLB loaderเดิมได้ ไม่มีexternalURL/texture และไม่เกินbudgetที่103ยืนยัน",
+        "ฐานไม่ลอย/จม โต๊ะ/ถาดวางได้จริง อุปกรณ์และanchorตรงcontract",
+        "ไม่แก้assetอื่น ไม่เขียนGLBลูกค้า/พนักงาน และผลbuildทำซ้ำได้ในเชิงsemantic"
+      ],
+      "verification": [
+        "โหลดGLBsaladและตรวจbounds/variant/material/anchor",
+        "ตรวจภาพ3มุม+full/lite+ขนาดบนถาดและโต๊ะเล็ก",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "อาหารเล็กบนฉากอาจอ่านไม่ออก",
+        "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-107/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-108",
+      "name": "Food asset: โมเดลเค้ก full/lite + สถานะกิน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-103"
+      ],
+      "role": "design",
+      "summary": "สร้างเค้กชิ้นบนจานและส้อมขนมตามสัญญาอาหารโดยทำแยกจากอีก4ชนิดได้",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "food-cake",
+      "branch": "codex/feat-108",
+      "write_scope": [
+        "scripts/food-models/cake/",
+        "public/assets/models/food/cake/",
+        "src/components/preview-3d/food/assets/cake.test.ts",
+        "harness/evidence/feat-108/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ใช้sharedhelpersที่freezeแล้วสร้างgeometry/material/full/partial/empty; มีชิ้นเต็ม/กินบางส่วน/เศษหมดบนจาน",
+        "export full/lite เฉพาะfolderของตน, รายงานbounds/triangles/bytesและตรวจanchor; ทรงชั้นเค้กยังชัดที่ขนาดจริงไม่ใหญ่เกินถาด",
+        "จัดภาพ3มุมของทุกstate พร้อมวางบนถาดและโต๊ะเล็ก ส่งasset/source/หลักฐานโดยไม่แก้catalogue"
+      ],
+      "acceptance_criteria": [
+        "มีอาหารของตนครบ full/lite และเต็ม/บางส่วน/หมด ภาชนะคงอยู่หลังอาหารหมด",
+        "โหลดด้วยtrustedGLB loaderเดิมได้ ไม่มีexternalURL/texture และไม่เกินbudgetที่103ยืนยัน",
+        "ฐานไม่ลอย/จม โต๊ะ/ถาดวางได้จริง อุปกรณ์และanchorตรงcontract",
+        "ไม่แก้assetอื่น ไม่เขียนGLBลูกค้า/พนักงาน และผลbuildทำซ้ำได้ในเชิงsemantic"
+      ],
+      "verification": [
+        "โหลดGLBcakeและตรวจbounds/variant/material/anchor",
+        "ตรวจภาพ3มุม+full/lite+ขนาดบนถาดและโต๊ะเล็ก",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "อาหารเล็กบนฉากอาจอ่านไม่ออก",
+        "variantกินหมดอาจลบภาชนะหรือเปลี่ยนorigin"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-108/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-109",
+      "name": "Staff clips: ยืนถือถาด เดินถืออาหาร รับและวางจาน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "design",
+      "summary": "สร้าง CarryIdle/CarryWalk/PickUp/PutDown บนrigเดิมโดยไม่exportทับstaffGLBกลาง",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "clip-staff-carry",
+      "branch": "codex/feat-109",
+      "write_scope": [
+        "scripts/character-clips/staff-carry.mjs",
+        "src/components/preview-3d/staff-actions/staff-carry-clips.test.ts",
+        "harness/evidence/feat-109/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "สร้างupperbodyposeมือรองถาดให้ได้2grip anchorsและรักษาระดับถาด",
+        "ทำCarryWalkจากlowerbodyWalkเดิมโดยไม่ใส่roottranslation; ทำPickUp/PutDownพร้อมcontactmarkers",
+        "previewtemporaryassetของตนทั้งfull/liteและ4ทิศส่งclipproviderให้117"
+      ],
+      "acceptance_criteria": [
+        "คลิป4ชื่อ/markerครบ skeletonและ_partเดิมไม่เปลี่ยน",
+        "เดิน/เลี้ยว/หยุดแขนไม่แกว่งทะลุถาด มือแตะgrip และอาหารไม่ลอย",
+        "ไม่แย่งclipWork/Walkเดิมและไม่เปลี่ยนbasewalkcadenceเงียบ ๆ",
+        "ไม่เขียนpublic/assets/models/cafe-staff*.glb;117เป็นผู้exportจริง"
+      ],
+      "verification": [
+        "samplebones/markersกับถาดจริงตรวจระยะcontact",
+        "renderเดินตรง/เลี้ยว/Idle/วางจานที่ความสูงโต๊ะจริง",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "สองมือ/ถาดติดrootคนละตำแหน่งอาจเกิดdrift",
+        "crossfadeตำแหน่งแขนทำให้ถาดเด้ง"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-109/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-110",
+      "name": "Customer clips: นั่งกินอาหารพร้อมอุปกรณ์และจังหวะมือเข้าปาก",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "design",
+      "summary": "สร้างEat loopเข้ากับท่านั่งเดิมและอุปกรณ์ช้อน/ส้อม/ตะเกียบ",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "clip-customer-eat",
+      "branch": "codex/feat-110",
+      "write_scope": [
+        "scripts/character-clips/customer-eat.mjs",
+        "src/components/preview-3d/customer-actions/customer-eat-clips.test.ts",
+        "harness/evidence/feat-110/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "กำหนดseatedbaseposeและmouth/plate/utensilanchorsบนrigเดิม",
+        "สร้างloopตัก/ยกเข้าปาก/วางกลับพร้อมcontactmarkersและvariationphaseแบบdeterministic",
+        "ทดสอบกับโต๊ะสูง0.74ม.และเบาะ0.45ม.;ส่งproviderให้118รวมasset"
+      ],
+      "acceptance_criteria": [
+        "Eatไม่เลื่อนสะโพก/ขาออกจากเบาะ ไม่เคลื่อนrootซ้ำcontroller",
+        "อุปกรณ์เข้าถึงจานและปากโดยไม่ทะลุใบหน้า/โต๊ะอย่างเห็นได้ชัด",
+        "loopต่อเนื่องและมีนโยบายเปลี่ยนอุปกรณ์ตาม5foodชนิด",
+        "ไม่เขียนcustomerGLBกลางและไม่ผูกการกินกับรหัส4แบบเดา"
+      ],
+      "verification": [
+        "sampleEatloopต้น/กลาง/ปลายและboneanchors",
+        "previewช้อน/ส้อม/ตะเกียบกับสัดส่วนลูกค้าที่ใช้จริง",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "EatblendกับSitอาจทำให้เข่าหรือสะโพกหลุดเบาะ"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-110/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-111",
+      "name": "Staff clips: เช็ดโต๊ะด้วยผ้าและเก็บจาน",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "design",
+      "summary": "สร้างWipeTableและmarkerเก็บจาน/เช็ดสำเร็จให้117เชื่อมstate",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "clip-staff-clean",
+      "branch": "codex/feat-111",
+      "write_scope": [
+        "scripts/character-clips/staff-clean.mjs",
+        "src/components/preview-3d/staff-actions/staff-clean-clips.test.ts",
+        "harness/evidence/feat-111/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ทำท่ายืนข้างโต๊ะโน้มตัวและผ้าในมือกวาดพื้นผิวโต๊ะไม่ทะลุ",
+        "กำหนดnormalizedcontact/wipeprogress/clearcompleteให้สัมพันธ์semanticsโดยไม่callbackเปลี่ยนengine",
+        "previewโต๊ะหลายความสูง/ขนาดที่ระบบรองรับและส่งproviderแยก"
+      ],
+      "acceptance_criteria": [
+        "ผ้าอยู่ในมือและแตะผิวโต๊ะในช่วงเช็ด ลำตัว/แขนไม่ทะลุโต๊ะ",
+        "มีช่วงเตรียมเช็ด/เช็ด/เสร็จพร้อมmarkersที่ใช้กับsnapshotได้",
+        "คลิปfull/liteใช้rigเดิม ไม่overwritecarryclipsหรือstaffGLB",
+        "ท่าทางรองรับด้านservicepointจริงของโต๊ะและfallbackเมื่อเอื้อมไม่ถึง"
+      ],
+      "verification": [
+        "sampleช่วงcontactและจบงาน",
+        "previewเช็ดโต๊ะหมุน4ด้านและโต๊ะเล็ก/ใหญ่",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "เช็ดจากด้านที่pathเข้าไม่ถึง",
+        "คราบหายก่อนงานเช็ดเสร็จถ้าใช้markerผิด"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-111/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-112",
+      "name": "Customer clips: ดึงเก้าอี้ นั่ง ดันเข้า และลุกอย่างสัมพันธ์มือเท้า",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "design",
+      "summary": "สร้างPullChair/SitDown/PushChair/StandUpให้119ใช้ควบคุมเก้าอี้ต่อเนื่อง",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "clip-customer-seat",
+      "branch": "codex/feat-112",
+      "write_scope": [
+        "scripts/character-clips/customer-seat.mjs",
+        "src/components/preview-3d/seating/customer-seat-clips.test.ts",
+        "harness/evidence/feat-112/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "กำหนดmarkerมือจับพนัก/สะโพกลงเบาะ/เท้าถอย/ลุกพ้นและrootmotionpolicy",
+        "สร้างคลิปphaseที่blendเข้าท่ายืน/นั่งเดิมและปรับระยะดึงด้วยparameterได้",
+        "ตรวจpreviewร่วมกับเก้าอี้แบบที่มีอยู่ ส่งproviderให้118exportและ119อ่านmarkers"
+      ],
+      "acceptance_criteria": [
+        "คลิป4phaseครบมีmarkerและdurationชัดเจน ไม่เปลี่ยนbone/_part",
+        "มือเกาะพนักและเท้าไม่ไถล/เข่าทะลุโต๊ะอย่างเห็นได้ชัด",
+        "ปรับpulldistanceลดลงได้ในพื้นที่คับแคบและมีท่าสำรอง",
+        "ไม่แก้seat-motion/runtime/customerGLBโดยตรง"
+      ],
+      "verification": [
+        "ตรวจtrajectoryมือเท้าสะโพกตามnormalizedphase",
+        "previewคนหลายscaleและเก้าอี้อย่างน้อย2แบบที่ระบบรองรับ",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "roottranslationกับchairtranslationถูกคูณซ้ำ"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-112/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-113",
+      "name": "Core metadata: สมาชิก เก้าอี้ จาน งานเสิร์ฟ และวงจรโต๊ะ",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "core",
+      "summary": "เปิดเผยsemantic snapshotจากengineจริงและแก้identity/pathต่อสมาชิกโดยคงผลวิเคราะห์เดิม",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "core-semantics",
+      "branch": "codex/feat-113",
+      "write_scope": [
+        "src/core/simulation/engine.ts",
+        "src/core/simulation/engine.test.ts",
+        "src/core/simulation/staff-visual.ts",
+        "src/core/simulation/staff-visual.test.ts",
+        "src/core/simulation/presentation-snapshot.ts",
+        "src/core/simulation/presentation-snapshot.test.ts"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ผูกrenderMemberกับparty/table/chairที่จองจริงอย่างunique;ส่งpathidตรงbufferทุกสมาชิก",
+        "สร้างreadonlysnapshotลูกค้ารอ/กิน/จบ, mealid/foodhash, tablecycle/cleanprogress, stafftask/phase/anchors/time markers",
+        "คำนวณpickup/putdown/wipecompleteจากplanและเวลาจริงไม่เดาจากSTAFF_STATE_CODE;รองรับcancel/party1–4/counterorder",
+        "ตรวจการเปิด/ปิดmetadataไม่เปลี่ยนrandomsequence/metricsและไม่ใช้Three/DOM"
+      ],
+      "acceptance_criteria": [
+        "ทุกrenderAgentมีbindingแน่นอน ไม่มีสมาชิก4คนแชร์เก้าอี้;pathsและagentsใช้identityเดียวกัน",
+        "waiting-food/eatingต่างกัน,จานไม่เกิดก่อนserved;dirty/cleaning/cleanผูกcycleจริง",
+        "ส่งsnapshotที่เริ่มแสดงกลางrunและหลังmissedtickได้ ไม่ต้องพึ่งeventเก่า",
+        "ไม่มีlatefood/latecleanของรอบที่ยกเลิก และผลanalyzeDayเท่าเดิมเมื่อไม่เปลี่ยนสูตรธุรกิจ"
+      ],
+      "verification": [
+        "unitparty1/2/4, tablecapacity, renderid/path/chairmapping",
+        "snapshotordering/cancellation/restartและmetricsparity metadataon/off",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "engine taskcompleteอาจอยู่หลังstaffเดินกลับ ต้องแยกvisualmilestone",
+        "การเพิ่มrandomเพื่อเลือกอาหารทำให้ผลวิเคราะห์เปลี่ยน"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-113/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-114",
+      "name": "Transport: ส่ง semantic snapshot ข้าม Worker และ bridge เข้าภาพ",
+      "status": "not-started",
+      "dependencies": [
+        "feat-113"
+      ],
+      "role": "p2",
+      "summary": "ต่อoptionalmetadata/runidentityเข้าสู่STARTED/TICKโดยไม่ชนcontrollerของงานเวลาเดิน",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "worker-transport",
+      "branch": "codex/feat-114",
+      "write_scope": [
+        "src/core/simulation/protocol.ts",
+        "src/core/simulation/worker-runtime.ts",
+        "src/core/simulation/simulation.test.ts",
+        "src/lib/simulation-client.ts",
+        "src/lib/simulation-client.test.ts",
+        "src/components/simulation/presentation-bridge.ts",
+        "src/components/simulation/presentation-bridge.test.ts"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "เพิ่มoptionalversionedmetadataและrunId/sequenceให้STARTED.initial/TICKโดยรักษาAGENT/STAFF_STRIDEเดิม",
+        "ส่งinitialfullsnapshotและอัปเดตที่restoreกลางrunได้;จัดcopy/transferไม่detachbufferที่engineใช้อยู่",
+        "สร้างbridgeรับsnapshotคัดstale/duplicate/outoforderและfallbackworkerเก่า;ส่งAPIให้115และruntimefeatures"
+      ],
+      "acceptance_criteria": [
+        "workerเก่าที่ไม่ส่งmetadataยังวาดได้โดยไม่เริ่มEat/cleanแบบเดา",
+        "STOP/START/PAUSE/RESUMEและlayoutrevisionไม่รับtickเก่ามาทำpropsค้าง",
+        "ไม่มีThree/React/DOMในworker/core;payloadไม่โตตามเวลารัน",
+        "ส่งstateได้ครบหลังเริ่ม3Dช้าหรือพลาดTICKและไม่detachsharedbuffer"
+      ],
+      "verification": [
+        "protocol/worker/clienttests initial+optional+stale+transferownership",
+        "วัดขนาดsnapshotสำหรับ1/40/80คน",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "metadataeventqueueสะสมไม่จำกัด",
+        "TICKจากworkerเก่าปะปนrunใหม่"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-114/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-115",
+      "name": "Timing: ทุกคนเดินตามเวลาปกติและหยุดการเร่งไล่ข้อมูล",
+      "status": "not-started",
+      "dependencies": [
+        "feat-114"
+      ],
+      "role": "frontend",
+      "summary": "ใช้canonicalclock/velocityจากengineที่1×และแก้backlogตั้งแต่ต้นทางไม่ให้ภาพวิ่งไล่",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "motion-clock",
+      "branch": "codex/feat-115",
+      "write_scope": [
+        "src/components/simulation/walk-pacer.ts",
+        "src/components/simulation/walk-pacer.test.ts",
+        "src/components/simulation/staff-pacer.ts",
+        "src/components/simulation/staff-pacer.test.ts",
+        "src/components/simulation/simulation-controller.ts",
+        "src/components/simulation/simulation-gate.test.tsx",
+        "src/components/simulation/motion/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ต่อpresentationbridgeจาก114เข้าcontroller;ใช้per-memberpathsและความเร็วจริงของengineจากmetadata",
+        "เลิกmaxspeedcatchup4/8วิ;ทำboundedinterpolationและstatequeueที่ไม่เพิ่มlatencyต่อเนื่อง;จัดdt/pause/backgroundresyncอย่างชัดเจน",
+        "คูณplaybackเพียงครั้งเดียว ส่งtimingAPIให้3D/seat/actionsและคงปุ่มเร่งที่ผู้ใช้เลือก",
+        "วัดระยะจริงบนจอ/pathตามเวลาและทดสอบfps/tickjitter/หลายคน"
+      ],
+      "acceptance_criteria": [
+        "1×ลูกค้าใช้config1.0–1.4ม./วิ พนักงาน1.2ม./วิ ไม่ถูกบังคับ1.4เท่ากันหรือเร่งcatchup",
+        "ทางตรงพนักงาน6ม.ใช้5วิคลาดไม่เกิน5%; 15/30/60/120fpsไม่ทำให้ระยะผิด",
+        "หยุด/กลับแท็บไม่พุ่งพรวด;เข้าแถว/ออก/เลี้ยวไม่ตัดโต๊ะ/teleportและbufferbounded",
+        "1×30วิจริง=30วิจำลองตามtoleranceใน101;2/5/10/30×ตามที่เลือก;ไม่กลับไปskipQuietอัตโนมัติ"
+      ],
+      "verification": [
+        "fakeclockตารางfps/TICKjitterรวมdt>0.25วินาทีและlongpause",
+        "regressionpaths/staffkitchen/queue/cancelและวัดwalk6ม.",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "แก้ความเร็วแค่pacerแต่ThreeViewยังทิ้งdeltaทำให้cadenceผิด",
+        "visualstateค้างหากworkerเดินเร็วกว่าpresentationไม่สิ้นสุด"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-115/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-116",
+      "name": "Table visuals: จานอาหาร 5 แบบ การกิน คราบ และการล้างคราบ",
+      "status": "not-started",
+      "dependencies": [
+        "feat-104",
+        "feat-105",
+        "feat-106",
+        "feat-107",
+        "feat-108",
+        "feat-114"
+      ],
+      "role": "frontend",
+      "summary": "วาดmealต่อสมาชิกและคราบต่อโต๊ะจากsemanticcycleไม่อิงระยะใกล้สุด",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "table-surface",
+      "branch": "codex/feat-116",
+      "write_scope": [
+        "src/components/preview-3d/table-service/",
+        "harness/evidence/feat-116/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "สร้างtablelocalanchorsจากchairbindingและshape/rotation;loadfoodcatalogueอย่างlazyพร้อมfallback",
+        "แสดงfull/partial/emptyตามeatingprogressและคราบสะสมdeterministicในboundsไม่เกิดz-fighting",
+        "เชื่อมserved/used/wiping/cleanกับcycle,คงคราบหลังคนออกและล้างเมื่อcleancomplete;ทำresourcecleanup"
+      ],
+      "acceptance_criteria": [
+        "5อาหารวางบนโต๊ะเล็ก/ใหญ่/กลม/เหลี่ยมและparty1/2/4ได้ไม่ซ้อน ไม่จมหรือลอย",
+        "ก่อนservedไม่มีอาหาร,กินแล้วลดปริมาณและมีคราบ,จาน/คราบไม่หายตอนคนออก",
+        "เริ่มcleaningยังมีคราบ;wipeprogressลดลงและcompleteหายครบเฉพาะโต๊ะ/cycleเป้าหมาย",
+        "restart/cancel/assetfail/switchviewไม่มีghostpropsหรือdisposeทรัพยากรที่instanceอื่นใช้"
+      ],
+      "verification": [
+        "table-serviceunit snapshots/fullreconstruction/cancel/reusecycle",
+        "visual5เมนูทุกstateและโต๊ะหมุน4มุม;resourcecountsหลัง10รอบ",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "materialsharedทำให้คราบอีกโต๊ะหาย",
+        "จานเหลื่อมสมาชิกเพราะchairbindingผิด"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-116/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-117",
+      "name": "Staff runtime: รวมคลิปพนักงาน ถือเสิร์ฟและเช็ดโต๊ะ",
+      "status": "not-started",
+      "dependencies": [
+        "feat-109",
+        "feat-111",
+        "feat-114"
+      ],
+      "role": "frontend",
+      "summary": "soleexporterstafffull/liteและสร้างactioncontrollerจากtaskphaseจริง",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "staff-runtime",
+      "branch": "codex/feat-117",
+      "write_scope": [
+        "src/components/preview-3d/staff-actions/ (ยกเว้น staff-carry-clips.test.ts และ staff-clean-clips.test.ts)",
+        "public/assets/models/cafe-staff.glb",
+        "public/assets/models/cafe-staff-lite.glb",
+        "harness/evidence/feat-117/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ประกอบ109+111ผ่านhelper102และexportเฉพาะstaffroleไปสองGLBที่ตนเป็นเจ้าของ",
+        "ทำactionpriority Walk/CarryIdle/CarryWalk/PickUp/PutDown/WipeTable,แนบถาด/ผ้าที่handgrips",
+        "วางจาน/เช็ดตามsemanticmarkers+cycleโดยใช้APItable-serviceแบบdependencyinjection;ไม่ยึดcallbackanimation",
+        "รองรับpause/ratechange/cancel/reducedmotion/assetfallbackและcleanup"
+      ],
+      "acceptance_criteria": [
+        "staffGLBทั้งสองมีคลิปเดิมและคลิปใหม่ถูกต้อง ใช้skeleton/_partเดิม",
+        "เดินถืออาหารมือรองถาดไม่ลอย วางจานโต๊ะเป้าหมายและหยุดถือเมื่อputdown",
+        "เช็ดที่servicepointที่เข้าถึงได้และส่งprogressตรงงานเดียวกัน ไม่ทำคราบหายก่อนเช็ด",
+        "ไม่มีการเขียนcustomerGLBหรือแก้three-viewกลาง;exportroleอื่นไม่ถูกรัน"
+      ],
+      "verification": [
+        "staffactiontransitionmatrixตามsnapshotรวมcancel/reducedmotion",
+        "GLBclip/bone/markersและvisualเดินเลี้ยว/วาง/เช็ด4ด้าน",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "poseกำลังเดินแย่งแขนcarry",
+        "taskเก่าลบคราบcycleใหม่"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-117/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-118",
+      "name": "Customer runtime: รวม GLB ลูกค้าและเล่นกินอาหารตามสถานะจริง",
+      "status": "not-started",
+      "dependencies": [
+        "feat-110",
+        "feat-112",
+        "feat-114"
+      ],
+      "role": "frontend",
+      "summary": "soleexportercustomerfull/liteรวมEat+SeatclipsและควบคุมEatหลังservedเท่านั้น",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "customer-runtime",
+      "branch": "codex/feat-118",
+      "write_scope": [
+        "src/components/preview-3d/customer-actions/ (ยกเว้น customer-eat-clips.test.ts)",
+        "public/assets/models/cafe-customer.glb",
+        "public/assets/models/cafe-customer-lite.glb",
+        "harness/evidence/feat-118/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ประกอบEatและSeatclipprovidersจาก110/112ผ่านhelper102แล้วexportcustomerสองไฟล์เท่านั้น",
+        "ทำAPIpose/actionpriorityที่seating119เรียกได้;นั่งรอไม่Eatและนั่งพร้อม+servedจึงเริ่ม",
+        "ผูกอุปกรณ์/mouth/plateanchorsตามfoodkind, phaseต่อmemberและeatingprogress;pause/cancel/reducedmotion/cleanup"
+      ],
+      "acceptance_criteria": [
+        "customerGLBรวมIdle/Walk/SitเดิมและEat/Seatใหม่ครบfull/liteไม่เปลี่ยน_part/skeleton",
+        "waiting-order/waiting-foodไม่กิน;นั่งพร้อมและมีจานจึงEat;finishedหยุดตัก",
+        "ลูกค้ากินต่างphase มือ/อุปกรณ์ไม่ทะลุปากและขานิ่งตามseatingAPI",
+        "ไม่เขียนstaffGLBหรือthree-view;เข้า3Dกลางrunยังreconstructท่าได้"
+      ],
+      "verification": [
+        "customerstatetransitionswaiting/served/seated/eating/finished/cancel",
+        "GLBfull/liteและvisualEat5foodtoolpolicies",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "Eatเริ่มก่อนSitจบหรือเก้าอี้ยังเลื่อน",
+        "exportcustomerไปทับstaffถ้าCLIไม่แยกrole"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-118/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-119",
+      "name": "Seating runtime: มือดึงเก้าอี้และเลื่อนนั่งลุกตามพื้นที่จริง",
+      "status": "not-started",
+      "dependencies": [
+        "feat-112",
+        "feat-115"
+      ],
+      "role": "frontend",
+      "summary": "ต่อยอดpull/sit/pushเดิมให้มือเท้าและเก้าอี้สัมพันธ์กันโดยไม่แก้ผังจริง",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "seating-runtime",
+      "branch": "codex/feat-119",
+      "write_scope": [
+        "src/components/preview-3d/seat-motion.ts",
+        "src/components/preview-3d/seat-motion.test.ts",
+        "src/components/preview-3d/seating/ (ยกเว้น customer-seat-clips.test.ts)",
+        "harness/evidence/feat-119/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "คำนวณapproach/facing/localoutward/pulldistanceจากchair/tableและพื้นที่ว่างโดยpurehelperในPresentation",
+        "ทำphasesมือแตะพนัก/ดึง/ถอย/นั่ง/ดัน/ลุก/ก้าวพ้น/คืนเก้าอี้ตามclipmarkersและclock115",
+        "ส่งposeAPIผ่านcontractให้customer-actionsเชื่อมใน122;จัดuniqueoccupant/reassignment/reset/reducedmotion"
+      ],
+      "acceptance_criteria": [
+        "ลูกค้าแต่ละคนผูกเก้าอี้จริงไม่แย่งตัวเดียวและมือถือพนักในช่วงดึง",
+        "เก้าอี้/สะโพก/เท้าเคลื่อนต่อเนื่อง4ทิศ,พื้นที่คับแคบลดระยะหรือใช้ท่าสำรองไม่ทะลุผนัง/โต๊ะ",
+        "เวลาเหมือนกันที่fpsต่างกัน;pauseหยุดทุกphaseและlุกพ้นก่อนคืนเก้าอี้",
+        "ไม่เปลี่ยนlayoutพิกัดsnap/validation/UndoRedo;resetกลับตำแหน่งผังและไม่เหลือoccupant"
+      ],
+      "verification": [
+        "phase/state/collisionbounds/uniqueoccupantunit;dtและfpsmatrix",
+        "visualนั่ง/ลุกโต๊ะหลายทรง/เก้าอี้หลายแบบ/หมุน4มุม/พื้นที่คับแคบ",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "phaseเดิมใช้secondsจริงขัดกับplaybackclockใหม่",
+        "ดึงเก้าอี้แล้วชนลูกค้าที่กำลังเดิน"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-119/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-120",
+      "name": "Solar foundation: คำนวณทิศแดด นาฬิกาจริง และตั้งค่าพิกัด/ทิศเหนือ",
+      "status": "not-started",
+      "dependencies": [
+        "feat-102"
+      ],
+      "role": "frontend",
+      "summary": "สร้างPureTSsolar/clockhelpersในpresentationและแผงแสงแยกจากเวลาจำลอง",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "solar-clock",
+      "branch": "codex/feat-120",
+      "write_scope": [
+        "src/components/preview-3d/lighting/solar-position.ts",
+        "src/components/preview-3d/lighting/solar-position.test.ts",
+        "src/components/preview-3d/lighting/clock.ts",
+        "src/components/preview-3d/lighting/clock.test.ts",
+        "src/components/preview-3d/lighting/settings.ts",
+        "src/components/preview-3d/lighting/settings-panel.tsx",
+        "src/components/preview-3d/lighting/settings-panel.test.tsx",
+        "src/store/use-lighting-store.ts"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "คำนวณazimuth/elevationจากUTCinstant+lat/lonตามNOAA,แปลงแกน+northoffsetให้ไม่อิงกล้อง",
+        "ทำclockrealtime/fixedแบบinjectableกำหนดcadenceและvisibility/reducedmotion;ค่าตั้งต้นBangkokเป็นreferenceชัดเจน",
+        "ทำpresentationlightstore/UIพิกัด/ทิศเหนือ/timezone/fixedtimeมีThaiariaและไม่แตะP1schema/day-config"
+      ],
+      "acceptance_criteria": [
+        "realtimeอ่านเวลาจริงอุปกรณ์ไม่เร่งตามsimulationplayback;fixedmodeใช้ทดสอบซ้ำได้",
+        "พิกัด/ทิศเหนือระบุชัดและแก้ได้ ไม่มีการอ้างว่าตรวจพบตำแหน่งหรือขอgeolocationเอง",
+        "numericfixturesเช้า/เที่ยง/เย็น/กลางคืนตรงreferenceพร้อมtoleranceและแหล่งข้อมูล",
+        "midnight/DST/leapyear/UTCoffsetไม่บวกซ้ำ, viewrotationไม่เปลี่ยนsolarworlddirection"
+      ],
+      "verification": [
+        "numericNOAAfixturesอย่างน้อย2ละติจูด+ขอบวัน/ปี+tolerance",
+        "clockfakeDate/background/realtimevsfixedและkeyboard6breakpointsของUI",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "timezoneผิดทำแดดเหลื่อมหลายชั่วโมง",
+        "ค่าnorth0กับแกนlayoutyต้องนิยามตรงกัน"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-120/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-121",
+      "name": "Lighting runtime: แสงกลางวัน กลางคืน และ shadow camera ตามเวลาจริง",
+      "status": "not-started",
+      "dependencies": [
+        "feat-120"
+      ],
+      "role": "frontend",
+      "summary": "ต่อยอดDirectional/Hemisphereเดิมให้เงาตามแดดและยังอ่านฉากออกตอนกลางคืน",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "scene-lighting",
+      "branch": "codex/feat-121",
+      "write_scope": [
+        "src/components/preview-3d/lighting/scene-lighting.ts",
+        "src/components/preview-3d/lighting/scene-lighting.test.ts",
+        "src/components/preview-3d/lighting/shadow-fit.ts",
+        "src/components/preview-3d/lighting/shadow-fit.test.ts",
+        "harness/evidence/feat-121/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "สร้างlightserviceรับsolar/settingsและqualitylevel;ปรับposition/intensity/color/twilight/indoorfillต่อเนื่อง",
+        "fit/stabilizeshadowcameraตามroom/objects/entryและqualityเดิม;กำหนดcutawaywallshadowpolicyคงที่ไม่ผูกกล้อง",
+        "ทำdirtyshadowinvalidationsเมื่อไฟ/props/เก้าอี้เปลี่ยนแม้autoUpdatefalse,resourcecleanupและreducedmotion/print"
+      ],
+      "acceptance_criteria": [
+        "เช้า/เที่ยง/เย็นมีทิศเงาตรงข้ามแดด;กลางคืนปิดdirectsunและเห็นร้านด้วยindoorfill",
+        "หมุนกล้อง4มุมแล้วทิศแดดโลกคงเดิม;ห้อง2–30ม.เงาไม่ถูกตัดหรือacneรุนแรง",
+        "ไม่allocate shadowmapทุกเฟรม;qualityลดแล้วเงายังอัปเดตเมื่อแดด/ฉากเปลี่ยน",
+        "clockupdateไม่ทำเฟรมกระพริบ;disposeไฟ/targets/shadowmaps/timersครบและfallbackใช้ได้"
+      ],
+      "verification": [
+        "shadowfrustumbounds/stabilization/invalidationunit",
+        "visualfixedtime4ช่วง+4มุม+room2/8/30ม.+qualityทุกขั้น",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "cutawayผนังที่หายทำให้กลางคืน/กลางวันไม่สัมพันธ์แสง",
+        "shadowmapกว้างทั้ง30ม.ทำรายละเอียดหาย"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-121/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-122",
+      "name": "Integration: รวมวงจรอาหาร พนักงาน ลูกค้า เก้าอี้ และแสงทุกมุมมอง",
+      "status": "not-started",
+      "dependencies": [
+        "feat-115",
+        "feat-116",
+        "feat-117",
+        "feat-118",
+        "feat-119",
+        "feat-121"
+      ],
+      "role": "frontend",
+      "summary": "solewritersharedfilesช่วงรวมงาน เชื่อมmoduleที่ผ่านแล้วเป็นวงจรครบและคง2D/SVG",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "integrator",
+      "branch": "codex/feat-122",
+      "write_scope": [
+        "src/components/preview-3d/three-view.tsx",
+        "src/components/preview-3d/runtime/",
+        "src/components/preview-3d/character-models.ts",
+        "src/components/preview-3d/character-models.test.ts",
+        "src/components/preview-3d/customer-walk.test.ts",
+        "src/components/preview-3d/adaptive-quality.ts",
+        "src/components/preview-3d/adaptive-quality.test.ts",
+        "src/components/character-lab/",
+        "src/components/simulation/simulation-overlay.tsx",
+        "src/components/simulation/iso-simulation-overlay.tsx",
+        "src/components/simulation/iso-simulation-overlay.test.tsx",
+        "src/components/preview-3d/isometric-view.tsx",
+        "scripts/create-cafe-customer-model.mjs (registrationเท่านั้น)",
+        "PRD.md",
+        "architecture.md",
+        "design-system.md",
+        "SKILL.md",
+        "harness/evidence/feat-122/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "ประกอบbridge/timing/food/table/staff/customer/seating/lightingโดยimports/APIที่freeze;แก้renderdeltaที่ทิ้งเวลาที่fpsต่ำ",
+        "เชื่อมmodulepropsเข้าฉากและCharacterLab,รวมcatalogue/clipregistrationsโดยไม่exportGLBทับของlaneอื่น",
+        "ทำ2D/SVGsemanticfallback+reducedmotion/print/assetfail/late3Dload,qualityและcleanupครบ",
+        "syncเอกสารเฉพาะclock/semanticstate/animation/lighting/ownershipใหม่ ตรวจfullservicecycleและส่งQA"
+      ],
+      "acceptance_criteria": [
+        "เห็นรับอาหาร→ถือ→วาง→กิน→คราบ→เช็ด→สะอาดจริงและtableavailabilityตรงengine",
+        "1/2/4สมาชิกคนละเก้าอี้/จาน,ไม่มีเดินเร็วที่1×และseatไม่กระตุก",
+        "5อาหาร/4เวลาของแสง/lazyload/fallback/reducedmotionใช้ได้;ไม่มีThreeเข้าcore/worker/BFF",
+        "CharacterLabดูทุกclip/stateใหม่ได้,sharedassetsไม่leakและไม่มีconsoleerror"
+      ],
+      "verification": [
+        "browserflowเต็มบนfixtureที่กำหนดseedและfixedclock;pause/stop/restart/switchview/cancel",
+        "unitregression+visualก่อนส่ง123และdocumentconsistency",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "ต่างlaneมีassumptionคนละclock/identity",
+        "แก้generatorกลางแล้วexportทับassetที่ตรวจแล้ว"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-122/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+    },
+    {
+      "id": "feat-123",
+      "name": "QA gate: ตรวจรับภาพ วงจรบริการ เวลาเดิน แสง และ performance",
+      "status": "not-started",
+      "dependencies": [
+        "feat-122"
+      ],
+      "role": "qa",
+      "summary": "ตรวจรับครบ7คำขอด้วยผลวัดและภาพจริงก่อนปิดsprint5",
+      "sprint": 5,
+      "priority": "P1",
+      "planning_document": "harness/restaurant-animation-plan.md",
+      "owner_lane": "qa",
+      "branch": "codex/feat-123",
+      "write_scope": [
+        "e2e/restaurant-animation.spec.ts",
+        "e2e/restaurant-animation-timing.spec.ts",
+        "e2e/restaurant-animation-lighting.spec.ts",
+        "harness/evidence/feat-123/"
+      ],
+      "gate": "dependencies ทั้งหมด done, contract v1 และ write_scope ถูก freeze; ตรวจ harness/restaurant-animation-plan.md ก่อนเริ่ม",
+      "steps": [
+        "สร้างdeterministicfixtures/clockและทดสอบ5อาหาร,party1/2/4,หลายstaff/โต๊ะ/มุม,วงจรบริการและcancellation",
+        "วัดclock1×/walk6ม./fps15–120/TICKjitter/แท็บซ่อนและทุกplaybackrateพร้อมภาพท่านั่ง/ถือ/กิน/เช็ด",
+        "ตรวจแสง4เวลา4มุมroom2–30ม.,quality/reducedmotion/print/WebGLfail/assetfail/responsive6breakpoints/a11y",
+        "เทียบperformancebaselineฉาก80ลูกค้า+8staffถ้าผังรองรับรายงานdevice/median/p95/drawcalls/memoryและstartstop10รอบ;ส่งdefectกลับownerแล้วreverify"
+      ],
+      "acceptance_criteria": [
+        "npm test/lint/typecheck/Harness/boundaryผ่าน100% ไม่มีfailurebaselineค้าง",
+        "หลักฐานภาพ/วิดีโอ/ค่าระยะเวลาแสดงว่าครบ7ข้อ ไม่อ้างGLBโหลดผ่านแทนvisualQA",
+        "เวลาปกติ±5%ในsteadywalk ไม่มีsilentcatchup;คราบหายหลังเช็ดcompleteและไม่กระทบcycleใหม่",
+        "performanceถึงเป้าใน101หรือแก้จนผ่านบนreference device;consoleerror0/nohorizontaloverflowทุก6breakpoints"
+      ],
+      "verification": [
+        "npm test; npm run lint; npm run typecheck; python scripts/validate_harness.py และboundaryscan",
+        "Playwrightที่กำหนด3specข้างต้น+manualvisual/measurementreportตามแผน§8",
+        "npm test ต้องผ่านทั้งหมด; npm run lint; npm run typecheck; python scripts/validate_harness.py; ตรวจ Pure TS/Three.js boundaries ตามแผน §8"
+      ],
+      "risks": [
+        "softwareWebGLอาจไม่แทนperformanceเครื่องจริง ต้องระบุdeviceชัดเจน",
+        "fixtureเร่งเวลาอาจซ่อนbug1×ต้องวัดจริงด้วย"
+      ],
+      "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-123/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
     }
   ]
 }

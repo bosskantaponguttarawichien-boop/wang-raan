@@ -7,7 +7,7 @@
  *   3. สร้าง P1 → P2 contract แล้วตรวจด้วย Zod (P1LayoutContractSchema)
  *   4. SYNC_LAYOUT → Worker ตรวจซ้ำอีกชั้น → ANALYZE_DAY (จำลองทั้งวันเบื้องหลัง ตอบ 3 คำถาม, feat-095)
  *   5. START ตั้งแต่เปิดร้าน (ร้านว่าง) → หยุดเองเมื่อจบช่วงคนเยอะ (TICK finished)
- *      ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเอง (skipQuiet) จึงไม่ต้องนั่งดูร้านนิ่ง
+ *      ที่ 1× เวลาเดินตามเวลาจริง 1 วินาทีต่อ 1 วินาที และให้ลูกค้ากลุ่มแรกมาทันทีตอนเริ่ม (ไม่ต้องรอนั่งดูร้านว่าง)
  * ตำแหน่งลูกค้าที่ส่งให้ภาพผ่าน WalkPacer และพนักงานผ่าน StaffPacer ก่อน — ภาพเดินตามทางจริงด้วยความเร็วคนเดิน
  * (พนักงานแวะเข้าครัวก่อนเสิร์ฟด้วย)
  * ผังเปลี่ยนระหว่างจำลอง → หยุดทันที (ผลจำลองเดิมไม่ตรงกับผังแล้ว)
@@ -254,6 +254,7 @@ export class SimulationController {
     this.pacer.reset();
     this.staffPacer.reset();
     this.lastTickAt = null;
+    this.lastMetricsAt = -Infinity;
   }
 
   private onTick(tick: TickMessage) {

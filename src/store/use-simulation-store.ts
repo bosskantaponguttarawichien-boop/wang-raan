@@ -12,7 +12,7 @@ export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 /** ค่าฟอร์มจำลองร้าน 1 วัน (feat-095) + ความเร็วเล่นภาพ */
 export interface SimulationConfigState extends DayConfig {
   /**
-   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง (ช่วงที่ไม่มีใครเดิน worker เล่นเร็วขึ้นเอง)
+   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง 1 วินาทีต่อ 1 วินาที
    * แปลงเป็นวินาทีจำลองต่อวินาทีจริงที่ SimulationController ก่อนส่ง Worker
    */
   speed: number;

@@ -3,6 +3,28 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-101 — ฐานร่วมและสัญญา animation v1 พร้อม
+
+- รักษา working changes เวลา1×/นาฬิกาวินาทีเดิมครบ; บันทึก HEAD/SHA-256ตั้งต้นใน `harness/evidence/feat-101/starting-base.json`
+- แก้สอง baseline failures ด้วย fixture ที่สร้างคอขวดจริง ไม่แก้สูตร simulation: ร้าน48ที่นั่ง200คน/วันผ่านเกณฑ์คิวเดิม จึงเพิ่มกรณี300คน/วันที่ล้นจริง; การเปรียบเทียบstaffใช้ครัวเร็ว/ทานสั้น/รอ6นาทีและเพิ่มthroughput assertions ดูผลprobe `baseline-scenarios.json`
+- เพิ่ม `presentation-contract.ts` (Pure TS) และ `runtime/contracts.ts` พร้อม `harness/animation-contract-v1.md` ล็อกclock/identity/chair/meal/cycle/milestone/moduleAPI/clipprovider/foodbudget/lighting defaults และตัวอย่างpayload ยังไม่เชื่อมmetadataหรือเพิ่มภาพใหม่
+- QA: npm test78files/984testsผ่าน, typecheckผ่าน, lintผ่าน(exit0 มีwarningเดิม `_initial` ในsimulation-gate.test.tsx), boundary/Harnessผ่าน; Chrome156บนNVIDIA GTX1050TiเปิดPlayground3DและCharacterLab/staffนั่งได้ assetHTTP200 ไม่มีbrowsererror เก็บภาพฐานใน `harness/evidence/feat-101/browser-before/`
+
+## [2026-10-28] Planning only: อาหาร แอนิเมชันร้าน เวลาเดิน และแสงจริง (feat-101–123)
+
+- ตามคำขอผู้ใช้ session นี้ **แตก tasks เท่านั้น ยังไม่เริ่ม implementation** เพิ่ม sprint 5 จำนวน 23 งาน (`feat-101`–`feat-123`) ใน `harness/feature_list.json` ทุกงานเป็น `not-started`; มี dependencies, gate, write_scope, owner_lane, steps, acceptance, verification, risks และแนวทางส่งหลักฐาน ไม่เปลี่ยนสถานะ/เนื้อหาของ 100 งานเดิม
+- คู่มือฉบับละเอียด: `harness/restaurant-animation-plan.md` ครบทั้งอาหาร 5 แบบ, ถือ/เสิร์ฟ, ความเร็วเดินปกติ, กิน/คราบ, เช็ด, นั่ง/เลื่อนเก้าอี้ และแสงเงา realtime พร้อมสัญญา clock/identity/state, แนวคิดคำนวณแดด, ownership, ลำดับ fan-out/fan-in และข้อความมอบหมาย agent
+- แยกอาหารเป็น 5 task และคลิปตัวละครเป็น 4 task; ห้ามหลาย agent แก้ `three-view.tsx`/generator หรือ export GLB role เดียวกัน งาน Foundation เตรียม module ก่อน, integration รวม shared files ภายหลัง แนะนำ worktree จากฐานร่วมที่รวม timing/party working changes แล้ว; session นี้ไม่สร้าง worktree/branch/agent หรือ asset
+- ข้อมูลฐาน: `main` HEAD `7d5b122` มี working changes อยู่ก่อน ตรวจพบ engine party ภายใน/สมาชิกแยกรายคนใน render buffer, path id ต้องสัมพันธ์กัน, seated code4ยุบ waiting/eating, โต๊ะ dirty/cleaning ยังไม่ส่ง renderer และ pacers ยังเร่ง catch-up ได้ จึงใส่เป็นงาน foundation/core/timing โดยยังไม่แก้ source
+- Startup `harness/init.sh` ผ่าน runtime/dependencies/boundary และ Harness เดิม 100 งาน แต่ test suite **981 ผ่าน / 2 ล้ม / 983 รวม** (`day-analysis.test.ts:89`, `restaurant.test.ts:91`); init กลืน exit code ของ tests จึงไม่ถือว่า baseline ผ่าน ต้องแก้/ยืนยันสาเหตุใน feat-101 ก่อนเริ่ม lane อื่น ไม่แก้ failure ในงานวางแผนนี้
+- การตรวจแผน: `python scripts/validate_harness.py` ผ่าน123รายการ ไม่มีdependencyหาย/วน;100entryเดิมไม่เปลี่ยน,23งานใหม่เป็นnot-startedครบ มีเพียง101ที่dependencyพร้อม; `git diff --check` ผ่าน;SHA-256ของsourceที่มีworking changesทั้ง9ไฟล์ตรงก่อนเริ่ม งานทั้งหมดเป็นแผน ยังไม่มี evidence ว่าฟีเจอร์ทำสำเร็จ
+
+## [2026-10-28] ปรับเวลาจำลองให้เดินตามเวลาจริง 1 วิ = 1 วิ และแสดงนาฬิการะดับวินาที
+
+- `src/core/simulation/worker-runtime.ts` & `src/core/simulation/engine.ts`: ปรับ `tick(realMs)` ให้เดินเวลาจำลองตามเวลาจริง `1 วินาทีจริง = 1 วินาทีจำลอง` ตลอดเวลาที่ `1×` (ไม่เร่งความเร็ว 60 เท่าเองในช่วงที่ไม่มีคนเดิน) และเพิ่ม `spawnFirstCustomer()` เพื่อให้ลูกค้ากลุ่มแรกเข้าร้านทันทีเมื่อเริ่มจำลองจากร้านว่าง โดยเวลาจำลองยังคงเริ่มเดินจากเวลาเปิดร้านจริง.
+- `src/lib/day-config.ts`, `src/components/simulation/simulation-panel.tsx`, `src/components/editor/playground-status-bar.tsx`: เพิ่ม `formatClockSeconds()` แสดงเวลาในร้านระดับวินาที (`HH:MM:SS น.` เช่น `10:00:05 น.`) ทั้งในแผงจำลองและแถบสถานะ พร้อมปรับคำอธิบายปุ่มความเร็วเป็น `(x1 = เวลาจริง 1 วิ ต่อ 1 วิ)`.
+- QA: `engine.test.ts`, `day-panel.test.tsx`, `simulation-gate.test.tsx` (44 tests) ผ่าน 100%.
+
 ## [2026-10-28] Code Review: คืนทรัพยากรถาด 3D และแก้ CRLF ใน test design tokens
 
 - ตรวจทานโค้ดบน branch `fix/staff-walk-kitchen` (commit `1e6a8fc`): สถาปัตยกรรม Pure TypeScript ใน `src/core/simulation/` ปราศจากการ import React/DOM ถูกต้องตาม Architectural Boundary.

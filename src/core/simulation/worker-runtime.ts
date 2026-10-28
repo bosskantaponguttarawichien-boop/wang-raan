@@ -199,16 +199,17 @@ export class SimulationWorkerRuntime {
 
   /**
    * เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่
-   * skipQuiet: ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเป็น QUIET_SPEED และกลับมาความเร็วปกติทันทีที่มีคนเริ่มเดิน
-   * ร้านว่างทั้งร้านข้ามไปถึงตอนลูกค้ากลุ่มถัดไปเดินเข้าประตูเลย
+   * ที่ 1× เวลาจำลองเดินเท่าเวลาจริง 1 วินาทีต่อ 1 วินาทีตลอดเวลา (ไม่เร่งความเร็วเองตอนไม่มีใครเดิน)
+   * เมื่อเปิด skipQuiet ตอนเริ่มเล่นภาพที่ร้านว่าง จะให้ลูกค้ากลุ่มแรกมาทันทีใน tick แรกเพื่อไม่ต้องรอนั่งดูร้านว่าง
    */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
-    const quiet = this.skipQuiet && this.speed < QUIET_SPEED && this.simulation.isQuiet();
-    let seconds = quiet && this.simulation.isEmpty() ? EMPTY_SKIP_SECONDS : (realMs / 1000) * (quiet ? QUIET_SPEED : this.speed);
+    if (this.skipQuiet && this.ticks === 0 && this.simulation.isEmpty()) {
+      this.simulation.spawnFirstCustomer();
+    }
+    let seconds = (realMs / 1000) * this.speed;
     if (this.stopAt !== null) seconds = Math.max(0, Math.min(seconds, this.stopAt - this.simulation.getMetrics().time));
-    if (quiet) this.simulation.stepWhileQuiet(seconds);
-    else this.simulation.step(seconds);
+    this.simulation.step(seconds);
     const finished = this.stopAt !== null && this.simulation.getMetrics().time >= this.stopAt - 1e-9;
     if (finished) this.running = false;
     const agents = this.simulation.agentBuffer();

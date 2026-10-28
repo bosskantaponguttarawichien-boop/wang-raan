@@ -621,6 +621,13 @@ export class Simulation {
     return this.agents.length === 0 && this.frontStaff.every((staff) => !staff.task) && this.cooks.every((cook) => !cook.task);
   }
 
+  /** ให้ลูกค้ากลุ่มแรกมาถึงทันทีตอนเริ่มเล่นภาพ (ไม่ต้องรอนั่งดูร้านว่างหลายนาที โดยเวลาจำลองยังเริ่มจาก 0 และเดิน 1 วิ = 1 วิ) */
+  spawnFirstCustomer() {
+    if (this.agents.length === 0 && this.rateAt(this.metrics.time) > 0) {
+      this.spawn();
+    }
+  }
+
   /** เดินเวลาต่อได้ไม่เกิน maxSeconds ระหว่างที่ยังเงียบอยู่ — หยุดทันทีที่มีคนเริ่มเดิน คืนวินาทีที่เดินไป */
   stepWhileQuiet(maxSeconds: number): number {
     let elapsed = 0;

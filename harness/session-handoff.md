@@ -3,6 +3,28 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — feat-101 เสร็จ เตรียมทำ102ต่อ
+
+- **ผลลัพธ์**: baseline testsเขียว, contractv1ล็อกแล้วที่ `harness/animation-contract-v1.md`, core/runtimetypesและpayloadexamplesพร้อม ไม่มีอาหาร/คลิปใหม่ถูกสร้าง
+- **การตรวจ**: npm test984/984, typecheckผ่าน, lintexit0(warningเดิม1), boundary/Harnessผ่าน; Chrome156/GTX1050Tiเห็นPlayground3D/CharacterLab/staffนั่งและไม่มีbrowsererror ภาพก่อนrefactorใน `harness/evidence/feat-101/browser-before/`
+- **ถัดไป**:102แยกscenehost6ช่อง(no-op), legacylighting/propsและgeneratorrig/export/provider;คงภาพ/พฤติกรรมเดิม ตรวจGLBtempไม่เขียนทับpublicassetsและเทียบภาพจริงก่อนเปิดdependentlane
+- **ฐานร่วม**: รวมworking changesเวลาจำลองเดิมด้วย;ดูmanifestตั้งต้นเพื่อแยกงานเดิมจากงานfoundation ใช้basecommitหลัง101/102ที่ระบุในเอกสารส่งต่องาน ไม่ใช้mainเก่าที่ขาดworking changes
+
+## 2026-10-28 ICT — Planning only: 23 tasks สำหรับอาหาร/แอนิเมชัน/เวลาเดิน/แสง
+
+- **ผลลัพธ์**: เพิ่ม `feat-101`–`feat-123` (sprint 5) ทุกงาน `not-started`, ระบุ gate/dependencies/เจ้าของไฟล์/steps/acceptance/verification/risks; แผนละเอียดและการจัด agent/worktree อยู่ที่ `harness/restaurant-animation-plan.md` ไม่มี runtime/model/animation code ใหม่ ไม่มี agent/worktree/branch ถูกสร้าง
+- **เริ่มเมื่อผู้ใช้สั่งทำจริง**: 101 เตรียมฐานร่วม/แก้ baseline/freeze contract → 102 แยก shared modules/generator → fan-out อาหาร5ชิ้น, คลิป4ชุด, core metadata, solar → transport/timing/runtime → 122 รวม shared files → 123 QA. ห้ามเริ่มทุกงานพร้อมกันจาก main เดิม ดูตารางช่วงและ scope ในแผน §5–6
+- **กติกาป้องกันชน**: `three-view.tsx`/model generator เขียนโดย102แล้ว122เท่านั้น; คลิปไม่ export ทับGLB;117เป็นเจ้าของstaffGLB,118เป็นเจ้าของcustomerGLB; Harness กลางรวมทีละงานโดยcoordinator งานsourceเดิมที่ยังไม่commitต้องรวมในbaseก่อนแยกworktree
+- **การตรวจ/ข้อจำกัด**: init ตรวจ runtime/dependencies/boundary/Harness เดิมผ่าน แต่ tests 981ผ่าน/2ล้มจาก983 (`day-analysis.test.ts:89`, `restaurant.test.ts:91`) ห้ามอ้างว่า tests ผ่านทั้งหมดหรือเริ่ม dependent implementation ก่อน baseline gate ผ่าน รายงานแผนนี้ไม่ได้แก้สอง failure ดังกล่าว
+- **ตรวจแผนหลังบันทึก**: `python scripts/validate_harness.py` ผ่านครบ123รายการ ไม่มีdependencyหาย/วน; ตรวจ100entryเดิมเท่ากับHEADทุกfield,23งานใหม่มีรายละเอียดครบและเป็นnot-startedทั้งหมด มีเพียง101ที่dependencyพร้อม; `git diff --check` ผ่าน และSHA-256ของsourceที่มีworking changesทั้ง9ไฟล์ตรงก่อนเริ่มวางแผน
+- **สมมติฐานรอยืนยันใน101**: อาหารข้าวผัด/ก๋วยเตี๋ยว/สเต๊ก/สลัด/เค้ก; “เช็คโต๊ะ”ตีความเป็นเช็ด;1×ตามความเร็วengineไม่เร่งcatch-up;แสงrealtimeของอุปกรณ์โดยใช้Bangkokเป็นreferenceที่แก้ได้ ไม่ใช่เวลาจำลองร้านและไม่ใช่การตรวจพบตำแหน่ง
+
+## 2026-10-28 ICT — ปรับเวลาจำลอง 1 วิ = 1 วิ และแสดงนาฬิการะดับวินาที
+
+- **ผลลัพธ์**: เวลาจำลองที่ `1×` เดินตามเวลาจริง 1 วินาทีต่อ 1 วินาทีตลอดเวลา (ไม่เร่ง 60× เองช่วงที่ไม่มีคนเดิน) โดยตอนกดเริ่มจำลองจากร้านว่างให้ลูกค้ากลุ่มแรกมาทันที (`spawnFirstCustomer()`) และแสดงเวลาในร้านระดับวินาที (`HH:MM:SS น.` เช่น `10:00:05 น.`) ทั้งบนแผงจำลองและแถบสถานะ (`formatClockSeconds`)
+- **การตรวจ**: `engine.test.ts`, `day-panel.test.tsx`, `simulation-gate.test.tsx` (44 tests) ผ่านครบ 100%
+- **ข้อควรรู้**: หากต้องการเร่งเวลาสามารถกดปุ่ม `2×`, `5×`, `10×`, `30×` ได้โดยตรง
+
 ## 2026-10-28 ICT — ลูกค้าดึงเก้าอี้ออกก่อนนั่ง แล้วดันเข้า (3D)
 
 - **ผลลัพธ์**: เก้าอี้ใน 3D แยกเป็น object ที่ขยับได้ (ไม่รวมกับเฟอร์นิเจอร์อื่น); นั่ง = ดึงเก้าอี้ออก 0.3 ม. → นั่งลง → ดันเก้าอี้พร้อมคนเข้าโต๊ะ, ลุก = เลื่อนออก → ลุก → เดินไป แล้วเก้าอี้เลื่อนกลับ (`seat-motion.ts`, `three-view.tsx`)

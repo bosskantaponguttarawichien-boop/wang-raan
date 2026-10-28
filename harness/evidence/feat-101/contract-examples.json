@@ -1,0 +1,217 @@
+{
+  "initial": {
+    "version": 1,
+    "runId": "example-run-1",
+    "layoutRevision": "example-layout-rev",
+    "sequence": 0,
+    "simTimeSeconds": 0,
+    "customers": [],
+    "meals": [],
+    "tables": [],
+    "staff": [],
+    "milestones": []
+  },
+  "waiting-food-party-of-two": {
+    "version": 1,
+    "runId": "example-run-1",
+    "layoutRevision": "example-layout-rev",
+    "sequence": 1,
+    "simTimeSeconds": 100,
+    "customers": [
+      {
+        "renderAgentId": 10,
+        "partyId": 1,
+        "memberIndex": 0,
+        "tableId": "table-A",
+        "chairId": "chair-0",
+        "serviceCycleId": "table-A-1",
+        "activity": "waiting-food",
+        "seatingPhase": "seated",
+        "walkMetersPerSecond": 1.2,
+        "mealId": null
+      },
+      {
+        "renderAgentId": 11,
+        "partyId": 1,
+        "memberIndex": 1,
+        "tableId": "table-A",
+        "chairId": "chair-1",
+        "serviceCycleId": "table-A-1",
+        "activity": "waiting-food",
+        "seatingPhase": "seated",
+        "walkMetersPerSecond": 1.2,
+        "mealId": null
+      }
+    ],
+    "meals": [],
+    "tables": [
+      {
+        "tableId": "table-A",
+        "serviceCycleId": "table-A-1",
+        "availability": "occupied",
+        "surface": "empty",
+        "mealIds": [],
+        "stainAmount": 0,
+        "wipeProgress": 0,
+        "cleanCompletedAtSeconds": null
+      }
+    ],
+    "staff": [],
+    "milestones": []
+  },
+  "eating-party-of-two": {
+    "version": 1,
+    "runId": "example-run-1",
+    "layoutRevision": "example-layout-rev",
+    "sequence": 2,
+    "simTimeSeconds": 360,
+    "customers": [
+      {
+        "renderAgentId": 10,
+        "partyId": 1,
+        "memberIndex": 0,
+        "tableId": "table-A",
+        "chairId": "chair-0",
+        "serviceCycleId": "table-A-1",
+        "activity": "eating",
+        "seatingPhase": "seated",
+        "walkMetersPerSecond": 1.2,
+        "mealId": "meal-10"
+      },
+      {
+        "renderAgentId": 11,
+        "partyId": 1,
+        "memberIndex": 1,
+        "tableId": "table-A",
+        "chairId": "chair-1",
+        "serviceCycleId": "table-A-1",
+        "activity": "eating",
+        "seatingPhase": "seated",
+        "walkMetersPerSecond": 1.2,
+        "mealId": "meal-11"
+      }
+    ],
+    "meals": [
+      {
+        "mealId": "meal-10",
+        "ownerRenderAgentId": 10,
+        "tableId": "table-A",
+        "chairId": "chair-0",
+        "serviceCycleId": "table-A-1",
+        "foodKind": "fried-rice",
+        "anchor": {
+          "x": -0.15,
+          "y": 0
+        },
+        "progress": "partial",
+        "consumed": 0.25,
+        "placedAtSeconds": 300
+      },
+      {
+        "mealId": "meal-11",
+        "ownerRenderAgentId": 11,
+        "tableId": "table-A",
+        "chairId": "chair-1",
+        "serviceCycleId": "table-A-1",
+        "foodKind": "fried-rice",
+        "anchor": {
+          "x": 0.15,
+          "y": 0
+        },
+        "progress": "partial",
+        "consumed": 0.25,
+        "placedAtSeconds": 300
+      }
+    ],
+    "tables": [
+      {
+        "tableId": "table-A",
+        "serviceCycleId": "table-A-1",
+        "availability": "occupied",
+        "surface": "eating",
+        "mealIds": [
+          "meal-10",
+          "meal-11"
+        ],
+        "stainAmount": 0.1,
+        "wipeProgress": 0,
+        "cleanCompletedAtSeconds": null
+      }
+    ],
+    "staff": [],
+    "milestones": []
+  },
+  "cancelled-after-service": {
+    "version": 1,
+    "runId": "example-run-1",
+    "layoutRevision": "example-layout-rev",
+    "sequence": 3,
+    "simTimeSeconds": 400,
+    "customers": [],
+    "meals": [
+      {
+        "mealId": "meal-10",
+        "ownerRenderAgentId": 10,
+        "tableId": "table-A",
+        "chairId": "chair-0",
+        "serviceCycleId": "table-A-1",
+        "foodKind": "fried-rice",
+        "anchor": {
+          "x": -0.15,
+          "y": 0
+        },
+        "progress": "partial",
+        "consumed": 0.25,
+        "placedAtSeconds": 300
+      },
+      {
+        "mealId": "meal-11",
+        "ownerRenderAgentId": 11,
+        "tableId": "table-A",
+        "chairId": "chair-1",
+        "serviceCycleId": "table-A-1",
+        "foodKind": "fried-rice",
+        "anchor": {
+          "x": 0.15,
+          "y": 0
+        },
+        "progress": "partial",
+        "consumed": 0.25,
+        "placedAtSeconds": 300
+      }
+    ],
+    "tables": [
+      {
+        "tableId": "table-A",
+        "serviceCycleId": "table-A-1",
+        "availability": "dirty",
+        "surface": "used",
+        "mealIds": [
+          "meal-10",
+          "meal-11"
+        ],
+        "stainAmount": 0.1,
+        "wipeProgress": 0,
+        "cleanCompletedAtSeconds": null
+      }
+    ],
+    "staff": [],
+    "milestones": []
+  },
+  "restart": {
+    "version": 1,
+    "runId": "example-run-2",
+    "layoutRevision": "example-layout-rev",
+    "sequence": 0,
+    "simTimeSeconds": 0,
+    "customers": [],
+    "meals": [],
+    "tables": [],
+    "staff": [],
+    "milestones": []
+  },
+  "legacy-worker": {
+    "agents": [],
+    "staff": []
+  }
+}

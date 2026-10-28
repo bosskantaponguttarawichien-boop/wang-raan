@@ -82,7 +82,11 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
 
   it("พนักงานหน้าร้านน้อย → รับออร์เดอร์ช้า รออาหารนานขึ้น", () => {
     const wait = (frontStaff: number) => {
-      const sim = restaurant({ cooks: 3, frontStaff, customersPerHour: 30, takeOrderSeconds: [150, 210] });
+      // ครัวเร็วและทานสั้นเพื่อให้พนักงานหน้าร้านเป็นคอขวดจริง แทนที่จะติดโต๊ะสองชุดเต็ม
+      const sim = restaurant({
+        cooks: 3, frontStaff, customersPerHour: 30, takeOrderSeconds: [150, 210],
+        cookMinutesPerDish: 0.5, dineMinutes: [1, 2], patienceMinutes: 6,
+      });
       run(sim, 3 * 3600);
       return sim.getMetrics();
     };
@@ -90,6 +94,8 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
     const three = wait(3);
     expect(one.abandoned).toBeGreaterThan(three.abandoned);
     expect(one.frontStaffBusy).toBeGreaterThan(three.frontStaffBusy);
+    expect(one.fed).toBeGreaterThan(0);
+    expect(three.fed).toBeGreaterThan(one.fed);
   });
 
   it("ไม่มีโต๊ะสะอาดว่าง → รอหน้าเข้าได้ แต่กลับเมื่อเกิน patience", () => {

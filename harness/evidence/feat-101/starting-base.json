@@ -1,0 +1,14 @@
+{
+  "head": "7d5b1220eafc16ab5509feb9d1e4996b88255231",
+  "working_changes": {
+    "src/components/editor/playground-status-bar.tsx": "6c9148430ce19cf4aa24dca5e6a4a74b38021ff1c835fc4245a256aa34445e12",
+    "src/components/simulation/simulation-controller.ts": "d0186339ff7369946702c64369f2ff3db6ca189f280fb9f77ebd455ee81b3a8b",
+    "src/components/simulation/simulation-gate.test.tsx": "adaa01f407bee181524f5ca2d18c953553443f3584c58b3c41f9e03c0280529e",
+    "src/components/simulation/simulation-panel.tsx": "269db5aad91bb449f211008047c487349d1dfd7d3e73f7664ae6b11187f9e4e3",
+    "src/core/simulation/engine.test.ts": "5ac5689ebf849d4503c7dd5d120dc4a190c4fb78ffa7fd4b6f156b2b340be249",
+    "src/core/simulation/engine.ts": "e16197f6f19c04fdd87704551382585257e94160a3e186fd0314eb022d086a1a",
+    "src/core/simulation/worker-runtime.ts": "d2445636a6ae1289ab0275aa733f1770195183d87e232b1f65594e1e1c062917",
+    "src/lib/day-config.ts": "c216cbbd5817fa566cc928442f44e5308ae4491501a3442e6581cbbfd0d6c34f",
+    "src/store/use-simulation-store.ts": "079290d7ed36ed6d1a167e02298fa9e3a8f5943071725919a96ebd303587dd6b"
+  }
+}
