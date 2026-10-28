@@ -154,6 +154,8 @@ export interface SimulationMetrics {
   maxEntranceQueue: number;
   /** table-service: เวลาเฉลี่ยที่ลูกค้ายืนรอโต๊ะสะอาดหน้าร้าน */
   avgEntranceWaitMinutes: number;
+  /** table-service: ออกจากร้านเพราะรออาหารนานเกินกำหนด */
+  abandoned: number;
 }
 
 /** metrics เริ่มต้น (ค่า 0 ทั้งหมด) */
@@ -178,6 +180,7 @@ export function emptyMetrics(): SimulationMetrics {
     waitingEntrance: 0,
     maxEntranceQueue: 0,
     avgEntranceWaitMinutes: 0,
+    abandoned: 0,
   };
 }
 
@@ -216,6 +219,10 @@ interface Agent {
   entranceQueuedAt: number | null;
   enteredAt: number;
   seatedAt: number;
+  /** จำนวนจานของทั้งกลุ่มที่ยังทำไม่เสร็จ */
+  pendingDishes: number;
+  /** ลูกค้าตัดสินใจออกแล้ว; งานที่ค้างต้องไม่เสิร์ฟย้อนหลัง */
+  cancelled: boolean;
   /** ลักษณะเฉพาะคน สุ่มตอนเข้าร้าน (วินาที; cookFactor = ตัวคูณเวลาทำจาน) */
   traits: { orderSeconds: number; dineSeconds: number; takeOrderSeconds: number; paySeconds: number; cookFactor: number };
 }
@@ -277,6 +284,8 @@ export interface PreparedStore {
   readonly grid: OccupancyGrid;
   readonly counterCount: number;
   readonly counterField: FlowField;
+  /** ช่องว่างเรียงจากเคาน์เตอร์ออกไป ใช้วางคิวจ่ายเงิน */
+  readonly paymentQueueCells: readonly number[];
   readonly exitField: FlowField;
   /** เก้าอี้ที่ลูกค้าเดินไปถึงได้จากทางเข้า */
   readonly chairs: readonly Chair[];
@@ -292,6 +301,9 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const counters = layout.objects.filter((o) => o.type === "counter");
   const counterField = computeFlowField(grid, counters.flatMap((c) => touchingCells(grid, footprint(c))));
   const exitField = computeFlowField(grid, grid.entranceCells);
+  const paymentQueueCells = Array.from(grid.cells.keys())
+    .filter((cell) => grid.cells[cell] === CELL_FREE && Number.isFinite(counterField.distance[cell]!))
+    .sort((a, b) => counterField.distance[a]! - counterField.distance[b]!);
 
   // เก้าอี้ที่ลูกค้าเดินไปถึงได้จากทางเข้าเท่านั้น
   const seatFields = new Map<string, FlowField>();
@@ -322,7 +334,7 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const tables = layout.objects.filter((o): o is Table => o.type === "table").filter((table) =>
     table.chairIds.some((id) => seatFields.has(id)),
   );
-  return { layout, grid, counterCount: counters.length, counterField, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
+  return { layout, grid, counterCount: counters.length, counterField, paymentQueueCells, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
 }
 
 export class Simulation {
@@ -334,6 +346,7 @@ export class Simulation {
   /** สุ่มอื่น ๆ ที่ขึ้นกับสถานะร้าน (เลือกเก้าอี้) */
   private readonly seatRandom: () => number;
   private readonly counterField: FlowField;
+  private readonly paymentQueueCells: readonly number[];
   private readonly exitField: FlowField;
   private readonly seatFields: ReadonlyMap<string, FlowField>;
   private readonly chairs: readonly Chair[];
@@ -376,6 +389,7 @@ export class Simulation {
     this.layout = prepared.layout;
     this.heatmap = new Float32Array(this.grid.cells.length);
     this.counterField = prepared.counterField;
+    this.paymentQueueCells = prepared.paymentQueueCells;
     this.exitField = prepared.exitField;
     this.chairs = prepared.chairs;
     for (const chair of this.chairs) this.chairById.set(chair.id, chair);
@@ -461,6 +475,8 @@ export class Simulation {
       entranceQueuedAt: null,
       enteredAt: this.metrics.time,
       seatedAt: 0,
+      pendingDishes: 0,
+      cancelled: false,
       traits: {
         orderSeconds: this.between(this.config.orderSeconds),
         dineSeconds: this.between(this.config.dineMinutes) * 60,
@@ -472,11 +488,15 @@ export class Simulation {
     this.agents.push(agent);
     this.markPath(agent);
     this.metrics.arrived += agent.partySize;
-    // ร้านอาหาร: ไม่มีโต๊ะสะอาดที่พอสำหรับทั้งกลุ่ม ให้ยืนรอที่ทางเข้า
+    // ถ้าไม่มีโต๊ะขนาดรองรับกลุ่มเลย ให้กลับทันที; ถ้ามีแต่ยังไม่สะอาดให้รอหน้าเข้า
     if (this.tableService && !this.goToChair(agent)) {
-      agent.field = null;
-      agent.state = "waiting-entrance";
-      agent.entranceQueuedAt = this.metrics.time;
+      if (!this.hasTableForParty(agent.partySize)) {
+        this.abandon(agent, true);
+      } else {
+        agent.field = null;
+        agent.state = "waiting-entrance";
+        agent.entranceQueuedAt = this.metrics.time;
+      }
     }
   }
 
@@ -535,6 +555,10 @@ export class Simulation {
       }
     }
     return false;
+  }
+
+  private hasTableForParty(partySize: number) {
+    return [...this.tableById.values()].some((table) => table.chairIds.length >= partySize);
   }
 
   private pickTable(partySize: number): RuntimeTable | null {
@@ -642,6 +666,29 @@ export class Simulation {
     agent.state = "leaving";
   }
 
+  /** ตัดงานที่ยังไม่เริ่มของลูกค้าที่ออกจากร้าน เพื่อไม่ให้มีอาหาร/บริการผี */
+  private cancelQueuedWork(agent: Agent) {
+    for (let i = this.staffTasks.length - 1; i >= 0; i--) {
+      if (this.staffTasks[i]!.agent === agent) this.staffTasks.splice(i, 1);
+    }
+    for (let i = this.kitchenOrders.length - 1; i >= 0; i--) {
+      if (this.kitchenOrders[i] === agent) this.kitchenOrders.splice(i, 1);
+    }
+  }
+
+  /** ลูกค้าถอนตัว: โต๊ะต้องเข้าสู่วงจรเก็บโต๊ะ และงานค้างต้องไม่เสิร์ฟย้อนหลัง */
+  private abandon(agent: Agent, noSeat: boolean) {
+    if (agent.cancelled) return;
+    agent.cancelled = true;
+    this.cancelQueuedWork(agent);
+    // ลูกค้านั่งอยู่กลาง footprint ของเก้าอี้ จึงต้องลุกไปช่องเดินก่อนหาเส้นออก
+    if (agent.tableId && agent.chairId) this.standUp(agent);
+    if (agent.tableId) this.markTableDirty(agent.tableId);
+    if (noSeat) this.metrics.noSeat += agent.partySize;
+    else this.metrics.abandoned += agent.partySize;
+    this.leave(agent);
+  }
+
   step(dt: number) {
     // walk() ไล่ผ่านหลาย cell ตาม budget ได้อยู่แล้ว; แบ่งไม่เกิน 1 วินาที
     // เพื่อให้การวิเคราะห์ทั้งวันไม่วนคิวหน้าร้านเดิมซ้ำเกินจำเป็น
@@ -672,6 +719,9 @@ export class Simulation {
     for (const agent of this.agents) {
       switch (agent.state) {
         case "waiting-entrance":
+          if (agent.entranceQueuedAt !== null && this.metrics.time - agent.entranceQueuedAt >= this.config.patienceMinutes * 60) {
+            this.abandon(agent, true);
+          }
           break;
         case "to-counter":
           if (this.walk(agent, dt)) {
@@ -681,7 +731,9 @@ export class Simulation {
           break;
         case "queuing":
         case "waiting-order":
+          break;
         case "waiting-food":
+          if (this.metrics.time - agent.seatedAt >= this.config.patienceMinutes * 60) this.abandon(agent, false);
           break;
         case "ordering":
           if (this.tableService) break; // จ่ายเงิน: จบเมื่อพนักงานทำงาน pay เสร็จ
@@ -735,6 +787,8 @@ export class Simulation {
       }
     }
 
+    if (this.tableService) this.positionPaymentQueue();
+
     // ออกจากร้านเมื่อถึงประตู
     this.agents = this.agents.filter((agent) => {
       if (agent.state === "leaving" && this.exitField.distance[this.cellOf(agent.x, agent.y)] === 0) {
@@ -758,7 +812,7 @@ export class Simulation {
       if (agent.state === "queuing") queuing += agent.partySize;
       if (agent.state === "waiting-entrance") waitingEntrance += agent.partySize;
       if (code === 4) seated += agent.partySize;
-      if (code !== 4 && agent.state !== "ordering") this.heatmap[this.cellOf(agent.x, agent.y)]! += dt;
+      if (code !== 4 && agent.state !== "ordering") this.heatmap[this.cellOf(agent.x, agent.y)]! += dt * agent.partySize;
     }
     const m = this.metrics;
     m.inStore = peopleInStore;
@@ -777,7 +831,18 @@ export class Simulation {
   }
 
   private addTask(kind: StaffTaskKind, agent: Agent) {
-    this.staffTasks.push({ kind, agent, tableId: null, createdAt: this.metrics.time });
+    if (!agent.cancelled) this.staffTasks.push({ kind, agent, tableId: null, createdAt: this.metrics.time });
+  }
+
+  /** ช่องคิวจ่ายเงิน: เรียงจากเคาน์เตอร์ออกไปตาม flow field และไม่ใช้ช่องซ้ำ */
+  private positionPaymentQueue() {
+    const queue = this.agents
+      .filter((agent) => agent.state === "ordering" || agent.state === "queuing")
+      .sort((a, b) => (a.state === "ordering" ? -1 : b.state === "ordering" ? 1 : a.enteredAt - b.enteredAt));
+    queue.forEach((agent, index) => {
+      const cell = this.paymentQueueCells[Math.min(index, this.paymentQueueCells.length - 1)];
+      if (cell !== undefined) Object.assign(agent, this.cellCenter(cell));
+    });
   }
 
   private markTableDirty(tableId: string) {
@@ -798,7 +863,8 @@ export class Simulation {
       this.kitchenBusySeconds += dt;
       cook.remaining -= dt;
       if (cook.remaining <= 0) {
-        this.addTask("deliver", cook.task.agent!);
+        const agent = cook.task.agent!;
+        if (!agent.cancelled && --agent.pendingDishes === 0) this.addTask("deliver", agent);
         cook.task = null;
       }
     }
@@ -824,7 +890,9 @@ export class Simulation {
     this.staffTasks.sort((a, b) => this.taskPriority(a) - this.taskPriority(b) || a.createdAt - b.createdAt);
     for (const [index, staff] of this.frontStaff.entries()) {
       if (staff.task || this.staffTasks.length === 0) continue;
-      const task = this.staffTasks.shift()!;
+      let task = this.staffTasks.shift()!;
+      while (task.agent?.cancelled && this.staffTasks.length > 0) task = this.staffTasks.shift()!;
+      if (task.agent?.cancelled) continue;
       staff.task = task;
       staff.remaining = this.taskSeconds(task);
       staff.plan = this.staffVisuals?.plan(index, task.kind, task.tableId ?? task.agent?.tableId ?? null, staff.remaining, this.walkSeconds(task)) ?? null;
@@ -833,19 +901,23 @@ export class Simulation {
     }
   }
 
+  /** ระยะเดินไปจุดบริการที่ใกล้ที่สุดของโต๊ะ ไม่ผูกกับเก้าอี้ตัวแรกของ preset */
+  private tableWalk(tableId: string | null | undefined, walks: ReadonlyMap<string, number>) {
+    const table = tableId ? this.tableById.get(tableId) : null;
+    return table ? Math.min(...table.chairIds.map((chairId) => walks.get(chairId) ?? Infinity)) : 0;
+  }
+
   private taskSeconds(task: StaffTask): number {
-    const chairId = task.agent?.chairId;
+    const party = task.agent?.partySize ?? 1;
     switch (task.kind) {
       case "take-order":
-        return (this.takeOrderWalk.get(chairId!) ?? 0) + task.agent!.traits.takeOrderSeconds;
+        return this.tableWalk(task.agent!.tableId, this.takeOrderWalk) + task.agent!.traits.takeOrderSeconds + (party - 1) * 15;
       case "deliver":
-        return this.deliverWalk.get(chairId!) ?? 0;
+        return this.tableWalk(task.agent!.tableId, this.deliverWalk) + party * 10;
       case "pay":
         return task.agent!.traits.paySeconds;
-      case "clean": {
-        const chairId = this.tableById.get(task.tableId!)!.chairIds[0]!;
-        return (this.takeOrderWalk.get(chairId) ?? 0) + this.between(this.config.cleanTableSeconds);
-      }
+      case "clean":
+        return this.tableWalk(task.tableId, this.takeOrderWalk) + this.between(this.config.cleanTableSeconds);
     }
   }
 
@@ -853,11 +925,11 @@ export class Simulation {
   private walkSeconds(task: StaffTask): number {
     switch (task.kind) {
       case "take-order":
-        return this.takeOrderWalk.get(task.agent!.chairId!) ?? 0;
+        return this.tableWalk(task.agent!.tableId, this.takeOrderWalk);
       case "clean":
-        return this.takeOrderWalk.get(this.tableById.get(task.tableId!)!.chairIds[0]!) ?? 0;
+        return this.tableWalk(task.tableId, this.takeOrderWalk);
       case "deliver":
-        return this.deliverWalk.get(task.agent!.chairId!) ?? 0;
+        return this.tableWalk(task.agent!.tableId, this.deliverWalk);
       case "pay":
         return 0;
     }
@@ -877,10 +949,13 @@ export class Simulation {
     const { agent } = task;
     switch (task.kind) {
       case "take-order":
+        if (agent!.cancelled) break;
         agent!.state = "waiting-food";
-        this.kitchenOrders.push(agent!);
+        agent!.pendingDishes = agent!.partySize;
+        for (let dish = 0; dish < agent!.partySize; dish++) this.kitchenOrders.push(agent!);
         break;
       case "deliver": {
+        if (agent!.cancelled) break;
         const wait = this.metrics.time - agent!.seatedAt;
         this.metrics.fed += agent!.partySize;
         this.totalFoodWaitSeconds += wait * agent!.partySize;
@@ -924,14 +999,20 @@ export class Simulation {
 
   /** ตำแหน่งและสถานะของลูกค้าทุกคน (id, x, y, stateCode) */
   agentBuffer(): Float32Array {
-    const buffer = new Float32Array(this.agents.length * AGENT_STRIDE);
-    this.agents.forEach((a, i) => {
-      const o = i * AGENT_STRIDE;
-      buffer[o] = a.id;
-      buffer[o + 1] = a.x + a.jitter.x;
-      buffer[o + 2] = a.y + a.jitter.y;
-      buffer[o + 3] = AGENT_STATE_CODE[a.state];
-    });
+    const count = this.agents.reduce((sum, agent) => sum + agent.partySize, 0);
+    const buffer = new Float32Array(count * AGENT_STRIDE);
+    let i = 0;
+    for (const agent of this.agents) {
+      for (let member = 0; member < agent.partySize; member++) {
+        const o = i++ * AGENT_STRIDE;
+        const column = member % 2;
+        const row = Math.floor(member / 2);
+        buffer[o] = agent.id * 10 + member;
+        buffer[o + 1] = agent.x + agent.jitter.x + (column - 0.5) * 0.14;
+        buffer[o + 2] = agent.y + agent.jitter.y + (row - 0.5) * 0.14;
+        buffer[o + 3] = AGENT_STATE_CODE[agent.state];
+      }
+    }
     return buffer;
   }
 

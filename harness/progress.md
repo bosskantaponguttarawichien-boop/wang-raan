@@ -1430,3 +1430,11 @@
 - ท่านั่ง (รอบ 2): ข้อมือพับ 75° ดูหัก และถุงมือชี้เข้าหากันพาดหน้าพุง → หามุมใหม่ให้นิ้วชี้ไปหน้า ถุงมือวางตะแคงนิ้วโป้งขึ้นบนต้นขา ข้อมืองอ .27 rad แขนไม่จมลำตัว; test ข้อมือ y < .75
 - ท่านั่ง (รอบ 3): ต้นแขนเอนหลังกับปลายแขนยื่นตรงดูแข็ง → ต้นแขนห้อยข้างตัว ศอกใต้ไหล่ ปลายแขนลาดลง มือวางบนเข่า
 - ลบเส้นรอยต่อที่แขน/ขา: แขน (ไหล่ถึงปลายมือ) และขา (สะโพกถึงข้อเท้า) เป็นท่อเดียว เพิ่มวงรอบศอก/เข่า น้ำหนักผิวส่งต่อ ±2.8 ซม.; เลิก Decimate (สามเหลี่ยมยาวทำผิวบิดเป็นริ้วตอนงอ) → แบ่งช่องตามงบแล้ว Shrinkwrap ลงผิวเรียบเกลา 3 ขั้น ได้ ~6.9k / 1.7k สามเหลี่ยม; `npm test` 896 ผ่าน
+
+## 2026-10-28 ICT — Correct customer/staff simulation behaviour
+
+- Fixed restaurant simulation accuracy: one party member equals one dish; the party is served only after every dish is ready; front-staff work uses the nearest service point and scales order/delivery handling for group size.
+- Customers now leave after exceeding patience while waiting outside or for food; impossible-to-seat parties are rejected immediately; queued/active work is cancelled safely and abandoned tables enter cleaning.
+- Payment queues use distinct traversable cells; render buffers expose every member and heatmap weights traffic by party size.
+- Day analysis now reports abandonment/unfinished diners and fails staffing recommendations when diners remain after drain time.
+- Added/updated regression tests. PR #39 created; CI pending.
