@@ -284,6 +284,8 @@ export interface PreparedStore {
   readonly grid: OccupancyGrid;
   readonly counterCount: number;
   readonly counterField: FlowField;
+  /** ช่องว่างเรียงจากเคาน์เตอร์ออกไป ใช้วางคิวจ่ายเงิน */
+  readonly paymentQueueCells: readonly number[];
   readonly exitField: FlowField;
   /** เก้าอี้ที่ลูกค้าเดินไปถึงได้จากทางเข้า */
   readonly chairs: readonly Chair[];
@@ -299,6 +301,9 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const counters = layout.objects.filter((o) => o.type === "counter");
   const counterField = computeFlowField(grid, counters.flatMap((c) => touchingCells(grid, footprint(c))));
   const exitField = computeFlowField(grid, grid.entranceCells);
+  const paymentQueueCells = Array.from(grid.cells.keys())
+    .filter((cell) => grid.cells[cell] === CELL_FREE && Number.isFinite(counterField.distance[cell]!))
+    .sort((a, b) => counterField.distance[a]! - counterField.distance[b]!);
 
   // เก้าอี้ที่ลูกค้าเดินไปถึงได้จากทางเข้าเท่านั้น
   const seatFields = new Map<string, FlowField>();
@@ -329,7 +334,7 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const tables = layout.objects.filter((o): o is Table => o.type === "table").filter((table) =>
     table.chairIds.some((id) => seatFields.has(id)),
   );
-  return { layout, grid, counterCount: counters.length, counterField, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
+  return { layout, grid, counterCount: counters.length, counterField, paymentQueueCells, exitField, chairs, tables, seatFields, takeOrderWalk, deliverWalk };
 }
 
 export class Simulation {
@@ -341,6 +346,7 @@ export class Simulation {
   /** สุ่มอื่น ๆ ที่ขึ้นกับสถานะร้าน (เลือกเก้าอี้) */
   private readonly seatRandom: () => number;
   private readonly counterField: FlowField;
+  private readonly paymentQueueCells: readonly number[];
   private readonly exitField: FlowField;
   private readonly seatFields: ReadonlyMap<string, FlowField>;
   private readonly chairs: readonly Chair[];
@@ -383,6 +389,7 @@ export class Simulation {
     this.layout = prepared.layout;
     this.heatmap = new Float32Array(this.grid.cells.length);
     this.counterField = prepared.counterField;
+    this.paymentQueueCells = prepared.paymentQueueCells;
     this.exitField = prepared.exitField;
     this.chairs = prepared.chairs;
     for (const chair of this.chairs) this.chairById.set(chair.id, chair);
@@ -832,11 +839,8 @@ export class Simulation {
     const queue = this.agents
       .filter((agent) => agent.state === "ordering" || agent.state === "queuing")
       .sort((a, b) => (a.state === "ordering" ? -1 : b.state === "ordering" ? 1 : a.enteredAt - b.enteredAt));
-    const cells = Array.from(this.grid.cells.keys())
-      .filter((cell) => this.grid.cells[cell] === CELL_FREE && Number.isFinite(this.counterField.distance[cell]!))
-      .sort((a, b) => this.counterField.distance[a]! - this.counterField.distance[b]!);
     queue.forEach((agent, index) => {
-      const cell = cells[Math.min(index, cells.length - 1)];
+      const cell = this.paymentQueueCells[Math.min(index, this.paymentQueueCells.length - 1)];
       if (cell !== undefined) Object.assign(agent, this.cellCenter(cell));
     });
   }
