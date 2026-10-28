@@ -3,9 +3,12 @@
  * - ไฟล์ build (/_next/static), รูป/โมเดล (/assets), ไอคอน: เก็บแคชครั้งแรกที่โหลด แล้วใช้จากแคช (ชื่อไฟล์มี hash)
  * - หน้าเว็บ: ขอจากเน็ตก่อน ถ้าออฟไลน์ใช้ฉบับที่เคยเปิด → ไม่มีก็แสดงหน้า /offline
  * - /api และคำขอ RSC ไม่แคช (ข้อมูลบัญชีต้องสดเสมอ)
+ * - Web Worker: ไฟล์เริ่ม worker ของ Turbopack ชื่อเดิมทุก build และรับรายชื่อไฟล์โค้ดผ่าน #params ท้าย URL
+ *   ถ้าส่ง response จากแคชตรง ๆ worker จะได้ URL (และ #params) ของ build ที่แคชไว้ครั้งแรก → รันโค้ดจำลองรุ่นเก่า
+ *   จึงต้องห่อ response ใหม่ให้ worker ใช้ URL ของคำขอปัจจุบัน
  * เปลี่ยน VERSION เมื่อแก้ไฟล์นี้ เพื่อล้างแคชเก่า
  */
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC_CACHE = `wangraan-static-${VERSION}`;
 const PAGE_CACHE = `wangraan-pages-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -36,6 +39,13 @@ self.addEventListener("activate", (event) => {
 const isStatic = (url) =>
   url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/");
 
+const isWorker = (request) => request.destination === "worker" || request.destination === "sharedworker";
+
+/** response ที่สร้างใหม่ไม่มี URL ติดมา — worker จึงใช้ URL ของคำขอนี้ (#params ของ build ปัจจุบัน) */
+function freshUrl(response) {
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers: response.headers });
+}
+
 async function trimStatic(cache) {
   const keys = await cache.keys();
   await Promise.all(keys.slice(0, Math.max(0, keys.length - STATIC_MAX)).map((key) => cache.delete(key)));
@@ -44,7 +54,7 @@ async function trimStatic(cache) {
 async function cacheFirst(event, request) {
   const cache = await caches.open(STATIC_CACHE);
   const hit = await cache.match(request);
-  if (hit) return hit;
+  if (hit) return isWorker(request) ? freshUrl(hit) : hit;
   const response = await fetch(request);
   if (response.ok && response.status === 200) {
     event.waitUntil(cache.put(request, response.clone()).then(() => trimStatic(cache)));
