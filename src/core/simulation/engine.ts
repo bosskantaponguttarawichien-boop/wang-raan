@@ -19,7 +19,9 @@ import { footprint, objectCenter } from "../layout/geometry";
 import type { Chair, Point, Rect, StoreLayout, Table } from "../layout/types";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
-import { STAFF_STRIDE, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { STAFF_STRIDE, STAFF_VISUAL_WALK_SPEED, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { buildPresentationSnapshot, renderMemberId, taskMilestones, type PartyView, type TaskView } from "./presentation-snapshot";
+import type { PresentationSnapshot } from "./presentation-contract";
 
 export type ServiceStyle = "table-service" | "counter-order";
 
@@ -54,7 +56,7 @@ export const AGENT_STATE_CODE: Record<AgentState, number> = {
 export const AGENT_STRIDE = 4;
 
 /** ความเร็วเดินของพนักงาน (ม./วินาที) */
-export const STAFF_WALK_SPEED = 1.2;
+export const STAFF_WALK_SPEED = STAFF_VISUAL_WALK_SPEED;
 /** เวลาทำแต่ละจานแกว่งรอบค่าที่ตั้ง ±20% */
 export const COOK_TIME_SPREAD = 0.2;
 /** ค่าเฉลี่ยของกลุ่มที่สุ่ม 1–4 คน = 2.5 คน ใช้แปลงคน/ชม. เป็นกลุ่ม/ชม. */
@@ -185,6 +187,7 @@ export function emptyMetrics(): SimulationMetrics {
 }
 
 interface StaffTask {
+  id: string;
   kind: StaffTaskKind;
   agent: Agent | null;
   tableId: string | null;
@@ -192,6 +195,8 @@ interface StaffTask {
 }
 
 interface Worker {
+  startedAt: number;
+  total: number;
   /** วินาทีที่เหลือของงานปัจจุบัน; 0 = ว่าง */
   remaining: number;
   task: StaffTask | null;
@@ -203,6 +208,10 @@ interface Worker {
 const WALKING_STATES: ReadonlySet<AgentState> = new Set(["to-counter", "to-seat", "leaving"]);
 
 interface Agent {
+  renderChairIds: readonly string[];
+  serviceCycleId: string | null;
+  fedAt: number | null;
+  placedAt: number | null;
   id: number;
   state: AgentState;
   x: number;
@@ -233,6 +242,8 @@ interface RuntimeTable {
   id: string;
   chairIds: readonly string[];
   status: TableStatus;
+  cycle: number;
+  cleanCompletedAt: number | null;
 }
 
 function mulberry32(seed: number) {
@@ -366,6 +377,10 @@ export class Simulation {
   private readonly kitchenOrders: Agent[] = [];
   private agents: Agent[] = [];
   private nextId = 1;
+  private nextTaskId = 1;
+  private readonly departed = new Map<string, PartyView>();
+  private readonly presentationTasks = new Map<string, { task: StaffTask; startedAt: number; total: number; plan: StaffPlan | null; cycleId: string | null }>();
+  private readonly memberPathPoints = new Map<number, { x: number; y: number; seated: boolean; chairId: string | null }>();
   private nextArrival: number;
   /** จุดที่ลูกค้าเดินผ่านตั้งแต่ drainPaths() ครั้งก่อน (x, y ต่อจุด) — null = ไม่เก็บ */
   private paths: Map<number, number[]> | null = null;
@@ -395,14 +410,14 @@ export class Simulation {
     for (const chair of this.chairs) this.chairById.set(chair.id, chair);
     for (const table of prepared.tables) {
       const chairIds = table.chairIds.filter((id) => this.chairById.has(id));
-      if (chairIds.length > 0) this.tableById.set(table.id, { id: table.id, chairIds, status: "clean" });
+      if (chairIds.length > 0) this.tableById.set(table.id, { id: table.id, chairIds, status: "clean", cycle: 0, cleanCompletedAt: null });
     }
     this.seatFields = prepared.seatFields;
     this.takeOrderWalk = prepared.takeOrderWalk;
     this.deliverWalk = prepared.deliverWalk;
     this.servingSlots = Math.max(1, prepared.counterCount * this.config.servingSlotsPerCounter);
 
-    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null }));
+    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null, startedAt: 0, total: 0 }));
     this.frontStaff = team(this.config.frontStaff);
     this.cooks = team(this.config.cooks);
 
@@ -461,6 +476,7 @@ export class Simulation {
     const p = this.cellCenter(cell);
     const spread = 1 + (this.random() * 2 - 1) * COOK_TIME_SPREAD;
     const agent: Agent = {
+      renderChairIds: [], serviceCycleId: null, fedAt: null, placedAt: null,
       id: this.nextId++,
       state: "to-counter",
       x: p.x,
@@ -512,6 +528,8 @@ export class Simulation {
       if (!chair) return false;
       this.occupiedChairs.add(chair.id);
       agent.chairId = chair.id;
+      agent.renderChairIds = [chair.id];
+      agent.serviceCycleId = `counter:${chair.tableId}`;
       agent.field = this.seatFields.get(chair.id)!;
       agent.state = "to-seat";
       return true;
@@ -520,8 +538,13 @@ export class Simulation {
     if (!table) return false;
     const chair = this.chairById.get(table.chairIds[0]!)!;
     table.status = "occupied";
+    table.cycle++;
+    table.cleanCompletedAt = null;
+    this.departed.delete(table.id);
     for (const chairId of table.chairIds) this.occupiedChairs.add(chairId);
     agent.tableId = table.id;
+    agent.renderChairIds = table.chairIds.slice(0, agent.partySize);
+    agent.serviceCycleId = `${table.id}:${table.cycle}`;
     agent.chairId = chair.id;
     agent.field = this.seatFields.get(chair.id)!;
     agent.state = "to-seat";
@@ -578,7 +601,7 @@ export class Simulation {
     agent.x = center.x;
     agent.y = center.y;
     agent.jitter = { x: 0, y: 0 };
-    this.markPath(agent);
+    this.markPath(agent, true);
   }
 
   /** ลุกจากเก้าอี้ ออกมายืนที่ช่องว่างข้างเก้าอี้ */
@@ -588,13 +611,18 @@ export class Simulation {
     const chair = this.chairById.get(agent.chairId!)!;
     const standCell = touchingCells(this.grid, footprint(chair)).find((c) => field.distance[c] === 0);
     if (standCell !== undefined) Object.assign(agent, this.cellCenter(standCell));
-    this.markPath(agent);
+    this.markPath(agent, false);
   }
 
   /** เริ่มเก็บทางเดินของลูกค้า ให้ภาพเดินตามทางจริงได้ (ไม่ตัดผ่านโต๊ะ) แม้ tick ห่างกันหลายเมตร */
   trackPaths() {
     this.paths ??= new Map();
     if (this.tableService) this.staffVisuals ??= new StaffVisuals(this.layout, this.frontStaff.length);
+    this.frontStaff.forEach((staff, index) => {
+      if (!staff.task || staff.plan || !this.staffVisuals) return;
+      staff.plan = this.staffVisuals.plan(index, staff.task.kind, staff.task.tableId ?? staff.task.agent?.tableId ?? null, staff.total, this.walkSeconds(staff.task));
+      for (const record of this.presentationTasks.values()) if (record.task.id === staff.task.id) record.plan = staff.plan;
+    });
   }
 
   /** ตำแหน่งพนักงานหน้าร้าน (index, x, y, STAFF_STATE_CODE) — ว่างเมื่อไม่ได้ trackPaths */
@@ -642,27 +670,58 @@ export class Simulation {
   /** ทางเดินตั้งแต่ครั้งก่อน: [id, จำนวนจุด, x1, y1, x2, y2, ...] ต่อกันทุกคน (รวมคนที่เพิ่งออกจากร้าน) */
   drainPaths(): Float32Array {
     const out: number[] = [];
+    if (this.paths) for (const agent of this.agents) this.markPath(agent);
     for (const [id, points] of this.paths ?? []) out.push(id, points.length / 2, ...points);
     this.paths?.clear();
     return new Float32Array(out);
   }
 
-  private markPath(agent: Agent) {
+  private memberPosition(agent: Agent, member: number, seated = AGENT_STATE_CODE[agent.state] === 4): Point {
+    const chair = this.chairById.get(agent.renderChairIds[member] ?? "");
+    if (seated && chair) return objectCenter(chair);
+    return { x: agent.x + agent.jitter.x + (member % 2 - 0.5) * 0.14, y: agent.y + agent.jitter.y + (Math.floor(member / 2) - 0.5) * 0.14 };
+  }
+
+  /** Free-cell junctions keep the branch to each assigned chair out of other furniture. */
+  private appendMemberRoute(id: number, from: Point, target: Point, chairId: string, entering: boolean) {
+    const chair = this.chairById.get(chairId)!;
+    const seatField = this.seatFields.get(chairId)!;
+    const stand = touchingCells(this.grid, footprint(chair)).find(cell => seatField.distance[cell] === 0);
+    if (stand === undefined) { this.appendPath(id, target.x, target.y); return; }
+    let cell = this.cellOf(from.x, from.y);
+    const field = entering ? seatField : computeFlowField(this.grid, [this.cellOf(target.x, target.y)]);
+    if (!entering) { cell = stand; const p = this.cellCenter(cell); this.appendPath(id, p.x, p.y); }
+    if (this.grid.cells[cell] !== CELL_FREE) cell = stand;
+    for (let guard = 0; guard < this.grid.cells.length; guard++) {
+      const p = this.cellCenter(cell); this.appendPath(id, p.x, p.y);
+      if (field.distance[cell] === 0 || field.next[cell]! < 0 || !Number.isFinite(field.distance[cell]!)) break;
+      cell = field.next[cell]!;
+    }
+    this.appendPath(id, target.x, target.y);
+  }
+
+  private markPath(agent: Agent, seated = AGENT_STATE_CODE[agent.state] === 4) {
     if (!this.paths) return;
-    const x = agent.x + agent.jitter.x;
-    const y = agent.y + agent.jitter.y;
-    let points = this.paths.get(agent.id);
-    if (!points) this.paths.set(agent.id, (points = []));
+    for (let member = 0; member < agent.partySize; member++) {
+      const id = renderMemberId(agent.id, member), target = this.memberPosition(agent, member, seated);
+      const previous = this.memberPathPoints.get(id);
+      const chairId = agent.renderChairIds[member] ?? null;
+      if (previous && previous.seated === seated && Math.hypot(previous.x - target.x, previous.y - target.y) < 1e-7) continue;
+      if (previous && previous.seated !== seated && chairId) this.appendMemberRoute(id, previous, target, chairId, seated);
+      else this.appendPath(id, target.x, target.y);
+      this.memberPathPoints.set(id, { ...target, seated, chairId });
+    }
+  }
+
+  private appendPath(id: number, x: number, y: number) {
+    let points = this.paths!.get(id);
+    if (!points) this.paths!.set(id, (points = []));
     const n = points.length;
-    // จุดที่อยู่แนวเดียวกับสองจุดก่อนหน้า แทนที่จุดท้ายแทนการต่อเพิ่ม
+    if (n >= 2 && Math.hypot(x - points[n - 2]!, y - points[n - 1]!) < 1e-7) return;
     if (n >= 4) {
       const ax = points[n - 4]!, ay = points[n - 3]!, bx = points[n - 2]!, by = points[n - 1]!;
-      const cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
-      const dot = (bx - ax) * (x - bx) + (by - ay) * (y - by);
-      if (Math.abs(cross) < 1e-6 && dot >= 0) {
-        points[n - 2] = x;
-        points[n - 1] = y;
-        return;
+      if (Math.abs((bx - ax) * (y - ay) - (by - ay) * (x - ax)) < 1e-6 && (bx - ax) * (x - bx) + (by - ay) * (y - by) >= 0) {
+        points[n - 2] = x; points[n - 1] = y; return;
       }
     }
     points.push(x, y);
@@ -758,6 +817,8 @@ export class Simulation {
               agent.state = "waiting-order";
               this.addTask("take-order", agent);
             } else {
+              agent.fedAt = this.metrics.time;
+              agent.placedAt = this.metrics.time;
               agent.timer = agent.traits.dineSeconds;
               agent.state = "seated";
             }
@@ -804,6 +865,7 @@ export class Simulation {
           this.left += agent.partySize;
           this.totalVisitSeconds += (this.metrics.time - agent.enteredAt) * agent.partySize;
         }
+        for (let member = 0; member < agent.partySize; member++) this.memberPathPoints.delete(renderMemberId(agent.id, member));
         return false;
       }
       return true;
@@ -838,7 +900,7 @@ export class Simulation {
   }
 
   private addTask(kind: StaffTaskKind, agent: Agent) {
-    if (!agent.cancelled) this.staffTasks.push({ kind, agent, tableId: null, createdAt: this.metrics.time });
+    if (!agent.cancelled) this.staffTasks.push({ id: `task:${this.nextTaskId++}`, kind, agent, tableId: null, createdAt: this.metrics.time });
   }
 
   /** ช่องคิวจ่ายเงิน: เรียงจากเคาน์เตอร์ออกไปตาม flow field และไม่ใช้ช่องซ้ำ */
@@ -856,10 +918,12 @@ export class Simulation {
     const table = this.tableById.get(tableId);
     if (!table || table.status !== "occupied") return;
     table.status = "dirty";
+    const departed = this.agents.find(agent => agent.tableId === tableId && agent.serviceCycleId === `${table.id}:${table.cycle}`);
+    if (departed) this.departed.set(tableId, this.partyView(departed));
     for (const chairId of table.chairIds) this.occupiedChairs.delete(chairId);
     if (!this.queuedCleanTables.has(tableId)) {
       this.queuedCleanTables.add(tableId);
-      this.staffTasks.push({ kind: "clean", agent: null, tableId, createdAt: this.metrics.time });
+      this.staffTasks.push({ id: `task:${this.nextTaskId++}`, kind: "clean", agent: null, tableId, createdAt: this.metrics.time });
     }
   }
 
@@ -879,6 +943,12 @@ export class Simulation {
       if (!staff.task) continue;
       this.frontBusySeconds += dt;
       staff.remaining -= dt;
+      if (staff.task.kind === "deliver" && staff.task.agent && !staff.task.agent.cancelled && staff.plan) {
+        const task = staff.task;
+        const placement = taskMilestones({ id: task.id, kind: task.kind, tableId: task.agent!.tableId, cycleId: task.agent!.serviceCycleId,
+          startedAt: staff.startedAt, total: staff.total, plan: staff.plan, party: null }).placedAtSeconds;
+        if (placement !== null && this.metrics.time >= placement) task.agent!.placedAt ??= placement;
+      }
       if (staff.remaining <= 0) {
         this.finishTask(staff.task);
         staff.task = null;
@@ -889,7 +959,7 @@ export class Simulation {
     for (const cook of this.cooks) {
       if (cook.task || this.kitchenOrders.length === 0) continue;
       const agent = this.kitchenOrders.shift()!;
-      cook.task = { kind: "deliver", agent, tableId: null, createdAt: this.metrics.time };
+      cook.task = { id: `task:${this.nextTaskId++}`, kind: "deliver", agent, tableId: null, createdAt: this.metrics.time };
       cook.remaining = this.config.cookMinutesPerDish * 60 * agent.traits.cookFactor;
     }
 
@@ -902,7 +972,14 @@ export class Simulation {
       if (task.agent?.cancelled) continue;
       staff.task = task;
       staff.remaining = this.taskSeconds(task);
+      staff.total = staff.remaining;
+      staff.startedAt = this.metrics.time;
       staff.plan = this.staffVisuals?.plan(index, task.kind, task.tableId ?? task.agent?.tableId ?? null, staff.remaining, this.walkSeconds(task)) ?? null;
+      const tableId = task.tableId ?? task.agent?.tableId ?? null;
+      if (tableId) this.presentationTasks.set(`${tableId}:${task.kind}`, {
+        task, startedAt: staff.startedAt, total: staff.total, plan: staff.plan,
+        cycleId: task.agent?.serviceCycleId ?? `${tableId}:${this.tableById.get(tableId)?.cycle ?? 0}`,
+      });
       if (task.kind === "pay" && task.agent) task.agent.state = "ordering";
       if (task.kind === "clean" && task.tableId) this.tableById.get(task.tableId)!.status = "cleaning";
     }
@@ -968,6 +1045,8 @@ export class Simulation {
         this.totalFoodWaitSeconds += wait * agent!.partySize;
         if (wait > this.config.patienceMinutes * 60) this.metrics.waitedTooLong += agent!.partySize;
         agent!.timer = agent!.traits.dineSeconds;
+        agent!.fedAt = this.metrics.time;
+        agent!.placedAt ??= this.metrics.time;
         agent!.state = "seated";
         break;
       }
@@ -979,6 +1058,8 @@ export class Simulation {
         const table = this.tableById.get(task.tableId!);
         if (!table) break;
         table.status = "clean";
+        table.cleanCompletedAt = this.metrics.time;
+        this.departed.delete(table.id);
         this.queuedCleanTables.delete(table.id);
         this.seatWaitingParty(table);
         break;
@@ -991,9 +1072,14 @@ export class Simulation {
     const waiting = this.agents.find((agent) => agent.state === "waiting-entrance" && agent.partySize <= table.chairIds.length);
     if (!waiting) return;
     table.status = "occupied";
+    table.cycle++;
+    table.cleanCompletedAt = null;
+    this.departed.delete(table.id);
     for (const chairId of table.chairIds) this.occupiedChairs.add(chairId);
     const chair = this.chairById.get(table.chairIds[0]!)!;
     waiting.tableId = table.id;
+    waiting.renderChairIds = table.chairIds.slice(0, waiting.partySize);
+    waiting.serviceCycleId = `${table.id}:${table.cycle}`;
     waiting.chairId = chair.id;
     waiting.field = this.seatFields.get(chair.id)!;
     waiting.state = "to-seat";
@@ -1012,15 +1098,45 @@ export class Simulation {
     for (const agent of this.agents) {
       for (let member = 0; member < agent.partySize; member++) {
         const o = i++ * AGENT_STRIDE;
-        const column = member % 2;
-        const row = Math.floor(member / 2);
-        buffer[o] = agent.id * 10 + member;
-        buffer[o + 1] = agent.x + agent.jitter.x + (column - 0.5) * 0.14;
-        buffer[o + 2] = agent.y + agent.jitter.y + (row - 0.5) * 0.14;
+        const position = this.memberPosition(agent, member);
+        buffer[o] = renderMemberId(agent.id, member);
+        buffer[o + 1] = position.x;
+        buffer[o + 2] = position.y;
         buffer[o + 3] = AGENT_STATE_CODE[agent.state];
       }
     }
     return buffer;
+  }
+
+  private partyView(agent: Agent): PartyView {
+    return { id: agent.id, state: agent.state, partySize: agent.partySize, chairIds: [...agent.renderChairIds],
+      tableId: agent.tableId ?? this.chairById.get(agent.chairId ?? "")?.tableId ?? null,
+      cycleId: agent.serviceCycleId, speed: agent.speed, fedAt: agent.fedAt, placedAt: agent.placedAt, dineSeconds: agent.traits.dineSeconds, cancelled: agent.cancelled };
+  }
+
+  /** Full metadata without advancing time, changing business state or drawing randomness. */
+  presentationSnapshot(envelope: { runId: string; layoutRevision: string; sequence: number }): PresentationSnapshot {
+    const taskView = (record: { task: StaffTask; startedAt: number; total: number; plan: StaffPlan | null; cycleId: string | null }): TaskView => ({
+      id: record.task.id, kind: record.task.kind, tableId: record.task.tableId ?? record.task.agent?.tableId ?? null,
+      cycleId: record.cycleId, startedAt: record.startedAt, total: record.total, plan: record.plan,
+      party: record.task.agent ? this.partyView(record.task.agent) : null,
+    });
+    const parties = this.agents.map(agent => this.partyView(agent));
+    return buildPresentationSnapshot(this.layout, {
+      ...envelope, time: this.metrics.time, seed: this.config.seed, parties,
+      tables: [...this.tableById.values()].map(table => ({
+        id: table.id, cycleId: this.tableService ? `${table.id}:${table.cycle}` : `counter:${table.id}`,
+        status: this.tableService ? table.status : parties.some(party => party.tableId === table.id) ? "occupied" : "clean",
+        cleanCompletedAt: table.cleanCompletedAt,
+      })),
+      departed: [...this.departed.values()], tasks: [...this.presentationTasks.values()].map(taskView),
+      staff: this.frontStaff.map((staff, id) => {
+        const record = [...this.presentationTasks.values()].find(record => record.task.id === staff.task?.id);
+        const active = staff.task ? { task: staff.task, startedAt: staff.startedAt, total: staff.total, plan: staff.plan,
+          cycleId: staff.task.agent?.serviceCycleId ?? record?.cycleId ?? null } : null;
+        return { id, task: active ? taskView(active) : null };
+      }),
+    });
   }
 
   /** สำเนาข้อมูลภายในสำหรับเทสต์ */

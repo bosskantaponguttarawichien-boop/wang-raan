@@ -1914,7 +1914,7 @@
     {
       "id": "feat-113",
       "name": "Core metadata: สมาชิก เก้าอี้ จาน งานเสิร์ฟ และวงจรโต๊ะ",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -1956,7 +1956,8 @@
         "การเพิ่มrandomเพื่อเลือกอาหารทำให้ผลวิเคราะห์เปลี่ยน"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-113/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-113/README.md; presentation-snapshot.ts full state, per-member chair/path binding, cycle/task identity, deterministic meal selection, serving/cleaning milestones, retained dirty meals and cancelled delivery guards. Full workspace tests 87 files/1023 tests passed; lint/typecheck/boundary/Harness passed. Per-step metadata-on/off metrics parity and 20-staff path timing verified."
     },
     {
       "id": "feat-114",

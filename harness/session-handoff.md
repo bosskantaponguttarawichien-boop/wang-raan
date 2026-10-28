@@ -3,6 +3,19 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — Agent1:113เสร็จ กำลังต่อ114→115
+
+- 113fullsnapshot/สมาชิก-เก้าอี้-path/cycle/meals/staffmilestonesพร้อม;อ่านผ่าน `Simulation.presentationSnapshot` หลังtrackPaths ใช้contractv1เดิม ไม่เปลี่ยนmetrics/RNG/สูตรธุรกิจ
+- ตรวจ87files/1023tests,lint/typecheck/boundary/Harnessผ่าน หลักฐาน `harness/evidence/feat-113/`;มีงานอาหาร/คลิปจากagentอื่นอยู่ร่วมworkspace ห้ามstageหรือแก้ไฟล์นอกAgent1
+- ถัดไป114ส่งmetadata/runId/sequenceข้ามWorkerและbridgefilter จากนั้น115แก้catchup/clock/visibility;ภาพอาหาร/คลิปใหม่ยังเป็นงานของlaneอื่นและ122เชื่อม
+
+## 2026-10-29 ICT — Agent 2: feat-103 → feat-104–108 เสร็จสมบูรณ์ (โมเดลอาหาร 5 เมนู + แคตตาล็อก)
+
+- **ผลลัพธ์**: ทำ `feat-103` (แคตตาล็อกอาหาร, deterministic hash แยกจาก simulation RNG, shared procedural builders, CLI `export-one.mjs`, และ `harness/food-asset-spec.md`) ต่อด้วยโมเดลอาหารทีละงานจนครบทั้ง 5 ชนิด (`feat-104` ข้าวผัด, `feat-105` ก๋วยเตี๋ยว, `feat-106` สเต๊ก, `feat-107` สลัด, `feat-108` เค้ก) ทั้งรุ่น `full` และ `lite` พร้อมโหนด `Vessel`, `FoodFull`, `FoodPartial`, `FoodEmpty`, `Utensil` และ `userData.foodContract`
+- **การตรวจ**: ยูนิตเทสต์ใหม่ 6 ไฟล์ (15 tests) และเทสต์ทั้งโปรเจกต์ผ่านครบ, `tsc --noEmit` ผ่าน, `eslint` ผ่าน (0 errors), `validate_harness.py` ผ่าน (Done 100 งาน), ภาพเรนเดอร์ 3D ครบทุกสถานะและบนถาด/โต๊ะเล็กใน `harness/evidence/feat-103/` ถึง `feat-108/`
+- **ขอบเขตและไฟล์กลาง**: ไม่ได้แก้ไข `three-view.tsx`, `scripts/create-cafe-customer-model.mjs`, หรือไฟล์ `cafe-customer*.glb` / `cafe-staff*.glb` ตามกฎการแบ่งงาน 3 Agent
+- **งานถัดไปของ Agent 2**: รอ `feat-114` (Worker/protocol transport จาก Agent 1) เสร็จเพื่อทำ `feat-116` (Table service runtime: วางอาหารตามที่นั่ง ลดปริมาณตามการกิน คราบบนโต๊ะ และการเช็ด) หรือทำ `feat-120 → 121` (ระบบคำนวณตำแหน่งดวงอาทิตย์และแสงเงาตามเวลาจริง)
+
 ## 2026-10-29 ICT — feat-101→102 เสร็จ พร้อมฐานสำหรับ3agent
 
 - **ผลลัพธ์**:101baselineเขียว+contractv1;102แยกscenehost6ช่อง(no-op),legacylighting/servingpropsและgeneratorrig/baseclips/build/export พร้อมrole/output-dir/providers ทุกงาน103–123ยังnot-started ไม่มีagentอื่น/worktreeถูกสร้าง

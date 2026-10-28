@@ -3,6 +3,22 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-113 — สถานะบริการและสมาชิกพร้อมส่งWorker
+
+- เพิ่มfullsnapshotv1,สมาชิกแต่ละคนผูกเก้าอี้/จาน/cycleและpathidตรงbuffer เส้นทางแยกเก้าอี้ผ่านช่องเดิน;รออาหาร/กิน/จบ/dirty/cleaningแยกกัน เก็บจานหลังออกจนcleancompleteและกันงานเก่าข้ามcycle
+- แยกpickup/put-down/wipeจากtaskcomplete,walkphaseตาม1.2ม./วิในงบงานปกติ โดยไม่เปลี่ยนสูตรธุรกิจ/RNG/metrics;เก็บประวัติแบบboundedต่อโต๊ะ รองรับcounter-order/เริ่มติดตามกลางrun
+- QA:87files/1023testsของworkspaceผ่านรวมงานอาหารที่เข้ามาคู่ขนาน,lint/typecheck/boundary/Harnessผ่าน;metadataon/offเทียบmetricsทุกstep1800รอบและstaff20ตำแหน่งผ่าน หลักฐาน `harness/evidence/feat-113/`
+
+## [2026-10-29] feat-103 → feat-108 — แคตตาล็อกอาหาร อุปกรณ์ ภาชนะ และโมเดลอาหาร 3D ทั้ง 5 เมนู (Agent 2)
+
+- **feat-103 (Food foundation)**: สร้าง `src/components/preview-3d/food/catalog.ts`, `catalog.test.ts`, `scripts/food-models/shared/index.mjs`, `scripts/food-models/export-one.mjs` และ `harness/food-asset-spec.md`; ล็อก 5 เมนู (`fried-rice`, `noodles`, `steak`, `salad`, `cake`) พร้อม `chooseFoodKind(seed, partyId, memberIndex)` แบบ 32-bit avalanche hash แยกจาก simulation RNG 100%, คำนวณตำแหน่งวางบนถาด (`computeTraySlotOffsets`) และโต๊ะเล็ก 2/4 ที่นั่ง (`computeTablePlatePlacement`) ไม่ชนกันและไม่ล้นขอบ
+- **feat-104 (ข้าวผัด `fried-rice`)**: สร้าง `scripts/food-models/fried-rice/build.mjs` และ export `fried-rice.glb` (64.3 KB, 2,524 tris) / `fried-rice-lite.glb` (32.6 KB, 976 tris) มีจาน ข้าวผัดสีทอง แตงกวา มะเขือเทศ และช้อนสั้น ครบโหนด `Vessel`, `FoodFull`, `FoodPartial`, `FoodEmpty`, `Utensil`
+- **feat-105 (ก๋วยเตี๋ยว `noodles`)**: สร้าง `scripts/food-models/noodles/build.mjs` และ export `noodles.glb` (131.7 KB, 5,932 tris) / `noodles-lite.glb` (51.8 KB, 1,828 tris) มีชามก้นลึก น้ำซุปลดระดับตามสถานะ เส้น ลูกชิ้น ผัก ตะเกียบและช้อนซุป
+- **feat-106 (สเต๊ก `steak`)**: สร้าง `scripts/food-models/steak/build.mjs` และ export `steak.glb` (42.8 KB, 1,444 tris) / `steak-lite.glb` (29.7 KB, 776 tris) มีชิ้นเนื้อสเต๊กพร้อมรอยย่าง เนยสมุนไพร มันฝรั่งทอด บรอกโคลี และส้อม/มีดวางในกรอบจาน
+- **feat-107 (สลัด `salad`)**: สร้าง `scripts/food-models/salad/build.mjs` และ export `salad.glb` (98.5 KB, 3,992 tris) / `salad-lite.glb` (40.8 KB, 1,276 tris) มีชามสลัด ผักกาดเขียว/ม่วง มะเขือเทศราชินี กรูตองซ์ และส้อมสลัด
+- **feat-108 (เค้ก `cake`)**: สร้าง `scripts/food-models/cake/build.mjs` และ export `cake.glb` (32.8 KB, 1,012 tris) / `cake-lite.glb` (23.6 KB, 536 tris) มีจานขนม เค้กชิ้นสามเหลี่ยมสลับชั้นครีมและสตรอว์เบอร์รี พร้อมส้อมขนม
+- **QA & Evidence**: ยูนิตเทสต์อาหารทั้ง 6 ไฟล์ (`catalog.test.ts` + 5 asset tests) ผ่านครบ; เรนเดอร์ภาพ 3 มุม + เทียบสถานะ `full/partial/empty` + ภาพวางบนถาดและโต๊ะเล็กด้วย Chromium WebGL เก็บใน `harness/evidence/feat-103/` ถึง `feat-108/` โดยไม่แตะ `three-view.tsx` หรือ GLB ตัวละคร
+
 ## [2026-10-29] feat-102 — แยกโมดูลฉากและตัวสร้างGLB พร้อมแบ่ง3agent
 
 - เพิ่มscenehost6ช่องfood/table-service/staff-actions/customer-actions/seating/lightingพร้อมsyncLayout/update/reset/dispose,rootแยกต่อfeature,reversedisposal/idempotencyและrollback แต่ทุกช่องยังno-op ไม่มีพฤติกรรมใหม่ แยกlegacyแสง/ถาดจากthree-viewโดยคงค่าของเดิมและcleanuplegacyอยู่finally
