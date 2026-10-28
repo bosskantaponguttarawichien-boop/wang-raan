@@ -190,6 +190,17 @@ export class SimulationController {
         return { ok: false, reason: "ยกเลิกการเริ่มจำลอง" };
       }
       this.grid = { cols: started.grid.cols, rows: started.grid.rows };
+      // STARTED มี frame ตั้งต้นจาก engine แล้ว จึงวาดพนักงานได้ตั้งแต่เวลาเปิดร้าน
+      // โดยไม่ต้องรอ Worker ส่ง TICK แรก (สำคัญกับ SVG fallback บนมือถือ)
+      const initialAt = this.deps.now();
+      const walkSpeed = VISUAL_WALK_SPEED * config.speed;
+      this.previous = null;
+      this.current = {
+        at: initialAt,
+        agents: this.pacer.update(started.initial.agents, undefined, 0, walkSpeed),
+        staff: this.staffPacer.update(started.initial.staff, 0, walkSpeed, config.speed),
+      };
+      this.emit();
       this.setSim({ status: "running", seats: started.seats });
       return { ok: true };
     } catch (error) {
