@@ -17,6 +17,7 @@ import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController, type HeatmapFrame } from "./simulation-controller";
 import { behaviorFromState, drawPerson, facingFrom, personLook, type Facing, type PersonLook } from "./iso-person";
 import { AGENT_COLORS, STAFF_COLOR, interpolateAgents, interpolateStaff, paintHeatmap } from "./simulation-overlay";
+import { STAFF_KITCHEN_CODE } from "./staff-pacer";
 import { doorFrame } from "./walk-pacer";
 
 const TICK_MS = 50;
@@ -167,6 +168,8 @@ export function IsoSimulationOverlay({
       for (const sprite of projectAgents(withIds, scene.scale)) {
         seen.add(sprite.id);
         const isStaff = sprite.id < 0;
+        // คนที่ไปรับอาหารอยู่หลังผนังครัว ต้องไม่โผล่บน SVG fallback เช่นเดียวกับ 2D/Three.js
+        if (isStaff && sprite.state === STAFF_KITCHEN_CODE) continue;
         let w = walkers.get(sprite.id);
         if (!w) {
           w = { look: isStaff ? STAFF_LOOK : personLook(sprite.id), mx: sprite.mx, my: sprite.my, facing: { front: true, right: true }, phase: 0, walking: false };
