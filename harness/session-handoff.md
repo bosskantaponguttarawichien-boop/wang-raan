@@ -3,6 +3,16 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — feat-101→102 เสร็จ พร้อมฐานสำหรับ3agent
+
+- **ผลลัพธ์**:101baselineเขียว+contractv1;102แยกscenehost6ช่อง(no-op),legacylighting/servingpropsและgeneratorrig/baseclips/build/export พร้อมrole/output-dir/providers ทุกงาน103–123ยังnot-started ไม่มีagentอื่น/worktreeถูกสร้าง
+- **ฐานส่งต่อ**: branch `codex/animation-foundation`;101commit `ad1d3b3`;เริ่มworktreeจากcommit102ล่าสุดบนbranchนี้ (ดู `git log -1 codex/animation-foundation`) รวมการแก้เวลาเดิมและฐานtestที่ผ่านแล้ว อย่าใช้mainเก่า
+- **เอกสารที่ต้องอ่าน**: `harness/animation-contract-v1.md`, `harness/animation-module-map.md` และfeature_list;Agent1ทำ113→114→115,Agent2ทำ103→104–108→116และ120→121,Agent3ทำ109–112→117–119ตามdependency ก่อน122รวมและ123QA
+- **การตรวจ**:npm test1001/1001ใน80files,lint/typecheck/boundary52sourcefiles/Harness/diffcheckผ่าน;lintexit0เหลือwarningเดิม `_initial`1รายการ โมเดลทั้ง4ไฟล์สร้างซ้ำเท่าเดิมทุกไบต์ publicassetsไม่เปลี่ยน
+- **ภาพ/flowจริง**:Chrome156บนGTX1050Ti,modelHTTP200/browsererror0,canvasก่อนหลังต่าง1pixel;หมุน4มุม/เริ่มหยุดจำลอง/สลับ2D3D3รอบ/reducedmotionSVG375pxผ่าน หลักฐาน `harness/evidence/feat-101/` และ `feat-102/`
+- **ขอบเขตที่ยังไม่ได้ทำ**: metadataproducer/Workerbridge/แก้catchupเดิน/Eat/Carry/Wipe/seatใหม่/อาหาร5แบบ/แสงrealtime;ทั้ง6featureยังno-opและGLBมีคลิปเดิม การตรวจครั้งแรกของflowเจอselectorในสคริปต์ผิดชื่อiso-svg แก้สคริปต์แล้วผ่าน ไม่มีการแก้UIเพื่อให้testผ่าน
+- **สภาพแวดล้อม**:ใช้devserverเดิมlocalhost3000ของผู้ใช้ ไม่หยุดserverนั้น;3DยังมีdeprecationwarningsเดิมClock/PCFSoftShadowMap ไม่ใช่browsererrors
+
 ## 2026-10-29 ICT — feat-101 เสร็จ เตรียมทำ102ต่อ
 
 - **ผลลัพธ์**: baseline testsเขียว, contractv1ล็อกแล้วที่ `harness/animation-contract-v1.md`, core/runtimetypesและpayloadexamplesพร้อม ไม่มีอาหาร/คลิปใหม่ถูกสร้าง

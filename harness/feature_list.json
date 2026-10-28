@@ -1434,7 +1434,7 @@
     {
       "id": "feat-102",
       "name": "Foundation: แยกฉาก 3D และ model generator เป็น module สำหรับงานคู่ขนาน",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-101"
       ],
@@ -1474,7 +1474,8 @@
         "exporthelperต้องไม่ทำ side effect ตอนถูกimport"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-102/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/animation-module-map.md; scene-runtime host with six no-op feature roots and isolated lifecycle, legacy lights/serving props extracted; rig/base-clips/build/export helpers + CLI role/output-dir/clip provider support; four generated GLBs byte-identical and public assets unchanged. npm test 80 files / 1001 tests, lint exit0 (one existing warning), typecheck, boundary52files, Harness and diff-check passed. Chrome156/GTX1050Ti before-after canvas differs1pixel; full START/PAUSE/RESUME/STOP, camera4views, 3remounts, reduced-motion SVG375px passed without browser errors. Evidence: harness/evidence/feat-102/. Shared base branch codex/animation-foundation includes feat-101 commit ad1d3b3."
     },
     {
       "id": "feat-103",

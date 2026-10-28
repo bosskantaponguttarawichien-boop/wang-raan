@@ -66,4 +66,3 @@ Not implemented: HTMLCanvasElement's getContext() method: without installing the
 
     Isolate  78 workers spawned · ~823ms startup each (spawn + environment, per file)
              at least ~12.01s faster with isolate: false — reuses workers across files instead of one per file
-

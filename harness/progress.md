@@ -3,6 +3,15 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-102 — แยกโมดูลฉากและตัวสร้างGLB พร้อมแบ่ง3agent
+
+- เพิ่มscenehost6ช่องfood/table-service/staff-actions/customer-actions/seating/lightingพร้อมsyncLayout/update/reset/dispose,rootแยกต่อfeature,reversedisposal/idempotencyและrollback แต่ทุกช่องยังno-op ไม่มีพฤติกรรมใหม่ แยกlegacyแสง/ถาดจากthree-viewโดยคงค่าของเดิมและcleanuplegacyอยู่finally
+- แยกgeneratorเป็นrig/base-clips/build/export,entryCLIเลือกrole/lite/output-dir/clipprovidersได้ importไม่มีการbuildหรือเขียนasset และrejectชื่อclipซ้ำ/targetหาย/markerผิดก่อนexport ผู้ทำclipไม่ต้องแก้generatorกลาง
+- ตรวจGLBcustomer/staff full/liteเท่าของเดิมทุกไบต์ทั้ง4ไฟล์ด้วยSHA-256และunittest ไม่มีpublicassetเปลี่ยน ภาพcanvasก่อน/หลัง1032×844ต่างเกินthreshold15เพียง1pixel
+- QA: npm test80files/1001testsผ่าน;lint/typecheckผ่าน(lintexit0มีwarningเดิม1รายการ),boundary52sourcefiles/Harness/diffcheckผ่าน;Chrome156/GTX1050Tiเปิด3D/CharacterLab/staffนั่ง,หมุน4มุม,START→3D→PAUSE→RESUME→STOP,สลับ2D/3D3รอบและ375pxreducedmotionSVGผ่าน ไม่มีbrowsererror
+- แผนที่API/ownership/คำสั่งbuildและการแบ่ง3agentอยู่ `harness/animation-module-map.md`;101basecommit `ad1d3b3`,integrationbranch `codex/animation-foundation` ใช้commit102ล่าสุดหลังส่งมอบเป็นฐานworktree งาน103–123ยังnot-started ไม่ได้เปิดagentอื่น
+- หลักฐานทั้งหมด `harness/evidence/feat-102/`;ยังคงwarningsThree.Clock/PCFSoftShadowMapของเดิมตามscope ไม่เปลี่ยนสูตรsimulation/เดิน/อาหาร/แอนิเมชันใหม่ใน102
+
 ## [2026-10-29] feat-101 — ฐานร่วมและสัญญา animation v1 พร้อม
 
 - รักษา working changes เวลา1×/นาฬิกาวินาทีเดิมครบ; บันทึก HEAD/SHA-256ตั้งต้นใน `harness/evidence/feat-101/starting-base.json`

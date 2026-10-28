@@ -1,0 +1,61 @@
+{
+  "browser": "156.0.8078.48",
+  "checks": [
+    "2D loads no character model assets",
+    "camera rotation completes in all four directions",
+    "START → 3D → PAUSE → RESUME → STOP works without renderer errors",
+    "three consecutive viewer unmount/remount cycles keep exactly one canvas",
+    "375px reduced-motion uses SVG fallback without horizontal overflow"
+  ],
+  "errors": [],
+  "modelResponses": [
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    }
+  ]
+}

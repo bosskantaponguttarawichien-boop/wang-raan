@@ -2,6 +2,8 @@
 
 วันที่วางแผน: 2026-10-28 (Asia/Bangkok) · **Planning only — ยังไม่เริ่ม implementation**
 
+> อัปเดต2026-10-29: Foundation `101–102` ทำแล้ว สัญญาที่ใช้งานจริงอยู่ `animation-contract-v1.md` และจุดเชื่อม/เจ้าของไฟล์อยู่ `animation-module-map.md` งาน103–123ยังไม่เริ่ม ส่วนเนื้อหาด้านล่างเป็นแผนตั้งต้นและผลตรวจฐานในวันที่วางแผน
+
 รายการงานที่ติดตามสถานะจริง: `harness/feature_list.json` — `feat-101` ถึง `feat-123` (23 งาน, sprint 5)
 
 ## 1. เป้าหมายและขอบเขต
@@ -203,4 +205,4 @@ CLI หลัง 102 ต้องเลือก role และ output directory
 
 > ทำเฉพาะ feat-NNN จาก harness/feature_list.json และแผน restaurant-animation-plan.md บน worktree/branch ที่กำหนด ตรวจ dependency และ gate ก่อนเริ่ม อ่าน AGENTS/PRD/architecture/design-system/SKILL และเอกสาร Next.js ใน node_modules ตามส่วนที่เกี่ยวข้อง เขียนได้เฉพาะ write_scope ของงาน ห้ามแก้ shared files หรือ generate GLB ของ role อื่น หากสัญญาไม่พอให้แจ้งจุดเปลี่ยนก่อน ไม่แก้ให้ lane อื่นพัง ส่งหลักฐานตาม acceptance/verification และสรุปไฟล์/commit/ข้อจำกัดเพื่อรวมงานทีละ task
 
-**สถานะ session นี้:** สร้างเฉพาะรายการงานและเอกสารแผน/ส่งต่อ ไม่มีโมเดล ไม่มี animation ไม่มี runtime code ใหม่ ไม่มี worktree และไม่มี agent ถูกเปิดทำ implementation
+**สถานะ session วางแผน2026-10-28:** สร้างเฉพาะรายการงานและเอกสารแผน/ส่งต่อ ไม่มีโมเดล ไม่มี animation ไม่มี runtime code ใหม่ ไม่มี worktree และไม่มี agent ถูกเปิดทำ implementation; สถานะงานปัจจุบันดูfeature_listและเอกสารmodule-map
