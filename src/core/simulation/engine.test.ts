@@ -227,6 +227,9 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     expect(rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } }).response.type).toBe("STATUS");
     const res = rt.handle({ type: "START", requestId: 2, layoutRevision: validation.layoutRevision, config: { customersPerHour: 120, speed, seed: 9 } });
     expect(res.response).toMatchObject({ type: "STARTED", seats: 6, grid: { cols: 32, rows: 24 } });
+    if (res.response.type !== "STARTED") throw new Error("expected STARTED");
+    expect(res.response.initial.agents).toHaveLength(0);
+    expect(res.response.initial.staff).toHaveLength(2 * STAFF_STRIDE);
     return rt;
   }
 
