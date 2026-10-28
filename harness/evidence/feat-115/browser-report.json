@@ -1,0 +1,13 @@
+{
+  "browser": "156.0.8078.48",
+  "wallSeconds": 30.051,
+  "simulationSeconds": 30.051199999809278,
+  "pausedTime": 32.15670000028612,
+  "resumedTime": 33.16610000038148,
+  "checks": [
+    "real Worker 1× tracks 30 real seconds within 0.75s; metadata v1 reaches browser",
+    "injected document visibility events pause/resume real Worker without accumulating hidden time",
+    "3D START/PAUSE/RESUME/STOP works"
+  ],
+  "errors": []
+}

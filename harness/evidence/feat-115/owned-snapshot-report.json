@@ -1,0 +1,21 @@
+{
+  "base": "6a3702539cae3f4bc4e894d73e29363bf8985268",
+  "overlaid_files": [
+    "src/components/simulation/simulation-controller.ts",
+    "src/components/simulation/simulation-gate.test.tsx",
+    "src/components/simulation/walk-pacer.ts",
+    "src/components/simulation/walk-pacer.test.ts",
+    "src/components/simulation/staff-pacer.ts",
+    "src/components/simulation/staff-pacer.test.ts",
+    "src/components/simulation/motion/playback-clock.test.ts",
+    "src/components/simulation/motion/playback-clock.ts",
+    "src/components/simulation/motion/presentation-frame.test.ts",
+    "src/components/simulation/motion/presentation-frame.ts"
+  ],
+  "checks": {
+    "unit-tests": 0,
+    "typecheck": 0,
+    "lint": 0
+  },
+  "scope": "Tracked Agent 1 integration base plus feat-115 only. Concurrent untracked food/clip lanes are excluded."
+}

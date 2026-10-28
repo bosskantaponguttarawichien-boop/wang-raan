@@ -1,7 +1,7 @@
 /**
  * StaffPacer — ให้ภาพพนักงานเดินด้วยความเร็วคนเดินจริง และแวะเข้าครัวก่อนเสิร์ฟ (คู่กับ WalkPacer ของลูกค้า)
  * - เวลาจำลองไม่เปลี่ยน: ตำแหน่งจาก engine เป็นจุดหมายที่ต่อคิวไว้ ภาพเดินตามทางเดิมทีละจุดด้วยความเร็วคนเดิน
- * - ตามหลังไกลเกิน MAX_STAFF_LAG_SECONDS วินาทีเดิน ค่อยเร่งให้ทัน (เช่นหลัง worker ข้ามช่วงเงียบ)
+ * - เดินตามความเร็วที่กำหนด ไม่เร่งไล่คิว; เมื่อคิวเต็มให้ controller จัด resync ที่จุดพัก
  * - รับอาหารที่ประตูครัว = เดินผ่านประตูเข้าไปในครัว หายตัว KITCHEN_SECONDS วินาที แล้วถือถาดออกมาเสิร์ฟ
  * ผลลัพธ์อยู่ในรูปแบบเดียวกับ TickMessage.staff (index, x, y, stateCode) เพื่อให้ overlay 2D / 3D ใช้ได้เหมือนเดิม
  */
@@ -18,10 +18,9 @@ export const KITCHEN_SECONDS = 5;
 /** เดินพ้นแนวผนังเข้าไปในครัวเท่านี้ (ม.) แล้วจึงหายตัว */
 export const KITCHEN_DEPTH = 0.4;
 /**
- * ภาพตามหลังได้ไม่เกินเท่านี้ (วินาทีเดินที่ค้าง) จะเร่งให้ทัน
- * มากกว่าของลูกค้าเพราะพนักงานหยุดแวะครัวทุกรอบเสิร์ฟ — เดินค้างเพราะรอในครัวจึงไม่ทำให้วิ่ง
+ * จำกัดคิวเส้นทาง โดยไม่ตัดมุมหรือเร่งความเร็วเมื่อคิวมาก
  */
-export const MAX_STAFF_LAG_SECONDS = 8;
+export const MAX_QUEUED_STAFF_POINTS = 1024;
 
 const SERVING = STAFF_STATE_CODE.serving;
 
@@ -48,9 +47,12 @@ interface Server {
 export class StaffPacer {
   private readonly servers = new Map<number, Server>();
   private door: DoorFrame | null = null;
+  private overflow = false;
+  get needsResync() { return this.overflow; }
 
   reset() {
     this.servers.clear();
+    this.overflow = false;
   }
 
   /** ประตูครัวของผังที่กำลังจำลอง — null = ไม่ต้องแวะเข้าครัว (รับอาหารหน้าประตูเหมือนเดิม) */
@@ -64,7 +66,7 @@ export class StaffPacer {
    * @param speed ความเร็วเดินบนภาพ (ม./วินาทีจริง — คูณความเร็วเล่นภาพมาแล้ว)
    * @param timeScale ตัวคูณความเร็วเล่นภาพ (วินาทีจำลองต่อวินาทีจริง) ใช้กับเวลาที่ยืนรอ
    */
-  update(staff: Float32Array, dt: number, speed: number, timeScale = 1): Float32Array {
+  update(staff: Float32Array, dt: number, speed: number, timeScale = 1, metadataDriven = false): Float32Array {
     const live = new Set<number>();
     for (let o = 0; o < staff.length; o += STAFF_STRIDE) {
       const index = staff[o]!;
@@ -78,7 +80,8 @@ export class StaffPacer {
         server = { x, y, code, queue: [], simCode: code, holding: 0 };
         this.servers.set(index, server);
       }
-      if (code === SERVING && server.simCode !== SERVING && this.door) this.enterKitchen(server);
+      // Modern metadata already includes kitchen pickup time; do not add a second wait.
+      if (!metadataDriven && code === SERVING && server.simCode !== SERVING && this.door) this.enterKitchen(server);
       server.simCode = code;
       this.push(server, x, y, code);
     }
@@ -96,6 +99,7 @@ export class StaffPacer {
 
   /** ต่อคิว: ผ่านช่องประตูครัว → เข้าไปในครัว (หายตัว) → ออกมาที่ช่องประตูพร้อมถาด */
   private enterKitchen(server: Server) {
+    if (server.queue.length + 3 > MAX_QUEUED_STAFF_POINTS) { this.overflow = true; return; }
     const { center, outward } = this.door!;
     const tail = server.queue[server.queue.length - 1];
     const from = tail ?? server;
@@ -118,26 +122,27 @@ export class StaffPacer {
       else if (server.holding <= 0) server.code = code;
       return;
     }
+    const before = server.queue.at(-2);
+    if (tail && before && !tail.hold && !before.hold && tail.code === code && before.code === code &&
+      Math.abs((tail.x - before.x) * (y - tail.y) - (tail.y - before.y) * (x - tail.x)) < 1e-7 &&
+      (tail.x - before.x) * (x - tail.x) + (tail.y - before.y) * (y - tail.y) >= 0) {
+      tail.x = x; tail.y = y; return;
+    }
+    if (server.queue.length >= MAX_QUEUED_STAFF_POINTS) { this.overflow = true; return; }
     server.queue.push({ x, y, code, hold: 0 });
   }
 
   private move(server: Server, dt: number, speed: number, timeScale: number) {
+    if (![dt, speed, timeScale].every(Number.isFinite) || dt <= 0 || speed <= 0 || timeScale <= 0) return;
     if (server.holding > 0) {
-      server.holding -= dt * timeScale;
-      return;
+      const wait = server.holding / timeScale;
+      server.holding = Math.max(0, server.holding - dt * timeScale);
+      dt = Math.max(0, dt - wait);
+      if (dt === 0) return;
     }
     const { queue } = server;
     if (queue.length === 0) return;
-    let left = 0;
-    let px = server.x;
-    let py = server.y;
-    for (const step of queue) {
-      left += Math.hypot(step.x - px, step.y - py);
-      px = step.x;
-      py = step.y;
-    }
-    // ค้างเกิน MAX_STAFF_LAG_SECONDS → เร่งให้ระยะที่ค้างหายไปในเวลาราวนั้น
-    let budget = Math.max(speed, left / MAX_STAFF_LAG_SECONDS) * dt;
+    let budget = speed * dt;
     while (queue.length > 0 && budget > 0) {
       const step = queue[0]!;
       const dx = step.x - server.x;
@@ -155,6 +160,7 @@ export class StaffPacer {
       queue.shift();
       if (step.hold > 0) {
         server.holding = step.hold;
+        this.move(server, budget / speed, speed, timeScale);
         break;
       }
     }

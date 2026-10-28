@@ -3,6 +3,13 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-115 — เดินตามความเร็วจริงและใช้เวลาเดียวกัน
+
+- Controllerต่อbridge114,ใช้ความเร็วลูกค้าแต่ละคนจากengineและstaff1.2ม./วิ ยกเลิกcatchup,คูณplaybackครั้งเดียว,คิวไม่เกิน1024จุดต่อคน/เก็บมุมทางเดิน;เปิดAPI current.presentation/current.timingสำหรับ122
+- ซ่อนแท็บpauseWorkerและรักษาตำแหน่ง,กลับมาresumeเฉพาะauto-pause;manualpauseคงเดิม ไม่สะสม60วิที่พัก gap/overflowหยุดก่อนและresyncเมื่อผู้ใช้resume แยกmodernpickupไม่รอครัวซ้ำและกั้นEat/workก่อนเดินถึง
+- QAของชุดส่งAgent1:สำเนาฐานtracked6a37025+115ผ่านnpm test84files/1043tests,lint/typecheckผ่าน,boundary53files/Harnessผ่าน targeted5files/65tests;Chromeจริง30.051วิ=sim30.0512วิ,visibility/3Dcontrolsผ่าน/browsererrors0 หลักฐาน `harness/evidence/feat-115/`
+- ข้อจำกัดตรวจรวม:workspaceที่มีงานคลิปuntrackedคู่ขนานมีtest _partที่staff-carry-clips.test.ts:142ล้ม1และtypeArrayBufferที่:44 ยังไม่แก้/ไม่stageไฟล์laneอื่น ตรวจisolatedเพื่อยืนยันชุดAgent1เท่านั้น;ThreeViewcadence/ติดตั้งคลิป/อาหาร/แสงยังเป็น122
+
 ## [2026-10-29] feat-114 — Worker snapshotและbridgeพร้อม
 
 - STARTED.initial/TICKส่งfullmetadata/runId/sequenceแบบoptional,โอนbufferเดิมโดยไม่detachstateengine เปลี่ยนrunทุกSTARTและหยุดrunเมื่อsyncผังBlocked

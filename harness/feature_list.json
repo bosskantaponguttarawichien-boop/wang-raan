@@ -2010,7 +2010,7 @@
     {
       "id": "feat-115",
       "name": "Timing: ทุกคนเดินตามเวลาปกติและหยุดการเร่งไล่ข้อมูล",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-114"
       ],
@@ -2053,7 +2053,8 @@
         "visualstateค้างหากworkerเดินเร็วกว่าpresentationไม่สิ้นสุด"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-115/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-115/README.md; controller bridge/per-member engine speed, shared staff1.2m/s, canonical tick clock and bounded non-accelerating pacers. FPS15/30/60/120 x playback1/2/5/10/30, staff6m/5s, individual customer paths, jitter/dt0.35, hidden60s/manual pause/overflow/dispose verified. Agent1 isolated base6a37025 plus115: full84files/1043tests, lint/typecheck passed; boundaries53files/Harness passed. Chrome real30.051s=sim30.0512s, visibility and3D controls/browsererrors0. Concurrent untracked clip-lane full-workspace test/typecheck failures documented separately; no edits to those files or ThreeView/GLBs."
     },
     {
       "id": "feat-116",

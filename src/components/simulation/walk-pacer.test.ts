@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_STATE_CODE, AGENT_STRIDE } from "@/core/simulation";
 import { cafeLayout } from "@/test/fixtures/layouts";
-import { MAX_VISUAL_LAG_SECONDS, OUTSIDE_DISTANCE, QUEUE_FIRST, QUEUE_GAP, WalkPacer, doorFrame } from "./walk-pacer";
+import { OUTSIDE_DISTANCE, QUEUE_FIRST, QUEUE_GAP, WalkPacer, doorFrame } from "./walk-pacer";
 
 const TO_SEAT = AGENT_STATE_CODE["to-seat"];
 const SEATED = AGENT_STATE_CODE.seated;
@@ -67,14 +67,14 @@ describe("WalkPacer — ภาพเดินเท่าคนจริง", ()
     expect(row(out, 5)).toBeNull();
   });
 
-  it("ตามหลังไกลเกินไป → เร่งให้ทันภายในราว MAX_VISUAL_LAG_SECONDS", () => {
+  it("ตามหลัง 40 เมตรก็ยังเดินด้วยความเร็วเดิม", () => {
     const pacer = new WalkPacer();
     pacer.update(agents(), undefined, 0, 1.4);
     const far = 40;
     let out = pacer.update(agents([6, far, 0, TO_SEAT]), paths([6, [0, 0, far, 0]]), 0.05, 1.4);
-    expect(row(out, 6)![0]).toBeCloseTo((far / MAX_VISUAL_LAG_SECONDS) * 0.05, 4);
-    for (let i = 0; i < (MAX_VISUAL_LAG_SECONDS * 5) / 0.05; i++) out = pacer.update(agents([6, far, 0, TO_SEAT]), undefined, 0.05, 1.4);
-    expect(row(out, 6)![0]).toBeCloseTo(far, 4);
+    expect(row(out, 6)![0]).toBeCloseTo(1.4 * 0.05, 4);
+    for (let i = 0; i < 99; i++) out = pacer.update(agents([6, far, 0, TO_SEAT]), undefined, 0.05, 1.4);
+    expect(row(out, 6)![0]).toBeCloseTo(7, 4);
   });
 
   it("reset ล้างทุกคน", () => {
