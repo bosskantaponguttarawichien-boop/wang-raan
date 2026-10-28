@@ -1,0 +1,39 @@
+{
+  "feature_id": "feat-104",
+  "foodId": "fried-rice",
+  "owner_lane": "food-fried-rice",
+  "full": {
+    "file": "public/assets/models/food/fried-rice/fried-rice.glb",
+    "bytes": 64340,
+    "triangles": 2524,
+    "vertices": 7572,
+    "meshCount": 10,
+    "footprintDiameter": 0.24,
+    "height": 0.0552,
+    "stateTriangles": {
+      "full": 1250,
+      "partial": 674,
+      "empty": 36
+    }
+  },
+  "lite": {
+    "file": "public/assets/models/food/fried-rice/fried-rice-lite.glb",
+    "bytes": 32636,
+    "triangles": 976,
+    "vertices": 2928,
+    "meshCount": 10,
+    "footprintDiameter": 0.24,
+    "height": 0.0551,
+    "stateTriangles": {
+      "full": 468,
+      "partial": 220,
+      "empty": 36
+    }
+  },
+  "screenshots": [
+    "harness/evidence/feat-104/fried-rice-states-3-angles.png",
+    "harness/evidence/feat-104/fried-rice-angles-comparison.png",
+    "harness/evidence/feat-104/fried-rice-tray-and-table.png"
+  ]
+}
+

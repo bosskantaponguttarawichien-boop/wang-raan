@@ -1,0 +1,39 @@
+{
+  "feature_id": "feat-107",
+  "foodId": "salad",
+  "owner_lane": "food-salad",
+  "full": {
+    "file": "public/assets/models/food/salad/salad.glb",
+    "bytes": 98548,
+    "triangles": 3992,
+    "vertices": 11976,
+    "meshCount": 11,
+    "footprintDiameter": 0.22,
+    "height": 0.0616,
+    "stateTriangles": {
+      "full": 2232,
+      "partial": 1072,
+      "empty": 40
+    }
+  },
+  "lite": {
+    "file": "public/assets/models/food/salad/salad-lite.glb",
+    "bytes": 40756,
+    "triangles": 1276,
+    "vertices": 3828,
+    "meshCount": 11,
+    "footprintDiameter": 0.22,
+    "height": 0.0613,
+    "stateTriangles": {
+      "full": 616,
+      "partial": 288,
+      "empty": 24
+    }
+  },
+  "screenshots": [
+    "harness/evidence/feat-107/salad-states-3-angles.png",
+    "harness/evidence/feat-107/salad-angles-comparison.png",
+    "harness/evidence/feat-107/salad-tray-and-table.png"
+  ]
+}
+

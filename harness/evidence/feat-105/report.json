@@ -1,0 +1,39 @@
+{
+  "feature_id": "feat-105",
+  "foodId": "noodles",
+  "owner_lane": "food-noodles",
+  "full": {
+    "file": "public/assets/models/food/noodles/noodles.glb",
+    "bytes": 131696,
+    "triangles": 5932,
+    "vertices": 17796,
+    "meshCount": 12,
+    "footprintDiameter": 0.22,
+    "height": 0.1013,
+    "stateTriangles": {
+      "full": 3428,
+      "partial": 1564,
+      "empty": 104
+    }
+  },
+  "lite": {
+    "file": "public/assets/models/food/noodles/noodles-lite.glb",
+    "bytes": 51848,
+    "triangles": 1828,
+    "vertices": 5484,
+    "meshCount": 12,
+    "footprintDiameter": 0.22,
+    "height": 0.093,
+    "stateTriangles": {
+      "full": 944,
+      "partial": 432,
+      "empty": 56
+    }
+  },
+  "screenshots": [
+    "harness/evidence/feat-105/noodles-states-3-angles.png",
+    "harness/evidence/feat-105/noodles-angles-comparison.png",
+    "harness/evidence/feat-105/noodles-tray-and-table.png"
+  ]
+}
+
