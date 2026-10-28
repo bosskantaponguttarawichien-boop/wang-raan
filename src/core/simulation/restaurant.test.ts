@@ -94,14 +94,22 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
     expect(one.frontStaffBusy).toBeGreaterThan(three.frontStaffBusy);
   });
 
-  it("ไม่มีโต๊ะสะอาดว่าง → ยืนรอหน้าร้าน ไม่เดินกลับทันที", () => {
-    const sim = restaurant({ customersPerHour: 300, cooks: 3 });
+  it("ไม่มีโต๊ะสะอาดว่าง → รอหน้าเข้าได้ แต่กลับเมื่อเกิน patience", () => {
+    const sim = restaurant({ customersPerHour: 300, cooks: 3, patienceMinutes: 1 });
     run(sim, 3600);
     const m = sim.getMetrics();
-    expect(m.noSeat).toBe(0);
+    expect(m.noSeat).toBeGreaterThan(0);
     expect(m.maxEntranceQueue).toBeGreaterThan(0);
     expect(m.seated).toBeLessThanOrEqual(sim.seatCount);
-    if (m.avgVisitMinutes > 0) expect(m.avgVisitMinutes).toBeGreaterThan(10);
+  });
+
+  it("กลุ่มหนึ่งคนละหนึ่งจาน: ครัวต้องทำครบทั้งกลุ่มก่อนเริ่มทาน", () => {
+    const oneCook = restaurant({ customersPerHour: 30, cooks: 1, cookMinutesPerDish: 4, patienceMinutes: 60 });
+    const manyCooks = restaurant({ customersPerHour: 30, cooks: 4, cookMinutesPerDish: 4, patienceMinutes: 60 });
+    run(oneCook, 3 * 3600);
+    run(manyCooks, 3 * 3600);
+    expect(oneCook.getMetrics().avgFoodWaitMinutes).toBeGreaterThan(manyCooks.getMetrics().avgFoodWaitMinutes);
+    expect(oneCook.getMetrics().kitchenBusy).toBeGreaterThan(manyCooks.getMetrics().kitchenBusy);
   });
 
   it("หนึ่งโต๊ะรองรับได้เพียงหนึ่งกลุ่ม และต้องเก็บก่อนจึงส่งกลุ่มถัดไปเข้า", () => {
