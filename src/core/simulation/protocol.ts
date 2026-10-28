@@ -68,7 +68,17 @@ export interface TickMessage {
 export type WorkerResponse =
   | { type: "PONG"; requestId: number }
   | { type: "STATUS"; requestId: number; status: "READY"; layoutRevision: string; grid: GridSummary }
-  | { type: "STARTED"; requestId: number; seats: number; grid: { cols: number; rows: number; cellSize: number } }
+  /**
+   * `initial` คือภาพ ณ ขณะเริ่มจำลอง ก่อน tick รอบแรก
+   * ทำให้ทุก renderer เห็นพนักงานประจำเคาน์เตอร์ทันที ไม่ต้องรอ timer ของ Worker
+   */
+  | {
+      type: "STARTED";
+      requestId: number;
+      seats: number;
+      grid: { cols: number; rows: number; cellSize: number };
+      initial: { agents: Float32Array; staff: Float32Array };
+    }
   | { type: "ACK"; requestId: number; command: "PAUSE" | "RESUME" | "STOP" | "SET_SPEED" }
   | { type: "ANALYSIS"; requestId: number; layoutRevision: string; analysis: DayAnalysis }
   | { type: "ERROR"; requestId: number; code: WorkerErrorCode; message: string };

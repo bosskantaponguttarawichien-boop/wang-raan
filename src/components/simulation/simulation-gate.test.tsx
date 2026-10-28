@@ -77,6 +77,10 @@ describe("P2 Gate ใน SimulationController", () => {
     // ค่าตั้งต้น 10:00–20:00 คนเยอะ 11:30–13:00 → ภาพเริ่มตอนเปิดร้าน (ร้านว่าง) แล้วจบเมื่อจบช่วงคนเยอะ
     expect(sim.getState().analysis?.staffing.recommended).not.toBeNull();
     expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { startAtSeconds: 0, stopAtSeconds: 10_800, cooks: 1, frontStaff: 2, speed: 1, skipQuiet: true } });
+    // ไม่ต้องรอ tick แรก: พนักงานประจำเคาน์เตอร์ต้องเห็นพร้อมสถานะ running
+    expect(controller.current).not.toBeNull();
+    expect(controller.current!.agents).toHaveLength(0);
+    expect(controller.current!.staff).toHaveLength(2 * 4);
     for (let i = 0; i < 40; i++) fake.tick(250);
     await flush();
     expect(controller.current).not.toBeNull();

@@ -161,7 +161,14 @@ export class SimulationWorkerRuntime {
         this.running = true;
         this.ticks = 0;
         const { cols, rows, cellSize } = this.simulation.grid;
-        return { response: { type: "STARTED", requestId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize } }, transfer: [] };
+        // ส่งภาพตั้งต้นพร้อม STARTED แทนการรอ tick แรก: ร้านเปิดใหม่จึงไม่มีลูกค้า
+        // แต่พนักงานต้องยืนประจำเคาน์เตอร์ให้เห็นทันทีในทุก renderer รวมถึง SVG บนมือถือ
+        const agents = this.simulation.agentBuffer();
+        const staff = this.simulation.staffBuffer();
+        return {
+          response: { type: "STARTED", requestId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize }, initial: { agents, staff } },
+          transfer: [agents.buffer as ArrayBuffer, staff.buffer as ArrayBuffer],
+        };
       }
 
       case "PAUSE":
