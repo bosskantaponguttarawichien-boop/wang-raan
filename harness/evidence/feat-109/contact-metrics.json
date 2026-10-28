@@ -1,0 +1,352 @@
+{
+  "task": "feat-109",
+  "generatedAt": "2026-10-28T18:40:57.909Z",
+  "provider": "scripts/character-clips/staff-carry.mjs",
+  "clipNames": [
+    "CarryIdle",
+    "CarryWalk",
+    "PickUp",
+    "PutDown"
+  ],
+  "profile": {
+    "tray": {
+      "centerY": 1.02,
+      "bottomY": 1,
+      "boardBottomY": 1.0090000000000001,
+      "forward": 0.3,
+      "halfX": 0.23,
+      "halfZ": 0.17
+    },
+    "grips": {
+      "left": [
+        -0.155,
+        1,
+        0.262
+      ],
+      "right": [
+        0.155,
+        1,
+        0.262
+      ],
+      "palmLocal": [
+        -0.0099,
+        -0.0864,
+        -0.0253
+      ]
+    },
+    "receive": {
+      "surfaceY": 1.05,
+      "palmY": 1.135,
+      "forward": 0.34
+    },
+    "place": {
+      "surfaceY": 0.76,
+      "forward": 0.38,
+      "plateThickness": 0.025,
+      "plateOnTrayTopY": 1.0565
+    },
+    "durations": {
+      "CarryIdle": 6,
+      "CarryWalk": 0.95,
+      "PickUp": 1.2,
+      "PutDown": 1.4
+    }
+  },
+  "markers": {
+    "CarryIdle": [
+      {
+        "name": "hand-contact",
+        "time": 0
+      }
+    ],
+    "CarryWalk": [
+      {
+        "name": "hand-contact",
+        "time": 0
+      }
+    ],
+    "PickUp": [
+      {
+        "name": "hand-contact",
+        "time": 0.4
+      },
+      {
+        "name": "food-contact",
+        "time": 0.58
+      }
+    ],
+    "PutDown": [
+      {
+        "name": "hand-contact",
+        "time": 0.26
+      },
+      {
+        "name": "food-contact",
+        "time": 0.62
+      }
+    ]
+  },
+  "metrics": {
+    "full": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "triangles": 27568,
+      "clips": [
+        {
+          "name": "CarryIdle",
+          "duration": 6,
+          "tracks": 17
+        },
+        {
+          "name": "CarryWalk",
+          "duration": 0.95,
+          "tracks": 17
+        },
+        {
+          "name": "PickUp",
+          "duration": 1.2,
+          "tracks": 17
+        },
+        {
+          "name": "PutDown",
+          "duration": 1.4,
+          "tracks": 17
+        }
+      ],
+      "baseline": [
+        {
+          "clip": "Walk",
+          "duration": 0.95,
+          "frames": 36,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.0161,
+          "handLowestOverCounter": 0.6002,
+          "bodyLowestOverTable": 0.7312,
+          "ankleSlip": 0.45,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "Work",
+          "duration": 8,
+          "frames": 36,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.1065,
+          "handLowestOverCounter": 0.9336,
+          "bodyLowestOverTable": 0.9336,
+          "ankleSlip": 0,
+          "palmYSpread": 0
+        }
+      ],
+      "authored": [
+        {
+          "clip": "CarryIdle",
+          "duration": 6,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.0127,
+          "handLowestOverCounter": 0.8982,
+          "bodyLowestOverTable": 0.9338,
+          "ankleSlip": 0.0205,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "CarryWalk",
+          "duration": 0.95,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.0121,
+          "handLowestOverCounter": 0.6033,
+          "bodyLowestOverTable": 0.9338,
+          "ankleSlip": 0.45,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "PickUp",
+          "duration": 1.2,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.1998,
+          "handLowestOverCounter": 0.8982,
+          "bodyLowestOverTable": 0.9338,
+          "ankleSlip": 0,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "PutDown",
+          "duration": 1.4,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.2,
+          "handLowestOverCounter": 0.6003,
+          "bodyLowestOverTable": 0.7847,
+          "ankleSlip": 0.0001,
+          "palmYSpread": 0
+        }
+      ]
+    },
+    "lite": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "triangles": 6892,
+      "clips": [
+        {
+          "name": "CarryIdle",
+          "duration": 6,
+          "tracks": 17
+        },
+        {
+          "name": "CarryWalk",
+          "duration": 0.95,
+          "tracks": 17
+        },
+        {
+          "name": "PickUp",
+          "duration": 1.2,
+          "tracks": 17
+        },
+        {
+          "name": "PutDown",
+          "duration": 1.4,
+          "tracks": 17
+        }
+      ],
+      "baseline": [
+        {
+          "clip": "Walk",
+          "duration": 0.95,
+          "frames": 36,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.018,
+          "handLowestOverCounter": 0.603,
+          "bodyLowestOverTable": 0.732,
+          "ankleSlip": 0.45,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "Work",
+          "duration": 8,
+          "frames": 36,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.1027,
+          "handLowestOverCounter": 0.934,
+          "bodyLowestOverTable": 0.934,
+          "ankleSlip": 0,
+          "palmYSpread": 0
+        }
+      ],
+      "authored": [
+        {
+          "clip": "CarryIdle",
+          "duration": 6,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.0001,
+          "handLowestOverCounter": 0.8989,
+          "bodyLowestOverTable": 0.9365,
+          "ankleSlip": 0.0205,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "CarryWalk",
+          "duration": 0.95,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.0001,
+          "handLowestOverCounter": 0.6001,
+          "bodyLowestOverTable": 0.9365,
+          "ankleSlip": 0.45,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "PickUp",
+          "duration": 1.2,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.1778,
+          "handLowestOverCounter": 0.8989,
+          "bodyLowestOverTable": 0.9365,
+          "ankleSlip": 0,
+          "palmYSpread": 0
+        },
+        {
+          "clip": "PutDown",
+          "duration": 1.4,
+          "frames": 48,
+          "gripError": 0,
+          "trayPenetration": 0.0155,
+          "overBoardMaxY": 1.1997,
+          "handLowestOverCounter": 0.6907,
+          "bodyLowestOverTable": 0.7866,
+          "ankleSlip": 0.0001,
+          "palmYSpread": 0
+        }
+      ]
+    }
+  },
+  "temporaryBuild": {
+    "full": {
+      "files": [
+        "cafe-staff.glb"
+      ],
+      "bytes": 363580,
+      "sha256": "8db4105a9313121c731236acb686e97d3ba25af12653a717fbab669743bae2ba",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat109-NJXYBH\\full\\cafe-staff.glb",
+        "bytes": 363580,
+        "vertices": 13879,
+        "triangles": 27568,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Work",
+          "CarryIdle",
+          "CarryWalk",
+          "PickUp",
+          "PutDown"
+        ]
+      }
+    },
+    "lite": {
+      "files": [
+        "cafe-staff-lite.glb"
+      ],
+      "bytes": 160012,
+      "sha256": "d86322658e1ec5f49f03d40c283c77e0b14d8fef379327f33836be8797e76cfb",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat109-NJXYBH\\lite\\cafe-staff-lite.glb",
+        "bytes": 160012,
+        "vertices": 3517,
+        "triangles": 6892,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Work",
+          "CarryIdle",
+          "CarryWalk",
+          "PickUp",
+          "PutDown"
+        ]
+      }
+    }
+  },
+  "publicAssetsUnchanged": true,
+  "publicAssetsSha256": {
+    "cafe-customer-lite.glb": "51b6b44c558e18f8a455cb828fc18614ac9f3aa9f59a42738df1c679b7fdbdf8",
+    "cafe-customer.glb": "12f1715ec32e6269f23957751f6c3e5463a53c757bae45049b019f5be7c349e4",
+    "cafe-staff-lite.glb": "648b8637907cb187b7bb3fca57111d795424a396389fe1a9af93b2691db352cb",
+    "cafe-staff.glb": "5f0c60fa474f523128d6d4b2d048fa78a18a1b05d973d8c508c5baf4350b42a0"
+  }
+}
