@@ -1,0 +1,233 @@
+{
+  "task": "feat-110",
+  "generatedAt": "2026-10-28T18:40:59.254Z",
+  "provider": "scripts/character-clips/customer-eat.mjs",
+  "profile": {
+    "seatTopY": 0.45,
+    "tableSurfaceY": 0.76,
+    "foodSurfaceY": 0.785,
+    "plateForward": 0.34,
+    "mouthLocal": [
+      0,
+      0.075,
+      0.115
+    ],
+    "tipReach": 0.135,
+    "palmLocal": [
+      -0.0099,
+      -0.0864,
+      -0.0253
+    ],
+    "durations": {
+      "Eat": 3.2
+    }
+  },
+  "markers": {
+    "Eat": [
+      {
+        "name": "seated",
+        "time": 0
+      },
+      {
+        "name": "food-contact",
+        "time": 0.14
+      },
+      {
+        "name": "hand-contact",
+        "time": 0.45
+      }
+    ]
+  },
+  "utensils": {
+    "fried-rice": {
+      "utensil": "spoon",
+      "length": 0.17,
+      "gripOffset": 0.035
+    },
+    "noodles": {
+      "utensil": "chopsticks",
+      "length": 0.24,
+      "gripOffset": 0.105
+    },
+    "steak": {
+      "utensil": "fork",
+      "length": 0.19,
+      "gripOffset": 0.055
+    },
+    "salad": {
+      "utensil": "fork",
+      "length": 0.19,
+      "gripOffset": 0.055
+    },
+    "cake": {
+      "utensil": "fork",
+      "length": 0.16,
+      "gripOffset": 0.025
+    }
+  },
+  "phaseOffsets": [
+    {
+      "party": 1,
+      "member": 0,
+      "offset": 0.76942
+    },
+    {
+      "party": 1,
+      "member": 1,
+      "offset": 0.45624
+    },
+    {
+      "party": 1,
+      "member": 2,
+      "offset": 0.14307
+    },
+    {
+      "party": 1,
+      "member": 3,
+      "offset": 0.82989
+    },
+    {
+      "party": 2,
+      "member": 0,
+      "offset": 0.67511
+    },
+    {
+      "party": 2,
+      "member": 1,
+      "offset": 0.98829
+    },
+    {
+      "party": 2,
+      "member": 2,
+      "offset": 0.30147
+    },
+    {
+      "party": 2,
+      "member": 3,
+      "offset": 0.61464
+    },
+    {
+      "party": 3,
+      "member": 0,
+      "offset": 0.03988
+    },
+    {
+      "party": 3,
+      "member": 1,
+      "offset": 0.72671
+    },
+    {
+      "party": 3,
+      "member": 2,
+      "offset": 0.66623
+    },
+    {
+      "party": 3,
+      "member": 3,
+      "offset": 0.35306
+    }
+  ],
+  "metrics": {
+    "full": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "Eat",
+          "duration": 3.2,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "Eat",
+          "duration": 3.2,
+          "frames": 48,
+          "seatedAnchorDrift": 0,
+          "tipLowest": 0.7858,
+          "tipHighestAboveMouth": -0.0097,
+          "handLowestOverTable": 0.8413,
+          "leftHandDrift": 0,
+          "mouthReachError": 0.0213,
+          "plateReachError": 0.0012,
+          "headClearanceAtBite": 0.1445,
+          "plateRadialDistance": 0.045
+        }
+      ]
+    },
+    "lite": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "Eat",
+          "duration": 3.2,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "Eat",
+          "duration": 3.2,
+          "frames": 48,
+          "seatedAnchorDrift": 0,
+          "tipLowest": 0.7858,
+          "tipHighestAboveMouth": -0.0097,
+          "handLowestOverTable": 0.8413,
+          "leftHandDrift": 0,
+          "mouthReachError": 0.0213,
+          "plateReachError": 0.0012,
+          "headClearanceAtBite": 0.1445,
+          "plateRadialDistance": 0.045
+        }
+      ]
+    }
+  },
+  "temporaryBuild": {
+    "full": {
+      "files": [
+        "cafe-customer.glb"
+      ],
+      "bytes": 291448,
+      "sha256": "4b3c15430225cd0d68935399739278518188ab769e751d89b062971945f67c20",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat110-u1FNAc\\full\\cafe-customer.glb",
+        "bytes": 291448,
+        "vertices": 13879,
+        "triangles": 27568,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Eat"
+        ]
+      }
+    },
+    "lite": {
+      "files": [
+        "cafe-customer-lite.glb"
+      ],
+      "bytes": 107760,
+      "sha256": "f08702a4ccb7995e30c5aa9b86817b72cd51c911f16e4766bbf835d4355c6e05",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat110-u1FNAc\\lite\\cafe-customer-lite.glb",
+        "bytes": 107760,
+        "vertices": 3517,
+        "triangles": 6892,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "Eat"
+        ]
+      }
+    }
+  },
+  "publicAssetsUnchanged": true,
+  "publicAssetsSha256": {
+    "cafe-customer-lite.glb": "51b6b44c558e18f8a455cb828fc18614ac9f3aa9f59a42738df1c679b7fdbdf8",
+    "cafe-customer.glb": "12f1715ec32e6269f23957751f6c3e5463a53c757bae45049b019f5be7c349e4",
+    "cafe-staff-lite.glb": "648b8637907cb187b7bb3fca57111d795424a396389fe1a9af93b2691db352cb",
+    "cafe-staff.glb": "5f0c60fa474f523128d6d4b2d048fa78a18a1b05d973d8c508c5baf4350b42a0"
+  }
+}

@@ -1788,7 +1788,7 @@
     {
       "id": "feat-110",
       "name": "Customer clips: นั่งกินอาหารพร้อมอุปกรณ์และจังหวะมือเข้าปาก",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-102"
       ],
@@ -1825,7 +1825,8 @@
         "EatblendกับSitอาจทำให้เข่าหรือสะโพกหลุดเบาะ"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-110/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "scripts/character-clips/customer-eat.mjs → Eat (3.2 วิ/คำ, markers seated/food-contact/hand-contact). สะโพกคาท่านั่งบนเบาะ 0.45 ม. นิ่งสนิท (drift 0) ไม่มี root translation; loop ต่อเนื่อง (คีย์แรก=คีย์ท้าย) จึงเริ่มที่ phase ใดก็ได้. ปลายอุปกรณ์แตะผิวในจานคลาด 0.0012 ม. และถึงปากคลาด 0.0213 ม. โดยห่างกระดูกหัว 0.1445 ม. (ไม่ทะลุใบหน้า) และไม่เคยสูงเกินระดับปาก. มือไม่จมผิวโต๊ะ (ต่ำสุด 0.8656 ม.) มือซ้ายวางนิ่งบนโต๊ะ. นโยบายอุปกรณ์ครบ 5 เมนู (ช้อน/ตะเกียบ/ส้อม) เลื่อนด้ามตาม gripOffset ให้ปลายอยู่ที่ 0.135 ม. เท่ากัน และ eatPhaseOffset กระจาย deterministic. 10 เทสต์ใน src/components/preview-3d/customer-actions/customer-eat-clips.test.ts ผ่าน; หลักฐานใน harness/evidence/feat-110/; public/assets/models ไม่เปลี่ยน"
     },
     {
       "id": "feat-111",
