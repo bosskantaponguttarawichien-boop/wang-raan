@@ -674,6 +674,8 @@ export class Simulation {
     if (agent.cancelled) return;
     agent.cancelled = true;
     this.cancelQueuedWork(agent);
+    // ลูกค้านั่งอยู่กลาง footprint ของเก้าอี้ จึงต้องลุกไปช่องเดินก่อนหาเส้นออก
+    if (agent.tableId && agent.chairId) this.standUp(agent);
     if (agent.tableId) this.markTableDirty(agent.tableId);
     if (noSeat) this.metrics.noSeat += agent.partySize;
     else this.metrics.abandoned += agent.partySize;
