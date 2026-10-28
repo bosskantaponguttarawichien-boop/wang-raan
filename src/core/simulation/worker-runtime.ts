@@ -93,8 +93,13 @@ export const HEATMAP_EVERY = 5;
 export const QUIET_SPEED = 60;
 /** ร้านว่างทั้งร้าน: ข้ามไปถึงลูกค้ากลุ่มถัดไปได้ในครั้งเดียว ไม่เกินเท่านี้ (วินาทีจำลอง) */
 export const EMPTY_SKIP_SECONDS = 2 * 3600;
+let nextRuntimeId = 1;
 
 export class SimulationWorkerRuntime {
+  private readonly runtimeId = nextRuntimeId++;
+  private generation = 0;
+  private runId = "";
+  private sequence = 0;
   private synced: { layout: StoreLayout; revision: string } | null = null;
   private simulation: Simulation | null = null;
   private running = false;
@@ -127,6 +132,7 @@ export class SimulationWorkerRuntime {
           return this.error(requestId, "STALE_VALIDATION", "ผลตรวจไม่ตรงกับผังล่าสุด กรุณาตรวจผังใหม่");
         }
         if (validation.status === "blocked" || validateLayout(layout).status === "blocked") {
+          this.reset();
           this.synced = null;
           return this.error(requestId, "BLOCKED", "ผังยังไม่ผ่านกฎจำเป็น เริ่มจำลองไม่ได้");
         }
@@ -160,13 +166,16 @@ export class SimulationWorkerRuntime {
         this.speed = speed;
         this.running = true;
         this.ticks = 0;
+        this.runId = `run:${this.runtimeId}:${++this.generation}`;
+        this.sequence = 0;
         const { cols, rows, cellSize } = this.simulation.grid;
         // ส่งภาพตั้งต้นพร้อม STARTED แทนการรอ tick แรก: ร้านเปิดใหม่จึงไม่มีลูกค้า
         // แต่พนักงานต้องยืนประจำเคาน์เตอร์ให้เห็นทันทีในทุก renderer รวมถึง SVG บนมือถือ
         const agents = this.simulation.agentBuffer();
         const staff = this.simulation.staffBuffer();
+        const presentation = this.simulation.presentationSnapshot({ runId: this.runId, layoutRevision: this.synced.revision, sequence: this.sequence });
         return {
-          response: { type: "STARTED", requestId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize }, initial: { agents, staff } },
+          response: { type: "STARTED", requestId, runId: this.runId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize }, initial: { agents, staff, presentation } },
           transfer: [agents.buffer as ArrayBuffer, staff.buffer as ArrayBuffer],
         };
       }
@@ -215,7 +224,9 @@ export class SimulationWorkerRuntime {
     const agents = this.simulation.agentBuffer();
     const paths = this.simulation.drainPaths();
     const staff = this.simulation.staffBuffer();
-    const tick: TickMessage = { type: "TICK", agents, paths, staff, metrics: this.simulation.getMetrics() };
+    const sequence = ++this.sequence;
+    const presentation = this.simulation.presentationSnapshot({ runId: this.runId, layoutRevision: this.synced!.revision, sequence });
+    const tick: TickMessage = { type: "TICK", runId: this.runId, sequence, presentation, agents, paths, staff, metrics: this.simulation.getMetrics() };
     if (finished) tick.finished = true;
     const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer, paths.buffer as ArrayBuffer, staff.buffer as ArrayBuffer];
     if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {
@@ -235,6 +246,8 @@ export class SimulationWorkerRuntime {
     this.skipQuiet = false;
     this.running = false;
     this.ticks = 0;
+    this.runId = "";
+    this.sequence = 0;
   }
 
   private error(requestId: number, code: Extract<WorkerResponse, { type: "ERROR" }>["code"], message: string): HandledMessage {

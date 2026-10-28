@@ -3,6 +3,12 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-114 — Worker snapshotและbridgeพร้อม
+
+- STARTED.initial/TICKส่งfullmetadata/runId/sequenceแบบoptional,โอนbufferเดิมโดยไม่detachstateengine เปลี่ยนrunทุกSTARTและหยุดrunเมื่อsyncผังBlocked
+- PresentationBridgeตรวจrun/layout/sequence/time/schema/identity/cycle เก็บsnapshotล่าสุดและfallbacklegacy/unknownversionโดยไม่เดาEat/clean รอ115ต่อcontroller
+- QA:88files/1029testsผ่าน,lint/typecheck/Harness/boundaryผ่าน หลักฐาน `harness/evidence/feat-114/`;ทดสอบtransfer/pause/restart/stale/legacyและpayload1/40/80คน
+
 ## [2026-10-29] feat-113 — สถานะบริการและสมาชิกพร้อมส่งWorker
 
 - เพิ่มfullsnapshotv1,สมาชิกแต่ละคนผูกเก้าอี้/จาน/cycleและpathidตรงbuffer เส้นทางแยกเก้าอี้ผ่านช่องเดิน;รออาหาร/กิน/จบ/dirty/cleaningแยกกัน เก็บจานหลังออกจนcleancompleteและกันงานเก่าข้ามcycle

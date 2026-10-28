@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — Agent1:114เสร็จ ถัดไป115
+
+- Workerส่งoptionalpresentation/runId/sequenceทั้งinitialและTICK;bridgeAPIbegin/accept/current/resetพร้อมสำหรับcontroller115 ไม่มีstrideหรือP1/BFFschemaเปลี่ยน
+- ตรวจ88files/1029tests,lint/typecheck/Harness/boundaryผ่าน;กันstalerun/sequence/layoutและผิดschema,legacy/unknownversionไม่มีsemanticguess,transferไม่ทำenginebufferเสีย ดู `harness/evidence/feat-114/README.md`
+- 115ต้องbeginbridgeหลังSTARTED/resetเมื่อSTOP,เดินด้วยauthoritativesimdeltaและper-membervelocity,เลิกmaxcatchup,autopausevisibilityและเก็บunsubscribeให้ครบ ยังไม่แตะthree-view/animationintegration122
+
 ## 2026-10-29 ICT — Agent1:113เสร็จ กำลังต่อ114→115
 
 - 113fullsnapshot/สมาชิก-เก้าอี้-path/cycle/meals/staffmilestonesพร้อม;อ่านผ่าน `Simulation.presentationSnapshot` หลังtrackPaths ใช้contractv1เดิม ไม่เปลี่ยนmetrics/RNG/สูตรธุรกิจ

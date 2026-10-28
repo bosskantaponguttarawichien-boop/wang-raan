@@ -1962,7 +1962,7 @@
     {
       "id": "feat-114",
       "name": "Transport: ส่ง semantic snapshot ข้าม Worker และ bridge เข้าภาพ",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-113"
       ],
@@ -2004,7 +2004,8 @@
         "TICKจากworkerเก่าปะปนrunใหม่"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-114/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-114/README.md; optional full STARTED/TICK metadata with distinct run ids/monotonic sequence, fresh snapshot objects and unchanged buffer transfer/strides. PresentationBridge rejects stale/malformed data, supports legacy/unknown-version motion without guessing semantic state. StructuredClone transfers, pause/restart/blocked-sync and 1/40/80-actor payload scaling verified. Full workspace 88files/1029tests, lint/typecheck/Harness/boundary passed."
     },
     {
       "id": "feat-115",
