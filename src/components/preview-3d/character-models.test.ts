@@ -32,6 +32,13 @@ describe("customer look", () => {
   });
 });
 
+/** Clips in every role's GLB (scripts/model-generation/base-clips.mjs). */
+const BASE_CLIPS = ["Idle", "Walk", "Sit"] as const;
+/** Work plus the staff lane clips registered for export (feat-109/111 via feat-117). */
+const STAFF_ONLY_CLIPS = ["Work", "CarryIdle", "CarryWalk", "PickUp", "PutDown", "WipeTable"] as const;
+/** Customer lane clips registered for export (feat-110/112 via feat-118). */
+const CUSTOMER_ONLY_CLIPS = [] as const;
+
 describe("character models", () => {
   it("gives customers and staff separate files", () => {
     const files = Object.values(CHARACTER_MODELS).flatMap((model) => [model.full, model.lite]);
@@ -43,8 +50,9 @@ describe("character models", () => {
       const customer = await load(CHARACTER_MODELS.customer[variant]);
       const staff = await load(CHARACTER_MODELS.staff[variant]);
       expect(boneNames(staff.scene)).toEqual(boneNames(customer.scene));
-      // พนักงานมีท่าทำงานหลังเคาน์เตอร์เพิ่ม
-      expect(staff.animations.map((clip) => clip.name)).toEqual([...customer.animations.map((clip) => clip.name), "Work"]);
+      // ทั้งสองบทบาทใช้คลิปฐานชุดเดียวกัน แล้วแต่ละสายเติมคลิปของตัวเองต่อท้าย
+      expect(customer.animations.map((clip) => clip.name)).toEqual([...BASE_CLIPS, ...CUSTOMER_ONLY_CLIPS]);
+      expect(staff.animations.map((clip) => clip.name)).toEqual([...BASE_CLIPS, ...STAFF_ONLY_CLIPS]);
       expect(staff.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance).toBe(
         customer.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance,
       );

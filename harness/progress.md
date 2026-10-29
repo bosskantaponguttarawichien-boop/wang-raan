@@ -3,6 +3,17 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-117 — Staff runtime: รวมคลิปพนักงาน ถือเสิร์ฟและเช็ดโต๊ะ
+
+- **Export staff GLB**: ลง `REGISTERED_CLIP_MODULES` ใน `scripts/create-cafe-customer-model.mjs` (ใช้เมื่อไม่มี `--clips`; `--clips` ยังแทนที่ชุด default) แล้ว export `cafe-staff.glb` / `cafe-staff-lite.glb` ใหม่ ได้ 9 คลิป `Idle/Walk/Sit/Work/CarryIdle/CarryWalk/PickUp/PutDown/WipeTable` พร้อม `animationMarkers`; เทียบไฟล์ก่อนแก้แล้ว nodes/skins/meshes/`_PART` 0–6/`walkCycleDistance` 0.9 เท่าเดิมทุกค่า และ `cafe-customer*.glb` ไม่ถูกเขียน (sha256 เท่าสำเนาก่อนเริ่มงาน)
+- **Pure controller** `staff-actions/staff-action-controller.ts`: ตัดสินคลิป/phase/props จาก `StaffPresentation` ตาม priority สัญญา v1 §3 (task > carry > walk > idle/work) โดยไม่มี latch — ผลเป็นฟังก์ชันของ (snapshot, time, asset) ล้วน ยกเลิกงานหรือเริ่มรอบใหม่จึงไม่มีท่าค้าง
+- **เวลาเป็นของ simulation**: คลิป one-shot ถูก `paused` แล้วเขียน `action.time` จากช่วง `phaseStartedAtSeconds..phaseEndsAtSeconds` ทุกเฟรม ไม่พึ่ง mixer-finished callback, ไม่มี catch-up, pause หยุดสนิท และ playbackRate ไม่ทำให้ท่าหลุดจากข้อมูล
+- **Scene feature** `staff-actions/staff-actions.ts`: host ยังเป็นเจ้าของ rig (ไม่ย้าย/หมุน/dispose และไม่เรียก `mixer.update` เอง) ถาดเป็นของ host จึงแตะแค่ `visible` และคืนค่าเดิมตอน release/reset/dispose; ผ้าเช็ดและจานที่เก็บเป็นของ feature เอง parent เข้า `RightHand`/`LeftHand` และ dispose เฉพาะของตัวเอง
+- **ไม่ทำคราบหายก่อนเช็ด**: อ่าน table-service แบบ DI อย่างเดียว (`getDishPlacements`/`getTableStainInfo`) คำนวณ `wipeProgress` เฉพาะช่วง `wipe-contact → clear-complete` ตาม `stainWindow` ของ feat-111 และถาดยังแสดงอาหารจนกว่า feat-116 จะรายงานว่าจานอยู่บนโต๊ะเป้าหมายจริง จานจึงไม่หายกลางอากาศ
+- **เท้าไม่ไถล**: เลือก CarryWalk/CarryIdle/Walk จากความเร็วของโมเดลที่วาดจริง และ `timeScale = speed × clipDuration / walkCycleDistance`; service point ที่ไกลกว่าระยะกวาดผ้า (`radiusFar` 0.44 ม.) ถูกรายงานเป็น `wipeOutOfReach` แทนการแกล้งเช็ดถึง
+- **Verify**: `npm test` 102 files / 1,154 tests ผ่าน · `npm run lint` 0 error (เหลือ warning เดิม `_initial`) · `npm run typecheck` ผ่าน · `python scripts/validate_harness.py` ผ่าน · boundary scan ไม่มี react/zustand/next ใน `src/core/` และไม่มี `three` ใน `src/core/`, `src/workers/`, `app/api/` · หลักฐาน `harness/evidence/feat-117/`
+- **ข้ามขอบเขตที่ต้องให้ coordinator รับทราบ**: แตะไฟล์ใน write_scope ของ feat-122 สองจุด คือ CLI registration และ `character-models.test.ts` (assertion เดิม `staff = customer + ["Work"]` เป็นจริงไม่ได้อีกเมื่อ staff มีคลิปของสายตัวเอง) — เป็นลำดับที่หลีกไม่ได้เพราะ gate ของ 117 สั่งให้ `npm test` ผ่าน 100% รายละเอียดใน `harness/evidence/feat-117/summary.md`
+
 ## [2026-10-29] feat-116, feat-120, feat-121 — Table Service Visuals, Solar Foundation และ Scene Lighting Runtime (Agent 2)
 
 - **feat-116 (Table visuals — จานอาหาร 5 แบบ การกิน คราบ และการล้างคราบ)**:

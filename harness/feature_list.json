@@ -2117,7 +2117,7 @@
     {
       "id": "feat-117",
       "name": "Staff runtime: รวมคลิปพนักงาน ถือเสิร์ฟและเช็ดโต๊ะ",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-109",
         "feat-111",
@@ -2159,7 +2159,8 @@
         "taskเก่าลบคราบcycleใหม่"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-117/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-117/ (summary.md, glb-staff-full.json, glb-staff-lite.json, unit-tests.log); staff GLB 2 ไฟล์มี 9 คลิป+markers โดย nodes/skins/meshes/_PART/walkCycleDistance เท่าเดิม; controller matrix 24 tests + feature 13 tests; npm test 102 files/1,154 tests, lint 0 error, typecheck, validate_harness และ boundary scan ผ่าน; customer GLB ไม่ถูกเขียน (sha256 เท่าเดิม); ข้ามขอบเขตไป 122 สองจุด (CLI registration, character-models.test.ts clip list) บันทึกใน summary.md"
     },
     {
       "id": "feat-118",

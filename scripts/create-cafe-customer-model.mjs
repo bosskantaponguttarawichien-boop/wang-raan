@@ -2,10 +2,23 @@
  * Build one trusted character GLB. Legacy --staff/--lite flags remain supported.
  * node scripts/create-cafe-customer-model.mjs --role staff --lite --output-dir <dir>
  * Add --clips <ESM module> per provider; importing this entry point writes nothing.
+ *
+ * With no --clips the role's registered lane providers are used, so the published
+ * assets stay reproducible from the plain command. An explicit --clips replaces
+ * that set entirely, which keeps provider fixtures isolated.
  */
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildCharacter } from "./model-generation/build.mjs";
+
+/** Clip providers that ship with each role's published GLB (feat-109/111 for staff). */
+export const REGISTERED_CLIP_MODULES = {
+  customer: [],
+  staff: ["scripts/character-clips/staff-carry.mjs", "scripts/character-clips/staff-clean.mjs"],
+};
+
+const registeredClipModules = (role) =>
+  REGISTERED_CLIP_MODULES[role].map((path) => fileURLToPath(new URL("../" + path, import.meta.url)));
 
 export function parseCharacterOptions(args) {
   let role, legacyStaff = false, lite = false;
@@ -28,7 +41,7 @@ export function parseCharacterOptions(args) {
   if (legacyStaff && role && role !== "staff") throw new Error("--staff conflicts with --role");
   role ??= legacyStaff ? "staff" : "customer";
   if (role !== "customer" && role !== "staff") throw new Error("Unknown role: " + role);
-  return { role, lite, outputDirectory, clipModules };
+  return { role, lite, outputDirectory, clipModules: clipModules.length ? clipModules : registeredClipModules(role) };
 }
 
 export async function runCharacterBuild(args) {
