@@ -2418,7 +2418,7 @@
     {
       "id": "feat-123",
       "name": "QA gate: ตรวจรับภาพ วงจรบริการ เวลาเดิน แสง และ performance",
-      "status": "not-started",
+      "status": "in-progress",
       "dependencies": [
         "feat-122"
       ],
@@ -2458,7 +2458,8 @@
         "fixtureเร่งเวลาอาจซ่อนbug1×ต้องวัดจริงด้วย"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-123/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-123/ (summary.md, measurements.jsonl, e2e-run.log, screens/ 20 ภาพ); e2e 27 tests ผ่านบน Chrome + GTX 1050 Ti (hardware WebGL) กับ production build: เวลา 1× อัตรา 0.998×, 10× อัตรา 9.94×, resume 0.996× และกลับจากแท็บซ่อน 1.162× (ไม่มีการไล่เวลาสะสม); pause และ stop ทำให้ภาพนิ่ง 0.000% ของพิกเซล; แสง 4 เวลา (กลางคืน 0.820 ยังอ่านผังออก, เที่ยง 0.917), หมุน 4 มุมแล้วแดดกลับที่เดิม, ร้าน 2–30 ม., reduced motion ใช้ SVG, WebGL fail ถอยไป SVG, 6 breakpoints ไม่มี horizontal scroll, start/stop 10 รอบ canvas ไม่งอก, performance median 50.0 fps / p95 49.3 fps (เกณฑ์ ≥30); พบเมนู 4 ใน 5 ในรอบ 30× สองนาที. ยังไม่ปิด: ไม่มี baseline ฉาก 80 ลูกค้า (ผังตัวอย่างมี 6 ที่นั่ง), วัด draw calls/GPU memory ไม่ได้เพราะ renderer.info ไม่ถูก expose, และยังไม่มีภาพ e2e ยืนยันคราบ/การเช็ด/ท่าถือเสิร์ฟรายข้อ — ต้องมี diagnostic hook ฝั่งแอปและผัง fixture ขนาดใหญ่ ดูรายละเอียดและ defect 3 ข้อใน summary.md"
     }
   ]
 }

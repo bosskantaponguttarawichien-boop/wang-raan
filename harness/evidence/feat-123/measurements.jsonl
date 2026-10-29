@@ -1,0 +1,18 @@
+{"check":"lighting-time","time":"morning","iso":"2026-06-21T07:30:00+07:00","meanLuminance":0.9068743072572991}
+{"check":"lighting-time","time":"noon","iso":"2026-06-21T12:00:00+07:00","meanLuminance":0.9173698563720255}
+{"check":"lighting-time","time":"evening","iso":"2026-06-21T17:45:00+07:00","meanLuminance":0.8686101369006398}
+{"check":"lighting-time","time":"night","iso":"2026-06-21T21:30:00+07:00","meanLuminance":0.8203396643381737}
+{"check":"noon-vs-night","noon":0.9173703279270368,"night":0.8203391439814198}
+{"check":"rotation-luminance","levels":[0.9068748999860572,0.9242370037578327,0.8989579213912251,0.9046410883438584,0.9067628584419405]}
+{"check":"room-size","meters":2,"meanLuminance":0.906875944907081}
+{"check":"room-size","meters":30,"meanLuminance":0.9412738521916584}
+{"check":"paused-frame-drift","ratio":0,"windowSeconds":2.5}
+{"check":"stopped-frame-drift","ratio":0,"windowSeconds":2}
+{"check":"service-cycle","meanLuminance":0.9333129697436703,"models":["http://localhost:3210/assets/models/food/steak/steak.glb","http://localhost:3210/assets/models/food/steak/steak-lite.glb"]}
+{"check":"performance","frames":501,"medianMs":20,"p95Ms":20.299999999999272,"usedJSHeapMB":16.5,"canvasPixels":[944,564],"devicePixelRatio":1,"renderer":"ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Ti (0x00001C82) Direct3D11 vs_5_0 ps_5_0, D3D11)","vendor":"Google Inc. (NVIDIA)","medianFps":50,"p95Fps":49.3,"storeMetrics":"เวลาในร้าน 10:00:30 น. ลูกค้าในร้าน 1 คน นั่งที่โต๊ะ 1 / 6 ที่ รอหน้าเข้า 0 คน รออาหารเฉลี่ย — รอโต๊ะเฉลี่ย — จ่ายเงินแล้ว 0 คน","note":"ผังตัวอย่างคาเฟ่ 8×6 ม. มี 6 ที่นั่ง จึงไม่สามารถสร้างฉาก 80 ลูกค้าพร้อมกันได้"}
+{"check":"start-stop-10-rounds","canvases":1,"heapBeforeMB":15.2,"heapAfterMB":22}
+{"check":"clock-1x","storeElapsed":15,"realElapsed":15.0295,"ratio":0.9980371935194118}
+{"check":"clock-10x","ratio":9.943446647194085}
+{"check":"resume-no-catchup","ratio":0.9957349353917259}
+{"check":"visibility-no-catchup","ratio":1.1616522014044601}
+{"check":"menus-observed","loaded":["cake","noodles","salad","steak"],"expected":["fried-rice","noodles","steak","salad","cake"]}

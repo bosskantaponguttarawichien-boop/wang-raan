@@ -1621,11 +1621,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         simulating, paused: pausedRef.current, presentation,
       };
       if (modern) {
-        moveModernCharacters(delta, blend, body, staffBody);
+        // หยุดชั่วคราว = หยุดภาพทั้งหมด ไม่ใช่แค่หยุดเดิน: คลิป loop ต้องไม่ขยับต่อด้วย
+        const animationDelta = running ? delta : 0;
+        moveModernCharacters(animationDelta, running ? blend : 0, body, staffBody);
         // feature อ่านตำแหน่งที่วาดจริงของเฟรมนี้ แล้วตั้งคลิป/ถาด/เก้าอี้
         runtime.update(frameInput);
-        for (const member of staff) member.mixer.update(delta);
-        for (const customer of customers.values()) customer.mixer.update(delta);
+        for (const member of staff) member.mixer.update(animationDelta);
+        for (const customer of customers.values()) customer.mixer.update(animationDelta);
         renderer.render(scene, camera);
         if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
           frame = requestAnimationFrame(tick);
