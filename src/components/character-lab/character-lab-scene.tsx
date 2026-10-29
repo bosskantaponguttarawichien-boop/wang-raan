@@ -54,16 +54,24 @@ export function CharacterLabScene({
   facing,
   seated,
   onMotionChange,
+  clip = null,
+  onClipsAvailable,
 }: {
   role: CharacterRole;
   facing: CharacterFacing;
   seated: boolean;
   onMotionChange: (motion: CharacterMotion) => void;
+  /** ชื่อคลิปที่ขอดูวนรอบ (null = ใช้ท่าตามการเดิน/นั่งเหมือนเดิม) */
+  clip?: string | null;
+  /** ชื่อคลิปทั้งหมดที่ GLB ของบทบาทนี้มีจริง — ไม่ใช่รายการที่ hardcode ไว้ */
+  onClipsAvailable?: (names: readonly string[]) => void;
 }) {
   const hostRef = React.useRef<HTMLDivElement>(null);
   const targetRotationRef = React.useRef(FACING_RADIANS[facing]);
   const seatedRef = React.useRef(seated);
   const motionChangeRef = React.useRef(onMotionChange);
+  const clipRef = React.useRef(clip);
+  const clipsAvailableRef = React.useRef(onClipsAvailable);
   const reducedMotion = React.useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => false);
   const [noWebGL, setNoWebGL] = React.useState(false);
   const unavailable = reducedMotion || noWebGL;
@@ -80,6 +88,14 @@ export function CharacterLabScene({
   React.useEffect(() => {
     motionChangeRef.current = onMotionChange;
   }, [onMotionChange]);
+
+  React.useEffect(() => {
+    clipRef.current = clip;
+  }, [clip]);
+
+  React.useEffect(() => {
+    clipsAvailableRef.current = onClipsAvailable;
+  }, [onClipsAvailable]);
 
   React.useEffect(() => {
     const host = hostRef.current;
@@ -208,6 +224,27 @@ export function CharacterLabScene({
       if (previous) next.crossFadeFrom(previous, ANIMATION_FADE_SECONDS, false);
       activeAnimation = name;
     };
+    /**
+     * ดูคลิปใดก็ได้ที่ฝังมากับ GLB แบบวนรอบ — ใช้ตรวจคลิปใหม่ของ feat-109–112
+     * one-shot ถูกเล่นวนเพื่อให้เห็นทั้งเส้น ไม่ใช่ค้างท่าสุดท้าย
+     */
+    const playBrowse = (name: string) => {
+      if (!mixer) return;
+      const clip = THREE.AnimationClip.findByName(clips, name);
+      if (!clip) return;
+      const next = mixer.clipAction(clip).reset().setEffectiveTimeScale(1).setEffectiveWeight(1);
+      next.setLoop(THREE.LoopRepeat, Infinity);
+      next.clampWhenFinished = false;
+      next.paused = false;
+      next.play();
+      const previous = activeAnimation ? mixer.existingAction(THREE.AnimationClip.findByName(clips, activeAnimation)!) : null;
+      if (previous && previous !== next) previous.stop();
+      activeAnimation = name;
+      standingUp = 0;
+    };
+    /** คลิปที่ท่าเริ่ม/จบอยู่บนเก้าอี้ จึงต้องโชว์เก้าอี้ไว้ด้วย */
+    const SEATED_CLIPS = new Set(["Sit", "Eat", "SitDown", "PushChair", "StandUp", "PullChair"]);
+
     const chooseTarget = (event: PointerEvent) => {
       const bounds = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - bounds.left) / bounds.width) * 2 - 1;
@@ -248,7 +285,9 @@ export function CharacterLabScene({
         const stride = model.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
         if (walkClip && typeof stride === "number" && stride > 0) walkSpeed = stride * CHARACTER_SCALE / walkClip.duration;
         mixer = new THREE.AnimationMixer(model);
-      play(walkTarget ? "Walk" : seatedRef.current ? "Sit" : "Idle");
+        clipsAvailableRef.current?.(clips.map((entry) => entry.name));
+        if (clipRef.current) playBrowse(clipRef.current);
+        else play(walkTarget ? "Walk" : seatedRef.current ? "Sit" : "Idle");
       },
       undefined,
       () => setFailed(true),
@@ -266,8 +305,35 @@ export function CharacterLabScene({
     renderer.domElement.addEventListener("pointerdown", chooseTarget);
     resize();
 
+    let browsing: string | null = null;
     const render = () => {
       const delta = Math.min(clock.getDelta(), MAX_ANIMATION_DELTA_SECONDS);
+      const requested = clipRef.current;
+      if (root && requested) {
+        // โหมดดูคลิป: ไม่เดิน ไม่สลับท่าเอง ให้เห็นคลิปเดียวตามที่เลือก
+        if (browsing !== requested) {
+          walkTarget = null;
+          currentSpeed = 0;
+          targetMarker.visible = false;
+          root.position.set(0, 0, SEATED_CLIPS.has(requested) ? -0.035 : 0);
+          playBrowse(requested);
+          browsing = requested;
+        }
+        chair.visible = SEATED_CLIPS.has(requested);
+        root.rotation.y += shortestAngle(root.rotation.y, targetRotationRef.current) * Math.min(1, delta * 8);
+        mixer?.update(delta);
+        renderer.render(scene, camera);
+        frame = requestAnimationFrame(render);
+        return;
+      }
+      if (root && browsing) {
+        // ออกจากโหมดดูคลิป: กลับไปท่าตามสถานะเดิม
+        browsing = null;
+        root.position.set(0, 0, seatedRef.current ? -0.035 : 0);
+        activeAnimation = "";
+        play(seatedRef.current ? "Sit" : "Idle");
+        setMotion(seatedRef.current ? "seated" : "idle");
+      }
       if (root) {
         if (seatedRef.current && motion !== "seated") {
           walkTarget = null;

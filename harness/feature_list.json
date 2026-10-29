@@ -2353,7 +2353,7 @@
     {
       "id": "feat-122",
       "name": "Integration: รวมวงจรอาหาร พนักงาน ลูกค้า เก้าอี้ และแสงทุกมุมมอง",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-115",
         "feat-116",
@@ -2412,7 +2412,8 @@
         "แก้generatorกลางแล้วexportทับassetที่ตรวจแล้ว"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-122/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-122/ (summary.md, browser-flow.json, browser-*.jpg/png, unit-tests.log, full-suite.log); เสียบ 5 feature เข้า scene runtime พร้อม typed ports ข้ามสาย, แก้ delta ที่ทิ้งเวลาที่ fps ต่ำ (frame-clock), เลิกใช้ nearest chair มาใช้ chairId จริงจากสาย seating, ชดเชยระยะเอื้อมจานที่จุดเดียวไม่เกิน 0.10 ม.; fallback 2D วาดจาน/คราบ/การเช็ดจาก snapshot; CharacterLab เลือกดูทุกคลิปใน GLB ได้; เอกสาร PRD/architecture/design-system/SKILL sync แล้ว; browser จริงบน GTX 1050 Ti (hardware WebGL): เห็นนั่ง-กิน-จานบนโต๊ะ, console error 0, canvas 1, ไม่มี horizontal overflow, pause หยุด pixel จริง, stop คืนเก้าอี้เข้าโต๊ะ; npm test 109 files/1,283 tests, lint 0 error, typecheck, validate_harness, boundary scan ผ่าน"
     },
     {
       "id": "feat-123",

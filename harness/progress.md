@@ -3,6 +3,21 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-122 — Integration: รวมวงจรอาหาร พนักงาน ลูกค้า เก้าอี้ และแสงทุกมุมมอง
+
+- **เสียบ 5 feature เข้าฉากจริง**: `runtime/scene-features.ts` เป็นจุดเดียวที่ประกอบ `table-service` / `staff-actions` / `customer-actions` / `seating` / `lighting` และเดินสายข้ามสายผ่าน typed port เท่านั้น (staff→table-service, customer→table-service+seating, seating→`CustomerPosePort`); ช่อง `food` ยังเป็น no-op โดยตั้งใจ เพราะแคตตาล็อกอาหารเป็นข้อมูลที่ table-service เป็นผู้วาด
+- **สองเส้นทางชัดเจน**: `modern = simulating && presentation !== undefined` — มี metadata ให้ feature เป็นเจ้าของคลิป/ถาด/เก้าอี้ทั้งหมด, ไม่มี metadata เดินเส้นทางเดิมทั้งเส้นโดยไม่เดาสถานะอาหาร/คราบ/ที่นั่ง
+- **ลำดับในหนึ่งเฟรม**: ย้ายตัวละคร → `runtime.update()` (feature อ่านความเร็วที่วาดจริงแล้วตั้ง action) → `mixer.update(delta)` ครั้งเดียวต่อ rig; feature ไม่เดินเวลา mixer เอง จึงไม่มีเวลาเดินซ้อน
+- **แก้ delta ที่ทิ้งเวลาที่ fps ต่ำ**: `runtime/frame-clock.ts` ยัง clamp ที่ 0.1 วิ/เฟรม แต่เก็บส่วนเกินเป็นหนี้แล้วคืนไม่เกิน 40% ของ delta เฟรมถัดไป เครื่อง 15 fps จึงไม่ค่อย ๆ ล้าหลังนาฬิกาจำลอง; กระตุกเกิน 0.5 วิ ถูกทิ้งไม่เล่นย้อน และ pause ล้างหนี้ทิ้ง
+- **เลิกใช้เก้าอี้ที่ใกล้ที่สุด**: ลูกค้าที่นั่งถูกวางจาก `getBodyPlacements()` ของสาย seating ซึ่งผูกกับ `chairId` ที่ engine จัดสรรจริง ตามที่สัญญา v1 §1 ห้ามไว้
+- **ชดเชยระยะเอื้อมจานที่จุดเดียว**: `plateForwardCorrection` ของ 118 ถูกบวกกับ `outwardOffset` ของ 119 ที่เดียว และจำกัดไม่เกิน 0.10 ม. (เท่าระยะเก้าอี้สอดใต้โต๊ะ) สองค่าจึงไม่หักล้างกัน
+- **แสงจริงรับไฟเดิมของฉาก**: ส่ง `existingLights` ให้ feature แสง และถอด `fitKeyLight` เดิมออกเพราะ shadow camera เป็นของ feature แล้ว — ไม่มีไฟสองชุดหรือ fit สองที่แย่งกัน
+- **Fallback 2D เห็นวงจรครบ**: `tableBadges()` ใน `iso-simulation-overlay.tsx` วาดจาน คราบ และจังหวะเช็ดจาก snapshot เดียวกัน คราบจางตาม `wipeProgress` แต่ยังเหลือจนงานเช็ดเสร็จจริง
+- **CharacterLab**: เลือกดูคลิปใดก็ได้ที่ฝังมากับ GLB แบบวนรอบ (อ่านรายชื่อจากไฟล์จริง ไม่ hardcode) พร้อมโชว์เก้าอี้ให้คลิปที่เป็นท่านั่ง
+- **Browser จริง** (Chrome บน NVIDIA GTX 1050 Ti ผ่าน ANGLE/D3D11 = hardware WebGL ไม่ใช่ software): เปิด 3D ระหว่างจำลอง เห็นลูกค้านั่งกินพร้อมจานบนโต๊ะ (`steak-lite.glb` 200) และพนักงานรับออร์เดอร์; console error 0, canvas WebGL 1 ตัว, ไม่มี horizontal overflow, pause แล้ว pixel ไม่เปลี่ยนเลย 1.2 วิ, stop แล้วเก้าอี้กลับเข้าโต๊ะไม่เหลือจาน/คราบ
+- **เอกสาร**: sync `architecture.md` (§5.3.1–5.3.3 scene feature registry, frame clock, fallback 2D), `PRD.md` §4.1 (สถานะจำลองไม่ใช่ข้อมูลผัง), `SKILL.md` กฎข้อ 10–12, `design-system.md` §2.4.1 — และเพิ่ม 3 token ใน `app/globals.css` เพราะ `design-tokens.test.ts` บังคับว่าสีในตารางต้องมีใน CSS
+- **Verify**: `npm test` 109 files / 1,283 tests ผ่าน · lint 0 error · typecheck ผ่าน · `validate_harness.py` ผ่าน · boundary scan ผ่าน · หลักฐาน `harness/evidence/feat-122/`
+
 ## [2026-10-29] feat-119 — Seating runtime: มือดึงเก้าอี้และเลื่อนนั่งลุกตามพื้นที่จริง
 
 - **แก้ปัญหามือหลุดจากพนักพิง**: คลิป PullChair ตรึงมือไว้เฉพาะ `gripWindow [0.22, 0.46]` ซึ่งเก้าอี้เคลื่อนได้แค่ 0.16 ม. แต่ `CHAIR_PULL` ของฉากคือ 0.30 ม. — เลื่อนเก้าอี้ด้วยนาฬิกาแยกแบบ machine เดิมจะทำให้เก้าอี้เคลื่อนต่ออีก 0.14 ม. หลังมือปล่อยแล้ว จึงผูกระยะเก้าอี้กับ normalized time ของคลิป (`pullChairTravel`): นิ่งก่อน `pullGrip` → เคลื่อนพอดี 0.16 ม. ระหว่าง gripWindow → ที่เหลือหลังปล่อยมือ มี test ยืนยันทั้งสามช่วงและว่าระยะไม่ถอยหลัง

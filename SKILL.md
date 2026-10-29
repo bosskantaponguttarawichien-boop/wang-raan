@@ -36,6 +36,17 @@ description: ใช้เมื่อทำงานกับโปรเจก�
 8. **Dual-Tier Validation:** เขียนลอจิกการตรวจผังทั้ง 4 ด้านเป็น Pure TypeScript ใน `src/core/validation/` เพื่อให้สามารถรันบน Client (Instant Feedback 0ms) และรันซ้ำที่ BFF Route Handler ก่อนบันทึกลงฐานข้อมูลได้
 9. **Accessibility & Reduced Motion:** ทุกคอมโพเนนต์ต้องรองรับคีย์บอร์ด (Tab + Focus Ring), มี `aria-label` ภาษาไทย และปิดแอนิเมชันทั้งหมดเมื่อเปิด `prefers-reduced-motion` หรือสั่งพิมพ์ (`@media print`)
 
+10. **ภาพขณะจำลองเป็น presentation state ล้วน ๆ:** จาน คราบ ตำแหน่งเก้าอี้ขณะเลื่อน และท่าตัวละคร
+    ห้ามเขียนลง `StoreLayout` หรือเข้า Undo/Redo และห้ามเปลี่ยนผลวิเคราะห์ของ engine เพื่อให้ภาพดูเข้าท่า
+    — โต๊ะว่างเมื่อ engine บอกว่าว่าง ไม่ใช่เมื่อคลิปเช็ดเล่นจบ
+11. **เวลาแอนิเมชันเป็นของ simulation ไม่ใช่ของ mixer:** คลิปที่เล่นครั้งเดียวต้องกำหนดตำแหน่งจาก
+    เวลาจำลอง (`action.paused = true` แล้วเขียน `action.time`) และอ่าน marker เป็น normalized time
+    จาก `userData.animationMarkers` ห้ามพึ่ง event `finished` ของ `AnimationMixer`
+    ห้ามเร่งเวลาไล่ข้อมูลที่ 1× และ `prefers-reduced-motion` ต้องยังเห็นสถานะที่เปลี่ยนไปโดยไม่มีการเคลื่อนไหวต่อเนื่อง
+12. **หนึ่ง bone channel มีเจ้าของเดียว:** ห้าม blend คลิปที่แย่งสะโพก/ขากัน (CarryWalk กับ Walk,
+    Eat กับ Sit) ให้สลับคลิปตรง ๆ และ feature ของสาย 3D ห้าม import implementation ของสายอื่น
+    ให้ผ่าน typed port ใน `contracts.ts` ของสายนั้นเท่านั้น
+
 > **ข้อยกเว้นมุมมอง 3D (feat-070):** ใช้ Three.js/WebGL ได้เฉพาะ Presentation Tier ของมุมมอง 3D เพื่อแสดง GLB ที่ trusted และ lazy-loaded เท่านั้น; 2D Artboard, `src/core/validation/`, BFF และ Web Worker ต้องไม่มี Three.js/WebGL/DOM. ต้องมี SVG fallback เมื่อ WebGL ใช้ไม่ได้และต้องหยุด animation เมื่อ reduced motion.
 
 ---

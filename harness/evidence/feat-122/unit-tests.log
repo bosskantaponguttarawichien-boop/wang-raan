@@ -1,0 +1,12 @@
+
+ RUN  v5.0.3 C:/Users/boss_/Documents/GitHub/wang-raan
+
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+Not implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package
+
+ Test Files  6 passed (6)
+      Tests  69 passed (69)
+   Start at  12:18:37
+   Duration  9.07s (tests 64%, setup 12%, environment 10%, transform 10%, import 4%)
+

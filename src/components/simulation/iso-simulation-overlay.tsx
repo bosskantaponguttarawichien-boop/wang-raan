@@ -10,6 +10,7 @@
  */
 import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
+import type { PresentationSnapshot, TableSurface } from "@/core/simulation/presentation-contract";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
 import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
@@ -71,6 +72,55 @@ export function seatedFacing(layout: StoreLayout, mx: number, my: number, previo
   if (!best) return previous;
   const f = directionVector(best.rotation as Parameters<typeof directionVector>[0]);
   return facingFrom(f.x, f.y, previous);
+}
+
+/** สีจาน/คราบบนโต๊ะใน fallback 2D — โทนเดียวกับ design-system (น้ำเงิน/ส้มอุ่น) */
+const DISH_FILL = "#f4f6fb";
+const DISH_EDGE = "#8f9bb3";
+const STAIN_FILL = "#b58150";
+
+/** สถานะโต๊ะที่ fallback 2D ต้องวาดให้เห็นวงจรบริการครบ โดยไม่ต้องมี WebGL */
+export interface IsoTableBadge {
+  tableId: string;
+  /** จุดกลางโต๊ะในพิกัดผัง (เมตร) */
+  mx: number;
+  my: number;
+  dishCount: number;
+  surface: TableSurface;
+  /** 0–1 ความเข้มคราบที่ยังเหลือหลังหักความคืบหน้าการเช็ด */
+  stain: number;
+  wiping: boolean;
+}
+
+/**
+ * แปลง snapshot เป็นสิ่งที่ fallback 2D ต้องวาด: จำนวนจานบนโต๊ะ สถานะผิวโต๊ะ และคราบที่เหลือ
+ * ใช้เฉพาะข้อมูลที่ producer ส่งมา ไม่เดาสถานะเอง และผังที่ไม่มีโต๊ะนั้นถูกข้าม
+ */
+export function tableBadges(
+  presentation: PresentationSnapshot | undefined,
+  layout: StoreLayout,
+): IsoTableBadge[] {
+  if (!presentation) return [];
+  const centers = new Map<string, { x: number; y: number }>();
+  for (const object of layout.objects) {
+    if (object.type !== "table") continue;
+    const rect = footprint(object);
+    centers.set(object.id, { x: rect.x + rect.width / 2, y: rect.y + rect.depth / 2 });
+  }
+  const badges: IsoTableBadge[] = [];
+  for (const table of presentation.tables) {
+    const center = centers.get(table.tableId);
+    if (!center) continue;
+    // คราบยังเหลือจนงานเช็ดเสร็จจริง — wipeProgress ลดความเข้มได้แต่ไม่ลบทิ้ง
+    const stain = Math.max(0, Math.min(1, table.stainAmount)) * (1 - Math.max(0, Math.min(1, table.wipeProgress)));
+    badges.push({
+      tableId: table.tableId, mx: center.x, my: center.y,
+      dishCount: table.mealIds.length, surface: table.surface,
+      stain: Number(stain.toFixed(4)),
+      wiping: table.surface === "wiping",
+    });
+  }
+  return badges;
 }
 
 /** สถานะต่อคนที่ต้องจำข้ามเฟรม: ตำแหน่งล่าสุด ทิศที่หัน และจังหวะก้าว */
@@ -162,6 +212,39 @@ export function IsoSimulationOverlay({
         const p = rotation ? pointToView({ x, y }, plan, rotation) : { x, y };
         withIds.push([-(i + 1), p.x, p.y, state]);
       });
+      // วงจรบริการใน fallback 2D: จาน → คราบ → เช็ด วาดก่อนคน เพื่อให้คนที่นั่งทับจานได้
+      for (const badge of tableBadges(current.presentation, layoutRef.current)) {
+        const p = rotation ? pointToView({ x: badge.mx, y: badge.my }, plan, rotation) : { x: badge.mx, y: badge.my };
+        const [cx, cy] = projectPoint(p.x, p.y, 0, scene.scale);
+        if (badge.stain > 0.01) {
+          ctx.globalAlpha = 0.18 + 0.5 * badge.stain;
+          ctx.fillStyle = STAIN_FILL;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy - 1.5 * size, 7 * size, 3.6 * size, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        for (let index = 0; index < Math.min(badge.dishCount, 4); index += 1) {
+          const angle = (index / Math.max(1, Math.min(badge.dishCount, 4))) * Math.PI * 2;
+          const dx = Math.cos(angle) * 5.5 * size;
+          const dy = Math.sin(angle) * 2.9 * size;
+          ctx.beginPath();
+          ctx.ellipse(cx + dx, cy - 2.4 * size + dy, 3.1 * size, 1.6 * size, 0, 0, Math.PI * 2);
+          ctx.fillStyle = DISH_FILL;
+          ctx.fill();
+          ctx.lineWidth = 0.5 * size;
+          ctx.strokeStyle = DISH_EDGE;
+          ctx.stroke();
+        }
+        if (badge.wiping) {
+          ctx.lineWidth = 1.4 * size;
+          ctx.strokeStyle = STAFF_COLOR;
+          ctx.beginPath();
+          ctx.moveTo(cx - 6 * size, cy - 2 * size);
+          ctx.lineTo(cx + 6 * size, cy - 2 * size);
+          ctx.stroke();
+        }
+      }
       const door = doorFrame(layoutRef.current);
       const doorView = door ? (rotation ? pointToView(door.center, plan, rotation) : door.center) : null;
       const seen = new Set<number>();

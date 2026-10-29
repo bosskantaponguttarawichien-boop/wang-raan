@@ -33,9 +33,14 @@ import {
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
 import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
-import { createLegacyLighting, fitKeyLight } from "./runtime/legacy-lighting";
+import { createLegacyLighting } from "./runtime/legacy-lighting";
 import { createLegacyServingProps } from "./runtime/legacy-serving-props";
 import { createSceneRuntime, type SceneRuntime } from "./runtime/scene-runtime";
+import { FrameClock } from "./runtime/frame-clock";
+import { createSceneFeatureFactories, type SceneFeatureHandles } from "./runtime/scene-features";
+import type { StaffRig } from "./staff-actions/contracts";
+import type { CustomerRig } from "./customer-actions/contracts";
+import type { ChairRig as SeatingChairRig } from "./seating/contracts";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { simulationStore } from "@/store/use-simulation-store";
 import { OUTSIDE_DISTANCE, doorFrame } from "@/components/simulation/walk-pacer";
@@ -54,6 +59,11 @@ export interface ThreeViewProps {
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
 /** ระยะเลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ — ติดลบ = ถอยข้อสะโพกไปหลังกลางเบาะ ให้หลังชิดพนักพิง (ไม่จม) */
 const SEATED_FRONT_OFFSET = -0.04;
+/**
+ * เลื่อนตัวที่นั่งเข้าหาโต๊ะได้มากสุดเท่านี้ (ม.) เพื่อให้คลิป Eat เอื้อมถึงจานจริง
+ * เท่ากับระยะที่เก้าอี้สอดใต้โต๊ะได้ (CLEARANCE.chairTuckMax) จึงไม่ดันตัวทะลุขอบโต๊ะ
+ */
+const MAX_SEAT_REACH_SHIFT = 0.1;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
@@ -151,6 +161,8 @@ type RoomMotion = {
 };
 
 type StandingStaff = {
+  /** id ของพนักงานตาม buffer/snapshot (ไม่ใช่ลำดับใน array) */
+  staffId: number;
   mixer: THREE.AnimationMixer;
   model: THREE.Object3D;
   body: THREE.SkinnedMesh | null;
@@ -177,6 +189,10 @@ type CharacterAsset = {
   clips: THREE.AnimationClip[];
   /** ความเร็วเดินตามท่า Walk (ระยะต่อรอบ / เวลาต่อรอบ) — ใช้เดินเท้าไม่ไถลบนพื้น */
   walkSpeed: number;
+  /** ระยะที่เดินได้ต่อหนึ่งรอบคลิป Walk (ม.) หลังคูณ scale — feature ใช้ตั้ง timeScale */
+  walkCycleDistance: number;
+  /** animationMarkers ที่ฝังมากับ GLB — อ่าน marker เป็น normalized time ไม่ใช้ callback ของ mixer */
+  markers: Record<string, { name: string; time: number }[]>;
 };
 
 /**
@@ -219,6 +235,7 @@ function attachShadowProxy(body: THREE.SkinnedMesh, liteGeometry: THREE.BufferGe
 
 const characterAsset = (urls: { full: string; lite: string }): CharacterAsset => ({
   urls, template: null, liteBody: null, fullBody: null, fullScene: null, fullRequested: false, clips: [], walkSpeed: 0.44,
+  walkCycleDistance: 0.9 * CHARACTER_SCALE, markers: {},
 });
 
 /** พนักงานเคลื่อนเร็วกว่านี้ (ม./วิ) เล่นท่าเดิน ไม่งั้นเล่นท่าทำงาน (รับออร์เดอร์/เก็บโต๊ะ/ที่เคาน์เตอร์) */
@@ -1114,6 +1131,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const { key } = lighting;
 
     const clock = new THREE.Clock(false);
+    const frameClock = new FrameClock();
     const customers = new Map<number, AnimatedCustomer>();
     /** เก้าอี้ของผังปัจจุบันตาม id — สร้างใหม่ทุกครั้งที่เปลี่ยนชุดเฟอร์นิเจอร์ */
     let chairRigs = new Map<string, ChairRig>();
@@ -1219,8 +1237,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         }
         asset.clips = gltf.animations;
         const walkClip = THREE.AnimationClip.findByName(asset.clips, "Walk");
-        const stride = gltf.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
+        const mannequin = gltf.scene.getObjectByName("CafeMannequin");
+        const stride = mannequin?.userData.walkCycleDistance;
+        if (typeof stride === "number" && stride > 0) asset.walkCycleDistance = stride * CUSTOMER_SCALE;
         if (walkClip && typeof stride === "number" && stride > 0) asset.walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
+        // markers เป็นของ GLB ที่โหลดได้จริง ไฟล์เก่าที่ไม่มีจะได้ {} แล้ว controller ใช้ค่า fallback
+        const markers = mannequin?.userData.animationMarkers;
+        asset.markers = markers && typeof markers === "object" ? markers as CharacterAsset["markers"] : {};
         onReady();
       };
       loader.load(asset.urls.lite, (gltf) => accept(gltf, false), undefined, () => {
@@ -1282,6 +1305,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const cap = model.getObjectByName(STAFF_CAP_NAME);
       if (cap) cap.castShadow = quality.current.characterShadows;
       const member: StandingStaff = {
+        staffId: index,
         mixer, model, body: body instanceof THREE.SkinnedMesh ? body : null,
         target: null, targetRotation: rotation, animation: "Work", action, tray: null,
       };
@@ -1313,7 +1337,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     };
 
     /** ระหว่างจำลอง: พนักงานหน้าร้านตามจำนวนที่ตั้งไว้ เดินรับออร์เดอร์ เสิร์ฟ เก็บโต๊ะตาม simulation */
-    const syncSimStaff = () => {
+    const syncSimStaff = (modern: boolean) => {
       const current = controller.current;
       if (!current) return;
       if (!staffAsset.template) {
@@ -1328,6 +1352,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         removeStaff();
         for (let i = 0; i < count; i++) {
           const member = addStaffMember(frame[i * STAFF_STRIDE + 1]!, frame[i * STAFF_STRIDE + 2]!, 0, i);
+          // Snapshot และ buffer ใช้ id ตัวแรกของแต่ละ stride ไม่ใช่ลำดับใน array
+          member.staffId = frame[i * STAFF_STRIDE]!;
           member.target = member.model.position.clone();
           const tray = createTray();
           member.model.add(tray);
@@ -1358,13 +1384,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           if (Math.hypot(spot.position.x - x, spot.position.y - z) < 0.05) member.targetRotation = Math.atan2(spot.facing.x, spot.facing.y);
         }
         target.set(x, 0, z);
-        if (member.tray) member.tray.visible = code === STAFF_STATE_CODE.serving;
+        // staff-actions เป็นเจ้าของถาดและคลิปเมื่อมี metadata จึงไม่สลับทับกัน
+        if (member.tray && !modern) member.tray.visible = code === STAFF_STATE_CODE.serving;
         // อยู่ในครัว (หลังผนัง) — ไม่ต้องวาดจนกว่าจะเดินออกมา
         member.model.visible = code !== STAFF_KITCHEN_CODE;
       });
     };
 
-    const syncCustomers = () => {
+    const syncCustomers = (modern: boolean) => {
       const current = controller.current;
       if (!customerAsset.template || !current) return;
       const liveIds = new Set<number>();
@@ -1377,7 +1404,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const z = agents[offset + 2]!;
         const state = agents[offset + 3]!;
         const animation = animationFor(state);
-        const seatedChair = state === AGENT_STATE_SEATED
+        // โหมดใหม่: เก้าอี้ของแต่ละคนมาจาก party.chairIds ผ่านสาย seating ไม่ใช่เก้าอี้ที่ใกล้ที่สุด
+        const seatedChair = !modern && state === AGENT_STATE_SEATED
           ? chairs.reduce<(typeof chairs)[number] | null>((nearest, chair) => {
               const center = objectCenter(chair);
               const currentDistance = (center.x - x) ** 2 + (center.y - z) ** 2;
@@ -1416,7 +1444,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
             idleOffset: (id * 1.37) % 6,
             seat: null,
           };
-          playClip(customer, animation);
+          if (!modern) playClip(customer, animation);
           customers.set(id, customer);
         }
         const dx = targetX - customer.target.x;
@@ -1430,7 +1458,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         customer.target.set(targetX, 0, targetZ);
         // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
         const standing = animation === "Walk" && customer.animation === "Idle";
-        if (animation !== customer.animation && !standing) {
+        // โหมดใหม่: customer-actions/seating เป็นเจ้าของคลิปและจังหวะเก้าอี้ทั้งหมด
+        if (!modern && animation !== customer.animation && !standing) {
           const rig = animation === "Sit" && seatedChair ? chairRigs.get(seatedChair.id) : undefined;
           if (customer.seat) {
             // ลุก: เลื่อนเก้าอี้ออกก่อน (ท่าลุกเริ่มใน stepSeat) — ยังไม่ทันนั่งก็เดินต่อได้เลย
@@ -1482,6 +1511,47 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
     };
 
+    /**
+     * โหมดใหม่: ขยับตำแหน่ง/ทิศของทุกตัวก่อนที่ feature จะอ่าน แล้ว feature จึงตั้งคลิปเองทั้งหมด
+     * - พนักงานและลูกค้าที่ยังเดินใช้เป้าหมายจาก pacer ของ feat-115 เหมือนเดิม
+     * - ลูกค้าที่นั่งใช้ตำแหน่งจากสาย seating (เก้าอี้จริงของคนนั้น) ไม่ใช่เก้าอี้ที่ใกล้ที่สุด
+     */
+    const moveModernCharacters = (
+      delta: number,
+      blend: number,
+      body: THREE.BufferGeometry | null,
+      staffBody: THREE.BufferGeometry | null,
+    ) => {
+      const turnTowards = (object: THREE.Object3D, target: number) => {
+        const turn = target - object.rotation.y;
+        object.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+      };
+      for (const member of staff) {
+        if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
+        if (!member.target) continue;
+        member.model.position.lerp(member.target, blend);
+        turnTowards(member.model, member.targetRotation);
+      }
+      const seats = new Map((features.seating?.getBodyPlacements() ?? []).map((seat) => [seat.renderAgentId, seat]));
+      const eating = new Map((features.customerActions?.getReports() ?? []).map((report) => [report.renderAgentId, report]));
+      for (const [id, customer] of customers) {
+        if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
+        const seat = seats.get(id);
+        const rig = seat ? chairRigs.get(seat.chairId) : undefined;
+        if (!seat || !rig) {
+          customer.model.position.lerp(customer.target, blend);
+          turnTowards(customer.model, customer.targetRotation);
+          continue;
+        }
+        // สะโพกถอยชิดพนักพิงเมื่อนั่งแล้ว และขยับเข้าหาโต๊ะเท่าที่คลิป Eat ต้องการ (ไม่เกินระยะที่เก้าอี้สอดใต้โต๊ะ)
+        const report = eating.get(id);
+        const reach = report?.eating ? Math.min(Math.max(report.plateForwardCorrection, 0), MAX_SEAT_REACH_SHIFT) : 0;
+        const along = seat.outwardOffset - (seat.seated ? SEATED_FRONT_OFFSET : 0) - reach;
+        customer.model.position.copy(rig.home).addScaledVector(rig.out, along);
+        turnTowards(customer.model, Math.atan2(seat.facing.x, seat.facing.y));
+      }
+    };
+
     /** ลูกค้าหลายสิบตัว × 2 รอบ (ภาพ + เงา) — ตอนตัวเล็กบนจอใช้ผิวรุ่นเบา ซูมเข้าใกล้ค่อยใช้รุ่นละเอียด */
     const wantsLiteBody = () => {
       const pixelsPerMeter = (renderer.domElement.clientHeight * camera.zoom) / (camera.top - camera.bottom);
@@ -1529,16 +1599,42 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       } else quality.reset();
       lastRenderAt = now;
       const realDelta = clock.getDelta();
-      const delta = Math.min(realDelta, MAX_FRAME_DELTA);
+      // เฟรมช้าไม่ทิ้งเวลา: ส่วนที่เกินเพดานถูกเก็บเป็นหนี้แล้วทยอยคืน (runtime/frame-clock.ts)
+      const step = frameClock.step(realDelta, running);
+      const delta = running ? step.seconds : Math.min(realDelta, MAX_FRAME_DELTA);
       const cameraAnimating = stage.updateCamera(now);
       const roomAnimating = stage.updateRoomTransition(now);
+      const modernFrame = simulating && controller.current?.presentation !== undefined;
       if (simulating) {
-        syncCustomers();
-        syncSimStaff();
+        syncCustomers(modernFrame);
+        syncSimStaff(modernFrame);
       }
       const blend = Math.min(1, delta * 14);
       const body = bodyForZoom(customerAsset);
       const staffBody = staff.length > 0 ? bodyForZoom(staffAsset) : null;
+      const presentation = simulating ? controller.current?.presentation : undefined;
+      // worker รุ่นเก่าหรือยังไม่มี metadata → เดินเส้นทางเดิมทั้งหมด ไม่เดาสถานะอาหาร/คราบ/ที่นั่ง
+      const modern = presentation !== undefined;
+      const frameInput = {
+        nowMs: now, realDeltaSeconds: running ? step.seconds : 0,
+        playbackRate: simulationStore.getState().config.speed,
+        simulating, paused: pausedRef.current, presentation,
+      };
+      if (modern) {
+        moveModernCharacters(delta, blend, body, staffBody);
+        // feature อ่านตำแหน่งที่วาดจริงของเฟรมนี้ แล้วตั้งคลิป/ถาด/เก้าอี้
+        runtime.update(frameInput);
+        for (const member of staff) member.mixer.update(delta);
+        for (const customer of customers.values()) customer.mixer.update(delta);
+        renderer.render(scene, camera);
+        if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
+          frame = requestAnimationFrame(tick);
+        } else {
+          clock.stop();
+          lastRenderAt = 0;
+        }
+        return;
+      }
       for (const member of staff) {
         if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
         if (!member.target) {
@@ -1559,11 +1655,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         );
       }
       stepChairs(delta);
-      runtime.update({
-        nowMs: now, realDeltaSeconds: running ? realDelta : 0,
-        playbackRate: simulationStore.getState().config.speed,
-        simulating, paused: pausedRef.current,
-      });
+      runtime.update(frameInput);
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         if (customer.seat) {
@@ -1725,13 +1817,49 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       };
       invalidate();
     };
+    /**
+     * พอร์ตที่ host ส่งให้ feature: feature อ่าน rig แล้วคุมคลิป/ถาด/เก้าอี้ แต่ตำแหน่งตัวละคร
+     * ยังมาจาก pacer ของ feat-115 ที่ host เป็นเจ้าของ และ host เป็นผู้เดินเวลา mixer เอง
+     */
+    const reducedMotionActive = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    const staffRigOf = (member: StandingStaff): StaffRig => ({
+      staffId: member.staffId,
+      model: member.model,
+      mixer: member.mixer,
+      clips: staffAsset.clips,
+      markers: staffAsset.markers,
+      walkCycleDistance: staffAsset.walkCycleDistance,
+      tray: member.tray,
+      getObject: (name: string) => member.model.getObjectByName(name) ?? null,
+    });
+    const customerRigOf = (id: number, customer: AnimatedCustomer): CustomerRig => ({
+      renderAgentId: id,
+      model: customer.model,
+      mixer: customer.mixer,
+      clips: customerAsset.clips,
+      markers: customerAsset.markers,
+      walkCycleDistance: customerAsset.walkCycleDistance,
+      modelScale: CUSTOMER_SCALE,
+      getObject: (name: string) => customer.model.getObjectByName(name) ?? null,
+    });
+    const features: SceneFeatureHandles = createSceneFeatureFactories({
+      staffRigs: { listRigs: () => staff.map(staffRigOf) },
+      customerRigs: { listRigs: () => [...customers].map(([id, customer]) => customerRigOf(id, customer)) },
+      chairRigs: {
+        listChairs: (): readonly SeatingChairRig[] =>
+          [...chairRigs].map(([chairId, rig]) => ({ chairId, object: rig.object, home: rig.home })),
+      },
+      reducedMotion: reducedMotionActive,
+      // แสงจริงรับไฟเดิมของฉากไปใช้ ไม่สร้างดวงที่สองทับ
+      lighting: { existingLights: { sunLight: lighting.key, skyGroundLight: lighting.ambient } },
+    });
     const runtime = createSceneRuntime({
       scene, camera,
       getLayout: () => stageRef.current?.layout ?? null,
       getQuality: () => quality.current,
       invalidate,
       invalidateShadows: () => { renderer.shadowMap.needsUpdate = true; invalidate(); },
-    });
+    }, features.factories);
     const stage: Stage = {
       renderer,
       runtime,
@@ -1807,10 +1935,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       stage.animateRoom(viewRotation);
     }
     // การหมุนมุมมองไม่ใช่การเปลี่ยนขนาดร้าน จึงไม่แตะตำแหน่งไฟหรือ shadow camera
-    if (layoutSizeChanged) {
-      fitKeyLight(stage.key, layout);
-      stage.resize();
-    } else if (viewChanged) stage.animateCamera();
+    // ตำแหน่งแดดและ shadow camera เป็นของ feature แสง (feat-121) ซึ่ง fit เองใน syncLayout
+    if (layoutSizeChanged) stage.resize();
+    else if (viewChanged) stage.animateCamera();
     stage.invalidate();
   }, [layout, viewRotation]);
 
