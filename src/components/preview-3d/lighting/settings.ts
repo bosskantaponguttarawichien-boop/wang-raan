@@ -6,10 +6,10 @@
  */
 import { clampLatitude, clampLongitude, normalizeSignedDegrees } from "./solar-position";
 
-export type LightingClockMode = "realtime" | "fixed";
+export type LightingClockMode = "simulation" | "fixed";
 
 export const BANGKOK_REFERENCE_DEFAULTS = {
-  mode: "realtime" as LightingClockMode,
+  mode: "simulation" as LightingClockMode,
   latitude: 13.7563,
   longitude: 100.5018,
   timezone: "Asia/Bangkok",
@@ -110,7 +110,7 @@ export function sanitizeLightingSettings(
   current: LightingSettings = BANGKOK_REFERENCE_DEFAULTS,
 ): LightingSettings {
   const mode: LightingClockMode =
-    partial.mode === "fixed" || partial.mode === "realtime" ? partial.mode : current.mode;
+    partial.mode === "fixed" || partial.mode === "simulation" ? partial.mode : current.mode;
   const latitude =
     partial.latitude !== undefined ? clampLatitude(partial.latitude) : current.latitude;
   const longitude =

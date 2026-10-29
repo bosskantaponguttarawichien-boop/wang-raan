@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IsometricScene, IsometricView } from "@/components/preview-3d/isometric-view";
 import { projectPoint } from "@/core/preview/isometric";
 import { layoutStore } from "@/store/use-layout-store";
 import { simulationStore } from "@/store/use-simulation-store";
 import { cafeLayout } from "@/test/fixtures/layouts";
 import type { PresentationSnapshot, TablePresentation } from "@/core/simulation/presentation-contract";
-import { projectAgents, seatedFacing, tableBadges } from "./iso-simulation-overlay";
+import { projectAgents, seatedFacing, tableBadges, drawThoughtBubble } from "./iso-simulation-overlay";
 
 afterEach(() => {
   cleanup();
@@ -116,5 +116,30 @@ describe("fallback 2D แสดงวงจรบริการจาก snapsh
 
   it("ข้ามโต๊ะที่ไม่อยู่ในผังที่กำลังแสดง", () => {
     expect(tableBadges(snapshotWith([tableOf("table-ที่ไม่มีจริง")], "table-ที่ไม่มีจริง"), cafeLayout())).toEqual([]);
+  });
+
+  it("drawThoughtBubble draws thought bubbles on canvas context", () => {
+    const fillText = vi.fn();
+    const fill = vi.fn();
+    const stroke = vi.fn();
+    const ctx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      rect: vi.fn(),
+      arc: vi.fn(),
+      fill,
+      stroke,
+      measureText: vi.fn(() => ({ width: 20 })),
+      fillText,
+    } as unknown as CanvasRenderingContext2D;
+
+    drawThoughtBubble(ctx, 100, 100, { kind: "food-critical", waitSeconds: 900, severity: "critical" }, 1);
+    expect(fillText).toHaveBeenCalled();
+    expect(String(fillText.mock.calls[0]?.[0])).toContain("😤");
+    expect(String(fillText.mock.calls[0]?.[0])).toContain("15น.!");
   });
 });

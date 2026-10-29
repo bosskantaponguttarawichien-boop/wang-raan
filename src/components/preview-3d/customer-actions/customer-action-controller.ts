@@ -224,3 +224,8 @@ export function plateReach(forward: number | null): { correction: number; outOfR
   const correction = Number((forward - EAT_PLATE_FORWARD).toFixed(4));
   return { correction, outOfReach: Math.abs(correction) > EAT_REACH_TOLERANCE };
 }
+
+/** The measured correction is relative to the current body, not its original seat. */
+export function nextSeatReachShift(current: number, correction: number, limit: number): number {
+  return Math.min(limit, Math.max(0, current + correction));
+}

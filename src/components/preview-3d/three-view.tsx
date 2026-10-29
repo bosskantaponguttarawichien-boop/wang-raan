@@ -36,6 +36,7 @@ import { createCharacterLoader } from "./character-loader";
 import { createLegacyLighting } from "./runtime/legacy-lighting";
 import { createLegacyServingProps } from "./runtime/legacy-serving-props";
 import { createSceneRuntime, type SceneRuntime } from "./runtime/scene-runtime";
+import { createThoughtOverlayManager } from "./thought-overlay";
 import { FrameClock } from "./runtime/frame-clock";
 import { createSceneFeatureFactories, type SceneFeatureHandles } from "./runtime/scene-features";
 import { installSceneDiagnostics, readRendererCounters, type SceneFrameInfo } from "./runtime/scene-diagnostics";
@@ -45,6 +46,7 @@ import type { ChairRig as SeatingChairRig } from "./seating/contracts";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { simulationStore } from "@/store/use-simulation-store";
 import { OUTSIDE_DISTANCE, doorFrame } from "@/components/simulation/walk-pacer";
+import { nextSeatReachShift } from "./customer-actions/customer-action-controller";
 
 export interface ThreeViewProps {
   layout: StoreLayout;
@@ -1094,6 +1096,7 @@ const animationFor = (state: number): CustomerAnimation => (state === AGENT_STAT
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
 export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = false, onUnavailable }: ThreeViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
+  const overlayRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Stage | null>(null);
   // อ่านค่าล่าสุดใน render loop โดยไม่ต้องสร้าง renderer ใหม่เมื่อค่าเปลี่ยน
   const zoomRef = React.useRef(zoom);
@@ -1133,7 +1136,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
 
     const clock = new THREE.Clock(false);
     const frameClock = new FrameClock();
+    const thoughtOverlay = overlayRef.current ? createThoughtOverlayManager(overlayRef.current) : null;
     const customers = new Map<number, AnimatedCustomer>();
+    const seatReachShifts = new Map<number, number>();
     /** เก้าอี้ของผังปัจจุบันตาม id — สร้างใหม่ทุกครั้งที่เปลี่ยนชุดเฟอร์นิเจอร์ */
     let chairRigs = new Map<string, ChairRig>();
     const collectChairRigs = (furniture: THREE.Group) => {
@@ -1209,6 +1214,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       // วัสดุสีเฉพาะตัว (customerMaterial) — geometry ใช้ร่วมกับ template จึงไม่คืนที่นี่
       if (customer.body && customer.body.material !== templateMaterial) (customer.body.material as THREE.Material).dispose();
       customers.delete(id);
+      seatReachShifts.delete(id);
     };
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
@@ -1359,6 +1365,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           const tray = createTray();
           member.model.add(tray);
           member.tray = tray;
+          if (modern) {
+            member.action?.stop();
+            member.action = null;
+          }
         }
       }
       const tables = layout?.objects.filter((o) => o.type === "table") ?? [];
@@ -1540,13 +1550,17 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const seat = seats.get(id);
         const rig = seat ? chairRigs.get(seat.chairId) : undefined;
         if (!seat || !rig) {
+          seatReachShifts.delete(id);
           customer.model.position.lerp(customer.target, blend);
           turnTowards(customer.model, customer.targetRotation);
           continue;
         }
         // สะโพกถอยชิดพนักพิงเมื่อนั่งแล้ว และขยับเข้าหาโต๊ะเท่าที่คลิป Eat ต้องการ (ไม่เกินระยะที่เก้าอี้สอดใต้โต๊ะ)
         const report = eating.get(id);
-        const reach = report?.eating ? Math.min(Math.max(report.plateForwardCorrection, 0), MAX_SEAT_REACH_SHIFT) : 0;
+        const reach = report?.eating
+          ? nextSeatReachShift(seatReachShifts.get(id) ?? 0, report.plateForwardCorrection, MAX_SEAT_REACH_SHIFT)
+          : 0;
+        seatReachShifts.set(id, reach);
         const along = seat.outwardOffset - (seat.seated ? SEATED_FRONT_OFFSET : 0) - reach;
         customer.model.position.copy(rig.home).addScaledVector(rig.out, along);
         turnTowards(customer.model, Math.atan2(seat.facing.x, seat.facing.y));
@@ -1638,6 +1652,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         for (const member of staff) member.mixer.update(animationDelta);
         for (const customer of customers.values()) customer.mixer.update(animationDelta);
         renderer.render(scene, camera);
+        const showThoughts = simulationStore.getState().showThoughts;
+        thoughtOverlay?.update(presentation, camera, renderer, customers, staff, showThoughts);
         if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
           frame = requestAnimationFrame(tick);
         } else {
@@ -1833,26 +1849,42 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
      * ยังมาจาก pacer ของ feat-115 ที่ host เป็นเจ้าของ และ host เป็นผู้เดินเวลา mixer เอง
      */
     const reducedMotionActive = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
-    const staffRigOf = (member: StandingStaff): StaffRig => ({
-      staffId: member.staffId,
-      model: member.model,
-      mixer: member.mixer,
-      clips: staffAsset.clips,
-      markers: staffAsset.markers,
-      walkCycleDistance: staffAsset.walkCycleDistance,
-      tray: member.tray,
-      getObject: (name: string) => member.model.getObjectByName(name) ?? null,
-    });
-    const customerRigOf = (id: number, customer: AnimatedCustomer): CustomerRig => ({
-      renderAgentId: id,
-      model: customer.model,
-      mixer: customer.mixer,
-      clips: customerAsset.clips,
-      markers: customerAsset.markers,
-      walkCycleDistance: customerAsset.walkCycleDistance,
-      modelScale: CUSTOMER_SCALE,
-      getObject: (name: string) => customer.model.getObjectByName(name) ?? null,
-    });
+    const staffRigCache = new WeakMap<StandingStaff, StaffRig>();
+    const staffRigOf = (member: StandingStaff): StaffRig => {
+      let rig = staffRigCache.get(member);
+      if (!rig || rig.staffId !== member.staffId || rig.tray !== member.tray || rig.clips !== staffAsset.clips) {
+        rig = {
+          staffId: member.staffId,
+          model: member.model,
+          mixer: member.mixer,
+          clips: staffAsset.clips,
+          markers: staffAsset.markers,
+          walkCycleDistance: staffAsset.walkCycleDistance,
+          tray: member.tray,
+          getObject: (name: string) => member.model.getObjectByName(name) ?? null,
+        };
+        staffRigCache.set(member, rig);
+      }
+      return rig;
+    };
+    const customerRigCache = new WeakMap<AnimatedCustomer, CustomerRig>();
+    const customerRigOf = (id: number, customer: AnimatedCustomer): CustomerRig => {
+      let rig = customerRigCache.get(customer);
+      if (!rig || rig.renderAgentId !== id || rig.clips !== customerAsset.clips) {
+        rig = {
+          renderAgentId: id,
+          model: customer.model,
+          mixer: customer.mixer,
+          clips: customerAsset.clips,
+          markers: customerAsset.markers,
+          walkCycleDistance: customerAsset.walkCycleDistance,
+          modelScale: CUSTOMER_SCALE,
+          getObject: (name: string) => customer.model.getObjectByName(name) ?? null,
+        };
+        customerRigCache.set(customer, rig);
+      }
+      return rig;
+    };
     const features: SceneFeatureHandles = createSceneFeatureFactories({
       staffRigs: { listRigs: () => staff.map(staffRigOf) },
       customerRigs: { listRigs: () => [...customers].map(([id, customer]) => customerRigOf(id, customer)) },
@@ -1939,6 +1971,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           disposeModel(asset.fullScene);
         }
         lighting.dispose();
+        thoughtOverlay?.dispose();
         renderer.dispose();
         renderer.domElement.remove();
         stageRef.current = null;
@@ -2007,6 +2040,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       data-testid="three-view"
     >
       <div ref={hostRef} className="absolute inset-0" />
+      <div
+        ref={overlayRef}
+        className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+        data-testid="character-thought-overlay"
+      />
     </figure>
   );
 }

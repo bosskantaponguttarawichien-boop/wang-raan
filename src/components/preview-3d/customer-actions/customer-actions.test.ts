@@ -128,6 +128,40 @@ describe("customer-actions feature", () => {
     expect(feature.getStats().utensilCount).toBe(0);
   });
 
+  it("attaches the utensil to the animated anchor when the rig has one", () => {
+    const hand = rig.getObject("RightHand")!;
+    const anchor = new THREE.Group();
+    anchor.name = "EatUtensilAnchor";
+    hand.add(anchor);
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));
+    expect(anchor.children.map(child => child.name)).toEqual(["CustomerUtensil-spoon"]);
+    expect(anchor.children[0]!.position.z).toBeCloseTo(0.025);
+    expect(anchor.children[0]!.position.x).toBe(0);
+    expect(anchor.children[0]!.position.y).toBe(0);
+    feature.update(frameOf(snapshot([customerOf({ activity: "finished" })], [mealOf()], 311, 1)));
+    expect(anchor.children).toHaveLength(0);
+  });
+
+  it("uses the grip shape only while eating and restores it on release", () => {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute([0, 0, 0], 3));
+    const grip = new THREE.Float32BufferAttribute([0, 0, 0], 3);
+    grip.name = "EatGrip";
+    geometry.morphAttributes.position = [grip];
+    const body = new THREE.SkinnedMesh(geometry, new THREE.MeshBasicMaterial());
+    body.name = "MannequinBody";
+    rig.model.add(body);
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));
+    expect(body.morphTargetInfluences![0]).toBe(1);
+    feature.update(frameOf(snapshot([customerOf({ activity: "finished" })], [mealOf()], 311, 1)));
+    expect(body.morphTargetInfluences![0]).toBe(0);
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 312, 2)));
+    feature.reset();
+    expect(body.morphTargetInfluences![0]).toBe(0);
+    geometry.dispose();
+    (body.material as THREE.Material).dispose();
+  });
+
   it("swaps the utensil when the menu changes and reuses one template per kind", () => {
     feature.update(frameOf(snapshot([customerOf()], [mealOf({ foodKind: "noodles" })], 310)));
     expect(rig.getObject("RightHand")!.children[0]!.name).toBe("CustomerUtensil-chopsticks");
@@ -146,6 +180,36 @@ describe("customer-actions feature", () => {
     rig.mixer.update(1.1);
     feature.update(frameOf(snapshot([customerOf()], [mealOf()], 301.6, 1)));
     expect(action.time).toBeCloseTo(expected, 6);
+  });
+
+  it("smooths bites between worker ticks and freezes the pose while paused", () => {
+    const initial = snapshot([customerOf()], [mealOf()], 310, 0);
+    feature.update(frameOf(initial));
+    const before = feature.getReports()[0]!.phase!;
+    const next = snapshot([customerOf()], [mealOf()], 310.15, 1);
+    feature.update(frameOf(next, { realDeltaSeconds: 0.05, playbackRate: 1 }));
+    const first = feature.getReports()[0]!.phase!;
+    feature.update(frameOf(next, { realDeltaSeconds: 0.05, playbackRate: 1 }));
+    const second = feature.getReports()[0]!.phase!;
+    expect((first - before + 1) % 1).toBeCloseTo(0.05 / 3.2, 6);
+    expect((second - first + 1) % 1).toBeCloseTo(0.05 / 3.2, 6);
+    feature.update(frameOf(next, { paused: true, realDeltaSeconds: 1, playbackRate: 1 }));
+    expect(feature.getReports()[0]!.phase).toBe(second);
+    feature.update(frameOf(next, { realDeltaSeconds: 0.05, playbackRate: 1 }));
+    expect((feature.getReports()[0]!.phase! - second + 1) % 1).toBeCloseTo(0.05 / 3.2, 6);
+  });
+
+  it("scales smoothing at 30× without advancing past the latest simulation time", () => {
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310, 0)));
+    const before = feature.getReports()[0]!.phase!;
+    const next = snapshot([customerOf()], [mealOf()], 311.5, 1);
+    feature.update(frameOf(next, { realDeltaSeconds: 0.01, playbackRate: 30 }));
+    const first = feature.getReports()[0]!.phase!;
+    expect((first - before + 1) % 1).toBeCloseTo(0.3 / 3.2, 6);
+    feature.update(frameOf(next, { realDeltaSeconds: 1, playbackRate: 30 }));
+    const caughtUp = feature.getReports()[0]!.phase;
+    feature.update(frameOf(next, { realDeltaSeconds: 1, playbackRate: 30 }));
+    expect(feature.getReports()[0]!.phase).toBe(caughtUp);
   });
 
   it("takes the seating pose feat-119 pushes in, and forgets it when told to", () => {
@@ -273,5 +337,19 @@ describe("customer-actions feature", () => {
     expect(new Set(phases.map(value => value.toFixed(4))).size).toBe(4);
     expect(party.getReports().every(report => report.eating)).toBe(true);
     party.dispose();
+  });
+
+  it("preserves groundSpeed across frames when listRigs returns a fresh descriptor each frame", () => {
+    const freshFeature = createCustomerActionsFeature({
+      rigs: { listRigs: () => [{ ...rig }] },
+      tableService,
+    })(context);
+    freshFeature.syncLayout(layout());
+    const walkingCustomer = customerOf({ activity: "walking", seatingPhase: "approach", mealId: null });
+    freshFeature.update(frameOf(snapshot([walkingCustomer], [], 10, 0)));
+    rig.model.position.set(0.03, 0, 0);
+    freshFeature.update(frameOf(snapshot([walkingCustomer], [], 10.02, 1)));
+    expect(freshFeature.getReports()[0]).toMatchObject({ clip: "Walk", tier: "walk" });
+    freshFeature.dispose();
   });
 });

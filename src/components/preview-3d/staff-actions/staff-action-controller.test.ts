@@ -59,6 +59,7 @@ describe("staff action priority", () => {
 
   it("walks empty-handed and carries when meals are on the tray", () => {
     expect(decide(staffMember({ activity: "walking" }), 100, { groundSpeed: 1.2 })).toMatchObject({ clip: "Walk", tier: "walk" });
+    expect(decide(staffMember({ activity: "counter" }), 100, { groundSpeed: 1.2 })).toMatchObject({ clip: "Walk", tier: "walk" });
     const carrying = decide(staffMember({ activity: "carrying", carryMealIds: ["meal-1"] }), 100, { groundSpeed: 1.2 });
     expect(carrying).toMatchObject({ clip: "CarryWalk", tier: "carry" });
     expect(carrying.props).toMatchObject({ tray: true, trayMealIds: ["meal-1"] });

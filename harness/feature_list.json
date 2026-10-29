@@ -2,6 +2,146 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-137",
+      "name": "ลดอาการกระตุกระหว่างจำลอง",
+      "status": "in-progress",
+      "dependencies": ["feat-134"],
+      "role": "frontend",
+      "summary": "ตรวจและลดภาระการจำลองโดยเฉพาะขณะเปลี่ยนความเร็วและรันต่อเนื่อง",
+      "sprint": 5,
+      "evidence": "ลดการสร้าง DOM ก้อนความคิดซ้ำทุกเฟรม; ยังต้องวัด performance ก่อนและหลังในเบราว์เซอร์จริงระหว่างเปลี่ยนความเร็วและรันต่อเนื่อง"
+    },
+    {
+      "id": "feat-136",
+      "name": "ปรับฝ่ามือให้คว่ำแนบผ้าเช็ดโต๊ะ",
+      "status": "done",
+      "dependencies": ["feat-135"],
+      "role": "frontend",
+      "summary": "ปรับแนวมือและจุดติดผ้าตามผิวมือจริงเพื่อให้ฝ่ามือราบไปกับผ้าขณะเช็ด",
+      "sprint": 5,
+      "evidence": "harness/evidence/staff-wipe-palm/summary.md"
+    },
+    {
+      "id": "feat-135",
+      "name": "ปรับท่ายืนและผ้าเช็ดโต๊ะพนักงาน",
+      "status": "done",
+      "dependencies": ["feat-117"],
+      "role": "frontend",
+      "summary": "ปรับผ้าและจานให้แนบฝ่ามือ ลดการก้มและย่อตัวระหว่างเช็ด และเพิ่มสีผ้าให้เห็นบนโต๊ะ",
+      "sprint": 5,
+      "evidence": "harness/evidence/staff-wipe-adjustment/summary.md"
+    },
+    {
+      "id": "feat-134",
+      "name": "ก้อนความคิดและอิโมจิบอกสถานะตัวละครในระบบจำลอง (Simulation Character Thoughts & Emotes)",
+      "status": "done",
+      "dependencies": ["feat-123"],
+      "role": "frontend",
+      "summary": "แสดง Thought/Speech Bubble พร้อมอิโมจิสะท้อนสถานะลูกค้า (รอคิว, รอนาน, สั่งอาหาร, รออาหารนาน, ทาน, เช็คบิล) ในมุมมองจำลอง",
+      "sprint": 5,
+      "evidence": "CustomerThought + StaffThought schemas ใน presentation-contract.ts; resolveCustomerThought & resolveStaffThought ใน presentation-snapshot.ts; CharacterThoughtBubble & ThoughtOverlayManager ใน ThreeView (3D) & IsoSimulationOverlay (2D fallback); toggle showThoughts ใน use-simulation-store & simulation-panel; unit tests 182 passed; boundary check ผ่าน 100%"
+    },
+    {
+      "id": "feat-133",
+      "name": "ปรับนิ้วโป้งและนิ้วโอบด้ามช้อน",
+      "status": "done",
+      "dependencies": ["feat-132"],
+      "role": "frontend",
+      "summary": "ปรับรูปนิ้วโป้งเข้าหาด้ามและงอนิ้วเข้าหากำมือระหว่างถือช้อน",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-133-last/summary.md: npm test 111 files / 1,310 tests; Chrome ทดสอบเมนูช้อนพร้อมภาพขยาย; ตรวจระยะนิ้วโป้งถึงด้าม"
+    },
+    {
+      "id": "feat-132",
+      "name": "ย้ายด้ามช้อนส้อมเข้าแนวจับในกำมือ",
+      "status": "done",
+      "dependencies": ["feat-131"],
+      "role": "frontend",
+      "summary": "ปรับจุดยึดด้ามอุปกรณ์เข้าในรูปกำมือและคำนวณท่ากินให้ตรงจานและปาก",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-132/summary.md: npm test 111 files / 1,309 tests; Chrome 1× สี่มุมและ pause; ตรวจจุดจับเทียบผิวมือและสัมผัสอาหาร"
+    },
+    {
+      "id": "feat-131",
+      "name": "จัดตำแหน่งช้อนส้อมและท่าจับระหว่างกิน",
+      "status": "done",
+      "dependencies": ["feat-130"],
+      "role": "frontend",
+      "summary": "ให้ด้ามอุปกรณ์อยู่ตำแหน่งคงที่กับมือและหุบนิ้วเฉพาะช่วงกิน",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-131/summary.md: npm test 111 files / 1,308 tests; Chrome 1× กินสี่มุมและ pause; ตรวจ fixed grip, จุดสัมผัสและคืนรูปมือ"
+    },
+    {
+      "id": "feat-130",
+      "name": "แก้ข้อมือหมุนบิดระหว่างท่ากิน",
+      "status": "done",
+      "dependencies": ["feat-129"],
+      "role": "frontend",
+      "summary": "จำกัดการหมุนบิดของข้อมือเทียบกับปลายแขน พร้อมคงอุปกรณ์ผ่าน anchor",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-130/summary.md: npm test 111 files / 1,306 tests; Chrome 1× ท่ากิน 4 มุมและ pause; ตรวจการหมุนข้อมือครบ 97 เฟรม"
+    },
+    {
+      "id": "feat-129",
+      "name": "ปรับท่ากินโดยไม่หักข้อมือ",
+      "status": "done",
+      "dependencies": ["feat-128"],
+      "role": "frontend",
+      "summary": "แยกทิศมือกับอุปกรณ์ในคลิป Eat ให้ข้อมือต่อแนวปลายแขนตลอดรอบ",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-129/summary.md: npm test 111 files / 1,306 tests; Chrome 1× 8 จังหวะ; ตรวจมุมข้อมือครบ 97 เฟรมและจุดสัมผัส"
+    },
+    {
+      "id": "feat-128",
+      "name": "ปรับแนวข้อมือและข้อศอกระหว่างกิน",
+      "status": "done",
+      "dependencies": ["feat-127"],
+      "role": "frontend",
+      "summary": "ปรับการเคลื่อนข้อศอกและทิศอุปกรณ์ตามช่วงตักและยก ลดการหักข้อมือโดยไม่ให้ศอกซ้อนลำตัว",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-128-final/summary.md: npm test 111 files / 1,304 tests; Chrome 1× ภาพระยะใกล้ 8 จังหวะ; unit test มุมมือและจุดสัมผัสผ่าน"
+    },
+    {
+      "id": "feat-127",
+      "name": "ปรับท่ากินให้มืออยู่ด้านหน้าลำตัว",
+      "status": "done",
+      "dependencies": ["feat-126"],
+      "role": "frontend",
+      "summary": "ปรับแนวช้อน ข้อมือ และข้อศอกขณะตักและยกเข้าปากพร้อม rebuild ตัวละคร",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-127-final/summary.md: npm test 111 files / 1,304 tests ผ่าน; Chrome E2E และภาพท่ากิน 6 เฟรม; ตรวจจุดสัมผัสและตำแหน่งแขนผ่าน"
+    },
+    {
+      "id": "feat-126",
+      "name": "แก้ตัวลูกค้าสั่นและปรับท่ากิน 3D",
+      "status": "done",
+      "dependencies": ["feat-125"],
+      "role": "frontend",
+      "summary": "แก้ feedback ตำแหน่งลูกค้าขณะเอื้อมจานและปรับทิศศอกกับข้อมือในคลิป Eat",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-126/summary.md: npm test 111 files / 1,304 tests ผ่าน; Chrome 1× วัด 201 เฟรมและตำแหน่งจานคงที่; lint/typecheck ผ่าน"
+    },
+    {
+      "id": "feat-125",
+      "name": "ลดการกระตุกของท่ากินลูกค้า 3D",
+      "status": "done",
+      "dependencies": ["feat-118", "feat-123"],
+      "role": "frontend",
+      "summary": "เกลี่ยเวลาท่ากินระหว่าง worker ticks โดยไม่เดินเกินเวลาจำลองและหยุดตามการพัก",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-125/summary.md: npm test 111 files / 1,302 tests ผ่าน; lint 0 errors, typecheck ผ่าน; Chrome E2E วงจรบริการ 1/1 ผ่าน"
+    },
+    {
+      "id": "feat-124",
+      "name": "แสง 3D ตามเวลาเปิดร้านและเวลาจำลอง",
+      "status": "done",
+      "dependencies": ["feat-120", "feat-121", "feat-123"],
+      "role": "frontend",
+      "summary": "เปลี่ยนแสงจากเวลาเครื่องเป็นเวลาเปิดร้านบวกเวลาจำลอง รองรับพัก เริ่มใหม่ และโหมดตรวจแสงคงที่",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-124/summary.md และ measurements.jsonl: npm test 111 files / 1,298 tests ผ่าน; targeted lighting 17 tests ผ่าน; typecheck ผ่าน; lint 0 errors (1 warning เดิม); Core/Worker/BFF boundary scan และ validate_harness ผ่าน; Chrome E2E 11 กรณีผ่านรวมสองรอบ (10 ผ่านรอบแรก + restaurant-clock regression ผ่านหลังแก้การนำทางใน test), เปิด 10:00 ได้ความสว่าง 0.941432 / เปิด 20:00 ได้ 0.820340 แม้เวลาเครื่องเปลี่ยน, pause 10:01:18 ภาพตรงกันทุกไบต์, stop คืนแสงเวลาเปิดร้าน"
+    },
+    {
       "id": "feat-000",
       "name": "Harness & Agent Operating System Setup",
       "status": "done",

@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
 import type { StoreLayout } from "@/core/layout/types";
 import { createLightingStore } from "@/store/use-lighting-store";
+import { createSimulationStore } from "@/store/use-simulation-store";
+import { emptyMetrics } from "@/core/simulation/engine";
 import { QUALITY_LEVELS, type QualityLevel } from "../adaptive-quality";
 import type { SceneFeatureContext } from "../runtime/contracts";
 import { parseLocalDateTimeToUtcMs } from "./settings";
@@ -58,7 +60,7 @@ function makeContext(
   };
 }
 
-describe("feat-121: Real-Time & Fixed-Time Scene Lighting Runtime (scene-lighting.ts)", () => {
+describe("simulation & fixed-time scene lighting runtime", () => {
   const BANGKOK = { latitude: 13.7563, longitude: 100.5018, northOffsetDegrees: 0 };
 
   it("transitions photometric state cleanly across morning, solar noon, evening, twilight, and night (night turns direct sun shadow off while keeping indoor fill active)", () => {
@@ -176,6 +178,39 @@ describe("feat-121: Real-Time & Fixed-Time Scene Lighting Runtime (scene-lightin
 
     // Clean disposal removes all owned lights from the feature root
     feature.dispose();
+    store.dispose();
     expect(context.root.children).toHaveLength(0);
+  });
+
+  it("updates actual scene lights from the restaurant clock and preserves time across scene remounts", () => {
+    const simulation = createSimulationStore();
+    const store = createLightingStore({}, undefined, simulation);
+    const { context, invalidateShadowsSpy } = makeContext();
+    let feature = createSceneLightingFeature(context, { store });
+    try {
+      expect(feature.getPhotometricState().isNight).toBe(false);
+      const before = feature.sunLight.position.clone();
+      simulation.setState({ status: "running", metrics: { ...emptyMetrics(), time: 10 * 3600 } });
+      expect(feature.clock.getSnapshot().effectiveUtcMs).toBe(
+        parseLocalDateTimeToUtcMs("2026-03-21T20:00", "Asia/Bangkok"),
+      );
+      expect(feature.getPhotometricState().isNight).toBe(true);
+      expect(feature.sunLight.intensity).toBe(0);
+      expect(feature.sunLight.castShadow).toBe(false);
+      expect(feature.sunLight.position.equals(before)).toBe(false);
+      expect(invalidateShadowsSpy).toHaveBeenCalled();
+      feature.dispose();
+      feature = createSceneLightingFeature(context, { store });
+      expect(feature.getPhotometricState().isNight).toBe(true);
+      simulation.setState({ status: "paused" });
+      const timestamp = feature.clock.getSnapshot().effectiveUtcMs;
+      simulation.getState().setConfig({ speed: 30 });
+      expect(feature.clock.getSnapshot().effectiveUtcMs).toBe(timestamp);
+      simulation.setState({ status: "idle" });
+      expect(feature.getPhotometricState().isNight).toBe(false);
+    } finally {
+      feature.dispose();
+      store.dispose();
+    }
   });
 });

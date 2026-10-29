@@ -55,7 +55,7 @@ export interface CustomerActionsFeature extends SceneFeature {
 }
 
 interface RigState {
-  readonly rig: CustomerRig;
+  rig: CustomerRig;
   readonly actions: Map<string, THREE.AnimationAction>;
   active: THREE.AnimationAction | null;
   activeName: string | null;
@@ -83,6 +83,22 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
     let disposedGeometries = 0;
     let disposedMaterials = 0;
     let disposed = false;
+    let animationTime: number | null = null;
+    let animationRun: string | null = null;
+
+    // Follow the latest worker time from behind, spreading each tick over render frames.
+    // The worker remains authoritative; never predict a future bite or replay a long pause.
+    const smoothAnimationTime = (snapshot: PresentationSnapshot, frame: SceneFrame) => {
+      const target = snapshot.simTimeSeconds;
+      const rate = Math.max(0, frame.playbackRate);
+      if (animationRun !== snapshot.runId || animationTime === null || target < animationTime || target - animationTime > Math.max(0.5 * rate, 0.5)) {
+        animationRun = snapshot.runId;
+        animationTime = target;
+      } else if (!frame.paused) {
+        animationTime = Math.min(target, animationTime + Math.max(0, frame.realDeltaSeconds) * rate);
+      }
+      return animationTime;
+    };
 
     const keep = <T extends THREE.BufferGeometry>(geometry: T) => {
       geometries.push(geometry);
@@ -136,6 +152,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
     };
 
     const releaseRig = (state: RigState) => {
+      setGrip(state.rig, false);
       for (const action of state.actions.values()) action.stop();
       state.actions.clear();
       state.active = null;
@@ -145,9 +162,21 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       state.utensilKind = null;
     };
 
+    const setGrip = (rig: CustomerRig, eating: boolean): number | null => {
+      const body = rig.getObject("MannequinBody");
+      if (!(body instanceof THREE.SkinnedMesh)) return null;
+      const index = body.morphTargetDictionary?.EatGrip;
+      if (index === undefined || !body.morphTargetInfluences) return null;
+      body.morphTargetInfluences[index] = eating ? 1 : 0;
+      return body.morphTargetInfluences[index]!;
+    };
+
     const stateFor = (rig: CustomerRig): RigState => {
       const existing = states.get(rig.renderAgentId);
-      if (existing && existing.rig === rig) return existing;
+      if (existing && existing.rig.model === rig.model && existing.rig.mixer === rig.mixer) {
+        existing.rig = rig;
+        return existing;
+      }
       if (existing) releaseRig(existing);
       const state: RigState = {
         rig, actions: new Map(), active: null, activeName: null,
@@ -172,7 +201,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       if (!action) return;
       if (state.activeName !== name) {
         // Eat and the seating clips each own the hips and legs; blending them would fight.
-        if (state.active && state.active !== action) state.active.stop();
+        if (!state.active) state.rig.mixer.stopAllAction();
+        else if (state.active !== action) state.active.stop();
         action.reset();
         action.play();
         state.active = action;
@@ -202,8 +232,11 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       state.utensil?.removeFromParent();
       const object = buildUtensil(utensil);
       const hand = state.rig.getObject("RightHand");
-      (hand ?? context.root).add(object);
-      if (hand) object.position.set(PALM_LOCAL.x, PALM_LOCAL.y, PALM_LOCAL.z);
+      const anchor = state.rig.getObject("EatUtensilAnchor");
+      (anchor ?? hand ?? context.root).add(object);
+      if (!anchor && hand) object.position.set(PALM_LOCAL.x, PALM_LOCAL.y, PALM_LOCAL.z);
+      // Move the spoon towards the index-finger side without changing the arm animation.
+      if (utensil.utensil === "spoon") object.position.z += 0.025;
       state.utensil = object;
       state.utensilKind = utensil.utensil;
     };
@@ -245,6 +278,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       const live = new Set<number>();
       const reducedMotion = options.reducedMotion?.() ?? false;
       const deltaSeconds = Math.max(0, frame.realDeltaSeconds) * Math.max(frame.playbackRate, 1e-6);
+      const visualTime = smoothAnimationTime(snapshot, frame);
       const seed = seedFromRevision(snapshot.layoutRevision);
       const meals = new Map(snapshot.meals.map(meal => [meal.mealId, meal]));
       for (const rig of rigs) {
@@ -259,7 +293,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         const walkClip = rig.clips.find(clip => clip.name === "Walk");
         const decision = resolveCustomerAction({
           customer, meal, seatPose,
-          simTimeSeconds: snapshot.simTimeSeconds,
+          simTimeSeconds: meal?.placedAtSeconds !== null && meal?.placedAtSeconds !== undefined && meal.placedAtSeconds <= snapshot.simTimeSeconds
+            ? Math.max(visualTime, meal.placedAtSeconds) : visualTime,
           seed,
           groundSpeed: measureSpeed(state, deltaSeconds),
           reducedMotion,
@@ -273,6 +308,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         if (resolved) applyClip(state, resolved, decision);
         // The utensil only exists while a bite is actually being taken.
         syncUtensil(state, decision.eating ? decision.utensil : null);
+        const gripWeight = setGrip(state.rig, decision.eating);
 
         const offset = decision.eating ? plateOffset(rig, customer.chairId, meal) : null;
         const reach = plateReach(offset ? offset.y : null);
@@ -285,6 +321,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
           timeScale: decision.timeScale,
           seated: decision.seated,
           eating: decision.eating,
+          gripWeight,
           mealId: decision.mealId,
           utensil: decision.utensil,
           plateLocalOffset: offset,
@@ -330,6 +367,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       },
       reset() {
         reports.length = 0;
+        animationTime = null;
+        animationRun = null;
         for (const state of states.values()) releaseRig(state);
         states.clear();
         pushedPoses.clear();

@@ -11,7 +11,7 @@ export function createLegacyLighting(scene: THREE.Scene) {
   key.shadow.normalBias = 0.02;
   scene.add(ambient, key, key.target);
   let disposed = false;
-  // `ambient` and `key` are handed to the lighting feature (feat-121) so the realtime sun adopts
+  // `ambient` and `key` are handed to the lighting feature so the simulation sun adopts
   // the existing lights instead of adding a second set to the same scene.
   return { key, ambient, dispose() {
     if (disposed) return;

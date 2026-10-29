@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe("feat-120: LightingSettingsPanel accessibility, Thai labels, and state updates (settings-panel.tsx)", () => {
-  it("renders Thai aria-labels, Bangkok reference disclosure, and switches between realtime and fixed modes without calling navigator.geolocation", () => {
+  it("defaults to the restaurant clock and supports an explicit fixed lighting preview", () => {
     const fixedNowMs = parseLocalDateTimeToUtcMs("2026-03-21T10:00", "Asia/Bangkok");
     const store = createLightingStore({}, () => fixedNowMs);
 
@@ -24,10 +24,10 @@ describe("feat-120: LightingSettingsPanel accessibility, Thai labels, and state 
       "ค่าอ้างอิงเริ่มต้น: กรุงเทพฯ (ไม่ได้ตรวจพบตำแหน่งของคุณ)",
     );
 
-    // Default mode is realtime
-    const realtimeBtn = screen.getByRole("button", { name: "ใช้เวลาเครื่องจริง (Realtime)" });
+    const simulationBtn = screen.getByRole("button", { name: "ใช้เวลาร้านที่จำลอง" });
     const fixedBtn = screen.getByRole("button", { name: "ใช้เวลาทดสอบคงที่ (Fixed Time)" });
-    expect(realtimeBtn).toHaveAttribute("aria-pressed", "true");
+    expect(simulationBtn).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/แสงเริ่มที่เวลาเปิดร้าน/)).toBeInTheDocument();
     expect(fixedBtn).toHaveAttribute("aria-pressed", "false");
 
     // Switch to fixed mode
@@ -41,6 +41,10 @@ describe("feat-120: LightingSettingsPanel accessibility, Thai labels, and state 
     fireEvent.change(dateInput, { target: { value: "2026-03-21T23:15" } });
     expect(store.getState().settings.fixedDateTimeLocal).toBe("2026-03-21T23:15");
     expect(store.getState().solar.phase).toBe("night");
+    fireEvent.click(simulationBtn);
+    expect(store.getState().settings.mode).toBe("simulation");
+    expect(store.getState().effectiveUtcMs).toBe(fixedNowMs);
+    store.dispose();
   });
 
   it("updates latitude, longitude, north offset, clamps out-of-range coordinates with Thai feedback, and resets to Bangkok defaults", () => {
@@ -75,5 +79,6 @@ describe("feat-120: LightingSettingsPanel accessibility, Thai labels, and state 
     expect(store.getState().settings.latitude).toBeCloseTo(13.7563, 4);
     expect(store.getState().settings.longitude).toBeCloseTo(100.5018, 4);
     expect(store.getState().settings.northOffsetDegrees).toBe(0);
+    store.dispose();
   });
 });

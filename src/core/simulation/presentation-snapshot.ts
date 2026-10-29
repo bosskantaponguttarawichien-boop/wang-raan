@@ -3,7 +3,7 @@ import type { Chair, StoreLayout, Table } from "../layout/types";
 import type { AgentState } from "./engine";
 import type { StaffPlan, StaffTaskKind } from "./staff-visual";
 import { STAFF_STATE_CODE } from "./staff-visual";
-import { PRESENTATION_VERSION, type CustomerActivity, type FoodKind, type MealPresentation, type PresentationSnapshot, type ServiceMilestones, type StaffPresentation, type TableAvailability } from "./presentation-contract";
+import { PRESENTATION_VERSION, type CustomerActivity, type CustomerThought, type FoodKind, type MealPresentation, type PresentationSnapshot, type ServiceMilestones, type StaffPresentation, type StaffThought, type TableAvailability } from "./presentation-contract";
 
 export interface PartyView {
   id: number;
@@ -17,6 +17,8 @@ export interface PartyView {
   placedAt: number | null;
   dineSeconds: number;
   cancelled: boolean;
+  entranceQueuedAt?: number | null;
+  seatedAt?: number;
 }
 export interface TableView { id: string; cycleId: string; status: TableAvailability; cleanCompletedAt: number | null }
 export interface TaskView {
@@ -76,6 +78,78 @@ export function taskMilestones(task: TaskView): ServiceMilestones {
   };
 }
 
+
+export function resolveCustomerThought(
+  party: PartyView,
+  simTime: number,
+  memberIndex: number,
+  consumed: number,
+  patienceSeconds = 15 * 60,
+): CustomerThought | null {
+  if (party.cancelled || party.state === "leaving") return null;
+
+  // 1. รอคิวหน้าร้าน
+  if (party.state === "waiting-entrance") {
+    const wait = Math.max(0, simTime - (party.entranceQueuedAt ?? simTime));
+    if (wait >= patienceSeconds * 0.67 || wait >= 10 * 60) {
+      return { kind: "queue-critical", waitSeconds: wait, severity: "critical" };
+    }
+    if (wait >= patienceSeconds * 0.33 || wait >= 5 * 60) {
+      return { kind: "queue-warning", waitSeconds: wait, severity: "warning" };
+    }
+    return { kind: "queue-wait", waitSeconds: wait, severity: "normal" };
+  }
+
+  // 2. รอสั่งอาหารที่โต๊ะ
+  if (party.state === "waiting-order") {
+    const wait = Math.max(0, simTime - (party.seatedAt ?? simTime));
+    return {
+      kind: "order-wait",
+      waitSeconds: wait,
+      severity: wait >= 60 ? "warning" : "normal",
+    };
+  }
+
+  // 3. รออาหารที่โต๊ะ
+  if (party.state === "waiting-food") {
+    const wait = Math.max(0, simTime - (party.seatedAt ?? simTime));
+    if (wait >= patienceSeconds * 0.7 || wait >= 12 * 60) {
+      return { kind: "food-critical", waitSeconds: wait, severity: "critical" };
+    }
+    if (wait >= patienceSeconds * 0.35 || wait >= 6 * 60) {
+      return { kind: "food-warning", waitSeconds: wait, severity: "warning" };
+    }
+    return { kind: "food-wait", waitSeconds: wait, severity: "normal" };
+  }
+
+  // 4. กำลังทานอาหาร
+  if (party.fedAt !== null && consumed < 1) {
+    return {
+      kind: "eating",
+      waitSeconds: Math.max(0, simTime - party.fedAt),
+      severity: "normal",
+    };
+  }
+
+  // 5. ทานเสร็จแล้ว รอเช็คบิล / เตรียมลุก
+  if (party.fedAt !== null && consumed >= 1) {
+    return {
+      kind: "bill-wait",
+      waitSeconds: Math.max(0, simTime - party.fedAt),
+      severity: "normal",
+    };
+  }
+
+  return null;
+}
+
+export function resolveStaffThought(activity: StaffPresentation["activity"]): StaffThought | null {
+  if (activity === "taking-order") return { kind: "taking-order" };
+  if (activity === "carrying") return { kind: "serving" };
+  if (activity === "wiping") return { kind: "cleaning" };
+  return null;
+}
+
 function activity(party: PartyView): CustomerActivity {
   if (party.cancelled || party.state === "leaving") return "leaving";
   if (party.state === "waiting-order" || party.state === "waiting-food") return party.state;
@@ -108,6 +182,7 @@ function staffPresentation(staff: StaffView, now: number, meals: readonly MealPr
     walkMetersPerSecond: 1.2,
     carryMealIds: current === "carrying" ? meals.filter(meal => meal.serviceCycleId === task?.cycleId).map(meal => meal.mealId) : [],
     servicePoint, phaseStartedAtSeconds: start, phaseEndsAtSeconds: end,
+    thought: resolveStaffThought(current),
   };
 }
 
@@ -150,11 +225,15 @@ export function buildPresentationSnapshot(layout: StoreLayout, input: SnapshotIn
   const customers = input.parties.flatMap(party => Array.from({ length: party.partySize }, (_, member) => {
     const id = renderMemberId(party.id, member);
     const seated = party.state === "seated" || party.state === "waiting-order" || party.state === "waiting-food";
+    const ownMeal = meals.find(meal => meal.ownerRenderAgentId === id);
+    const consumed = ownMeal?.consumed ?? 0;
+    const thought = resolveCustomerThought(party, input.time, member, consumed);
     return {
       renderAgentId: id, partyId: party.id, memberIndex: member, tableId: party.tableId,
       chairId: party.chairIds[member] ?? null, serviceCycleId: party.cycleId,
       activity: activity(party), seatingPhase: seated ? "seated" as const : party.state === "to-seat" ? "approach" as const : party.fedAt !== null ? "depart" as const : null,
-      walkMetersPerSecond: party.speed, mealId: meals.find(meal => meal.ownerRenderAgentId === id)?.mealId ?? null,
+      walkMetersPerSecond: party.speed, mealId: ownMeal?.mealId ?? null,
+      thought,
     };
   }));
   return {

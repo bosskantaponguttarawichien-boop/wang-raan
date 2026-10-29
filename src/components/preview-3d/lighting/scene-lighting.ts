@@ -138,7 +138,7 @@ export function computePhotometricState(solar: SolarPositionResult): Photometric
 }
 
 /**
- * Creates the `"lighting"` scene feature that manages real-time/fixed solar lighting and shadow camera bounds.
+ * Creates simulation/fixed solar lighting and shadow camera bounds.
  */
 export function createSceneLightingFeature(
   context: SceneFeatureContext,
@@ -174,7 +174,10 @@ export function createSceneLightingFeature(
   }
   context.root.add(indoorFillLight, indoorFillLight.target);
 
-  const clock = createSolarClock(store.getState().settings, options.clockEnv);
+  const clock = createSolarClock(store.getState().settings, {
+    ...options.clockEnv,
+    nowMs: () => store.getState().effectiveUtcMs,
+  });
 
   let currentLayout: StoreLayout | null = context.getLayout();
   let lastSolar: SolarPositionResult = clock.getSnapshot().solar;
@@ -250,12 +253,9 @@ export function createSceneLightingFeature(
     context.invalidate();
   };
 
-  // Subscribe to clock ticks (every 60s in realtime mode or on visibility/settings change)
+  // The store owns simulation time; this controller only turns its snapshot into scene lighting.
   const unsubscribeClock = clock.subscribe((snap) => {
     if (disposed) return;
-    if (store.getState().effectiveUtcMs !== snap.effectiveUtcMs) {
-      store.getState().refreshRealtime(() => snap.effectiveUtcMs);
-    }
     applyLightingAndShadows(snap.solar, currentLayout);
   });
 
@@ -268,7 +268,7 @@ export function createSceneLightingFeature(
       state.effectiveUtcMs !== prevState.effectiveUtcMs &&
       state.effectiveUtcMs !== lastSolar.timestampMs
     ) {
-      applyLightingAndShadows(state.solar, currentLayout);
+      clock.refreshNow();
     }
   });
 
@@ -289,7 +289,7 @@ export function createSceneLightingFeature(
 
     update(): void {
       if (disposed) return;
-      // Note: Solar time NEVER advances by frame.playbackRate or frame.presentation.simTimeSeconds.
+      // The simulation store already owns elapsed time and playback speed; do not advance twice.
       // However, if AdaptiveQuality changed shadowMapSize between frames, update the shadow map resolution once.
       const currentQualitySize = context.getQuality().shadowMapSize;
       if (currentQualitySize !== lastShadowMapSize && currentLayout) {

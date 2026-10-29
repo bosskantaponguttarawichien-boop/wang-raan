@@ -6,6 +6,7 @@ import {
   EAT_TIP_REACH,
   canEat,
   eatPhaseOffset,
+  nextSeatReachShift,
   plateReach,
   resolveClipName,
   resolveCustomerAction,
@@ -146,6 +147,16 @@ describe("seating phases map onto the feat-112 clips", () => {
 });
 
 describe("bites", () => {
+  it("keeps the corrected seated position stable instead of bouncing each frame", () => {
+    let shift = 0;
+    for (let frame = 0; frame < 100; frame++) {
+      const correction = 0.08 - shift;
+      shift = nextSeatReachShift(shift, correction, 0.1);
+      expect(shift).toBeCloseTo(0.08);
+    }
+    expect(nextSeatReachShift(0.1, 0.2, 0.1)).toBe(0.1);
+    expect(nextSeatReachShift(0.08, -0.2, 0.1)).toBe(0);
+  });
   it("advances one bite per clip duration and wraps seamlessly", () => {
     const first = decide(customerOf(), { simTimeSeconds: 300 });
     const later = decide(customerOf(), { simTimeSeconds: 300 + 3.2 });

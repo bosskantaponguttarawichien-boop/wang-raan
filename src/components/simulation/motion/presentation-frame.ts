@@ -14,7 +14,10 @@ export function alignPresentation(snapshot: PresentationSnapshot, agents: Float3
     staff: snapshot.staff.map(member => {
       const position = positions.get(member.staffId);
       if (position?.code === 5) return { ...member, activity: "pickup", carryMealIds: [] };
-      if (position && member.servicePoint && Math.hypot(position.x - member.servicePoint.x, position.y - member.servicePoint.y) > 0.12 && ["wiping", "put-down", "taking-order"].includes(member.activity)) {
+      if (position && member.servicePoint && Math.hypot(position.x - member.servicePoint.x, position.y - member.servicePoint.y) > 0.12 && ["wiping", "put-down", "taking-order", "clearing"].includes(member.activity)) {
+        return { ...member, activity: position.code === 3 ? "carrying" : "walking" };
+      }
+      if (position && member.activity === "counter" && (position.code === 1 || position.code === 3)) {
         return { ...member, activity: position.code === 3 ? "carrying" : "walking" };
       }
       return member;

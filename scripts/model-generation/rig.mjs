@@ -117,6 +117,41 @@ export async function createCharacterRig({ role, lite = false }) {
   geometry.setAttribute("skinWeight", new THREE.Float32BufferAttribute(skinWeights, 4));
   const position = geometry.getAttribute("position");
 
+  if (!STAFF) {
+    // The mesh has no finger bones. A customer-only morph curls the right fingers while eating;
+    // the rest pose and every other animation keep the original geometry.
+    const grip = new Float32Array(position.count * 3);
+    const handIndex = boneIndex.get(rightHand);
+    const pivot = new THREE.Vector3(0.21, 0.731, 0);
+    const p = new THREE.Vector3();
+    for (let i = 0; i < position.count; i++) {
+      let weight = 0;
+      for (let slot = 0; slot < 4; slot++) if (skinIndices[i * 4 + slot] === handIndex) weight += skinWeights[i * 4 + slot];
+      p.fromBufferAttribute(position, i);
+      if (weight < 0.99) continue;
+      const original = p.clone();
+      if (p.y < pivot.y) {
+        const amount = Math.min(1, Math.max(0, (pivot.y - p.y) / 0.045));
+        p.sub(pivot).applyAxisAngle(new THREE.Vector3(0, 0, 1), -2.3 * amount).add(pivot);
+      }
+      // The thumb branches from the side of the palm above the finger knuckles. Fold its tip
+      // towards the shaft separately; curling only the four fingers leaves a visible thumbs-up.
+      const thumbSide = THREE.MathUtils.smoothstep(original.z, 0.043, 0.07);
+      const thumbLength = 1 - THREE.MathUtils.smoothstep(original.y, 0.75, 0.785);
+      const thumbFold = thumbSide * thumbLength;
+      p.z -= 0.065 * thumbFold;
+      p.x -= 0.012 * thumbFold;
+      p.y -= 0.008 * thumbFold;
+      grip[i * 3] = p.x - original.x;
+      grip[i * 3 + 1] = p.y - original.y;
+      grip[i * 3 + 2] = p.z - original.z;
+    }
+    const gripAttribute = new THREE.Float32BufferAttribute(grip, 3);
+    gripAttribute.name = "EatGrip";
+    geometry.morphAttributes.position = [gripAttribute];
+    geometry.morphTargetsRelative = true;
+  }
+
   const body = new THREE.SkinnedMesh(geometry, mannequin);
   body.name = "MannequinBody";
   body.castShadow = true;

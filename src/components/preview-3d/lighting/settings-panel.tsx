@@ -123,7 +123,7 @@ export function LightingSettingsPanel({
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2.5">
         <div>
           <h3 className="text-sm font-semibold leading-[1.5] text-ink">
-            ทิศแดดและเวลาจริง (Solar Lighting)
+            ทิศแดดและเวลาร้าน
           </h3>
           <p
             data-testid="lighting-reference-disclosure"
@@ -145,7 +145,10 @@ export function LightingSettingsPanel({
         </button>
       </div>
 
-      {/* โหมดเวลา: เวลาเครื่องจริง vs เวลาทดสอบคงที่ */}
+      <p className="mt-2 text-xs leading-[1.85] text-secondary-strong">
+        แสงเริ่มที่เวลาเปิดร้าน และเปลี่ยนตามเวลาจำลองจนปิดร้าน เมื่อพักการจำลองแสงจะหยุดตาม
+      </p>
+      {/* โหมดเวลา: เวลาร้านที่จำลอง หรือเวลาคงที่สำหรับตรวจแสง */}
       <div
         role="group"
         aria-label="โหมดเวลาแสงอาทิตย์"
@@ -153,17 +156,17 @@ export function LightingSettingsPanel({
       >
         <button
           type="button"
-          aria-label="ใช้เวลาเครื่องจริง (Realtime)"
-          aria-pressed={settings.mode === "realtime"}
-          data-testid="lighting-mode-realtime"
-          onClick={() => handleModeChange("realtime")}
+          aria-label="ใช้เวลาร้านที่จำลอง"
+          aria-pressed={settings.mode === "simulation"}
+          data-testid="lighting-mode-simulation"
+          onClick={() => handleModeChange("simulation")}
           className={`rounded-xl border px-3 py-1.5 text-xs font-medium leading-[1.85] transition-colors ${FOCUS_RING_CLASS} ${
-            settings.mode === "realtime"
+            settings.mode === "simulation"
               ? "border-blue bg-blue-soft text-blue-hover"
               : "border-line bg-white text-secondary-strong hover:bg-surface"
           }`}
         >
-          เวลาเครื่องจริง (Realtime)
+          ตามเวลาร้าน
         </button>
         <button
           type="button"

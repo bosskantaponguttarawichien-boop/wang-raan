@@ -14,6 +14,30 @@ export type TableSurface = "empty" | "served" | "eating" | "used" | "wiping" | "
 export type StaffActivity = "counter" | "walking" | "taking-order" | "pickup" | "carrying" | "put-down" | "wiping" | "clearing";
 export type PresentationTaskKind = "deliver" | "pay" | "clean" | "take-order";
 
+export type CustomerThoughtKind =
+  | "queue-wait"
+  | "queue-warning"
+  | "queue-critical"
+  | "order-wait"
+  | "food-wait"
+  | "food-warning"
+  | "food-critical"
+  | "eating"
+  | "bill-wait";
+
+export interface CustomerThought {
+  readonly kind: CustomerThoughtKind;
+  readonly waitSeconds: number;
+  readonly severity: "normal" | "warning" | "critical";
+}
+
+export type StaffThoughtKind = "taking-order" | "serving" | "cleaning";
+
+export interface StaffThought {
+  readonly kind: StaffThoughtKind;
+}
+
+
 /** Layout x/y in metres; Three.js maps (x, y) to (x, 0, z=y). */
 export interface PresentationPoint { readonly x: number; readonly y: number }
 
@@ -40,6 +64,7 @@ export interface CustomerPresentation {
   readonly seatingPhase: SeatingPhase | null;
   readonly walkMetersPerSecond: number;
   readonly mealId: string | null;
+  readonly thought?: CustomerThought | null;
 }
 
 export interface MealPresentation {
@@ -81,6 +106,7 @@ export interface StaffPresentation {
   readonly servicePoint: PresentationPoint | null;
   readonly phaseStartedAtSeconds: number;
   readonly phaseEndsAtSeconds: number;
+  readonly thought?: StaffThought | null;
 }
 
 /** All markers are absolute simulation times. Null means not scheduled/applicable. */

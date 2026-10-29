@@ -1111,7 +1111,7 @@ export class Simulation {
   private partyView(agent: Agent): PartyView {
     return { id: agent.id, state: agent.state, partySize: agent.partySize, chairIds: [...agent.renderChairIds],
       tableId: agent.tableId ?? this.chairById.get(agent.chairId ?? "")?.tableId ?? null,
-      cycleId: agent.serviceCycleId, speed: agent.speed, fedAt: agent.fedAt, placedAt: agent.placedAt, dineSeconds: agent.traits.dineSeconds, cancelled: agent.cancelled };
+      cycleId: agent.serviceCycleId, speed: agent.speed, fedAt: agent.fedAt, placedAt: agent.placedAt, dineSeconds: agent.traits.dineSeconds, cancelled: agent.cancelled, entranceQueuedAt: agent.entranceQueuedAt, seatedAt: agent.seatedAt };
   }
 
   /** Full metadata without advancing time, changing business state or drawing randomness. */

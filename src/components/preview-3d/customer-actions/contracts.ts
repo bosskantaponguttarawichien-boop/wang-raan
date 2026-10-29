@@ -98,6 +98,8 @@ export interface CustomerActionReport {
   readonly timeScale: number;
   readonly seated: boolean;
   readonly eating: boolean;
+  /** Current blend of the customer-only eating grip, or null on older assets. */
+  readonly gripWeight: number | null;
   readonly mealId: string | null;
   readonly utensil: UtensilSpec | null;
   /** Dish position in the customer's own frame (+y forward), from feat-116 when available. */

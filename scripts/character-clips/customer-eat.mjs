@@ -43,6 +43,8 @@ const EAT_DURATION = 3.2;
 
 /** จุดกลางผิวฝ่ามือใน local ของกระดูก Hand (หน้า local −Z ของก้อนมือ) */
 const palmLocal = (side) => V(side * -0.0099, -0.0864, -0.0253);
+/** Centre of the curled right-hand grip, inside the fingers rather than on the palm surface. */
+const utensilGripLocal = V(-0.025, -0.09, 0);
 
 const smooth = (t) => t * t * (3 - 2 * t);
 function rampAt(t, keys) {
@@ -121,12 +123,12 @@ function handQuaternion(fingers, palmNormal) {
 }
 
 /** วางผิวฝ่ามือไว้ที่ contact โดยนิ้วชี้ไปทาง fingers และฝ่ามือหันไปทาง palmNormal */
-function placePalm(skeleton, side, contact, fingers, palmNormal) {
+function placePalm(skeleton, side, contact, fingers, palmNormal, pole = null) {
   const prefix = side < 0 ? "Left" : "Right";
   const hand = skeleton.map.get(`${prefix}Hand`);
   const handQ = handQuaternion(fingers, palmNormal);
   const wrist = contact.clone().sub(palmLocal(side).applyQuaternion(handQ));
-  const miss = solveLimb(skeleton.map.get(`${prefix}Arm`), skeleton.map.get(`${prefix}ForeArm`), hand, wrist, V(side * 0.7, -0.6, -0.4));
+  const miss = solveLimb(skeleton.map.get(`${prefix}Arm`), skeleton.map.get(`${prefix}ForeArm`), hand, wrist, pole ?? V(side * 0.7, -1, -0.2));
   setWorldQuaternion(hand, handQ);
   return miss;
 }
@@ -135,18 +137,39 @@ function placePalm(skeleton, side, contact, fingers, palmNormal) {
  * ถืออุปกรณ์: ปลายอุปกรณ์อยู่ที่ tip โดยด้ามพุ่งไปทาง fingers (ผิวฝ่ามือถอยหลังมา EAT_TIP_REACH)
  * ฝ่ามือหันไปทางเดียวกับที่หงายรับอาหาร — ปลายช้อนจึงอยู่ด้านบนของมือเสมอ
  */
-function placeUtensil(skeleton, tip, fingers) {
+function placeUtensil(skeleton, tip, fingers, pole) {
   const direction = fingers.clone().normalize();
-  const palm = tip.clone().addScaledVector(direction, -EAT_TIP_REACH);
   const palmNormal = V(0, 1, 0).sub(direction.clone().multiplyScalar(direction.y));
   if (palmNormal.lengthSq() < 1e-6) palmNormal.set(0, 0, -1);
-  return { miss: placePalm(skeleton, 1, palm, direction, palmNormal), palm };
+  const hand = skeleton.map.get("RightHand");
+  const upper = skeleton.map.get("RightArm");
+  const forearm = skeleton.map.get("RightForeArm");
+  let handQ = handQuaternion(direction, palmNormal);
+  let miss = 0;
+  let palm = V();
+  // A fixed grip keeps the handle aligned with the fingers. Solve the wrist and elbow together
+  // so the fixed utensil reaches the target without twisting or bending the hand at the wrist.
+  for (let i = 0; i < 100; i += 1) {
+    const gripDirection = V(0, -1, 0).applyQuaternion(handQ);
+    palm = tip.clone().addScaledVector(gripDirection, -EAT_TIP_REACH);
+    const wrist = palm.clone().sub(utensilGripLocal.clone().applyQuaternion(handQ));
+    miss = solveLimb(upper, forearm, hand, wrist, pole);
+    // Keep the hand in the forearm's own frame: aligning only the finger direction still permits
+    // an arbitrary twist around that direction, which visibly wrings the wrist.
+    handQ.slerp(forearm.getWorldQuaternion(new THREE.Quaternion()), 0.35);
+    hand.quaternion.identity();
+    hand.updateMatrixWorld(true);
+  }
+  skeleton.map.get("EatUtensilAnchor").quaternion.identity();
+  skeleton.root.updateMatrixWorld(true);
+  return { miss, palm };
 }
 
 const QUATERNION_BONES = [
   "Hips", "Spine", "Neck", "Head",
   "LeftArm", "RightArm", "LeftForeArm", "RightForeArm", "LeftHand", "RightHand",
   "LeftLeg", "RightLeg", "LeftLowerLeg", "RightLowerLeg", "LeftFoot", "RightFoot",
+  "EatUtensilAnchor",
 ];
 
 function createRecorder() {
@@ -195,6 +218,10 @@ function seatedPose(baseClips) {
 
 export default function createCustomerEatClips({ role, bones, baseClips }) {
   if (role !== "customer") throw new Error(`customer-eat รองรับเฉพาะ customer (ได้ ${role})`);
+  const anchor = new THREE.Group();
+  anchor.name = "EatUtensilAnchor";
+  anchor.position.copy(utensilGripLocal);
+  bones.get("RightHand").add(anchor);
   const skeleton = cloneSkeleton(bones);
   const seated = seatedPose(baseClips);
 
@@ -215,21 +242,24 @@ export default function createCustomerEatClips({ role, bones, baseClips }) {
     [0.78, [0.045, FOOD_SURFACE_Y + 0.13, PLATE_FORWARD - 0.02]],
     [1, [0.045, FOOD_SURFACE_Y + 0.075, PLATE_FORWARD]],
   ];
-  // ด้ามอุปกรณ์: ตอนตักพุ่งลงหน้า ตอนเข้าปากพุ่งขึ้นและถอยเข้าหาตัว
+  // ยกมือจากด้านข้างเข้าหาปาก: ตอนรับคำ มืออยู่ด้านหน้าและด้านขวาของปาก
+  // หมุนอุปกรณ์ผ่านด้านข้างเพื่อไม่ให้ทิศด้ามหดเป็นศูนย์หรือพลิกข้อมือ
   const handlePath = [
-    [0, [-0.06, -0.62, 0.78]],
-    [0.14, [-0.06, -0.66, 0.75]],
-    [0.26, [-0.09, -0.3, 0.6]],
-    [0.45, [-0.14, 0.5, -0.85]],
-    [0.58, [-0.12, 0.1, -0.4]],
-    [0.78, [-0.08, -0.5, 0.72]],
-    [1, [-0.06, -0.62, 0.78]],
+    [0, [-0.45, -0.16, 0.88]],
+    [0.14, [-0.45, -0.16, 0.88]],
+    [0.26, [-0.55, -0.18, 0.8]],
+    [0.34, [-1, -0.05, 0.05]],
+    [0.45, [-0.7, 0.05, -0.7]],
+    [0.58, [-0.9, -0.1, -0.4]],
+    [0.68, [-0.8, -0.18, 0.5]],
+    [0.78, [-0.3, -0.18, 0.95]],
+    [1, [-0.45, -0.16, 0.88]],
   ];
   /** มือซ้ายวางนิ่งบนผิวโต๊ะข้างจาน (ฝ่ามือคว่ำ) */
   const leftRest = V(-0.185, TABLE_SURFACE_Y, PLATE_FORWARD - 0.05);
   const leftFingers = V(0.1, 0, 0.995);
 
-  const frames = 48;
+  const frames = 96;
   const times = Array.from({ length: frames + 1 }, (_, i) => (EAT_DURATION * i) / frames);
   const recorder = createRecorder();
   let miss = 0;
@@ -254,7 +284,9 @@ export default function createCustomerEatClips({ role, bones, baseClips }) {
     const biteWeight = rampAt(t, [[0, 0], [0.3, 0], [0.45, 1], [0.56, 0], [1, 0]]);
     const liveMouth = skeleton.map.get("Head").localToWorld(MOUTH_LOCAL.clone());
     const tip = rampVector(t, tipPath).lerp(liveMouth.add(BITE_OFFSET), biteWeight);
-    const utensil = placeUtensil(skeleton, tip, rampVector(t, handlePath));
+    // Keep the forearm aligned with the hand at the plate, then lower the elbow as the hand rises.
+    const pole = V(1, -0.35, -1).lerp(V(0.7, -1, -0.2), rampAt(t, [[0, 0], [0.18, 0], [0.38, 1], [0.62, 1], [0.88, 0], [1, 0]]));
+    const utensil = placeUtensil(skeleton, tip, rampVector(t, handlePath), pole);
     miss = Math.max(miss, utensil.miss);
     recorder.capture(skeleton);
     trace.push({ t, tip, palm: utensil.palm });

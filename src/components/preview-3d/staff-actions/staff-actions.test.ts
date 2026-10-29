@@ -155,6 +155,16 @@ describe("staff-actions feature", () => {
     feature.update(frameOf(snapshot([wiping], 5)));
     expect(rig.getObject("RightHand")?.children.map(child => child.name)).toContain("StaffWipeCloth");
     expect(rig.getObject("LeftHand")?.children.map(child => child.name)).toContain("StaffCollectedPlate");
+    for (const [hand, name, palmX, thickness] of [
+      ["RightHand", "StaffWipeCloth", -0.014, 0.03],
+      ["LeftHand", "StaffCollectedPlate", 0.014, 0.025],
+    ] as const) {
+      const prop = rig.getObject(hand)!.getObjectByName(name)!;
+      const top = new THREE.Vector3(0, thickness / 2, 0).applyQuaternion(prop.quaternion).add(prop.position);
+      expect(top.distanceTo(new THREE.Vector3(palmX, -0.065, 0.008))).toBeLessThan(0.00001);
+      const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(prop.quaternion);
+      expect(normal.distanceTo(new THREE.Vector3(hand === "RightHand" ? 1 : -1, 0, 0))).toBeLessThan(0.00001);
+    }
     expect(feature.getStats().propMeshCount).toBe(2);
     expect(feature.getReports()[0]?.wipeProgress).toBeCloseTo(0.5, 6);
 
@@ -244,5 +254,37 @@ describe("staff-actions feature", () => {
     expect(rig.tray.visible).toBe(true);
     expect(other.tray.visible).toBe(false);
     many.dispose();
+  });
+
+  it("keeps ground speed and walk cycle progress when listRigs returns a fresh descriptor each frame", () => {
+    const preStartedWork = rig.mixer.clipAction(rig.clips.find(clip => clip.name === "Work")!);
+    preStartedWork.play();
+    const freshListFeature = createStaffActionsFeature({
+      rigs: { listRigs: () => [{ ...rig }] },
+      tableService,
+    })(context);
+    freshListFeature.syncLayout(layout());
+
+    const walking = staffMember({ activity: "walking", carryMealIds: [] });
+    freshListFeature.update(frameOf(snapshot([walking], 1.0, 0)));
+    expect(preStartedWork.isRunning()).toBe(true);
+
+    // Move the model across frames while listRigs() returns a new wrapper object every frame.
+    rig.model.position.set(0.02, 0, 0);
+    freshListFeature.update(frameOf(snapshot([walking], 1.02, 1)));
+    expect(freshListFeature.getReports()[0]).toMatchObject({ clip: "Walk", tier: "walk" });
+    expect(preStartedWork.isRunning()).toBe(false);
+
+    const walkAction = rig.mixer.clipAction(rig.clips.find(clip => clip.name === "Walk")!);
+    rig.mixer.update(0.1);
+    const timeAfterFirstStep = walkAction.time;
+    expect(timeAfterFirstStep).toBeGreaterThan(0);
+
+    // Next frame continues walking: action must not reset to t=0.
+    rig.model.position.set(0.04, 0, 0);
+    freshListFeature.update(frameOf(snapshot([walking], 1.04, 2)));
+    expect(freshListFeature.getReports()[0]?.clip).toBe("Walk");
+    expect(walkAction.time).toBeCloseTo(timeAfterFirstStep, 5);
+    freshListFeature.dispose();
   });
 });

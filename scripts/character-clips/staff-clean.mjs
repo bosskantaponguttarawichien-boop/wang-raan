@@ -26,7 +26,7 @@ const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const TABLE_BOX_CENTER_Y = 0.74;
 const TABLE_SURFACE_Y = TABLE_BOX_CENTER_Y + 0.02;
 /** ความหนาผ้าเช็ดในมือ — ผิวฝ่ามือจึงอยู่สูงกว่าผิวโต๊ะเท่านี้ตอนเช็ด */
-const CLOTH_THICKNESS = 0.006;
+const CLOTH_THICKNESS = 0.03;
 const WIPE_CONTACT_Y = TABLE_SURFACE_Y + CLOTH_THICKNESS;
 /** ความหนาจานที่เก็บ (CylinderGeometry ของ legacy serving props) */
 const PLATE_THICKNESS = 0.025;
@@ -41,7 +41,7 @@ const WIPE_PIVOT = V(0.175, 0, 0.16);
 const WIPE_SWEEP_CENTER = -0.05;
 const WIPE_SWEEP_HALF = 0.5;
 /** รัศมีวงกวาด: เริ่มจากขอบไกลแล้วรูดเข้าหาตัว */
-const WIPE_RADIUS_FAR = 0.44;
+const WIPE_RADIUS_FAR = 0.43;
 const WIPE_RADIUS_NEAR = 0.2;
 /** จำนวนรอบกวาดซ้าย-ขวาในหนึ่งคลิป */
 const WIPE_STROKES = 2.5;
@@ -50,8 +50,8 @@ const WIPE_DURATION = 4;
 /** phase ของ marker (normalized) */
 const MARKER_TIMES = { handContact: 0.12, wipeContact: 0.3, clearComplete: 0.82 };
 
-/** จุดกลางผิวฝ่ามือใน local ของกระดูก Hand (หน้า local −Z ของก้อนมือ) */
-const palmLocal = (side) => V(side * -0.0099, -0.0864, -0.0253);
+/** ผิวฝ่ามือจริงอยู่ด้านในลำตัว (local −X สำหรับมือขวา) */
+const palmLocal = (side) => V(side * -0.014, -0.065, 0.008);
 
 const smooth = (t) => t * t * (3 - 2 * t);
 function rampAt(t, keys) {
@@ -117,20 +117,21 @@ function solveLimb(root, mid, tip, target, pole) {
   return Math.abs(span - reach);
 }
 
-function handQuaternion(fingers, palmNormal) {
+function handQuaternion(fingers, palmNormal, side) {
   const y = fingers.clone().normalize().negate();
-  const z = palmNormal.clone().normalize().negate();
-  z.sub(y.clone().multiplyScalar(z.dot(y)));
-  if (z.lengthSq() < 1e-8) z.set(y.y, -y.x, 0);
-  z.normalize();
-  const x = new THREE.Vector3().crossVectors(y, z);
+  const x = palmNormal.clone().normalize().multiplyScalar(-side);
+  x.sub(y.clone().multiplyScalar(x.dot(y)));
+  if (x.lengthSq() < 1e-8) x.set(y.y, -y.x, 0);
+  x.normalize();
+  const z = new THREE.Vector3().crossVectors(x, y).normalize();
+  x.crossVectors(y, z).normalize();
   return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(x, y, z));
 }
 
 function placePalm(skeleton, side, contact, fingers, palmNormal) {
   const prefix = side < 0 ? "Left" : "Right";
   const hand = skeleton.map.get(`${prefix}Hand`);
-  const handQ = handQuaternion(fingers, palmNormal);
+  const handQ = handQuaternion(fingers, palmNormal, side);
   const wrist = contact.clone().sub(palmLocal(side).applyQuaternion(handQ));
   const miss = solveLimb(skeleton.map.get(`${prefix}Arm`), skeleton.map.get(`${prefix}ForeArm`), hand, wrist, V(side * 0.55, -0.55, -0.65));
   setWorldQuaternion(hand, handQ);
@@ -190,7 +191,7 @@ export default function createStaffCleanClips({ role, bones }) {
   const { handContact, wipeContact, clearComplete } = MARKER_TIMES;
   // มือซ้าย: ปล่อยข้างตัว → กดลงบนขอบจาน (hand-contact) → ยกจานขึ้นถือไว้จนจบคลิป
   const leftPath = [
-    [0, [-0.215, 0.73, 0.03]],
+    [0, [-0.215, 0.78, 0.03]],
     [handContact - 0.06, [-0.19, TABLE_SURFACE_Y + 0.1, PLATE_FORWARD - 0.08]],
     [handContact, [-0.17, TABLE_SURFACE_Y + PLATE_THICKNESS, PLATE_FORWARD - 0.05]],
     [handContact + 0.1, [-0.2, TABLE_SURFACE_Y + 0.17, PLATE_FORWARD - 0.14]],
@@ -198,7 +199,7 @@ export default function createStaffCleanClips({ role, bones }) {
     [1, CARRIED_PLATE.toArray()],
   ];
   // คีย์ถี่พอให้การ slerp ระหว่างคีย์ไม่ยกผ้าลอยจากผิวโต๊ะเกิน 2 มม. ตอนกวาดเร็ว
-  const frames = 96;
+  const frames = 192;
   const times = Array.from({ length: frames + 1 }, (_, i) => (WIPE_DURATION * i) / frames);
   const recorder = createRecorder();
   let miss = 0;
@@ -207,8 +208,8 @@ export default function createStaffCleanClips({ role, bones }) {
     // โน้มตัวและก้าวสะโพกเข้าหาโต๊ะช่วงเก็บจาน/เช็ด แล้วยืนขึ้นหลัง clear-complete
     const engaged = rampAt(t, [[0, 0], [handContact, 0.8], [wipeContact, 1], [clearComplete, 1], [0.94, 0.08], [1, 0]]);
     resetPose(skeleton);
-    skeleton.map.get("Hips").position.add(V(0, -0.07 * engaged, 0.16 * engaged));
-    skeleton.map.get("Spine").quaternion.setFromEuler(new THREE.Euler(0.6 * engaged, 0, 0));
+    skeleton.map.get("Hips").position.add(V(0, -0.05 * engaged, 0.16 * engaged));
+    skeleton.map.get("Spine").quaternion.setFromEuler(new THREE.Euler(0.48 * engaged, 0, 0));
     skeleton.map.get("Neck").quaternion.setFromEuler(new THREE.Euler(0.1 * engaged, 0, 0));
     skeleton.root.updateMatrixWorld(true);
     plantFeet(skeleton);
@@ -218,12 +219,12 @@ export default function createStaffCleanClips({ role, bones }) {
     const stroke = wipePoint(u);
     // ก่อน/หลังช่วงเช็ด มือขวายกขึ้นจากผิวโต๊ะแล้วกลับไปข้างตัว (ผ้ายังอยู่ในมือ)
     const rightContact = wiping ? stroke.point : rampVector(t, [
-      [0, [0.215, 0.73, 0.03]],
+      [0, [0.215, 0.78, 0.03]],
       [wipeContact - 0.1, [0.21, TABLE_SURFACE_Y + 0.16, 0.34]],
       [wipeContact, wipePoint(0).point.toArray()],
       [clearComplete, wipePoint(1).point.toArray()],
       [clearComplete + 0.08, [0.22, TABLE_SURFACE_Y + 0.17, 0.3]],
-      [1, [0.215, 0.73, 0.03]],
+      [1, [0.215, 0.78, 0.03]],
     ]);
     // ฝ่ามือกดลงบนผ้า นิ้วชี้ตามแนวกวาด; ตอนปล่อยมือ นิ้วห้อยลงเหมือนท่ายืน
     const wipeFingers = V(Math.sin(stroke.angle * 0.6), 0, Math.cos(stroke.angle * 0.6));

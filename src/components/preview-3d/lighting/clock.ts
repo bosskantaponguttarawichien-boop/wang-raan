@@ -1,12 +1,11 @@
 /**
- * Wall-Clock & Deterministic Fixed-Time Controller for Solar Lighting (`feat-120`).
+ * Simulation-driven & deterministic fixed-time solar lighting controller.
  *
  * Key Invariants:
- * 1. In `"realtime"` mode, reads wall-clock `nowMs()` (default `Date.now()`) and refreshes on a 60s cadence
- *    (plus immediately on start/visibility-resume/settings-change).
- * 2. NEVER couples to simulation `playbackRate` or `simTimeSeconds`.
+ * 1. Simulation mode reads opening time + elapsed simulation time from its injected source.
+ * 2. Never advances time using wall-clock timers or multiplies playback speed a second time.
  * 3. In `"fixed"` mode, resolves the user's configured `fixedDateTimeLocal` + `timezone` into a deterministic UTC instant.
- * 4. Pauses interval ticking when `document.visibilityState === "hidden"`, `prefers-reduced-motion: reduce`, or `@media print`.
+ * 4. Visibility/media changes refresh a static snapshot from the same simulation source.
  */
 import {
   BANGKOK_REFERENCE_DEFAULTS,
@@ -16,7 +15,23 @@ import {
 } from "./settings";
 import { computeSolarPosition, type SolarPositionResult } from "./solar-position";
 
+/** Lighting changes at simulation-minute boundaries, matching the displayed restaurant clock. */
 export const SOLAR_CLOCK_CADENCE_MS = 60_000;
+
+export function resolveRestaurantSolarUtcMs(
+  settings: LightingSettings,
+  openTime: string,
+  elapsedSeconds: number,
+): number {
+  const validOpening = /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(openTime) ? openTime : "10:00";
+  // Use the configured reference date, never today's date or the device's timezone.
+  const openingUtcMs = parseLocalDateTimeToUtcMs(
+    `${settings.fixedDateTimeLocal.slice(0, 10)}T${validOpening}`,
+    settings.timezone,
+  );
+  const elapsed = Number.isFinite(elapsedSeconds) ? Math.max(0, elapsedSeconds) : 0;
+  return openingUtcMs + Math.floor(elapsed / 60) * SOLAR_CLOCK_CADENCE_MS;
+}
 
 export interface SolarClockSnapshot {
   readonly settings: LightingSettings;
@@ -28,9 +43,6 @@ export interface SolarClockSnapshot {
 
 export interface SolarClockEnvironment {
   readonly nowMs?: () => number;
-  readonly cadenceMs?: number;
-  readonly setIntervalFn?: (cb: () => void, ms: number) => ReturnType<typeof setInterval>;
-  readonly clearIntervalFn?: (handle: ReturnType<typeof setInterval>) => void;
   readonly isDocumentHidden?: () => boolean;
   readonly isReducedMotionOrPrint?: () => boolean;
   readonly subscribeVisibility?: (onChange: () => void) => () => void;
@@ -85,7 +97,7 @@ function defaultSubscribeMedia(onChange: () => void): () => void {
 
 export function resolveEffectiveSolarUtcMs(
   settings: LightingSettings,
-  nowMs: () => number = () => Date.now(),
+  nowMs: () => number = () => resolveRestaurantSolarUtcMs(settings, "10:00", 0),
 ): number {
   if (settings.mode === "fixed") {
     return parseLocalDateTimeToUtcMs(settings.fixedDateTimeLocal, settings.timezone);
@@ -97,17 +109,12 @@ export function createSolarClock(
   initialSettings: Partial<LightingSettings> = {},
   env: SolarClockEnvironment = {},
 ): SolarClockController {
-  const nowMs = env.nowMs ?? (() => Date.now());
-  const cadenceMs = Math.max(1000, env.cadenceMs ?? SOLAR_CLOCK_CADENCE_MS);
-  const setIntervalFn = env.setIntervalFn ?? ((cb, ms) => setInterval(cb, ms));
-  const clearIntervalFn = env.clearIntervalFn ?? ((id) => clearInterval(id));
   const isDocumentHidden = env.isDocumentHidden ?? defaultIsDocumentHidden;
   const isReducedMotionOrPrint = env.isReducedMotionOrPrint ?? defaultIsReducedMotionOrPrint;
   const subscribeVisibility = env.subscribeVisibility ?? defaultSubscribeVisibility;
   const subscribeMedia = env.subscribeMedia ?? defaultSubscribeMedia;
 
   let settings = sanitizeLightingSettings(initialSettings, BANGKOK_REFERENCE_DEFAULTS);
-  let timerHandle: ReturnType<typeof setInterval> | null = null;
   let unsubscribeVisibility: (() => void) | null = null;
   let unsubscribeMedia: (() => void) | null = null;
   let started = false;
@@ -116,7 +123,7 @@ export function createSolarClock(
   const listeners = new Set<(snapshot: SolarClockSnapshot) => void>();
 
   const computeCurrentSnapshot = (): SolarClockSnapshot => {
-    const effectiveUtcMs = resolveEffectiveSolarUtcMs(settings, nowMs);
+    const effectiveUtcMs = resolveEffectiveSolarUtcMs(settings, env.nowMs);
     const solar = computeSolarPosition(effectiveUtcMs, {
       latitude: settings.latitude,
       longitude: settings.longitude,
@@ -139,47 +146,10 @@ export function createSolarClock(
     }
   };
 
-  const clearTimer = (): void => {
-    if (timerHandle !== null) {
-      clearIntervalFn(timerHandle);
-      timerHandle = null;
-    }
-  };
-
-  const shouldTickInterval = (): boolean => {
-    if (!started || disposed) return false;
-    if (settings.mode !== "realtime") return false;
-    if (isDocumentHidden()) return false;
-    if (isReducedMotionOrPrint()) return false;
-    return true;
-  };
-
-  const syncTimer = (): void => {
-    if (!shouldTickInterval()) {
-      clearTimer();
-      return;
-    }
-    if (timerHandle !== null) return;
-    timerHandle = setIntervalFn(() => {
-      if (!shouldTickInterval()) {
-        clearTimer();
-        return;
-      }
-      snapshot = computeCurrentSnapshot();
-      notify();
-    }, cadenceMs);
-  };
-
   const handleEnvironmentSignal = (): void => {
     if (disposed) return;
-    const wasHidden = snapshot.hidden;
     snapshot = computeCurrentSnapshot();
-    syncTimer();
-    if (wasHidden && !snapshot.hidden) {
-      notify();
-    } else {
-      notify();
-    }
+    notify();
   };
 
   return {
@@ -189,14 +159,12 @@ export function createSolarClock(
       unsubscribeVisibility = subscribeVisibility(handleEnvironmentSignal);
       unsubscribeMedia = subscribeMedia(handleEnvironmentSignal);
       snapshot = computeCurrentSnapshot();
-      syncTimer();
       notify();
     },
 
     stop(): void {
       if (!started) return;
       started = false;
-      clearTimer();
       unsubscribeVisibility?.();
       unsubscribeVisibility = null;
       unsubscribeMedia?.();
@@ -213,7 +181,6 @@ export function createSolarClock(
     refreshNow(): SolarClockSnapshot {
       if (disposed) return snapshot;
       snapshot = computeCurrentSnapshot();
-      syncTimer();
       notify();
       return snapshot;
     },
@@ -226,7 +193,6 @@ export function createSolarClock(
       if (disposed) return snapshot;
       settings = sanitizeLightingSettings(patch, settings);
       snapshot = computeCurrentSnapshot();
-      syncTimer();
       notify();
       return snapshot;
     },
@@ -240,7 +206,7 @@ export function createSolarClock(
     },
 
     isRunning(): boolean {
-      return timerHandle !== null;
+      return false; // No independent timer; the simulation store drives refreshes.
     },
   };
 }

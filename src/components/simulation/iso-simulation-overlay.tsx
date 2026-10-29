@@ -10,7 +10,8 @@
  */
 import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
-import type { PresentationSnapshot, TableSurface } from "@/core/simulation/presentation-contract";
+import type { CustomerThought, PresentationSnapshot, StaffThought, TableSurface } from "@/core/simulation/presentation-contract";
+import { CLOUD_PATH, getEmoteConfig } from "./character-thought-bubble";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
 import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
@@ -137,6 +138,78 @@ interface Walker {
  * Canvas ทับฉาก 3D — ต้องอยู่ในกล่องเดียวกับ SVG (ขนาดเท่ากัน)
  * มุมมองหมุน: `layout` คือผังที่หมุนแล้ว (ตรงกับฉาก) และ `planSize` คือขนาดผังจริงที่ใช้แปลงพิกัดลูกค้า
  */
+
+export function drawThoughtBubble(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  thought: CustomerThought | StaffThought,
+  size: number,
+) {
+  const config = getEmoteConfig(thought);
+  const bubbleY = cy - 32 * size;
+
+  ctx.save();
+  const fillColor =
+    config.severity === "critical"
+      ? "#fff1f2"
+      : config.severity === "warning"
+      ? "#fffbeb"
+      : "#ffffff";
+
+  const strokeColor =
+    config.severity === "critical"
+      ? "#f43f5e"
+      : config.severity === "warning"
+      ? "#f59e0b"
+      : "#64748b";
+
+  const scaleFactor = 0.38 * size;
+  ctx.save();
+  ctx.translate(cx - 36 * size, bubbleY - 24 * size);
+  ctx.scale(scaleFactor, scaleFactor);
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (typeof Path2D !== "undefined") {
+    const cloud = new Path2D(CLOUD_PATH);
+    ctx.fill(cloud);
+    ctx.stroke(cloud);
+  } else {
+    ctx.beginPath();
+    ctx.arc(50, 30, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Tail circles
+  ctx.beginPath();
+  ctx.arc(66, 66, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(75, 77, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Emoji and badge text
+  ctx.font = `${Math.round(11 * size)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const text = config.badgeText ? `${config.emoji} ${config.badgeText}` : config.emoji;
+  ctx.fillStyle = config.severity === "critical" ? "#881337" : config.severity === "warning" ? "#78350f" : "#475569";
+  ctx.fillText(text, cx - 16 * size, bubbleY - 13 * size);
+  ctx.restore();
+}
+
 export function IsoSimulationOverlay({
   scene,
   layout,
@@ -151,6 +224,11 @@ export function IsoSimulationOverlay({
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const status = useSimulationStore((s) => s.status);
   const active = status === "running" || status === "paused";
+  const showThoughts = useSimulationStore((s) => s.showThoughts);
+  const showThoughtsRef = React.useRef(showThoughts);
+  React.useLayoutEffect(() => {
+    showThoughtsRef.current = showThoughts;
+  });
   // อ่านผังผ่าน ref — ไม่ใส่ใน deps ของ effect ข้างล่าง (ผังล็อกระหว่างจำลองอยู่แล้ว และไม่อยากเริ่ม loop/สถานะท่าเดินใหม่)
   const layoutRef = React.useRef(layout);
   const viewRef = React.useRef({ rotation: viewRotation, plan: planSize ?? layout });
@@ -284,6 +362,14 @@ export function IsoSimulationOverlay({
           ring: isStaff ? STAFF_COLOR : (AGENT_COLORS[sprite.state] ?? AGENT_COLORS[0]),
           size,
         });
+        if (showThoughtsRef.current && current.presentation) {
+          const thought = isStaff
+            ? current.presentation.staff[-(sprite.id + 1)]?.thought
+            : current.presentation.customers.find((c) => c.renderAgentId === sprite.id)?.thought;
+          if (thought) {
+            drawThoughtBubble(ctx, sprite.x, sprite.y, thought, size);
+          }
+        }
       }
       for (const id of walkers.keys()) if (!seen.has(id)) walkers.delete(id);
     };
@@ -330,7 +416,6 @@ export function IsoHeatmapLayer({
   const status = useSimulationStore((s) => s.status);
   const showHeatmap = useSimulationStore((s) => s.showHeatmap);
   const active = status === "running" || status === "paused";
-
   React.useEffect(() => {
     const image = imageRef.current;
     if (!image) return;

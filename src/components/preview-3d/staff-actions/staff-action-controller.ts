@@ -158,9 +158,11 @@ export function resolveStaffAction(input: StaffActionInput): StaffActionDecision
       return { ...base, clip: "Work", tier: "task", loop: true, phase: reducedMotion ? 0 : null,
         timeScale: reducedMotion ? 0 : 1, props: IDLE_PROPS };
     case "carrying":
-    case "walking": {
+    case "walking":
+    case "counter":
+    default: {
       const moving = input.groundSpeed > STANDING_SPEED_EPSILON;
-      if (meals.length > 0) {
+      if (meals.length > 0 && staff.activity !== "counter") {
         return { ...base, clip: moving ? "CarryWalk" : "CarryIdle", tier: "carry", loop: true,
           phase: reducedMotion ? 0 : null, timeScale: reducedMotion ? 0 : moving ? walkTimeScale() : 1,
           props: trayProps(meals, true) };
@@ -169,10 +171,6 @@ export function resolveStaffAction(input: StaffActionInput): StaffActionDecision
         phase: reducedMotion ? 0 : null, timeScale: reducedMotion ? 0 : moving ? walkTimeScale() : 1,
         props: IDLE_PROPS };
     }
-    case "counter":
-    default:
-      return { ...base, clip: "Work", tier: "base", loop: true, phase: reducedMotion ? 0 : null,
-        timeScale: reducedMotion ? 0 : 1, props: IDLE_PROPS };
   }
 }
 

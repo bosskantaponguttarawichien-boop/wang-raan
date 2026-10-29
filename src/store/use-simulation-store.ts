@@ -26,10 +26,12 @@ export interface SimulationStoreState {
   seats: number;
   config: SimulationConfigState;
   showHeatmap: boolean;
+  showThoughts: boolean;
   /** ผลวิเคราะห์ทั้งวันรอบล่าสุด (feat-094/094) */
   analysis: DayAnalysis | null;
   setConfig: (patch: Partial<SimulationConfigState>) => void;
   setShowHeatmap: (show: boolean) => void;
+  setShowThoughts: (show: boolean) => void;
 }
 
 /** ฐานเวลา x1 = เวลาจริง — ลูกค้าและพนักงานเดินเท่าคนจริง */
@@ -44,9 +46,11 @@ export function createSimulationStore() {
     seats: 0,
     config: { ...DEFAULT_DAY_CONFIG, speed: 1 },
     showHeatmap: true,
+    showThoughts: true,
     analysis: null,
     setConfig: (patch) => set({ config: { ...get().config, ...patch } }),
     setShowHeatmap: (showHeatmap) => set({ showHeatmap }),
+    setShowThoughts: (showThoughts) => set({ showThoughts }),
   }));
 }
 

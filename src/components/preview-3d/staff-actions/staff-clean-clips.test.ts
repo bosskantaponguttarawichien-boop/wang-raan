@@ -25,8 +25,8 @@ const TABLE_BOX_CENTER_Y = 0.74;
 const TABLE_SURFACE_Y = TABLE_BOX_CENTER_Y + 0.02;
 const PLATE_THICKNESS = 0.025;
 /** ความหนาผ้าเช็ด — ผิวฝ่ามือกดผ้าอยู่สูงกว่าผิวโต๊ะเท่านี้ */
-const CLOTH_THICKNESS = 0.006;
-const palmLocal = (side: number) => new THREE.Vector3(side * -0.0099, -0.0864, -0.0253);
+const CLOTH_THICKNESS = 0.03;
+const palmLocal = (side: number) => new THREE.Vector3(side * -0.014, -0.065, 0.008);
 
 const directory = mkdtempSync(join(tmpdir(), "wangraan-clean-test-"));
 afterAll(() => {
@@ -137,6 +137,9 @@ describe("feat-111 staff clean clip", () => {
     for (let frame = 0; frame <= 60; frame += 1) {
       const phase = from + ((to - from) * frame) / 60;
       const palm = at(phase).palm(1);
+      const hand = cleaning.scene.getObjectByName("RightHand")!;
+      const normal = new THREE.Vector3(-1, 0, 0).applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+      expect(normal.dot(new THREE.Vector3(0, -1, 0))).toBeGreaterThan(0.99);
       // ผิวฝ่ามือกดผ้าอยู่บนโต๊ะพอดี — ไม่ลอยและไม่จมผิวโต๊ะ (เผื่อ slerp ระหว่างคีย์ 2 มม.)
       expect(Math.abs(palm.y - (TABLE_SURFACE_Y + CLOTH_THICKNESS))).toBeLessThan(0.002);
       samples.push(palm);
@@ -183,7 +186,7 @@ describe("feat-111 staff clean clip", () => {
       // ส่วนที่ยื่นเหนือโต๊ะ (ไม่รวมขาที่ลอดใต้ขอบโต๊ะได้) ต้องไม่ต่ำกว่าผิวโต๊ะ
       for (let vertex = 0; vertex < sample.mesh.geometry.getAttribute("position").count; vertex += 1) {
         sample.mesh.getVertexPosition(vertex, point);
-        if (point.z >= 0.3 && point.y >= 0.5) expect(point.y).toBeGreaterThanOrEqual(TABLE_SURFACE_Y);
+        if (point.z >= 0.3 && point.y >= 0.5) expect(point.y, `frame ${frame}, vertex ${vertex}`).toBeGreaterThanOrEqual(TABLE_SURFACE_Y);
       }
     }
   }, 60000);

@@ -18,6 +18,19 @@ it("waits for the displayed seat/service point before playing eating or interact
   expect(arrived.customers[0]!.activity).toBe("eating");
   expect(arrived.staff[0]!.activity).toBe("wiping");
   expect(alignPresentation(snapshot, new Float32Array(), new Float32Array([0, 0, 0, 5])).staff[0]!.activity).toBe("pickup");
+
+  // Clearing before reaching servicePoint and counter while StaffPacer is still walking back (code=1 or 3).
+  const clearingSnapshot: PresentationSnapshot = {
+    ...snapshot,
+    staff: [
+      { ...snapshot.staff[0]!, activity: "clearing" },
+      { ...snapshot.staff[0]!, staffId: 1, activity: "counter", servicePoint: null },
+    ],
+  };
+  const aligned = alignPresentation(clearingSnapshot, new Float32Array(), new Float32Array([0, 0, 0, 2, 1, 2, 2, 1]));
+  expect(aligned.staff[0]!.activity).toBe("walking");
+  expect(aligned.staff[1]!.activity).toBe("walking");
+
   expect(snapshot.customers[0]!.activity).toBe("eating");
   expect(snapshot.staff[0]!.activity).toBe("wiping");
   expect(approaching.tables).toBe(snapshot.tables);

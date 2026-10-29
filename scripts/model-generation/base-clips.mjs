@@ -52,8 +52,9 @@ export function createBaseClips(rig, role) {
     eulerTrack("RightHand", idleCycle, () => [-0.06, 0, -0.06]),
   ]);
 
-  // ---- Work (พนักงาน): ยืนหลังเคาน์เตอร์ มือสองข้างวางทำงานบนเคาน์เตอร์ (ข้อมือสูง ~1 ม. หน้าตัว ~0.3 ม.) ก้มมองมือ
-  // มือขยับสลับกันเหมือนกดเครื่องคิดเงิน/จัดของ, ราวกลางคลิปเงยหน้ามองไปหน้าร้าน แล้วก้มกลับ, ตัวโยกช้า ๆ
+  // ---- Work (พนักงาน): ยืนหลังเคาน์เตอร์ มือสองข้างวางทำงานบนท็อปเคาน์เตอร์ (ท็อปสูง 1.05 ม. หน้าตัว ~0.35 ม.)
+  // หลังตั้งตรงเป็นธรรมชาติ คอก้มมองงานหน้าเคาน์เตอร์พอดีเห็นหน้าชัดจากมุมไอโซเมตริก มือทำงาน/เคาะแคชเชียร์สลับจัดของ
+  // กลางคลิปเงยหน้าสบตาลูกค้าหน้าร้านพร้อมรอยยิ้ม/หันหัวทักทาย แล้วกลับมาก้มทำงานต่อ
   const WORK_DURATION = 8;
   const workCycle = sampled(WORK_DURATION, 96);
   // 0 → 1 → 0 ช่วงเงยหน้า (กลางคลิป) แบบนุ่ม
@@ -67,22 +68,56 @@ export function createBaseClips(rig, role) {
     }));
   const work = new THREE.AnimationClip("Work", WORK_DURATION, [
     new THREE.VectorKeyframeTrack("Hips.position", workCycle.times,
-      workCycle.phases.flatMap((phase) => [0.008 * Math.sin(phase), HIPS_Y - 0.003, 0])),
-    eulerTrack("LeftLeg", workCycle, (phase) => [0, 0, -0.01 * Math.sin(phase)]),
-    eulerTrack("RightLeg", workCycle, (phase) => [0, 0, -0.01 * Math.sin(phase)]),
-    eulerTrack("LeftFoot", workCycle, (phase) => [0, 0, 0.01 * Math.sin(phase)]),
-    eulerTrack("RightFoot", workCycle, (phase) => [0, 0, 0.01 * Math.sin(phase)]),
-    eulerTrack("Spine", workCycle, (phase) => [0.09 - 0.05 * lookUp(phase) - 0.01 * (0.5 - 0.5 * Math.cos(phase * 4)), 0.03 * Math.sin(phase * 2), -0.012 * Math.sin(phase)]),
-    eulerTrack("Neck", workCycle, (phase) => [0.16 - 0.16 * lookUp(phase), 0.04 * Math.sin(phase * 3), 0]),
-    eulerTrack("Head", workCycle, (phase) => [0.2 - 0.22 * lookUp(phase), 0.06 * Math.sin(phase * 2 + 0.4) + 0.12 * lookUp(phase), 0]),
-    // ต้นแขนยื่นไปหน้า ปลายแขนเกือบขนานพื้นและหมุนเข้าหากลางตัว — มือขยับขึ้นลงสลับกัน (ความถี่สูงกว่าตัวโยก)
-    eulerTrack("LeftArm", workCycle, (phase) => [-0.32 + 0.04 * Math.sin(phase * 5), 0, 0.1], "YXZ"),
-    eulerTrack("RightArm", workCycle, (phase) => [-0.3 + 0.04 * Math.sin(phase * 5 + 2.2), 0, -0.1], "YXZ"),
-    // คว่ำมือลงบนเคาน์เตอร์: บิดรอบแกนท่อนแขน แบ่งครึ่งระหว่างปลายแขนกับข้อมือ (บิดที่เดียวผิวจะเป็นเกลียว)
-    pronatedTrack("LeftForeArm", (phase) => [-1.16 - 0.06 * Math.sin(phase * 5 + 0.6) + 0.1 * lookUp(phase), 0.35], 0.75),
-    pronatedTrack("RightForeArm", (phase) => [-1.14 - 0.06 * Math.sin(phase * 5 + 2.8) + 0.1 * lookUp(phase), -0.35], -0.8),
-    eulerTrack("LeftHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 1.2), 0.75, 0], "YXZ"),
-    eulerTrack("RightHand", workCycle, (phase) => [0.12 + 0.08 * Math.sin(phase * 5 + 3.4), -0.8, 0], "YXZ"),
+      workCycle.phases.flatMap((phase) => [0.006 * Math.sin(phase), HIPS_Y - 0.002, 0])),
+    eulerTrack("LeftLeg", workCycle, (phase) => [0, 0, -0.008 * Math.sin(phase)]),
+    eulerTrack("RightLeg", workCycle, (phase) => [0, 0, -0.008 * Math.sin(phase)]),
+    eulerTrack("LeftFoot", workCycle, (phase) => [0, 0, 0.008 * Math.sin(phase)]),
+    eulerTrack("RightFoot", workCycle, (phase) => [0, 0, 0.008 * Math.sin(phase)]),
+    eulerTrack("Spine", workCycle, (phase) => [
+      0.035 - 0.025 * lookUp(phase) - 0.008 * (0.5 - 0.5 * Math.cos(phase * 4)),
+      0.02 * Math.sin(phase * 2),
+      -0.01 * Math.sin(phase),
+    ]),
+    eulerTrack("Neck", workCycle, (phase) => [
+      0.05 - 0.08 * lookUp(phase) + 0.015 * Math.sin(phase * 3),
+      0.03 * Math.sin(phase * 2),
+      0,
+    ]),
+    eulerTrack("Head", workCycle, (phase) => [
+      0.06 - 0.10 * lookUp(phase) + 0.02 * Math.sin(phase * 2 + 0.5),
+      0.05 * Math.sin(phase * 2 + 0.4) + 0.12 * lookUp(phase),
+      0,
+    ]),
+    // ต้นแขนยื่นไปข้างหน้าและกางออกข้างสบาย ๆ ศอกพับไปข้างหน้าเหนือขอบเคาน์เตอร์
+    eulerTrack("LeftArm", workCycle, (phase) => [
+      -0.54 + 0.02 * Math.sin(phase * 4),
+      0.04,
+      0.18,
+    ], "YXZ"),
+    eulerTrack("RightArm", workCycle, (phase) => [
+      -0.52 + 0.025 * Math.sin(phase * 6 + 1.2),
+      -0.04,
+      -0.18,
+    ], "YXZ"),
+    // ท่อนแขนและมือวางคว่ำทำงานบนท็อปเคาน์เตอร์ (y ≥ 1.05 ม. เสมอ ไม่จมท็อป) ขยับมือทำงานสลับจังหวะ
+    pronatedTrack("LeftForeArm", (phase) => [
+      -1.12 - 0.03 * Math.sin(phase * 4 + 0.8) + 0.05 * lookUp(phase),
+      0.12 - 0.02 * Math.sin(phase * 2),
+    ], 0.65),
+    pronatedTrack("RightForeArm", (phase) => [
+      -1.10 - 0.035 * Math.sin(phase * 6 + 1.8) + 0.05 * lookUp(phase),
+      -0.12 + 0.02 * Math.sin(phase * 2),
+    ], -0.65),
+    eulerTrack("LeftHand", workCycle, (phase) => [
+      0.16 + 0.04 * Math.sin(phase * 4 + 1.4),
+      0.15,
+      0,
+    ], "YXZ"),
+    eulerTrack("RightHand", workCycle, (phase) => [
+      0.16 + 0.045 * Math.sin(phase * 6 + 2.4),
+      -0.15,
+      0,
+    ], "YXZ"),
   ]);
 
   // Solve a two-bone leg toward a planted/swinging ankle instead of swinging

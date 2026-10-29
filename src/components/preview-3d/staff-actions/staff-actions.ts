@@ -34,15 +34,15 @@ import {
 
 /** Reach of the WipeTable sweep, mirroring WIPE_FOOTPRINT in scripts/character-clips/staff-clean.mjs. */
 export const DEFAULT_WIPE_FOOTPRINT: WipeFootprint = Object.freeze({
-  bounds: Object.freeze([-0.0362, 0.3608, 0.3598, 0.6]) as unknown as readonly [number, number, number, number],
-  radiusFar: 0.44,
+  bounds: Object.freeze([-0.0498, 0.362, 0.3598, 0.59]) as unknown as readonly [number, number, number, number],
+  radiusFar: 0.43,
 });
 
-/** Cloth and plate sizes follow the clip comments: cloth 6 mm thick, plate 25 mm. */
-const CLOTH_SIZE = Object.freeze({ width: 0.17, height: 0.006, depth: 0.14 });
+/** Cloth and plate sizes follow the clip comments: cloth 30 mm thick, plate 25 mm. */
+const CLOTH_SIZE = Object.freeze({ width: 0.17, height: 0.03, depth: 0.14 });
 const PLATE_SIZE = Object.freeze({ radius: 0.105, height: 0.025 });
-/** Palm-surface offset inside the Hand bone, shared by every clip provider. */
-const PALM_LOCAL = Object.freeze({ x: -0.0099, y: -0.0864, z: -0.0253 });
+/** Inner palm surface in each hand's local frame. */
+const PALM_LOCAL = Object.freeze({ x: -0.014, y: -0.065, z: 0.008 });
 
 export interface StaffActionsFeature extends SceneFeature {
   /** What the feature decided for every rig in the last update — used by feat-122/123. */
@@ -56,7 +56,7 @@ export interface StaffActionsFeature extends SceneFeature {
 }
 
 interface RigState {
-  readonly rig: StaffRig;
+  rig: StaffRig;
   /** Actions this feature created, so release only stops what it started. */
   readonly actions: Map<string, THREE.AnimationAction>;
   active: THREE.AnimationAction | null;
@@ -98,7 +98,7 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
 
     const clothMesh = () => {
       clothGeometry ??= new THREE.BoxGeometry(CLOTH_SIZE.width, CLOTH_SIZE.height, CLOTH_SIZE.depth);
-      clothMaterial ??= new THREE.MeshStandardMaterial({ color: 0xdfe6ef, roughness: 0.9 });
+      clothMaterial ??= new THREE.MeshStandardMaterial({ color: 0x88adb8, roughness: 0.9 });
       const mesh = new THREE.Mesh(clothGeometry, clothMaterial);
       mesh.name = "StaffWipeCloth";
       return mesh;
@@ -115,7 +115,12 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
     const attachProp = (rig: StaffRig, mesh: THREE.Mesh, hand: "LeftHand" | "RightHand", lift: number) => {
       const bone = rig.getObject(hand);
       (bone ?? context.root).add(mesh);
-      if (bone) mesh.position.set(PALM_LOCAL.x, PALM_LOCAL.y - lift, PALM_LOCAL.z);
+      if (bone) {
+        const side = hand === "RightHand" ? 1 : -1;
+        // The hand mesh is thin along X; its inner surface faces -X on the right.
+        mesh.position.set(side * (PALM_LOCAL.x - lift), PALM_LOCAL.y, PALM_LOCAL.z);
+        mesh.rotation.z = -side * Math.PI / 2;
+      }
       mesh.castShadow = false;
       return mesh;
     };
@@ -139,7 +144,11 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
 
     const stateFor = (rig: StaffRig): RigState => {
       let state = states.get(rig.staffId);
-      if (state && state.rig === rig) return state;
+      if (state && state.rig.model === rig.model && state.rig.mixer === rig.mixer) {
+        state.rig = rig;
+        if (state.trayVisibleBefore === null && rig.tray) state.trayVisibleBefore = rig.tray.visible;
+        return state;
+      }
       if (state) releaseRig(state);
       state = {
         rig, actions: new Map(), active: null, activeName: null, cloth: null, plate: null,
@@ -165,7 +174,8 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
       if (!action) return;
       if (state.activeName !== name) {
         // Carry and walk share the lower body; a crossfade would make the arms fight, so swap.
-        if (state.active && state.active !== action) state.active.stop();
+        if (!state.active) state.rig.mixer.stopAllAction();
+        else if (state.active !== action) state.active.stop();
         action.reset();
         action.play();
         state.active = action;

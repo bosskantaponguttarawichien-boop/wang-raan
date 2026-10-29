@@ -1,18 +1,18 @@
 /**
  * Zustand Store for Solar & Scene Lighting Settings (`feat-120`).
  *
- * Kept strictly separate from `use-layout-store.ts`, `use-simulation-store.ts`, and `day-config.ts`
- * so lighting/solar adjustments never pollute Undo/Redo layout history or simulation RNG state.
+ * Reads the simulation clock without writing layout history, simulation configuration or RNG state.
  */
 import { useStore } from "zustand";
-import { createStore } from "zustand/vanilla";
+import { createStore, type StoreApi } from "zustand/vanilla";
+import { simulationStore, type SimulationStoreState } from "./use-simulation-store";
 import {
   BANGKOK_REFERENCE_DEFAULTS,
   sanitizeLightingSettings,
   type LightingClockMode,
   type LightingSettings,
 } from "@/components/preview-3d/lighting/settings";
-import { resolveEffectiveSolarUtcMs } from "@/components/preview-3d/lighting/clock";
+import { resolveEffectiveSolarUtcMs, resolveRestaurantSolarUtcMs } from "@/components/preview-3d/lighting/clock";
 import {
   computeSolarPosition,
   type SolarPositionResult,
@@ -28,13 +28,13 @@ export interface LightingStoreState {
   setNorthOffsetDegrees: (northOffsetDegrees: number, nowMs?: () => number) => void;
   setFixedDateTimeLocal: (fixedDateTimeLocal: string, nowMs?: () => number) => void;
   setTimezone: (timezone: string, nowMs?: () => number) => void;
-  refreshRealtime: (nowMs?: () => number) => void;
+  refreshSimulation: (nowMs?: () => number) => void;
   resetToBangkokDefaults: (nowMs?: () => number) => void;
 }
 
 function buildStateFromSettings(
   settings: LightingSettings,
-  nowMs: () => number = () => Date.now(),
+  nowMs: () => number,
 ): Pick<LightingStoreState, "settings" | "effectiveUtcMs" | "solar"> {
   const effectiveUtcMs = resolveEffectiveSolarUtcMs(settings, nowMs);
   const solar = computeSolarPosition(effectiveUtcMs, {
@@ -51,44 +51,56 @@ function buildStateFromSettings(
 
 export function createLightingStore(
   initialPatch: Partial<LightingSettings> = {},
-  defaultNowMs: () => number = () => Date.now(),
+  timeSource?: () => number,
+  simulation: StoreApi<SimulationStoreState> = simulationStore,
 ) {
+  const getSimulationUtcMs = (settings: LightingSettings): number => {
+    if (timeSource) return timeSource();
+    const state = simulation.getState();
+    const elapsed = state.status === "running" || state.status === "paused"
+      ? state.metrics?.time ?? 0 : 0;
+    return resolveRestaurantSolarUtcMs(settings, state.config.openTime, elapsed);
+  };
   const initialSettings = sanitizeLightingSettings(initialPatch, BANGKOK_REFERENCE_DEFAULTS);
-  const initialComputed = buildStateFromSettings(initialSettings, defaultNowMs);
+  const initialComputed = buildStateFromSettings(initialSettings, () => getSimulationUtcMs(initialSettings));
 
-  return createStore<LightingStoreState>()((set, get) => ({
+  const store = createStore<LightingStoreState>()((set, get) => ({
     ...initialComputed,
-    setSettings: (patch, nowMs = defaultNowMs) => {
+    setSettings: (patch, nowMs) => {
       const next = sanitizeLightingSettings(patch, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+      set(buildStateFromSettings(next, nowMs ?? (() => getSimulationUtcMs(next))));
     },
-    setMode: (mode, nowMs = defaultNowMs) => {
-      const next = sanitizeLightingSettings({ mode }, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+    setMode: (mode, nowMs) => {
+      get().setSettings({ mode }, nowMs);
     },
-    setCoordinates: (latitude, longitude, nowMs = defaultNowMs) => {
-      const next = sanitizeLightingSettings({ latitude, longitude }, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+    setCoordinates: (latitude, longitude, nowMs) => {
+      get().setSettings({ latitude, longitude }, nowMs);
     },
-    setNorthOffsetDegrees: (northOffsetDegrees, nowMs = defaultNowMs) => {
-      const next = sanitizeLightingSettings({ northOffsetDegrees }, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+    setNorthOffsetDegrees: (northOffsetDegrees, nowMs) => {
+      get().setSettings({ northOffsetDegrees }, nowMs);
     },
-    setFixedDateTimeLocal: (fixedDateTimeLocal, nowMs = defaultNowMs) => {
-      const next = sanitizeLightingSettings({ fixedDateTimeLocal }, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+    setFixedDateTimeLocal: (fixedDateTimeLocal, nowMs) => {
+      get().setSettings({ fixedDateTimeLocal }, nowMs);
     },
-    setTimezone: (timezone, nowMs = defaultNowMs) => {
-      const next = sanitizeLightingSettings({ timezone }, get().settings);
-      set(buildStateFromSettings(next, nowMs));
+    setTimezone: (timezone, nowMs) => {
+      get().setSettings({ timezone }, nowMs);
     },
-    refreshRealtime: (nowMs = defaultNowMs) => {
-      set(buildStateFromSettings(get().settings, nowMs));
+    refreshSimulation: (nowMs) => {
+      const settings = get().settings;
+      const source = nowMs ?? (() => getSimulationUtcMs(settings));
+      const effectiveUtcMs = resolveEffectiveSolarUtcMs(settings, source);
+      if (effectiveUtcMs !== get().effectiveUtcMs) set(buildStateFromSettings(settings, source));
     },
-    resetToBangkokDefaults: (nowMs = defaultNowMs) => {
-      set(buildStateFromSettings({ ...BANGKOK_REFERENCE_DEFAULTS }, nowMs));
+    resetToBangkokDefaults: (nowMs) => {
+      const settings = { ...BANGKOK_REFERENCE_DEFAULTS };
+      set(buildStateFromSettings(settings, nowMs ?? (() => getSimulationUtcMs(settings))));
     },
   }));
+
+  // Worker metrics already include playback speed. Refresh once per simulated minute;
+  // no wall-clock interval, including while paused, hidden, or viewing the 2D editor.
+  const unsubscribe = simulation.subscribe(() => store.getState().refreshSimulation());
+  return Object.assign(store, { dispose: unsubscribe });
 }
 
 export const lightingStore = createLightingStore();

@@ -582,3 +582,12 @@
 - GateของAgent1ผ่านบนสำเนาฐานtracked6a37025+115:84files/1043tests,lint/typecheck,boundary53source/Harness;targeted65tests/fps15–120/rates1–30/hidden60วิผ่าน Chromeจริง30.051วิ=sim30.0512วิ,3Dcontrols/visibility/browsererrors0
 - Workspaceรวมยังมีงานคู่ขนานuntrackedของAgent2/3:fulltestล้มที่staff-actions/staff-carry-clips.test.ts:142(_part)และtypecheckที่:44(ArrayBuffer|SharedArrayBuffer) ต้องให้laneคลิปแก้ก่อนintegrationทั้งทีม Agent1ไม่ได้แก้/commitไฟล์เหล่านั้น และไม่อ้างว่าworkspaceรวมเขียว
 - คงงานอาหาร/คลิป/GLBของagentอื่นในworkingtree ไม่stage;ThreeView/legacycadenceและติดตั้งvisualใหม่รอ122 ไม่มีpush/PR
+
+## 2026-10-29 ICT — Agent 2: feat-116, feat-120, feat-121 เสร็จครบทุกงานของสายอาหาร โต๊ะ และแสง
+
+- **ผลลัพธ์**:
+  - `feat-116`: สร้าง `src/components/preview-3d/table-service/` (`createTableServiceFeature`) วางจานอาหาร 5 เมนูบนผิวโต๊ะ (`y = 0.76m`) ตาม `chairId` รองรับโต๊ะกลม/เหลี่ยม ขนาดเล็ก `0.60×0.60m` ถึงใหญ่ หมุน `0/90/180/270` องศา กลุ่ม 1/2/4 คน, สลับ `FoodFull → FoodPartial → FoodEmpty`, สร้างคราบสะสมแบบ deterministic (`y = 0.7616m`) แยก material รายโต๊ะ/รอบบริการ คงจานและคราบหลังลูกค้าออก จางลงตาม `wipeProgress` และลบเมื่อ `clean`
+  - `feat-120`: สร้าง `src/components/preview-3d/lighting/solar-position.ts`, `clock.ts`, `settings.ts`, `settings-panel.tsx` และ `src/store/use-lighting-store.ts` คำนวณมุมแดดตาม NOAA จาก UTC + พิกัด + `northOffsetDegrees` โดยไม่ขึ้นกับ `viewRotation`, นาฬิกาเวลาจริงอัปเดตทุก 60 วินาทีแยกจาก `playbackRate` ของการจำลอง พร้อมโหมด `fixed` และค่าอ้างอิงเริ่มต้นกรุงเทพฯ
+  - `feat-121`: สร้าง `src/components/preview-3d/lighting/shadow-fit.ts` และ `scene-lighting.ts` (`createSceneLightingFeature`) คำนวณ orthographic shadow frustum + texel stabilization สำหรับห้อง `2–30m`, ปรับสี/ความเข้มแสงเช้า-เที่ยง-เย็น-กลางคืน (กลางคืนปิด direct sun shadow และเปิดไฟอบอุ่นในร้าน `indoorFillLight`)
+- **การตรวจ**: ยูนิตเทสต์ทั้งหมดของ Agent 2 (`food/`, `table-service/`, `lighting/` รวม 12 ไฟล์ 32 tests) ผ่าน 100%, `eslint` บนไฟล์ทั้งหมดของ Agent 2 ผ่าน (0 warnings/errors), `validate_harness.py` ผ่านครบ (Done 110/123 งาน), หลักฐานภาพและ `report.json` อยู่ใน `harness/evidence/feat-116/`, `harness/evidence/feat-120/`, และ `harness/evidence/feat-121/`
+- **ขอบเขตและไฟล์กลาง**: ไม่ได้แก้ไข `three-view.tsx`, `scripts/create-cafe-customer-model.mjs`, หรือไฟล์ GLB ตัวละคร (`cafe-customer*.glb`, `cafe-staff*.glb`) และไม่แตะไฟล์คู่ขนานของ Agent 3; พร้อมส่งให้ Agent 1 รวมเข้าฉากใน `feat-122`

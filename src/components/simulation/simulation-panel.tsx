@@ -57,6 +57,8 @@ export function SimulationPanel({
   const analysis = useSimulationStore((s) => s.analysis);
   const showHeatmap = useSimulationStore((s) => s.showHeatmap);
   const setShowHeatmap = useSimulationStore((s) => s.setShowHeatmap);
+  const showThoughts = useSimulationStore((s) => s.showThoughts);
+  const setShowThoughts = useSimulationStore((s) => s.setShowThoughts);
   const reasonId = React.useId();
 
   const blocked = live.result.status === "blocked";
@@ -171,6 +173,17 @@ export function SimulationPanel({
                 className="size-4 rounded border-line text-blue focus:ring-blue"
               />
               <span>แสดงจุดที่คนเดินหนาแน่น (Heatmap)</span>
+            </label>
+
+            <label className="flex items-center gap-2 text-[12px] text-ink cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={showThoughts}
+                onChange={(e) => setShowThoughts(e.target.checked)}
+                className="size-4 rounded border-line text-blue focus:ring-blue"
+                data-testid="toggle-thoughts"
+              />
+              <span>แสดงความคิด/ความรู้สึกตัวละคร (Emotes)</span>
             </label>
           </div>
 
@@ -409,6 +422,17 @@ export function SimulationPanel({
                   className="size-4 rounded border-line text-blue focus:ring-blue"
                 />
                 <span>แสดงจุดที่คนเดินหนาแน่น (Heatmap)</span>
+              </label>
+
+              <label className="flex items-center gap-2 text-[12px] text-ink cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showThoughts}
+                  onChange={(e) => setShowThoughts(e.target.checked)}
+                  className="size-4 rounded border-line text-blue focus:ring-blue"
+                  data-testid="toggle-thoughts-idle"
+                />
+                <span>แสดงความคิด/ความรู้สึกตัวละคร (Emotes)</span>
               </label>
 
               <button

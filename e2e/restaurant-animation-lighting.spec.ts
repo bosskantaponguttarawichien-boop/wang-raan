@@ -3,10 +3,10 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { openTab } from "./helpers";
 
 /**
- * feat-123 · ตรวจแสงตามเวลาจริงในมุมมอง 3D
+ * feat-124 · ตรวจแสงตามเวลาร้านและเวลาคงที่ในมุมมอง 3D
  *
- * ฉากอ่านเวลาจากอุปกรณ์ (feat-120/121) การทดสอบจึงตรึงเวลาเครื่องด้วย `page.clock.setFixedTime`
- * ซึ่งเปลี่ยนเฉพาะ `Date` ไม่แตะ timer หรือ requestAnimationFrame ฉากจึงยังวาดตามปกติ
+ * ค่าเริ่มต้นอ่านเวลาเปิดร้าน + เวลาจำลอง การตรวจแสง 4 ช่วงใช้แผงเวลาคงที่จริง
+ * และมี regression test ยืนยันว่าเวลาเครื่องไม่เปลี่ยนแสงของร้าน
  *
  * ค่าที่วัดคือความสว่างเฉลี่ยของภาพที่ canvas วาดจริง ไม่ใช่ค่าภายในของ feature
  */
@@ -22,8 +22,8 @@ const TIMES = [
 
 function record(measurement: Record<string, unknown>) {
   // ไม่เขียนลง e2e/.results เพราะ Playwright ล้าง outputDir ทุกครั้งที่เริ่มรัน
-  mkdirSync("harness/evidence/feat-123", { recursive: true });
-  appendFileSync("harness/evidence/feat-123/measurements.jsonl", `${JSON.stringify(measurement)}\n`, "utf8");
+  mkdirSync("harness/evidence/feat-124", { recursive: true });
+  appendFileSync("harness/evidence/feat-124/measurements.jsonl", `${JSON.stringify(measurement)}\n`, "utf8");
 }
 
 function watchErrors(page: Page) {
@@ -35,7 +35,7 @@ function watchErrors(page: Page) {
   return errors;
 }
 
-const SCREENS_DIR = "harness/evidence/feat-123/screens";
+const SCREENS_DIR = "harness/evidence/feat-124/screens";
 mkdirSync(SCREENS_DIR, { recursive: true });
 
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
@@ -54,6 +54,12 @@ async function show3D(page: Page): Promise<Locator> {
   // รอให้โหลดโมเดล/วาดเฟรมแรกเสร็จก่อนวัดความสว่าง
   await page.waitForTimeout(2500);
   return canvas;
+}
+
+async function setFixedLightingTime(page: Page, localTime: string) {
+  await openTab(page, "shop");
+  await page.getByTestId("lighting-mode-fixed").click();
+  await page.getByTestId("lighting-fixed-datetime").fill(localTime);
 }
 
 async function meanLuminance(page: Page, png: Buffer): Promise<number> {
@@ -78,12 +84,12 @@ async function meanLuminance(page: Page, png: Buffer): Promise<number> {
   }, png.toString("base64"));
 }
 
-test.describe("feat-123: แสงตามเวลาจริง", () => {
+test.describe("feat-124: แสงตามเวลาร้าน", () => {
   for (const time of TIMES) {
     test(`${time.thai}: ฉากวาดได้ อ่านผังออก และไม่มี console error`, async ({ page }) => {
       const errors = watchErrors(page);
-      await page.clock.setFixedTime(new Date(time.iso));
       await openReadyCafe(page);
+      await setFixedLightingTime(page, time.iso.slice(0, 16));
       const canvas = await show3D(page);
       const shot = await canvas.screenshot();
       const luminance = await meanLuminance(page, shot);
@@ -96,8 +102,54 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
     });
   }
 
+  test("แสงอิงเวลาเปิดร้าน เดินตามจำลอง และหยุดเมื่อพัก โดยไม่อิงเวลาเครื่อง", async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = watchErrors(page);
+    await page.clock.setFixedTime(new Date("2035-01-01T23:00:00+07:00"));
+    await openReadyCafe(page);
+    await openTab(page, "shop");
+    const summary = page.getByTestId("lighting-solar-summary");
+    await expect(page.getByTestId("lighting-mode-simulation")).toHaveAttribute("aria-pressed", "true");
+    await expect(summary).toContainText("10:00 น.");
+    const canvas = await show3D(page);
+    const day = await meanLuminance(page, await canvas.screenshot());
+    await openTab(page, "check");
+    await page.getByLabel("เวลาเปิดร้าน", { exact: true }).fill("20:00");
+    await page.getByLabel("เวลาปิดร้าน", { exact: true }).fill("23:00");
+    await openTab(page, "shop");
+    await expect(summary).toContainText("20:00 น.");
+    await page.waitForTimeout(500);
+    const night = await meanLuminance(page, await canvas.screenshot());
+    expect(day - night).toBeGreaterThan(0.025);
+    await page.clock.setFixedTime(new Date("2040-07-01T12:00:00+07:00"));
+    await expect(summary).toContainText("20:00 น.");
+    await page.screenshot({ path: `${SCREENS_DIR}/restaurant-opening-night.png` });
+
+    await openTab(page, "check");
+    await page.getByLabel("เวลาเปิดร้าน", { exact: true }).fill("10:00");
+    await page.getByLabel("เวลาปิดร้าน", { exact: true }).fill("20:00");
+    await page.getByTestId("start-simulation").click();
+    await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
+    await page.getByTestId("simulation-panel").getByRole("button", { name: "30×", exact: true }).last().click();
+    // During a run, the rail and shop settings are replaced by simulation controls.
+    const runningCanvas = await show3D(page);
+    await page.getByRole("button", { name: /หยุดชั่วคราว/ }).click();
+    await expect(page.getByTestId("simulation-status")).toContainText("หยุดชั่วคราว");
+    await page.waitForTimeout(500);
+    const paused = await page.getByTestId("simulation-status").innerText();
+    const pausedShot = await runningCanvas.screenshot();
+    await page.clock.setFixedTime(new Date("2045-01-01T01:00:00+07:00"));
+    await page.waitForTimeout(2500);
+    expect(await page.getByTestId("simulation-status").innerText()).toBe(paused);
+    expect((await runningCanvas.screenshot()).equals(pausedShot)).toBe(true);
+    await page.getByTestId("stop-simulation").click();
+    await openTab(page, "shop");
+    await expect(summary).toContainText("10:00 น.");
+    record({ check: "restaurant-clock", day, night, paused, deviceClockIgnored: true });
+    expect(errors).toEqual([]);
+  });
+
   test("เที่ยงสว่างกว่ากลางคืนอย่างเห็นได้ชัด และปรับเวลาผ่านแผงตั้งค่าแสงในแท็บร้านได้จริง", async ({ page }) => {
-    await page.clock.setFixedTime(new Date(TIMES[1].iso));
     await openReadyCafe(page);
     const canvas = await show3D(page);
 
@@ -128,8 +180,8 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
   test("หมุนมุมกล้องครบ 4 ด้านแล้วแดดไม่หมุนตามกล้อง", async ({ page }) => {
     test.setTimeout(90_000);
     const errors = watchErrors(page);
-    await page.clock.setFixedTime(new Date(TIMES[0].iso));
     await openReadyCafe(page);
+    await setFixedLightingTime(page, TIMES[0].iso.slice(0, 16));
     const canvas = await show3D(page);
     const levels: number[] = [await meanLuminance(page, await canvas.screenshot())];
     for (let turn = 0; turn < 4; turn += 1) {
@@ -151,8 +203,8 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
   test("prefers-reduced-motion: ใช้ฉาก SVG นิ่ง ไม่มี canvas WebGL", async ({ page }) => {
     const errors = watchErrors(page);
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.clock.setFixedTime(new Date(TIMES[1].iso));
     await openReadyCafe(page);
+    await setFixedLightingTime(page, TIMES[1].iso.slice(0, 16));
     await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();
     await expect(page.getByTestId("iso-svg")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("three-canvas")).toHaveCount(0);
@@ -163,13 +215,13 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
   test("สั่งพิมพ์: ฉากยังอยู่ครบและไม่มี error", async ({ page }) => {
     test.setTimeout(90_000);
     const errors = watchErrors(page);
-    await page.clock.setFixedTime(new Date(TIMES[2].iso));
     await openReadyCafe(page);
+    await setFixedLightingTime(page, TIMES[2].iso.slice(0, 16));
     await show3D(page);
     await page.emulateMedia({ media: "print" });
     await page.waitForTimeout(2000);
     // หมายเหตุ: Chromium ถ่ายภาพ element ขณะ emulate print ไม่ได้เสถียร การวัด pixel จึงอยู่ใน
-    // unit test ของนาฬิกาแสง (`lighting/clock.test.ts`) ที่ยืนยันว่า interval หยุดเมื่อ media print
+    // unit test ของนาฬิกาแสง (`lighting/clock.test.ts`) ที่ยืนยันว่าไม่มี timer อิสระ
     // ที่นี่ตรวจว่าฉากยังอยู่ครบและไม่มีข้อผิดพลาดตอนสลับไปโหมดพิมพ์
     await expect(page.getByTestId("three-canvas")).toHaveCount(1);
     await page.emulateMedia({ media: null });
@@ -182,8 +234,8 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
       test(`ร้าน ${size} × ${size} ม.: เงาครอบทั้งร้านและไม่มี error`, async ({ page }) => {
         test.setTimeout(90_000);
         const errors = watchErrors(page);
-        await page.clock.setFixedTime(new Date(TIMES[0].iso));
         await openReadyCafe(page);
+        await setFixedLightingTime(page, TIMES[0].iso.slice(0, 16));
         await openTab(page, "shop");
         const panel = page.locator("#panel");
         const width = panel.getByLabel("กว้าง (ม.)", { exact: true });

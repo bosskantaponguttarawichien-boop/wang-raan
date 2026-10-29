@@ -23,3 +23,7 @@
 {"check":"clock-10x","ratio":9.972451103944234}
 {"check":"resume-no-catchup","ratio":0.9941510777940417}
 {"check":"visibility-no-catchup","ratio":0.9963632740339393}
+{"check":"clock-1x","storeElapsed":15,"realElapsed":15.058699999809264,"ratio":0.9961019211611888}
+{"check":"clock-10x","ratio":9.84448210582401}
+{"check":"resume-no-catchup","ratio":0.9951734089822539}
+{"check":"visibility-no-catchup","ratio":0.9954706087775298}

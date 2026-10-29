@@ -3,6 +3,51 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-30] feat-137 — ลดภาระภาพจำลอง (ยังดำเนินการ)
+
+- ก้อนความคิด 3D ใช้ DOM เดิมในแต่ละเฟรมและสร้างเนื้อหาใหม่เฉพาะเมื่อสถานะเปลี่ยน; regression เฉพาะส่วน 47 ข้อผ่าน
+- npm test -- --maxWorkers=2 ผ่าน 113 ไฟล์ 1,320 tests; lint 0 errors (warning เดิม 1); typecheck, harness validation และ boundary scan ผ่าน; init ตรวจ environment/boundary ผ่าน แต่ชุด test ที่ init เริ่มถูกขัดจังหวะเพื่อลดการรันซ้อน
+- ยังต้องวัด FPS, frame time และหน่วยความจำก่อน–หลังในเบราว์เซอร์จริง รวมการเปลี่ยนความเร็วและรันนาน จึงยังไม่ยืนยันว่าแก้อาการทั้งหมด
+
+## [2026-10-30] feat-136 — ฝ่ามือแนบผ้าขณะเช็ด
+
+- แก้แนวฝ่ามือโดยใช้แกนผิวจริงของโมเดล ปรับผ้าพับและจุดสัมผัสโต๊ะ สร้าง staff GLB ทั้งสอง
+- ตรวจฝ่ามือคว่ำตลอดคลิป ผิวไม่จมโต๊ะ และภาพจำลองจริงหลายจังหวะ; npm test -- --maxWorkers=2 ผ่าน 1,320 ข้อ ดู harness/evidence/staff-wipe-palm/summary.md
+
+## [2026-10-30] feat-134 — ก้อนความคิดและอิโมจิบอกสถานะตัวละครในระบบจำลอง (Simulation Character Thoughts & Emotes)
+
+- **ระบบก้อนความคิดและอิโมจิ (Thought & Emote Bubbles)**: เพิ่มการแสดงออกทางอารมณ์และสถานะของตัวละครระหว่างเล่น Simulation ทั้งในมุมมอง 3D (ThreeView) และ 2D (IsoSimulationOverlay)
+- **สถานะที่ครอบคลุม (Customer & Staff Thoughts)**:
+  - **รอคิวหน้าร้าน (Queue Wait)**: ปกติ (0–5 นาที 📱), รอนาน (5–10 นาที ⏳ สีส้ม/Warning), วิกฤต (>10 นาที 💢 สีแดง/Critical เสี่ยงเดินหนี Walkout)
+  - **รอสั่งอาหารที่โต๊ะ (Order Wait)**: 🙋‍♂️ รอพนักงานมารับออร์เดอร์
+  - **รออาหารที่โต๊ะ (Food Wait)**: ปกติ (🍽️), รอนาน (⏳ สีส้ม), รอนานวิกฤต (😤 สีแดง + animate pulse/bounce)
+  - **รับประทานอาหาร & เช็คบิล (Dining & Payment)**: 😋 กำลังทานอาหารอย่างมีความสุข, 💳 พร้อมชำระเงิน
+  - **พนักงาน (Staff Emotes)**: 📝 รับออร์เดอร์, 🍲 เสิร์ฟอาหาร, 🧹 เช็ดทำความสะอาดโต๊ะ
+- **สถาปัตยกรรม Pure TS Core & Boundaries**:
+  - `CustomerThought` / `StaffThought` อยู่ใน `src/core/simulation/presentation-contract.ts` (Pure TS)
+  - `resolveCustomerThought` และ `resolveStaffThought` อยู่ใน `presentation-snapshot.ts` คำนวณจาก simulation time, wait seconds และ patience limit อย่างเป็น deterministic
+  - `presentation-bridge.ts` Zod schema อัปเดตรองรับ `thought` สมบูรณ์
+- **Presentation Tier (3D & 2D)**:
+  - ปรับทรงก้อนความคิดเป็นก้อนเมฆการ์ตูน (Comic Thought Cloud): เปลี่ยนจากทรงแคปซูลเรียบเป็นก้อนเมฆหยักป่องๆ (Fluffy Cloud SVG Path) พร้อมวงกลมหางความคิด 2 วงชี้ลงหาตัวละครตรงตามภาพตัวอย่างของผู้ใช้ เส้นขอบสไตล์การ์ตูนนุ่มนวล (#64748b, 1.5px) ลดขนาดอิโมจิเป็น 15px พร้อมจัดกึ่งกลางใจก้อนเมฆอย่างสมดุล (Optical center)
+  - `src/components/simulation/character-thought-bubble.tsx`: คอมโพเนนต์ก้อนความคิด accessible (`role="status"`, `aria-label`), สีเตือนตาม severity (ขาว/ส้ม/แดง), และ tooltip แสดงนาทีที่รอเมื่อ hover/แตะ
+  - `src/components/preview-3d/thought-overlay.ts`: ตัวจัดการฉายพิกัด 3D โลก → จอ 2D (Screen projection) แบบ DOM overlay เหนือ Canvas ไม่ทำให้ CanvasTexture บวมหรือกระตุก และคงการคลิกหมุนฉาก 3D ได้ปกติ
+  - `src/components/simulation/iso-simulation-overlay.tsx`: ฟังก์ชัน `drawThoughtBubble` วาดฟองความคิดลง 2D Canvas Fallback ตรงตำแหน่งหัวตัวละคร
+  - `src/store/use-simulation-store.ts` & `simulation-panel.tsx`: เพิ่ม toggle `showThoughts` ("แสดงความคิด/ความรู้สึกตัวละคร (Emotes)") ให้ผู้ใช้เลือกเปิด/ปิดได้
+- **Verify**: `npm test` 20 simulation files / 182 tests ผ่าน 100%, typecheck ผ่าน 0 errors, eslint ผ่าน, boundary check Pure TS ผ่าน 100%, `validate_harness.py` ผ่าน (126 done)
+
+## [2026-10-30] feat-135 — ปรับท่ายืนและผ้าเช็ดโต๊ะ
+
+- ปรับแนวผ้าและจานให้แนบฝ่ามือ ลดการก้มและย่อตัว และปรับสีผ้า; สร้างโมเดลพนักงานสองขนาดใหม่
+- npm test -- --maxWorkers=2 ผ่าน 1,320 tests; ตรวจภาพ WipeTable ในร้านขณะหยุดและทดสอบช่วงกวาด; รายละเอียด harness/evidence/staff-wipe-adjustment/summary.md
+
+## [2026-10-29] feat-124 — แสงตามเวลาเปิดร้านและนาฬิกาจำลอง
+
+- เปลี่ยนโหมดเริ่มต้นจาก realtime เป็น simulation: เวลาเปิดร้าน + metrics.time ทุกนาทีจำลอง ไม่มี wall-clock timer และไม่คูณ speed ซ้ำ; pause คงเวลา, stop/starting คืนเวลาเปิดร้าน, remount 3D คงเวลาปัจจุบัน
+- UI เปลี่ยนเป็น “ทิศแดดและเวลาร้าน” / “ตามเวลาร้าน”; ยังเก็บ fixed preview และพิกัด/ทิศเหนือ/เขตเวลาเดิม พร้อม sync architecture.md / design-system.md
+- Verify: npm test 111 files / 1,298 tests; เฉพาะแสง 17 tests; typecheck ผ่าน; lint 0 errors (1 warning เดิม); init, Core/Worker/BFF boundary scan และ validate_harness ผ่าน
+- Chrome production E2E ผ่านครบ 11 กรณีรวมสองรอบ: 10 ผ่านรอบแรก + regression เวลาร้านผ่านรอบเจาะจงหลังแก้ test navigation (shop rail ถูกซ่อนขณะจำลอง); เปิด 10:00 ความสว่าง 0.941432 / 20:00 ความสว่าง 0.820340; pause 10:01:18 ภาพคงเดิมทุกไบต์ แม้เปลี่ยนเวลาเครื่อง; stop คืน 10:00
+- หลักฐาน: harness/evidence/feat-124/summary.md, measurements.jsonl, screens/; ไม่แก้ Worker/BFF/layout/history/RNG และยังไม่ได้ commit/push/deploy
+
 ## [2026-10-29] feat-123 — QA gate: ตรวจรับภาพ วงจรบริการ เวลาเดิน แสง และ performance (done — ยืนยันผลรัน `--workers=1` ครบ 28/28 ข้อ และปิด defect ครบทั้ง 3 ข้อแล้ว)
 
 - **3 spec ใหม่ 28 tests ผ่านทั้งหมดด้วย `--workers=1`** บน Chrome + `NVIDIA GeForce GTX 1050 Ti` ผ่าน ANGLE/D3D11 = **hardware WebGL ไม่ใช่ software** กับ **production build** (`next build` + `next start`) ไม่ใช่ dev server; บันทึกภาพตรงเข้า `harness/evidence/feat-123/screens/` ครบ 27 ภาพ
@@ -1593,3 +1638,48 @@
 - **แก้ความสูงผิวโต๊ะ**: สัญญา v1 §3 เขียน "tabletop 0.74" แต่ `three-view.tsx` วางกล่องหนา 0.04 ม. โดยให้จุดกลางอยู่ที่ 0.74 (`placeMesh` ตั้ง `mesh.position.y`) ผิวสัมผัสจริงจึงเป็น 0.76 ม. ตรงกับที่ `table-service` (feat-116) ใช้ — คลิปทั้งสายปรับมาใช้ 0.76 แล้ว (จุดวางจาน, ผิวในจานของ Eat, ระดับผ้าเช็ด, และกรอบตรวจแผ่นโต๊ะ)
 - **แก้สองข้อที่ Agent 1 รายงานไว้ใน feat-115**: `staff-carry-clips.test.ts` ใช้ชื่อ attribute `_part` ตามที่ GLTFLoader ตั้ง (ไม่ใช่ `part`) และพารามิเตอร์ `Buffer<ArrayBuffer>` แก้ typecheck `ArrayBuffer | SharedArrayBuffer`
 - QA: เทสต์ใหม่ 4 ไฟล์ / 42 tests ผ่าน, `npx vitest run` ทั้ง workspace 100 files / 1117 tests ผ่าน, `eslint` บนไฟล์ของ Agent 3 ผ่าน 0 warning/error, `tsc --noEmit` ไม่มี error ในไฟล์ของ Agent 3, `validate_harness.py` ผ่าน (Done 110/123); `public/assets/models/*.glb` ไม่เปลี่ยนแม้ไบต์เดียว (sha256 ตรงก่อน-หลังทุกการ build) — GLB ตรวจรับถูกสร้างลง OS temp แล้วลบ
+## 2026-10-29 ICT — feat-125 แก้ท่ากินกระตุก
+
+- เกลี่ยเวลา animation ระหว่าง worker ticks ตามความเร็วจำลอง จำกัดไม่ให้ล้ำเวลาล่าสุด และหยุดเมื่อพัก; ทดสอบ 1×, 30×, pause และไม่ล้ำเวลา
+- ตรวจ npm test 111 files / 1,302 tests, lint 0 errors, typecheck ผ่าน; Chrome E2E วงจรบริการผ่าน 1/1 พบ Eat และจานอยู่ในระยะ ดูหลักฐาน feat-125/summary.md
+
+## 2026-10-29 ICT — feat-126 แก้ท่ากินกระตุกที่ 1×
+
+- แก้ feedback ตำแหน่งตัวที่สลับไปมาจาก correction เทียบตำแหน่งปัจจุบัน และปรับ elbow pole/ทิศอุปกรณ์ใน Eat เพื่อลดการพลิกข้อต่อ สร้าง customer GLB ทั้งสองรุ่นใหม่
+- Chrome 1×: 201 เฟรม, phase เปลี่ยน 200 ครั้ง, jump สูงสุด 0.0081 รอบ, ระยะจานเปลี่ยน 0; npm test 111 files / 1,304 tests ผ่าน ดูหลักฐาน feat-126
+
+## 2026-10-29 ICT — feat-127 ปรับท่ากินตามภาพผู้ใช้
+
+- ปรับทิศอุปกรณ์ให้มืออยู่ด้านหน้าและด้านข้างปาก ปรับข้อศอกออกจากลำตัว ลดมุมคว่ำของข้อมือตอนตัก และเพิ่มความละเอียดคีย์เฟรม; rebuild customer GLB ทั้งสองรุ่น
+- ตรวจ screenshot 6 จังหวะในร้าน, Chrome E2E กินพร้อมอาหารผ่าน, จุดสัมผัสจาน/ปากและตำแหน่งแขนผ่าน; npm test 111 files / 1,304 tests ผ่าน
+
+## 2026-10-29 ICT — feat-128 ปรับแนวแขนกินตามภาพผู้ใช้
+
+- ผู้ใช้ระบุท่ามือ/แขนแปลก: ปรับแนวศอกแปรตามช่วงกินและทิศอุปกรณ์เพื่อลดการหักข้อมือตอนตัก (~65° เหลือ ~22°) โดยให้ศอกพ้นด้านลำตัว; rebuild customer GLB ทั้งสองรุ่น
+- ทดสอบจุดสัมผัส/มุม/ความต่อเนื่อง, Chrome 1× เก็บภาพ 8 จังหวะ และ npm test 111 files / 1,304 tests ผ่าน; ข้อจำกัด: มือไม่มีข้อต่อนิ้วแยกจึงไม่กำอุปกรณ์จริง
+
+## 2026-10-29 ICT — feat-129 แยกทิศมือกับอุปกรณ์ในท่ากิน
+
+- ผู้ใช้ระบุข้อมือยังหัก: เพิ่ม anchor ที่เคลื่อนไหวแยกจากมือ และจัดมือให้ต่อกับปลายแขนตลอดทั้งรอบ ขณะที่ปลายอุปกรณ์ยังแตะจาน/ปาก; rebuild customer GLB สองรุ่น
+- Unit test ตรวจ 97 เฟรม, anchor, จุดสัมผัส, ความต่อเนื่อง; Chrome E2E และภาพขยาย 8 จังหวะที่ 1× ผ่าน; npm test 111 files / 1,306 tests ผ่าน
+
+## 2026-10-29 ICT — feat-130 แก้ข้อมือบิดขณะกิน
+
+- การตรวจเดิมดูเพียงแนวนิ้วเทียบแขน ไม่ได้จำกัดการหมุนรอบแกน จึงเปลี่ยนทิศมือให้สัมพันธ์กับกรอบของปลายแขนและคง anchor อุปกรณ์; rebuild customer GLB ทั้งสองรุ่น
+- Unit ตรวจมุมหมุนข้อมือใน local frame ครบ 97 เฟรมและจาน/ปาก; Chrome 1× ภาพสี่มุมพร้อม pause ผ่าน; npm test 111 files / 1,306 tests ผ่าน
+
+## 2026-10-29 ICT — feat-131 ท่าจับช้อนส้อม
+
+- แก้ด้ามอุปกรณ์หมุนเปลี่ยนตำแหน่งเทียบมือ ให้ยึดอยู่กับมือทั้งรอบโดยแก้เป้าข้อศอก/ข้อมือร่วมกัน; เพิ่ม morph หุบนิ้วขวาเฉพาะขณะกินแล้วคืนรูปเมื่อกินเสร็จ/รีเซ็ต
+- ตรวจ anchor คงที่ 97 เฟรม ข้อมือไม่บิด ปลายแตะจาน/ปาก และ morph คืนรูป; Chrome 1× ดูสี่มุมและ pause; npm test 111 files / 1,308 tests ผ่าน
+
+## 2026-10-29 ICT — feat-132 ย้ายจุดจับเข้าในกำมือ
+
+- ผู้ใช้แจ้งด้ามอยู่นอกมือ: เปลี่ยน EatUtensilAnchor จากขอบฝ่ามือเป็นพิกัดในกำมือ และแก้ IK ใช้จุดเดียวกัน; rebuild customer full/lite
+- Unit test ตรวจผิวมือที่หุบรอบจุดยึด, จุดสัมผัสจาน/ปาก, ข้อมือ และการคืนท่า; Chrome 1× แสดงส้อมในร้าน 4 มุมและ pause; npm test 111 files / 1,309 tests ผ่าน
+
+## 2026-10-29 ICT — feat-133 ปรับนิ้วโอบด้ามช้อน
+
+- ผู้ใช้ชี้ว่าดูเหมือนช้อนติดมือ: ปรับ morph ให้ปลายนิ้วงอกลับและนิ้วโป้งเข้าหาด้าม; ตรวจผิวปลายนิ้วโป้งใกล้รัศมีด้าม (0.0053 ม. เมื่อด้ามรัศมี 0.0045 ม.) พร้อม rebuild customer GLB
+- ทดสอบ Chrome เมนูช้อนด้วย seed ทดสอบและภาพขยายหลายจังหวะ; npm test 111 files / 1,310 tests; นิ้วยังคงเป็น mesh ชิ้นเดียว ไม่ใช่ข้อต่อแยก ดูข้อจำกัดในหลักฐาน
+

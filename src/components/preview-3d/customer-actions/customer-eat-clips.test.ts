@@ -84,15 +84,77 @@ function play(loaded: Loaded, clip: THREE.AnimationClip) {
     mesh.skeleton.update();
     const bone = (name: string) => loaded.scene.getObjectByName(name)!.getWorldPosition(new THREE.Vector3());
     const palm = (side: number) => loaded.scene.getObjectByName(side < 0 ? "LeftHand" : "RightHand")!.localToWorld(palmLocal(side).clone());
-    // ด้ามอุปกรณ์พุ่งไปทางนิ้ว (แกน local −Y ของกระดูก Hand) ปลายอยู่ห่างผิวฝ่ามือ TIP_REACH
-    const hand = loaded.scene.getObjectByName("RightHand")!;
-    const fingers = new THREE.Vector3(0, -1, 0).applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
-    const tip = palm(1).addScaledVector(fingers, TIP_REACH);
+    const anchor = loaded.scene.getObjectByName("EatUtensilAnchor")!;
+    const tip = anchor.localToWorld(new THREE.Vector3(0, -TIP_REACH, 0));
     return { mesh, bone, palm, tip, mouth: loaded.scene.getObjectByName("Head")!.localToWorld(MOUTH_LOCAL.clone()) };
   };
 }
 
 describe("feat-110 customer eat clip", () => {
+  it("ships a grip shape that is at rest unless eating activates it", () => {
+    const body = eating.scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
+    const index = body.morphTargetDictionary?.EatGrip;
+    expect(index).toBeDefined();
+    expect(body.morphTargetInfluences![index!]).toBe(0);
+    const grip = body.geometry.morphAttributes.position![index!]!;
+    let changed = 0;
+    for (let i = 0; i < grip.count; i++) {
+      if (Math.abs(grip.getX(i)) + Math.abs(grip.getY(i)) + Math.abs(grip.getZ(i)) > 0.0001) changed++;
+    }
+    expect(changed).toBeGreaterThan(20);
+    expect(changed).toBeLessThan(body.geometry.getAttribute("position").count / 4);
+  });
+
+  it("folds the thumb towards the handle as well as curling the fingers", () => {
+    const body = eating.scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
+    const positions = body.geometry.getAttribute("position");
+    const grip = body.geometry.morphAttributes.position![body.morphTargetDictionary!.EatGrip!]!;
+    const indices = body.geometry.getAttribute("skinIndex");
+    const weights = body.geometry.getAttribute("skinWeight");
+    const hand = body.skeleton.bones.findIndex(bone => bone.name === "RightHand");
+    const anchor = eating.scene.getObjectByName("EatUtensilAnchor")!;
+    let folded = 0;
+    let nearest = Infinity;
+    for (let i = 0; i < positions.count; i++) {
+      let weight = 0;
+      for (let slot = 0; slot < 4; slot++) if (indices.getComponent(i, slot) === hand) weight += weights.getComponent(i, slot);
+      if (weight > 0.99 && positions.getZ(i) > 0.06 && positions.getY(i) > 0.73 && positions.getY(i) < 0.76 && grip.getZ(i) < -0.01) {
+        folded++;
+        const point = new THREE.Vector3().fromBufferAttribute(positions, i)
+          .add(new THREE.Vector3().fromBufferAttribute(grip, i)).applyMatrix4(body.skeleton.boneInverses[hand]!);
+        if (Math.abs(point.y - anchor.position.y) < 0.025) nearest = Math.min(nearest, Math.hypot(point.x - anchor.position.x, point.z - anchor.position.z));
+      }
+    }
+    expect(folded).toBeGreaterThan(3);
+    // The handle radius is 4.5 mm; the thumb surface must meet it, not float centimetres away.
+    expect(nearest).toBeGreaterThan(0.004);
+    expect(nearest).toBeLessThan(0.01);
+  });
+
+  it("places the utensil shaft within the curled hand rather than outside its edge", () => {
+    const body = eating.scene.getObjectByName("MannequinBody") as THREE.SkinnedMesh;
+    const anchor = eating.scene.getObjectByName("EatUtensilAnchor")!;
+    const index = body.skeleton.bones.findIndex(bone => bone.name === "RightHand");
+    const position = body.geometry.getAttribute("position");
+    const joints = body.geometry.getAttribute("skinIndex");
+    const weights = body.geometry.getAttribute("skinWeight");
+    const grip = body.geometry.morphAttributes.position![body.morphTargetDictionary!.EatGrip!]!;
+    const nearby: THREE.Vector3[] = [];
+    for (let i = 0; i < position.count; i++) {
+      let weight = 0;
+      for (let slot = 0; slot < 4; slot++) if (joints.getComponent(i, slot) === index) weight += weights.getComponent(i, slot);
+      if (weight < 0.99) continue;
+      const point = new THREE.Vector3().fromBufferAttribute(position, i)
+        .add(new THREE.Vector3().fromBufferAttribute(grip, i)).applyMatrix4(body.skeleton.boneInverses[index]!);
+      if (Math.abs(point.y - anchor.position.y) < 0.015) nearby.push(point);
+    }
+    expect(nearby.length).toBeGreaterThan(20);
+    expect(Math.min(...nearby.map(p => p.x))).toBeLessThan(anchor.position.x);
+    expect(Math.max(...nearby.map(p => p.x))).toBeGreaterThan(anchor.position.x);
+    expect(Math.min(...nearby.map(p => p.z))).toBeLessThan(anchor.position.z);
+    expect(Math.max(...nearby.map(p => p.z))).toBeGreaterThan(anchor.position.z);
+    expect(Math.min(...nearby.map(p => Math.hypot(p.x - anchor.position.x, p.z - anchor.position.z)))).toBeLessThan(0.02);
+  });
   it("เพิ่มคลิป Eat เพียงคลิปเดียวต่อจากคลิปเดิม และไม่มี root translation", () => {
     expect(eating.animations.map((clip) => clip.name)).toEqual([...BASE_CLIPS, "Eat"]);
     expect(clipOf(eating, "Eat").duration).toBeCloseTo(3.2, 5);
@@ -143,6 +205,33 @@ describe("feat-110 customer eat clip", () => {
     }
   });
 
+  it("keeps arm and hand rotations continuous between adjacent poses", () => {
+    const clip = clipOf(eating, "Eat");
+    for (const track of clip.tracks.filter(track => /^(Left|Right)(Arm|ForeArm|Hand)\.quaternion$/.test(track.name))) {
+      for (let i = 1; i < track.times.length; i++) {
+        const previous = new THREE.Quaternion().fromArray(track.values, (i - 1) * 4);
+        const current = new THREE.Quaternion().fromArray(track.values, i * 4);
+        expect(previous.angleTo(current), `${track.name} at frame ${i}`).toBeLessThan(THREE.MathUtils.degToRad(40));
+      }
+    }
+  });
+
+  it("keeps the eating hand aligned with the forearm throughout the bite", () => {
+    const at = play(eating, clipOf(eating, "Eat"));
+    for (let frame = 0; frame <= 96; frame++) {
+      const sample = at(frame / 96);
+      const forearm = sample.bone("RightHand").sub(sample.bone("RightForeArm"));
+      const fingers = new THREE.Vector3(0, -1, 0).applyQuaternion(
+        eating.scene.getObjectByName("RightHand")!.getWorldQuaternion(new THREE.Quaternion()),
+      );
+      expect(forearm.angleTo(fingers), `frame ${frame}`).toBeLessThan(THREE.MathUtils.degToRad(12));
+      const localWrist = eating.scene.getObjectByName("RightHand")!.quaternion;
+      expect(localWrist.angleTo(new THREE.Quaternion()), `wrist twist at frame ${frame}`).toBeLessThan(THREE.MathUtils.degToRad(5));
+      const anchor = eating.scene.getObjectByName("EatUtensilAnchor")!;
+      expect(anchor.quaternion.angleTo(new THREE.Quaternion()), `grip slips at frame ${frame}`).toBeLessThan(THREE.MathUtils.degToRad(1));
+    }
+  });
+
   it("สะโพกและขาคาท่านั่งบนเบาะ 0.45 ม. ตลอดคลิป ไม่เลื่อนออกจากเบาะ", () => {
     const at = play(eating, clipOf(eating, "Eat"));
     const first = at(0);
@@ -161,9 +250,22 @@ describe("feat-110 customer eat clip", () => {
     const scooping = at(markers.find((marker) => marker.name === "food-contact")!.time);
     expect(scooping.tip.y).toBeCloseTo(FOOD_SURFACE_Y, 2);
     expect(Math.hypot(scooping.tip.x, scooping.tip.z - PLATE_FORWARD)).toBeLessThan(PLATE_RADIUS);
+    // A shallow utensil angle prevents a sharply bent wrist over the plate.
+    expect(scooping.palm(1).y - scooping.tip.y).toBeLessThan(0.04);
+    const forearm = scooping.bone("RightHand").sub(scooping.bone("RightForeArm"));
+    expect(scooping.bone("RightForeArm").x).toBeGreaterThan(0.2);
+    const handDirection = new THREE.Vector3(0, -1, 0).applyQuaternion(
+      eating.scene.getObjectByName("RightHand")!.getWorldQuaternion(new THREE.Quaternion()),
+    );
+    expect(forearm.angleTo(handDirection)).toBeLessThan(THREE.MathUtils.degToRad(40));
 
     const biting = at(markers.find((marker) => marker.name === "hand-contact")!.time);
     expect(biting.tip.distanceTo(biting.mouth)).toBeLessThan(0.035);
+    // The utensil hand and elbow must stay to the diner's right and in front of the torso.
+    expect(biting.bone("RightHand").x).toBeGreaterThan(0.10);
+    expect(biting.bone("RightHand").z).toBeGreaterThan(biting.mouth.z + 0.015);
+    expect(biting.bone("RightForeArm").x).toBeGreaterThan(0.16);
+    expect(biting.bone("RightForeArm").z).toBeGreaterThan(0.15);
     // ปลายอุปกรณ์หยุดนอกก้อนหัว (รัศมีหัวจากกระดูก Head ประมาณ 0.10–0.12 ม.)
     expect(biting.tip.distanceTo(biting.bone("Head"))).toBeGreaterThan(0.12);
     expect(biting.tip.z).toBeGreaterThan(biting.mouth.z - 0.005);
