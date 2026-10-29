@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { createCharacterLoader } from "../character-loader";
+import { plateReach } from "../customer-actions";
 import {
   FOOD_ASSET_BUDGET,
   FOOD_CATALOG,
@@ -142,6 +143,21 @@ describe("food catalog and contract (feat-103)", () => {
         northPlate.anchor.y - southPlate.anchor.y,
       );
       expect(centerDist).toBeGreaterThanOrEqual(FOOD_CATALOG[kind].footprintDiameter);
+
+      // On standard 2-seat (0.80m), 4-seat (1.20m), and wide (2.00m) tables, plates must sit within comfortable reach
+      for (const tableDepth of [0.8, 1.2, 2.0]) {
+        const chairLocalY = tableDepth / 2 + 0.15;
+        const placement = computeTablePlatePlacement({
+          tableWidth: tableDepth,
+          tableDepth,
+          tableShape: "rectangle",
+          chairLocalCenter: { x: 0, y: chairLocalY },
+          foodKind: kind,
+        });
+        const forward = chairLocalY - placement.anchor.y;
+        const reach = plateReach(forward);
+        expect(reach.outOfReach).toBe(false);
+      }
     }
   });
 

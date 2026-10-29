@@ -23,8 +23,7 @@ const TIMES = [
 function record(measurement: Record<string, unknown>) {
   // ไม่เขียนลง e2e/.results เพราะ Playwright ล้าง outputDir ทุกครั้งที่เริ่มรัน
   mkdirSync("harness/evidence/feat-123", { recursive: true });
-  appendFileSync("harness/evidence/feat-123/measurements.jsonl", `${JSON.stringify(measurement)}
-`, "utf8");
+  appendFileSync("harness/evidence/feat-123/measurements.jsonl", `${JSON.stringify(measurement)}\n`, "utf8");
 }
 
 function watchErrors(page: Page) {
@@ -97,17 +96,28 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
     });
   }
 
-  test("เที่ยงสว่างกว่ากลางคืนอย่างเห็นได้ชัด และภาพทั้งสองไม่เหมือนกัน", async ({ page }) => {
+  test("เที่ยงสว่างกว่ากลางคืนอย่างเห็นได้ชัด และปรับเวลาผ่านแผงตั้งค่าแสงในแท็บร้านได้จริง", async ({ page }) => {
     await page.clock.setFixedTime(new Date(TIMES[1].iso));
     await openReadyCafe(page);
-    const noonShot = await (await show3D(page)).screenshot();
+    const canvas = await show3D(page);
+
+    // เปิดแท็บ "ร้าน" เพื่อตรวจว่าแผงตั้งค่าแสง (LightingSettingsPanel) แสดงอยู่และปรับโหมดเวลาคงที่ได้จริง
+    await openTab(page, "shop");
+    const lightingPanel = page.getByTestId("lighting-settings-panel");
+    await expect(lightingPanel).toBeVisible();
+    await expect(page.getByTestId("lighting-reference-disclosure")).toBeVisible();
+
+    await page.getByTestId("lighting-mode-fixed").click();
+    const fixedInput = page.getByTestId("lighting-fixed-datetime");
+    await expect(fixedInput).toBeVisible();
+    await fixedInput.fill("2026-06-21T12:00");
+    await page.waitForTimeout(800);
+    const noonShot = await canvas.screenshot();
     const noon = await meanLuminance(page, noonShot);
 
-    await page.clock.setFixedTime(new Date(TIMES[3].iso));
-    await page.reload();
-    await openTab(page, "add");
-    await page.getByRole("button", { name: /ใช้ผังตัวอย่าง/ }).click();
-    const nightShot = await (await show3D(page)).screenshot();
+    await fixedInput.fill("2026-06-21T21:30");
+    await page.waitForTimeout(800);
+    const nightShot = await canvas.screenshot();
     const night = await meanLuminance(page, nightShot);
 
     record({ check: "noon-vs-night", noon, night });

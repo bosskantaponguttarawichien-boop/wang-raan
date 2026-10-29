@@ -424,7 +424,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       },
     );
     expect(eating.customers.find((report) => report.eating)!.clip).toBe("Eat");
-    expect(eating.customers.find((report) => report.eating)!.seated).toBe(true);
+    expect(eating.customers.find((report) => report.eating)!.seated).toBe(true); expect(eating.customers.find((report) => report.eating)!.plateOutOfReach).toBe(false);
 
     // 3. คราบปรากฏบนโต๊ะหลังลูกค้ากิน
     await milestone(

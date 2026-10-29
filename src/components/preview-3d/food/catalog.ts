@@ -347,13 +347,17 @@ export function computeTablePlatePlacement(params: {
   const dirX = dx / dist;
   const dirY = dy / dist;
 
-  // Place plate inset from the table edge toward the center so the diner can reach it comfortably
-  // while keeping at least `radius + margin` from the center when two diners sit opposite each other.
+  // Place plate at a realistic ergonomic inset (~0.18 m) from the table edge toward the center
+  // so a seated diner (chair center ~0.15 m outside table edge) reaches it at ~0.33 m forward
+  // across all table sizes (0.80 m, 1.20 m, 2.00 m), while keeping at least `radius + 0.015`
+  // from the center on small 0.60 m tables so opposite plates never collide.
+  const PLATE_EDGE_INSET = 0.18;
+
   if (tableShape === "round") {
     const tableRadius = Math.min(tableWidth, tableDepth) / 2;
     const maxRadial = Math.max(0.06, tableRadius - radius - margin);
     const minRadial = Math.min(maxRadial, radius + 0.015);
-    const targetRadial = Math.max(minRadial, Math.min(maxRadial, tableRadius * 0.56));
+    const targetRadial = Math.max(minRadial, Math.min(maxRadial, tableRadius - PLATE_EDGE_INSET));
     return {
       anchor: {
         x: Number((dirX * targetRadial).toFixed(4)),
@@ -371,7 +375,7 @@ export function computeTablePlatePlacement(params: {
   // Determine dominant side (north/south vs east/west)
   if (Math.abs(dy) >= Math.abs(dx)) {
     const signY = dy >= 0 ? 1 : -1;
-    const targetY = signY * Math.max(Math.min(maxY, radius + 0.015), Math.min(maxY, halfD * 0.56));
+    const targetY = signY * Math.max(Math.min(maxY, radius + 0.015), Math.min(maxY, halfD - PLATE_EDGE_INSET));
     const clampedX = Math.max(-maxX, Math.min(maxX, dx * 0.65));
     return {
       anchor: {
@@ -383,7 +387,7 @@ export function computeTablePlatePlacement(params: {
   }
 
   const signX = dx >= 0 ? 1 : -1;
-  const targetX = signX * Math.max(Math.min(maxX, radius + 0.015), Math.min(maxX, halfW * 0.56));
+  const targetX = signX * Math.max(Math.min(maxX, radius + 0.015), Math.min(maxX, halfW - PLATE_EDGE_INSET));
   const clampedY = Math.max(-maxY, Math.min(maxY, dy * 0.65));
   return {
     anchor: {

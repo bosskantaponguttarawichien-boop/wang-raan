@@ -15,6 +15,7 @@ import { TableSetCreatePanel } from "./forms/table-set-create-panel";
 import { CounterEditPanel } from "./forms/counter-style-controls";
 import { TableSetEditPanel } from "./forms/table-set-edit-panel";
 import { SimulationPanel } from "@/components/simulation/simulation-panel";
+import { LightingSettingsPanel } from "@/components/preview-3d/lighting/settings-panel";
 
 const ICON_STROKE = { fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinejoin: "round" as const };
 
@@ -145,6 +146,9 @@ export function PlaygroundPanel({
             ร้าน 2–30 ม. ปรับทีละ 25 ซม.<span className="max-[767px]:hidden"> · กด Enter หรือออกจากช่องเพื่อใช้ค่า</span>
           </p>
           <RoomSettingsForm />
+          <div className="mt-4 border-t border-line pt-4">
+            <LightingSettingsPanel />
+          </div>
         </div>
       ) : activeTab === "check" ? (
         <div>

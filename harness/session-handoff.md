@@ -3,31 +3,28 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
-## 2026-10-29 ICT — feat-123 รอบยืนยันผลรัน `--workers=1` ครบ 28/28 ข้อ (คงสถานะ in-progress รอเจ้าของสายรับ defect)
+## 2026-10-29 ICT — feat-123 เสร็จสมบูรณ์ (done) · ปิด Defect ครบทั้ง 3 ข้อ และยืนยันผลรัน `--workers=1` ครบ 28/28 ข้อ
 
 ### สิ่งที่ทำและยืนยันแล้วในรอบนี้
 
-- ปรับพาธบันทึกภาพใน `e2e/restaurant-animation.spec.ts` และ `e2e/restaurant-animation-lighting.spec.ts` ให้เขียนลง `harness/evidence/feat-123/screens/` โดยตรง (ป้องกันไม่ให้ Playwright ล้าง `e2e/.results/` ทับภาพรอบก่อน)
-- รันยืนยันด้วย `--workers=1` ครบทั้ง 3 ไฟล์ (`restaurant-animation.spec.ts` 14 ข้อ + `restaurant-animation-lighting.spec.ts` 10 ข้อ + `restaurant-animation-timing.spec.ts` 4 ข้อ) → **ผ่านครบ 28/28 ข้อ (0 ล้ม)** บน production build + Chrome + NVIDIA GeForce GTX 1050 Ti (hardware WebGL)
+- **แก้ไข Defect คงค้าง 2 ข้อของสายอาหาร/โต๊ะและสายแสง**:
+  1. เชื่อมต่อ `LightingSettingsPanel` (`src/components/preview-3d/lighting/settings-panel.tsx`) เข้ากับ `src/components/editor/playground-panel.tsx` ในแท็บ `"shop"` ("ร้าน") ถัดจาก `<RoomSettingsForm />` และยืนยันผ่าน E2E (`e2e/restaurant-animation-lighting.spec.ts`) ว่าสามารถสลับโหมด `Fixed Time` (`12:00` vs `21:30`) จากหน้า UI จริงแล้วความสว่างฉาก 3D เปลี่ยนตามทันที
+  2. แก้ไข `computeTablePlatePlacement` ใน `src/components/preview-3d/food/catalog.ts` ให้วางจานห่างจากขอบโต๊ะด้วยระยะคงที่ `PLATE_EDGE_INSET = 0.18` ม. แทนสัดส่วน `halfD * 0.56` ทำให้โต๊ะขนาด 0.80 ม., 1.20 ม., และ 2.00 ม. มีระยะเอื้อมจากเก้าอี้ถึงจาน `0.33` ม. (`correction = -0.01` ม., `outOfReach = false`) และโต๊ะเล็ก 0.60 ม. จานไม่ชนกันและไม่ล้นขอบ พร้อมอัปเดต `src/components/preview-3d/food/catalog.test.ts` และ `harness/evidence/feat-118/plate-reach-probe.json`
+- รันยืนยันด้วย `--workers=1` ครบทั้ง 3 ไฟล์ (`restaurant-animation-lighting.spec.ts` 10 ข้อ + `restaurant-animation.spec.ts` 14 ข้อ + `restaurant-animation-timing.spec.ts` 4 ข้อ) → **ผ่านครบ 28/28 ข้อ (0 ล้ม)** บน production build + Chrome + NVIDIA GeForce GTX 1050 Ti (hardware WebGL)
 - เก็บผลลัพธ์จริงลง `harness/evidence/feat-123/e2e-run.log`, `measurements.jsonl` (ครบ 25 รายการวัดผล), `summary.md` และ `screens/` (ครบ 27 ภาพ รวมถึง `cycle-*.png` และ `performance-dense.png`)
-- ตรวจสอบทั้ง workspace: `npm test` **110 files / 1,294 tests ผ่าน**, `npm run lint` 0 error, `npm run typecheck` ผ่าน, `python scripts/validate_harness.py` ผ่าน
+- ตรวจสอบทั้ง workspace: `npm test` **110 files / 1,294 tests ผ่าน**, `npm run lint` 0 error, `npm run typecheck` ผ่าน, `python scripts/validate_harness.py` ผ่าน (Done: 115/123, Sprint 5 `feat-100..123` เสร็จครบ 100%)
 
 ### ผลที่วัดได้จริงจากรอบ `--workers=1` ล่าสุด
 
-- **เวลาเดิน**: 1× อัตรา `0.999×` (15.00 วิจำลอง ใน 15.02 วิจริง), 10× อัตรา `9.70×`, resume `0.995×`, กลับจากแท็บซ่อน `0.997×` (ไม่ไล่เวลาสะสม)
-- **วงจรบริการ (ผ่าน diagnostic hook จริง)**: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` (`seated = true`) → คราบ 1 โต๊ะ → เช็ด `WipeTable` `wipeProgress 0.074 → 0.993` โดย **คราบยังอยู่ครบ 8 ก้อนระหว่างเช็ด** → ดึงเก้าอี้ `handOnBackrest = true` ขณะเก้าอี้เคลื่อน เห็นครบ `approach → pull → sit → push → seated` ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
-- **Performance ฉากหนาแน่น (ผัง 80 ที่นั่ง นำเข้าผ่านช่อง JSON จริงขึ้น Ready)**: **ลูกค้า 66 คน + พนักงาน 8 คน** (นั่ง 45/80 ที่ · รอหน้าร้าน 21 คน · `stalled = 0`) จานบนโต๊ะ 41 ใบ · median **50.0 fps** / p95 **49.8 fps** · **draw calls 693** · triangles 575,942 · geometries 292 / textures 81 / programs 8 · JS heap 53.3 MB · frame debt 0
-- **เริ่ม–จบรอบ 10 ครั้ง**: ผ่านครบ, canvas คงเหลือ 1 ตัว, heap 15.1 → 21.4 MB
+- **เวลาเดิน**: 1× อัตรา `0.999×` (15.00 วิจำลอง ใน 15.02 วิจริง), 10× อัตรา `9.97×`, resume `0.994×`, กลับจากแท็บซ่อน `0.996×` (ไม่ไล่เวลาสะสม)
+- **วงจรบริการ (ผ่าน diagnostic hook จริง)**: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` (`seated = true`, **`plateOutOfReach = false`**) → คราบ 1 โต๊ะ 5 ก้อน → เช็ด `WipeTable` `wipeProgress 0.003 → 0.982` โดย **คราบยังอยู่ครบ 8 ก้อนระหว่างเช็ด** และหลังเช็ดเสร็จ `stainMeshes = 0` → ดึงเก้าอี้ `handOnBackrest = true` ขณะเก้าอี้เคลื่อน เห็นครบ `approach → pull → sit → push → seated` ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
+- **Performance ฉากหนาแน่น (ผัง 80 ที่นั่ง นำเข้าผ่านช่อง JSON จริงขึ้น Ready)**: **ลูกค้า 66 คน + พนักงาน 8 คน** (นั่ง 45/80 ที่ · รอหน้าร้าน 15 คน · `stalled = 0`) จานบนโต๊ะ 41 ใบ · median **50.0 fps** / p95 **49.8 fps** · **draw calls 693** · triangles 582,820 · geometries 298 / textures 81 / programs 8 · JS heap 53.3 MB · frame debt 0
+- **เริ่ม–จบรอบ 10 ครั้ง**: ผ่านครบ, canvas คงเหลือ 1 ตัว, heap 18.5 → 21.3 MB
 
-### เหตุผลที่คง `feat-123` เป็น `in-progress` และงานถัดไป
+### สถานะงานคงค้างของโปรเจกต์ (นอก Sprint 5)
 
-1. **Defect 2 ข้อของสาย Agent 2 ยังรอเจ้าของสายรับไปแก้** (ยังไม่ได้ส่งให้ agent ใด เพราะไม่มี session อื่นบนเครื่องและยังไม่ได้ push — ห้ามอ้างว่าส่งแล้ว และห้ามแก้ private scope ของสายอื่นเองโดยพลการ):
-   - `src/components/preview-3d/lighting/settings-panel.tsx` (feat-120) ไม่ถูก mount ที่ไหนเลยในแอป
-   - `computeTablePlatePlacement` (feat-103/116) วางจานไกลเกินระยะเอื้อมคลิป Eat ที่โต๊ะ ≥ 1.2 ม. (`plateOutOfReach = true` ในผลวัดจริง; ตัวเลขใน `harness/evidence/feat-118/plate-reach-probe.json`)
-2. **ข้อจำกัดที่บันทึกไว้ตามจริง**:
-   - ลูกค้าพร้อมกันในฉากหนาแน่นวัดได้สูงสุด **66 คน** (+ พนักงาน 8 = 74 ตัวละคร) ยังไม่ถึง 80 คนพร้อมกัน เพราะติดเพดานอัตราเข้าร้าน (500 คน/วัน) และเวลาทำอาหารของ engine ไม่ใช่การวาดภาพ
-   - เมนูที่ 5 (`fried-rice`) ยังไม่ขึ้นโต๊ะในผังตัวอย่าง 6 ที่นั่ง (พบ 4 จาก 5 เมนูจากผลของ hash เลือกเมนูต่อกลุ่ม)
-   - GPU memory จริงอ่านจากหน้าเว็บไม่ได้ (วัดได้เฉพาะ JS heap และจำนวน geometry/texture)
+- Sprint 5 (`feat-100` ถึง `feat-123`) เสร็จสมบูรณ์ครบทุกข้อ (`done`)
+- งานที่ยังเป็น `in-progress` ในโปรเจกต์เหลือเพียงงาน Sprint 2 เดิมที่รอกระบวนการภายนอก: `feat-041` (รอทดสอบ Google OAuth จริงบน Railway/Cloudflare) และ `feat-043` (รอ push ขึ้น GitHub เพื่อรัน Actions และตั้ง branch protection)
 
 ## 2026-10-29 ICT — feat-117→119, feat-122 เสร็จ · feat-123 ตรวจแล้วแต่ยังไม่ปิด
 
