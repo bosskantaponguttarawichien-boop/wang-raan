@@ -38,6 +38,7 @@ import { createLegacyServingProps } from "./runtime/legacy-serving-props";
 import { createSceneRuntime, type SceneRuntime } from "./runtime/scene-runtime";
 import { FrameClock } from "./runtime/frame-clock";
 import { createSceneFeatureFactories, type SceneFeatureHandles } from "./runtime/scene-features";
+import { installSceneDiagnostics, readRendererCounters, type SceneFrameInfo } from "./runtime/scene-diagnostics";
 import type { StaffRig } from "./staff-actions/contracts";
 import type { CustomerRig } from "./customer-actions/contracts";
 import type { ChairRig as SeatingChairRig } from "./seating/contracts";
@@ -1620,6 +1621,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         playbackRate: simulationStore.getState().config.speed,
         simulating, paused: pausedRef.current, presentation,
       };
+      frameInfo = {
+        modern, simulating, running,
+        simTimeSeconds: presentation?.simTimeSeconds ?? null,
+        playbackRate: frameInput.playbackRate,
+        frameDebtSeconds: step.debt,
+        customerCount: customers.size,
+        staffCount: staff.length,
+      };
       if (modern) {
         // หยุดชั่วคราว = หยุดภาพทั้งหมด ไม่ใช่แค่หยุดเดิน: คลิป loop ต้องไม่ขยับต่อด้วย
         const animationDelta = running ? delta : 0;
@@ -1855,6 +1864,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       // แสงจริงรับไฟเดิมของฉากไปใช้ ไม่สร้างดวงที่สองทับ
       lighting: { existingLights: { sunLight: lighting.key, skyGroundLight: lighting.ambient } },
     });
+    /** สถานะเฟรมล่าสุดสำหรับ diagnostic hook — อัปเดตใน tick ไม่สร้าง object ใหม่ต่อเฟรม */
+    let frameInfo: SceneFrameInfo = {
+      modern: false, simulating: false, running: false, simTimeSeconds: null,
+      playbackRate: 1, frameDebtSeconds: 0, customerCount: 0, staffCount: 0,
+    };
     const runtime = createSceneRuntime({
       scene, camera,
       getLayout: () => stageRef.current?.layout ?? null,
@@ -1884,6 +1898,21 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       updateRoomTransition,
     };
     stageRef.current = stage;
+    // QA อัตโนมัติอ่านสิ่งที่ feature ตัดสินใจได้ เฉพาะเมื่อมีการตั้ง flag ไว้ก่อนฉากถูกสร้าง
+    const removeDiagnostics = installSceneDiagnostics(typeof window === "undefined" ? undefined : (window as unknown as Record<string, unknown>), {
+      version: 1,
+      staffActions: () => features.staffActions?.getReports() ?? [],
+      customerActions: () => features.customerActions?.getReports() ?? [],
+      seating: () => features.seating?.getReports() ?? [],
+      tableService: () => {
+        const stats = features.tableService?.getStats();
+        if (!stats) return null;
+        const { tableCount, activeDishCount, activeStainTableCount, activeStainMeshCount } = stats;
+        return { tableCount, activeDishCount, activeStainTableCount, activeStainMeshCount };
+      },
+      renderer: () => readRendererCounters(renderer.info),
+      frame: () => frameInfo,
+    });
     const observer = new ResizeObserver(resize);
     observer.observe(host);
 
@@ -1894,6 +1923,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
+      removeDiagnostics();
       try {
         runtime.dispose();
       } finally {

@@ -573,3 +573,12 @@
 - Customer exits: impossible party/table matches are counted as `noSeat`; entrance and food waits use `patienceMinutes`; cancellation removes queued work, prevents late delivery, and sends the table to cleaning.
 - Analysis: adds `abandoned` and `unfinished`; unresolved diners after the four-hour drain window make an option not good.
 - Tests updated for patience and per-diner dishes. GitHub CI run 40674434765 was queued at handoff; inspect its result before merging.
+
+## 2026-10-29 ICT — Agent1:113→114→115 พร้อมส่งต่อ
+
+- Commits113=`516f7f8`,114=`6a37025`;115ดูcommitล่าสุดบนcodex/animation-foundation หลังบันทึกชุดนี้ ใช้ฐานรวมเหล่านี้ก่อนงาน116–119/122;ไม่ต้องเริ่ม122ในturnนี้
+- 113ผลิตsnapshotv1ต่อสมาชิก/chair/meal/cycle/milestone,114ส่งWorker/run/sequence+bridge,115ต่อcontrollerและเดินตามenginevelocity/staff1.2ไม่catchup พร้อมpausevisibility/boundedqueue
+- APIของ122: `controller.current.presentation` และ `current.timing` (absolute simulationSeconds, deltaSecondsที่scaleแล้ว, playbackRate);timingเป็นTICKsample ห้ามบวกdeltaซ้ำทุกRAF ต้องhonourpausedและใช้absolutephase รายละเอียด `harness/evidence/feat-115/README.md`
+- GateของAgent1ผ่านบนสำเนาฐานtracked6a37025+115:84files/1043tests,lint/typecheck,boundary53source/Harness;targeted65tests/fps15–120/rates1–30/hidden60วิผ่าน Chromeจริง30.051วิ=sim30.0512วิ,3Dcontrols/visibility/browsererrors0
+- Workspaceรวมยังมีงานคู่ขนานuntrackedของAgent2/3:fulltestล้มที่staff-actions/staff-carry-clips.test.ts:142(_part)และtypecheckที่:44(ArrayBuffer|SharedArrayBuffer) ต้องให้laneคลิปแก้ก่อนintegrationทั้งทีม Agent1ไม่ได้แก้/commitไฟล์เหล่านั้น และไม่อ้างว่าworkspaceรวมเขียว
+- คงงานอาหาร/คลิป/GLBของagentอื่นในworkingtree ไม่stage;ThreeView/legacycadenceและติดตั้งvisualใหม่รอ122 ไม่มีpush/PR

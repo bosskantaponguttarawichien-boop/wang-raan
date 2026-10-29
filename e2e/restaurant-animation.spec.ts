@@ -5,6 +5,11 @@ import { BREAKPOINTS, openTab } from "./helpers";
 /**
  * feat-123 · ตรวจรับภาพวงจรบริการในมุมมอง 3D
  *
+ * **สองเทสต์ที่วัดผลจริงต้องรันเดี่ยว** — "เห็นครบทุกช่วงของวงจรบริการ" และ "performance ฉากหนาแน่น"
+ * ใช้เวลาเดินของการจำลองและความเร็วของเครื่องเป็นตัวแปร การรันขนานกับเบราว์เซอร์อื่นทำให้ throughput
+ * ของร้านต่างออกไปจนผลไม่เทียบกันได้ ให้รันด้วย:
+ *   npx playwright test e2e/restaurant-animation.spec.ts --workers=1
+ *
  * ทุกข้อวัดจากของจริงบนหน้าเว็บ: ภาพที่ canvas วาดจริง, ไฟล์โมเดลที่ถูกโหลดจริง และ console ของเบราว์เซอร์
  * ไม่ใช้ hook ภายในแอปและไม่ถือว่า "GLB โหลด 200" เท่ากับ "เห็นภาพถูกต้อง"
  */
@@ -30,6 +35,92 @@ function watchModelRequests(page: Page) {
 }
 
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
+
+/**
+ * เปิด diagnostic hook อ่านอย่างเดียวของฉาก (feat-123) — ต้องตั้งก่อนหน้าโหลด
+ * ของจริงไม่มีใครตั้ง flag นี้ ผู้ใช้ทั่วไปจึงไม่เคยได้ object นี้
+ */
+async function enableDiagnostics(page: Page) {
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__wangraanDiagnostics = true;
+  });
+}
+
+interface SceneReports {
+  staff: { clip: string; tier: string; trayMealIds: string[]; wipeProgress: number; dishReleased: boolean; tableId: string | null }[];
+  customers: { clip: string; eating: boolean; seated: boolean; utensil: { utensil: string; foodKind: string } | null; plateOutOfReach: boolean }[];
+  seating: { phase: string; chairPull: number; handOnBackrest: boolean; usesChairClips: boolean }[];
+  tableService: { tableCount: number; activeDishCount: number; activeStainTableCount: number; activeStainMeshCount: number } | null;
+  renderer: { calls: number; triangles: number; geometries: number; textures: number; programs: number } | null;
+  frame: { modern: boolean; running: boolean; simTimeSeconds: number | null; frameDebtSeconds: number; customerCount: number; staffCount: number } | null;
+}
+
+async function readScene(page: Page): Promise<SceneReports> {
+  return page.evaluate(() => {
+    const hook = (window as unknown as { __wangraanScene?: Record<string, (() => unknown) | undefined> }).__wangraanScene;
+    if (!hook) return { staff: [], customers: [], seating: [], tableService: null, renderer: null, frame: null };
+    return {
+      staff: (hook.staffActions?.() ?? []) as SceneReports["staff"],
+      customers: (hook.customerActions?.() ?? []) as SceneReports["customers"],
+      seating: (hook.seating?.() ?? []) as SceneReports["seating"],
+      tableService: (hook.tableService?.() ?? null) as SceneReports["tableService"],
+      renderer: (hook.renderer?.() ?? null) as SceneReports["renderer"],
+      frame: (hook.frame?.() ?? null) as SceneReports["frame"],
+    };
+  });
+}
+
+/**
+ * ผังหนาแน่น 80 ที่นั่ง (โต๊ะ 4 ที่ 20 ชุด) ในร้าน 20 × 16 ม.
+ * ระยะเก้าอี้รอบโต๊ะเท่ากับที่ `createTableSet` ของ Core วาง (สอดใต้โต๊ะ 0.10 ม.)
+ * ถ้าสูตรนี้เพี้ยน ผลตรวจผังของแอปเองจะไม่เป็น Ready — เทสต์จึงตรวจสถานะหลังนำเข้าเสมอ
+ */
+function denseLayoutJson(): string {
+  const objects: Record<string, unknown>[] = [
+    { id: "counter-1", type: "counter", x: 0.5, y: 0.5, width: 2.4, depth: 0.7, rotation: 0 },
+  ];
+  let serial = 0;
+  for (let column = 0; column < 5; column += 1) {
+    for (let row = 0; row < 4; row += 1) {
+      const x = 1 + column * 3.75;
+      const y = 2.5 + row * 3.25;
+      serial += 1;
+      const tableId = `table-${serial}`;
+      const sides = [
+        { dx: 0.35, dy: -0.4, rotation: 180 },
+        { dx: 1.1, dy: 0.35, rotation: 270 },
+        { dx: 0.35, dy: 1.1, rotation: 0 },
+        { dx: -0.4, dy: 0.35, rotation: 90 },
+      ];
+      const chairIds = sides.map((_, index) => `${tableId}-chair-${index + 1}`);
+      objects.push({ id: tableId, type: "table", preset: "table-4-seats", x, y, width: 1.2, depth: 1.2, rotation: 0, chairIds });
+      sides.forEach((side, index) => {
+        objects.push({
+          id: chairIds[index], type: "chair", tableId,
+          x: Number((x + side.dx).toFixed(2)), y: Number((y + side.dy).toFixed(2)),
+          width: 0.5, depth: 0.5, rotation: side.rotation,
+        });
+      });
+    }
+  }
+  return JSON.stringify({
+    id: "dense-80-seats", version: 1, units: "m", width: 20, depth: 16,
+    entrance: { id: "entrance-1", wall: "south", position: 9, width: 1.2 },
+    kitchenDoor: { id: "kitchen-1", wall: "north", position: 4, width: 0.9 },
+    objects,
+  });
+}
+
+/** นำเข้าผังหนาแน่นผ่านช่องเลือกไฟล์จริงของแอป */
+async function importDenseLayout(page: Page) {
+  await page.goto("/playground");
+  await page.setInputFiles('input[aria-label="เลือกไฟล์ผังร้าน JSON"]', {
+    name: "dense-80-seats.json",
+    mimeType: "application/json",
+    buffer: Buffer.from(denseLayoutJson(), "utf8"),
+  });
+  await expect(statusBar(page)).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
+}
 
 /** เปิด Playground ด้วยผังคาเฟ่ตัวอย่างที่ผ่านการตรวจแล้ว */
 async function openReadyCafe(page: Page) {
@@ -232,6 +323,148 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     expect(errors.filter((text) => !text.includes("Error creating WebGL context"))).toEqual([]);
   });
 
+  test("เห็นครบทุกช่วงของวงจรบริการจากสิ่งที่ feature ตัดสินใจจริง", async ({ page }) => {
+    test.setTimeout(900_000);
+    const errors = watchErrors(page);
+    await enableDiagnostics(page);
+    await openReadyCafe(page);
+    await startSimulation(page);
+    const canvas = await show3D(page);
+    await setSpeed(page, "1×");
+    expect((await readScene(page)).frame?.modern, "ฉากไม่ได้ใช้ metadata ของ simulation").toBe(true);
+
+    // ช่วงดึงเก้าอี้กินเวลาแค่ 1.1 วินาทีจำลอง จึงต้องเฝ้าที่ 1× ก่อนเร่งความเร็ว
+    const grip = { seen: false, phases: new Set<string>(), maxPull: 0, usesChairClips: true };
+    await expect.poll(async () => {
+      const scene = await readScene(page);
+      for (const report of scene.seating) {
+        grip.phases.add(report.phase);
+        grip.maxPull = Math.max(grip.maxPull, report.chairPull);
+        if (report.handOnBackrest && report.chairPull > 0) {
+          grip.seen = true;
+          grip.usesChairClips = report.usesChairClips;
+        }
+      }
+      return grip.seen;
+    }, { timeout: 180_000, intervals: [60], message: "ไม่เคยเห็นมือเกาะพนักพิงขณะเก้าอี้กำลังเคลื่อน" }).toBe(true);
+    await page.screenshot({ path: "e2e/.results/screens/cycle-chair-grip.png" });
+    // มือเกาะพนักตั้งแต่เก้าอี้ยังแทบไม่เคลื่อน จึงต้องเฝ้าต่ออีกหน่อยเพื่อดูระยะดึงเต็ม
+    const until = Date.now() + 8000;
+    while (Date.now() < until) {
+      for (const report of (await readScene(page)).seating) {
+        grip.phases.add(report.phase);
+        grip.maxPull = Math.max(grip.maxPull, report.chairPull);
+      }
+    }
+    record({
+      check: "cycle-chair-grip", handOnBackrestWhileChairMoves: grip.seen,
+      phasesSeen: [...grip.phases].sort(), maxChairPull: Number(grip.maxPull.toFixed(4)),
+      usesChairClips: grip.usesChairClips,
+    });
+    // ระยะดึงต้องไม่เกินระยะของฉาก (CHAIR_PULL = 0.30 ม.) และต้องเดินผ่านช่วงที่มือเกาะจริง
+    expect(grip.maxPull).toBeGreaterThan(0.05);
+    expect(grip.maxPull).toBeLessThanOrEqual(0.3001);
+
+    await setSpeed(page, "30×");
+
+    /**
+     * รอจนเงื่อนไขเป็นจริง โดยนับ **เวลาจำลอง** ไม่ใช่เวลาจริง — เครื่องที่รันหลายเบราว์เซอร์พร้อมกัน
+     * จะเดินช้าลงในเวลาจริง แต่วงจรบริการยังมาถึงเท่าเดิมเมื่อวัดด้วยนาฬิกาของร้าน
+     */
+    const milestone = async (
+      name: string,
+      ready: (scene: SceneReports) => boolean,
+      detail: (scene: SceneReports) => Record<string, unknown>,
+      simSecondsBudget = 5400,
+    ) => {
+      const start = (await readScene(page)).frame?.simTimeSeconds ?? 0;
+      let seen: SceneReports | null = null;
+      await expect.poll(async () => {
+        const scene = await readScene(page);
+        if (ready(scene)) seen = scene;
+        const elapsed = (scene.frame?.simTimeSeconds ?? start) - start;
+        if (seen) return "found";
+        return elapsed > simSecondsBudget ? "out-of-sim-time" : "waiting";
+      }, {
+        timeout: 600_000, intervals: [250],
+        message: `ไม่พบช่วง "${name}" ภายใน ${simSecondsBudget} วินาทีจำลอง`,
+      }).toBe("found");
+      await page.screenshot({ path: `e2e/.results/screens/cycle-${name}.png` });
+      record({ check: `cycle-${name}`, ...detail(seen!) });
+      return seen!;
+    };
+
+    // 1. พนักงานถือถาดอาหารเดินไปเสิร์ฟ
+    await milestone(
+      "carrying",
+      (scene) => scene.staff.some((report) => report.trayMealIds.length > 0 && report.clip.startsWith("Carry")),
+      (scene) => {
+        const carrying = scene.staff.find((report) => report.trayMealIds.length > 0)!;
+        return { clip: carrying.clip, tier: carrying.tier, meals: carrying.trayMealIds.length };
+      },
+    );
+
+    // 2. ลูกค้านั่งกินอาหารพร้อมอุปกรณ์ตามเมนู และจานอยู่บนโต๊ะจริง
+    const eating = await milestone(
+      "eating",
+      (scene) => scene.customers.some((report) => report.eating) && (scene.tableService?.activeDishCount ?? 0) > 0,
+      (scene) => {
+        const diner = scene.customers.find((report) => report.eating)!;
+        return {
+          clip: diner.clip, utensil: diner.utensil?.utensil, foodKind: diner.utensil?.foodKind,
+          plateOutOfReach: diner.plateOutOfReach, dishesOnTables: scene.tableService?.activeDishCount,
+        };
+      },
+    );
+    expect(eating.customers.find((report) => report.eating)!.clip).toBe("Eat");
+    expect(eating.customers.find((report) => report.eating)!.seated).toBe(true);
+
+    // 3. คราบปรากฏบนโต๊ะหลังลูกค้ากิน
+    await milestone(
+      "stained",
+      (scene) => (scene.tableService?.activeStainMeshCount ?? 0) > 0,
+      (scene) => ({
+        stainTables: scene.tableService?.activeStainTableCount,
+        stainMeshes: scene.tableService?.activeStainMeshCount,
+      }),
+    );
+
+    // 4. พนักงานเช็ดโต๊ะ โดยคราบยังไม่หายก่อนเช็ดเสร็จ
+    const wiping = await milestone(
+      "wiping",
+      (scene) => scene.staff.some((report) => report.clip === "WipeTable") && (scene.tableService?.activeStainMeshCount ?? 0) > 0,
+      (scene) => {
+        const cleaner = scene.staff.find((report) => report.clip === "WipeTable")!;
+        return {
+          clip: cleaner.clip, wipeProgress: cleaner.wipeProgress, tableId: cleaner.tableId,
+          stainMeshesStillThere: scene.tableService?.activeStainMeshCount,
+        };
+      },
+    );
+    const cleaner = wiping.staff.find((report) => report.clip === "WipeTable")!;
+    expect(cleaner.wipeProgress).toBeGreaterThanOrEqual(0);
+    expect(cleaner.wipeProgress).toBeLessThanOrEqual(1);
+    expect(wiping.tableService!.activeStainMeshCount, "คราบหายไปแล้วทั้งที่ยังเช็ดไม่เสร็จ").toBeGreaterThan(0);
+
+    // 5. งานเช็ดเดินจนจบจริง — ตรวจที่ความคืบหน้าของงาน ไม่ใช่ "ทั้งร้านไม่มีคราบ"
+    //    (ร้านที่คนเยอะมีโต๊ะอื่นเปื้อนตลอดเวลา เงื่อนไขระดับร้านจึงไม่ใช่สิ่งที่ควรรอ)
+    await milestone(
+      "wipe-complete",
+      (scene) => scene.staff.some((report) => report.clip === "WipeTable" && report.wipeProgress >= 0.95),
+      (scene) => {
+        const done = scene.staff.find((report) => report.clip === "WipeTable" && report.wipeProgress >= 0.95)!;
+        return {
+          wipeProgress: done.wipeProgress, tableId: done.tableId,
+          stainMeshes: scene.tableService?.activeStainMeshCount,
+          dishesOnTables: scene.tableService?.activeDishCount,
+        };
+      },
+    );
+
+    await expect(canvas).toBeVisible();
+    expect(errors).toEqual([]);
+  });
+
   test("เมนูที่ขึ้นโต๊ะอยู่ในห้าเมนูที่ล็อกไว้เท่านั้น", async ({ page }) => {
     test.setTimeout(300_000);
     const errors = watchErrors(page);
@@ -255,15 +488,50 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     expect(errors).toEqual([]);
   });
 
-  test("performance บนเครื่องอ้างอิง: วัด frame time จริงขณะจำลองในมุมมอง 3D", async ({ page }) => {
-    test.setTimeout(240_000);
+  test("performance บนเครื่องอ้างอิง: ฉากหนาแน่น 80 ที่นั่ง + พนักงาน 8 คน", async ({ page }) => {
+    test.setTimeout(900_000);
     const errors = watchErrors(page);
-    await openReadyCafe(page);
+    await enableDiagnostics(page);
+    await importDenseLayout(page);
+    await openTab(page, "check");
+
+    // พนักงานหน้าร้าน 8 คน (เพดานของระบบ) และพ่อครัวมากพอไม่ให้ครัวเป็นคอขวด
+    const panel = page.getByTestId("simulation-panel");
+    for (let click = 0; click < 8; click += 1) {
+      const add = panel.getByRole("button", { name: "เพิ่มพนักงานหน้าร้าน" });
+      if (await add.isDisabled()) break;
+      await add.click();
+    }
+    for (let click = 0; click < 8; click += 1) {
+      const add = panel.getByRole("button", { name: "เพิ่มพ่อครัว" });
+      if (await add.isDisabled()) break;
+      await add.click();
+    }
+    // ลูกค้าต่อวันสูงสุดและนั่งนาน เพื่อให้ที่นั่งเต็มพร้อมกันได้จริง (เลือกจาก label ไม่ใช่ลำดับ)
+    for (const [label, value] of [["อยากให้ลูกค้าเข้าทั้งวัน", "500"], ["ลูกค้านั่งกินประมาณ", "120"]] as const) {
+      const slider = panel.getByLabel(new RegExp(label));
+      if (await slider.count()) await slider.first().fill(value);
+    }
+    const staffCount = await panel.getByLabel(/พนักงานหน้าร้าน \d+ คน/).innerText().catch(() => "?");
+
     await startSimulation(page);
     await show3D(page);
+    await setSpeed(page, "30×");
+    // เร่ง 30× เป็นเวลาคงที่เพื่อให้ร้านเต็มเท่าที่ engine จะพาไปได้ แล้วค่อยวัดที่ 1×
+    // (ไม่ตั้งเป้าจำนวนคนตายตัว เพราะจำนวนที่นั่งเต็มขึ้นกับอัตราเข้าร้านของ engine ไม่ใช่ของภาพ)
+    let peak = 0;
+    const fillFrom = (await readScene(page)).frame?.simTimeSeconds ?? 0;
+    // งบเป็นเวลาจำลอง (1 ชั่วโมงในร้าน) เพื่อให้ผลไม่ขึ้นกับว่าเครื่องว่างแค่ไหน
+    for (;;) {
+      const scene = await readScene(page);
+      peak = Math.max(peak, scene.frame?.customerCount ?? 0);
+      const elapsed = (scene.frame?.simTimeSeconds ?? fillFrom) - fillFrom;
+      if (peak >= 70 || elapsed > 3600) break;
+      await page.waitForTimeout(500);
+    }
     await setSpeed(page, "1×");
-    // ปล่อยให้ร้านมีคนก่อนค่อยวัด — วัดฉากว่างไม่ได้บอกอะไร
-    await page.waitForTimeout(20_000);
+    await page.waitForTimeout(3000);
+    const dense = await readScene(page);
 
     const sample = await page.evaluate(async () => {
       const intervals: number[] = [];
@@ -296,14 +564,28 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       };
     });
     const inStore = await page.getByTestId("simulation-metrics").innerText().catch(() => "");
+    const after = await readScene(page);
     record({
-      check: "performance",
+      check: "performance-dense",
       ...sample,
       medianFps: Number((1000 / sample.medianMs).toFixed(1)),
       p95Fps: Number((1000 / sample.p95Ms).toFixed(1)),
+      seats: 80,
+      staffControl: staffCount,
+      peakCustomersInScene: peak,
+      customersWhileMeasuring: after.frame?.customerCount ?? null,
+      staffInScene: after.frame?.staffCount ?? null,
+      drawCalls: after.renderer?.calls ?? null,
+      triangles: after.renderer?.triangles ?? null,
+      geometries: after.renderer?.geometries ?? null,
+      textures: after.renderer?.textures ?? null,
+      programs: after.renderer?.programs ?? null,
+      dishesOnTables: dense.tableService?.activeDishCount ?? null,
+      frameDebtSeconds: after.frame?.frameDebtSeconds ?? null,
       storeMetrics: inStore.replace(/\s+/g, " ").slice(0, 240),
-      note: "ผังตัวอย่างคาเฟ่ 8×6 ม. มี 6 ที่นั่ง จึงไม่สามารถสร้างฉาก 80 ลูกค้าพร้อมกันได้",
     });
+    await page.screenshot({ path: "e2e/.results/screens/performance-dense.png" });
+    expect(peak, "ร้านแทบไม่มีคนเลย วัด performance ไม่มีความหมาย").toBeGreaterThanOrEqual(20);
     expect(sample.frames, "วัดเฟรมไม่ได้เลย").toBeGreaterThan(60);
     expect(1000 / sample.medianMs, `median ${(1000 / sample.medianMs).toFixed(1)} fps`).toBeGreaterThanOrEqual(30);
     expect(errors).toEqual([]);

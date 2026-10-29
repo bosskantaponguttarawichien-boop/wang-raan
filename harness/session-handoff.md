@@ -3,6 +3,46 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-29 ICT — feat-123 รอบสอง: diagnostic hook + ผังหนาแน่น (เหลือเก็บผลรันสุดท้าย)
+
+**สถานะโควตาตอนเขียน**: โควตา 5 ชั่วโมงใช้ไป **88%** (รีเซ็ตอีก ~2.5 ชม.) · รายสัปดาห์ 33% · context 69%
+จึงหยุดเปิดงานยาวรอบใหม่ และเขียนส่งต่อไว้ให้ทำต่อได้ทันที
+
+### ทำเพิ่มจากรอบแรก (commit ไว้แล้ว)
+
+- `src/components/preview-3d/runtime/scene-diagnostics.ts` + test 11 ข้อ — hook อ่านอย่างเดียวบน `window`
+  ติดตั้งเฉพาะเมื่อ `window.__wangraanDiagnostics === true` ถูกตั้งก่อนฉากถูกสร้าง (ผู้ใช้จริงไม่เคยได้)
+  คืน `staffActions` / `customerActions` / `seating` reports, `tableService` stats, `renderer.info` และ `frame`
+  · ต่อเข้า `three-view.tsx` แล้ว ถอดตอน unmount
+- `e2e/restaurant-animation.spec.ts` เพิ่มสองเทสต์ใหญ่: วงจรบริการรายช่วงจาก hook จริง และ performance ฉากหนาแน่น
+  (สร้างผัง 80 ที่นั่งใน spec แล้วนำเข้าผ่านช่องเลือกไฟล์ JSON ของแอป แอปตรวจเองขึ้น Ready)
+
+### ผลที่วัดได้แล้ว (จากการรันเดี่ยว — ตัวเลขจริง ไม่ใช่ประมาณ)
+
+- วงจรบริการ: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` → คราบ 1 โต๊ะ 5 ก้อน
+  → เช็ด `WipeTable` `wipeProgress 0.095` โดย **คราบยังอยู่ครบ 8 ก้อน** → ดึงเก้าอี้ `handOnBackrest = true`
+  ขณะเก้าอี้เคลื่อน เห็นครบ approach→pull→sit→push→seated ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
+- Performance ฉากหนาแน่น: **ลูกค้า 52 + พนักงาน 8** นั่ง 41/80 ที่ จาน 40 ใบ · median **50.0 fps** p95 **49.5 fps**
+  · **draw calls 650** · triangles 485,446 · geometries 282 / textures 67 / programs 8 · heap 47.5 MB · frame debt 0
+
+### สิ่งที่ค้างอยู่จริง ๆ (ทำต่อได้ทันที)
+
+1. **รัน `npx playwright test e2e/restaurant-animation.spec.ts --workers=1` ให้จบแล้วเก็บผล** — สองเทสต์ที่วัดผล
+   ใช้ throughput ของการจำลองเป็นตัวแปร รันขนานกับเบราว์เซอร์อื่นแล้วร้านเดินไม่เท่ากันจนล้ม (รอบขนานล่าสุด
+   26 ผ่าน 2 ล้มด้วยเหตุนี้) · รันเดี่ยวผ่านมาแล้วทีละตัว แต่ยังไม่มีผลรันเดี่ยวทั้งไฟล์ในมือ
+   · หลังรันเสร็จให้ copy `harness/evidence/feat-123/measurements.jsonl` และภาพใน `e2e/.results/screens/`
+   เข้า `harness/evidence/feat-123/screens/` แล้วอัปเดต `feature_list.json` ของ feat-123
+2. **เมนูที่ 5 (`fried-rice`)** ยังไม่เคยขึ้นโต๊ะในรอบที่รัน (เห็น 4 จาก 5) — ผลของ hash เลือกเมนูต่อกลุ่ม ไม่ใช่บั๊ก
+   แต่ยังไม่มีภาพยืนยันครบห้าเมนู
+3. **ลูกค้าพร้อมกันยังไม่ถึง 80** (สูงสุด 52) — ตัวจำกัดคืออัตราเข้าร้าน/เวลาทำอาหารของ engine ไม่ใช่การวาดภาพ
+4. **GPU memory จริง** อ่านจากหน้าเว็บไม่ได้ (มีแค่ JS heap กับจำนวน geometry/texture)
+
+### Defect ที่ยังรอเจ้าของสาย (ยังไม่ได้ส่งให้ใคร — ไม่มี agent อื่นบนเครื่องนี้ และยังไม่ push)
+
+1. `lighting/settings-panel.tsx` (feat-120) ไม่ถูก mount ที่ไหนเลยในแอป
+2. `computeTablePlatePlacement` วางจานไกลเกินระยะเอื้อมคลิป Eat ที่โต๊ะ ≥ 1.2 ม.
+   (ตัวเลข `harness/evidence/feat-118/plate-reach-probe.json`)
+
 ## 2026-10-29 ICT — feat-117→119, feat-122 เสร็จ · feat-123 ตรวจแล้วแต่ยังไม่ปิด
 
 - ทำบนเครื่องนี้ (ไม่ได้ย้ายไป Cloud) บนสาขา `codex/animation-foundation` commit ล่าสุด `6bd11c7`; 117/118/119/122 = done, **123 = in-progress**
@@ -58,12 +98,3 @@
   - `feat-121`: สร้าง `src/components/preview-3d/lighting/shadow-fit.ts` และ `scene-lighting.ts` (`createSceneLightingFeature`) คำนวณ orthographic shadow frustum + texel stabilization สำหรับห้อง `2–30m`, ปรับสี/ความเข้มแสงเช้า-เที่ยง-เย็น-กลางคืน (กลางคืนปิด direct sun shadow และเปิดไฟอบอุ่นในร้าน `indoorFillLight`)
 - **การตรวจ**: ยูนิตเทสต์ทั้งหมดของ Agent 2 (`food/`, `table-service/`, `lighting/` รวม 12 ไฟล์ 32 tests) ผ่าน 100%, `eslint` บนไฟล์ทั้งหมดของ Agent 2 ผ่าน (0 warnings/errors), `validate_harness.py` ผ่านครบ (Done 110/123 งาน), หลักฐานภาพและ `report.json` อยู่ใน `harness/evidence/feat-116/`, `harness/evidence/feat-120/`, และ `harness/evidence/feat-121/`
 - **ขอบเขตและไฟล์กลาง**: ไม่ได้แก้ไข `three-view.tsx`, `scripts/create-cafe-customer-model.mjs`, หรือไฟล์ GLB ตัวละคร (`cafe-customer*.glb`, `cafe-staff*.glb`) และไม่แตะไฟล์คู่ขนานของ Agent 3; พร้อมส่งให้ Agent 1 รวมเข้าฉากใน `feat-122`
-
-## 2026-10-29 ICT — Agent1:113→114→115 พร้อมส่งต่อ
-
-- Commits113=`516f7f8`,114=`6a37025`;115ดูcommitล่าสุดบนcodex/animation-foundation หลังบันทึกชุดนี้ ใช้ฐานรวมเหล่านี้ก่อนงาน116–119/122;ไม่ต้องเริ่ม122ในturnนี้
-- 113ผลิตsnapshotv1ต่อสมาชิก/chair/meal/cycle/milestone,114ส่งWorker/run/sequence+bridge,115ต่อcontrollerและเดินตามenginevelocity/staff1.2ไม่catchup พร้อมpausevisibility/boundedqueue
-- APIของ122: `controller.current.presentation` และ `current.timing` (absolute simulationSeconds, deltaSecondsที่scaleแล้ว, playbackRate);timingเป็นTICKsample ห้ามบวกdeltaซ้ำทุกRAF ต้องhonourpausedและใช้absolutephase รายละเอียด `harness/evidence/feat-115/README.md`
-- GateของAgent1ผ่านบนสำเนาฐานtracked6a37025+115:84files/1043tests,lint/typecheck,boundary53source/Harness;targeted65tests/fps15–120/rates1–30/hidden60วิผ่าน Chromeจริง30.051วิ=sim30.0512วิ,3Dcontrols/visibility/browsererrors0
-- Workspaceรวมยังมีงานคู่ขนานuntrackedของAgent2/3:fulltestล้มที่staff-actions/staff-carry-clips.test.ts:142(_part)และtypecheckที่:44(ArrayBuffer|SharedArrayBuffer) ต้องให้laneคลิปแก้ก่อนintegrationทั้งทีม Agent1ไม่ได้แก้/commitไฟล์เหล่านั้น และไม่อ้างว่าworkspaceรวมเขียว
-- คงงานอาหาร/คลิป/GLBของagentอื่นในworkingtree ไม่stage;ThreeView/legacycadenceและติดตั้งvisualใหม่รอ122 ไม่มีpush/PR
