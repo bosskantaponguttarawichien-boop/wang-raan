@@ -36,6 +36,9 @@ function watchErrors(page: Page) {
   return errors;
 }
 
+const SCREENS_DIR = "harness/evidence/feat-123/screens";
+mkdirSync(SCREENS_DIR, { recursive: true });
+
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
 
 async function openReadyCafe(page: Page) {
@@ -85,7 +88,7 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
       const canvas = await show3D(page);
       const shot = await canvas.screenshot();
       const luminance = await meanLuminance(page, shot);
-      await page.screenshot({ path: `e2e/.results/screens/lighting-${time.label}.png` });
+      await page.screenshot({ path: `${SCREENS_DIR}/lighting-${time.label}.png` });
       record({ check: "lighting-time", time: time.label, iso: time.iso, meanLuminance: luminance });
       // กลางคืนต้องยังมีไฟในร้านพอให้เห็นผัง (ไม่ดำสนิท) และกลางวันต้องไม่ขาวโพลนจนไม่เห็นรูปทรง
       expect(luminance, `ความสว่างเฉลี่ย ${luminance.toFixed(3)}`).toBeGreaterThan(0.08);
@@ -123,7 +126,7 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
       await page.getByRole("button", { name: /หมุนมุมมองตามเข็ม/ }).click();
       await page.waitForTimeout(1500);
       levels.push(await meanLuminance(page, await canvas.screenshot()));
-      await page.screenshot({ path: `e2e/.results/screens/lighting-rotation-${turn}.png` });
+      await page.screenshot({ path: `${SCREENS_DIR}/lighting-rotation-${turn}.png` });
     }
     // แดดยึดกับโลกของร้าน ไม่ใช่กล้อง: หมุนครบ 4 ครั้งกลับมุมเดิม ความสว่างจึงต้องกลับมาเท่าเดิม
     // (เทียบความสว่างแทนไบต์ เพราะฉากยังมีท่าทำงานของพนักงานเล่นอยู่ตลอด)
@@ -143,7 +146,7 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
     await page.getByRole("button", { name: "ดูตัวอย่าง 3D" }).click();
     await expect(page.getByTestId("iso-svg")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("three-canvas")).toHaveCount(0);
-    await page.screenshot({ path: "e2e/.results/screens/lighting-reduced-motion.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/lighting-reduced-motion.png` });
     expect(errors).toEqual([]);
   });
 
@@ -183,7 +186,7 @@ test.describe("feat-123: แสงตามเวลาจริง", () => {
         const luminance = await meanLuminance(page, await canvas.screenshot());
         record({ check: "room-size", meters: size, meanLuminance: luminance });
         expect(luminance).toBeGreaterThan(0.05);
-        await page.screenshot({ path: `e2e/.results/screens/lighting-room-${size}m.png` });
+        await page.screenshot({ path: `${SCREENS_DIR}/lighting-room-${size}m.png` });
         expect(errors).toEqual([]);
       });
     }

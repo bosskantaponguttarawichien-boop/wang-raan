@@ -34,6 +34,9 @@ function watchModelRequests(page: Page) {
   return urls;
 }
 
+const SCREENS_DIR = "harness/evidence/feat-123/screens";
+mkdirSync(SCREENS_DIR, { recursive: true });
+
 const statusBar = (page: Page) => page.getByTestId("validation-status-bar");
 
 /**
@@ -242,7 +245,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       .toBe(true);
 
     const served = await canvas.screenshot();
-    await page.screenshot({ path: "e2e/.results/screens/animation-service-cycle.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/animation-service-cycle.png` });
     // ภาพต้องไม่ใช่เฟรมว่าง (ฉากจริงมีผนัง เฟอร์นิเจอร์ และเงา)
     const luminance = await meanLuminance(page, served);
     record({ check: "service-cycle", meanLuminance: luminance, models: models.filter((url) => url.includes("/food/")) });
@@ -288,7 +291,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     const stoppedDrift = await pixelDiffRatio(page, stopped, await canvas.screenshot());
     record({ check: "stopped-frame-drift", ratio: stoppedDrift, windowSeconds: 2.0 });
     expect(stoppedDrift, `พิกเซลที่เปลี่ยนหลังจบรอบ ${(stoppedDrift * 100).toFixed(3)}%`).toBeLessThan(0.001);
-    await page.screenshot({ path: "e2e/.results/screens/animation-after-stop.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/animation-after-stop.png` });
     expect(errors).toEqual([]);
   });
 
@@ -322,7 +325,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     // ไม่มี WebGL → ต้องเห็นฉาก isometric แบบ SVG ไม่ใช่หน้าว่างหรือ error
     await expect(page.getByTestId("iso-svg")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByTestId("three-canvas")).toHaveCount(0);
-    await page.screenshot({ path: "e2e/.results/screens/animation-svg-fallback.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/animation-svg-fallback.png` });
     // three.js แจ้งว่าสร้าง WebGL context ไม่ได้ ซึ่งเป็นเหตุผลของการถอยไป SVG — ไม่ใช่ข้อผิดพลาดของแอป
     expect(errors.filter((text) => !text.includes("Error creating WebGL context"))).toEqual([]);
   });
@@ -351,7 +354,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       }
       return grip.seen;
     }, { timeout: 180_000, intervals: [60], message: "ไม่เคยเห็นมือเกาะพนักพิงขณะเก้าอี้กำลังเคลื่อน" }).toBe(true);
-    await page.screenshot({ path: "e2e/.results/screens/cycle-chair-grip.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/cycle-chair-grip.png` });
     // มือเกาะพนักตั้งแต่เก้าอี้ยังแทบไม่เคลื่อน จึงต้องเฝ้าต่ออีกหน่อยเพื่อดูระยะดึงเต็ม
     const until = Date.now() + 8000;
     while (Date.now() < until) {
@@ -393,7 +396,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
         timeout: 600_000, intervals: [250],
         message: `ไม่พบช่วง "${name}" ภายใน ${simSecondsBudget} วินาทีจำลอง`,
       }).toBe("found");
-      await page.screenshot({ path: `e2e/.results/screens/cycle-${name}.png` });
+      await page.screenshot({ path: `${SCREENS_DIR}/cycle-${name}.png` });
       record({ check: `cycle-${name}`, ...detail(seen!) });
       return seen!;
     };
@@ -595,7 +598,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       frameDebtSeconds: after.frame?.frameDebtSeconds ?? null,
       storeMetrics: inStore.replace(/\s+/g, " ").slice(0, 240),
     });
-    await page.screenshot({ path: "e2e/.results/screens/performance-dense.png" });
+    await page.screenshot({ path: `${SCREENS_DIR}/performance-dense.png` });
     expect(peak, "ร้านแทบไม่มีคนเลย วัด performance ไม่มีความหมาย").toBeGreaterThanOrEqual(20);
     expect(sample.frames, "วัดเฟรมไม่ได้เลย").toBeGreaterThan(60);
     expect(1000 / sample.medianMs, `median ${(1000 / sample.medianMs).toFixed(1)} fps`).toBeGreaterThanOrEqual(30);
@@ -640,7 +643,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       expect(box.x).toBeGreaterThanOrEqual(0);
       expect(box.x + box.width).toBeLessThanOrEqual(width + 1);
       expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
-      await page.screenshot({ path: `e2e/.results/screens/animation-3d-${width}.png` });
+      await page.screenshot({ path: `${SCREENS_DIR}/animation-3d-${width}.png` });
       expect(errors).toEqual([]);
     });
   }

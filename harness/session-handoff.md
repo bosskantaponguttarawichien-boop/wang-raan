@@ -3,50 +3,31 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
-## 2026-10-29 ICT — feat-123 รอบสอง: diagnostic hook + ผังหนาแน่น (เหลือเก็บผลรันสุดท้าย)
+## 2026-10-29 ICT — feat-123 รอบยืนยันผลรัน `--workers=1` ครบ 28/28 ข้อ (คงสถานะ in-progress รอเจ้าของสายรับ defect)
 
-**สถานะโควตาตอนเขียน**: โควตา 5 ชั่วโมงใช้ไป **88%** (รีเซ็ตอีก ~2.5 ชม.) · รายสัปดาห์ 33% · context 69%
-จึงหยุดเปิดงานยาวรอบใหม่ และเขียนส่งต่อไว้ให้ทำต่อได้ทันที
+### สิ่งที่ทำและยืนยันแล้วในรอบนี้
 
-### ทำเพิ่มจากรอบแรก (commit ไว้แล้ว)
+- ปรับพาธบันทึกภาพใน `e2e/restaurant-animation.spec.ts` และ `e2e/restaurant-animation-lighting.spec.ts` ให้เขียนลง `harness/evidence/feat-123/screens/` โดยตรง (ป้องกันไม่ให้ Playwright ล้าง `e2e/.results/` ทับภาพรอบก่อน)
+- รันยืนยันด้วย `--workers=1` ครบทั้ง 3 ไฟล์ (`restaurant-animation.spec.ts` 14 ข้อ + `restaurant-animation-lighting.spec.ts` 10 ข้อ + `restaurant-animation-timing.spec.ts` 4 ข้อ) → **ผ่านครบ 28/28 ข้อ (0 ล้ม)** บน production build + Chrome + NVIDIA GeForce GTX 1050 Ti (hardware WebGL)
+- เก็บผลลัพธ์จริงลง `harness/evidence/feat-123/e2e-run.log`, `measurements.jsonl` (ครบ 25 รายการวัดผล), `summary.md` และ `screens/` (ครบ 27 ภาพ รวมถึง `cycle-*.png` และ `performance-dense.png`)
+- ตรวจสอบทั้ง workspace: `npm test` **110 files / 1,294 tests ผ่าน**, `npm run lint` 0 error, `npm run typecheck` ผ่าน, `python scripts/validate_harness.py` ผ่าน
 
-- `src/components/preview-3d/runtime/scene-diagnostics.ts` + test 11 ข้อ — hook อ่านอย่างเดียวบน `window`
-  ติดตั้งเฉพาะเมื่อ `window.__wangraanDiagnostics === true` ถูกตั้งก่อนฉากถูกสร้าง (ผู้ใช้จริงไม่เคยได้)
-  คืน `staffActions` / `customerActions` / `seating` reports, `tableService` stats, `renderer.info` และ `frame`
-  · ต่อเข้า `three-view.tsx` แล้ว ถอดตอน unmount
-- `e2e/restaurant-animation.spec.ts` เพิ่มสองเทสต์ใหญ่: วงจรบริการรายช่วงจาก hook จริง และ performance ฉากหนาแน่น
-  (สร้างผัง 80 ที่นั่งใน spec แล้วนำเข้าผ่านช่องเลือกไฟล์ JSON ของแอป แอปตรวจเองขึ้น Ready)
+### ผลที่วัดได้จริงจากรอบ `--workers=1` ล่าสุด
 
-### ผลที่วัดได้แล้ว (จากการรันเดี่ยว — ตัวเลขจริง ไม่ใช่ประมาณ)
+- **เวลาเดิน**: 1× อัตรา `0.999×` (15.00 วิจำลอง ใน 15.02 วิจริง), 10× อัตรา `9.70×`, resume `0.995×`, กลับจากแท็บซ่อน `0.997×` (ไม่ไล่เวลาสะสม)
+- **วงจรบริการ (ผ่าน diagnostic hook จริง)**: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` (`seated = true`) → คราบ 1 โต๊ะ → เช็ด `WipeTable` `wipeProgress 0.074 → 0.993` โดย **คราบยังอยู่ครบ 8 ก้อนระหว่างเช็ด** → ดึงเก้าอี้ `handOnBackrest = true` ขณะเก้าอี้เคลื่อน เห็นครบ `approach → pull → sit → push → seated` ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
+- **Performance ฉากหนาแน่น (ผัง 80 ที่นั่ง นำเข้าผ่านช่อง JSON จริงขึ้น Ready)**: **ลูกค้า 66 คน + พนักงาน 8 คน** (นั่ง 45/80 ที่ · รอหน้าร้าน 21 คน · `stalled = 0`) จานบนโต๊ะ 41 ใบ · median **50.0 fps** / p95 **49.8 fps** · **draw calls 693** · triangles 575,942 · geometries 292 / textures 81 / programs 8 · JS heap 53.3 MB · frame debt 0
+- **เริ่ม–จบรอบ 10 ครั้ง**: ผ่านครบ, canvas คงเหลือ 1 ตัว, heap 15.1 → 21.4 MB
 
-- วงจรบริการ: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` → คราบ 1 โต๊ะ 5 ก้อน
-  → เช็ด `WipeTable` `wipeProgress 0.095` โดย **คราบยังอยู่ครบ 8 ก้อน** → ดึงเก้าอี้ `handOnBackrest = true`
-  ขณะเก้าอี้เคลื่อน เห็นครบ approach→pull→sit→push→seated ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
-- Performance ฉากหนาแน่น: **ลูกค้า 52 + พนักงาน 8** นั่ง 41/80 ที่ จาน 40 ใบ · median **50.0 fps** p95 **49.5 fps**
-  · **draw calls 650** · triangles 485,446 · geometries 282 / textures 67 / programs 8 · heap 47.5 MB · frame debt 0
+### เหตุผลที่คง `feat-123` เป็น `in-progress` และงานถัดไป
 
-### งานถัดไปที่ต้องทำก่อนอื่น (หยุดตรงนี้เพราะโควตา 5 ชั่วโมงถึง 97%)
-
-1. **รัน `npx playwright test e2e/restaurant-animation.spec.ts --workers=1` ให้จบแล้วเก็บผล**
-   - รอบขนานล่าสุด: 26 ผ่าน / 2 ล้ม · รอบ `--workers=1` ล่าสุด: **12 ผ่าน / 2 ล้ม** (ใช้เวลา 23.5 นาที)
-   - สองตัวที่ล้มเป็นปัญหาของโค้ดเทสต์เอง **ไม่ใช่ของแอป** และ**แก้ไว้แล้วแต่ยังไม่ได้ยืนยันผล**:
-     (ก) `performance ฉากหนาแน่น` ค้างในลูปเติมคนเพราะ controller หยุดชั่วคราวเองตามกลไก resync ของ feat-115
-     แล้วนาฬิกาจำลองไม่เดินต่อ → เพิ่มเงื่อนไขออกจากลูปเมื่อนาฬิกาจำลองนิ่ง 20 รอบ หรือครบ 300 วินาทีจริง
-     (ข) `เริ่ม–จบรอบ 10 ครั้ง` ล้มเพราะหลังกดเริ่ม สถานะเป็น "หยุดชั่วคราว" (auto-pause เดียวกัน)
-     → `startSimulation` รับได้ทั้งสองสถานะแล้วกด "เล่นต่อ" ให้ก่อน
-   - มีรอบรันค้างอยู่เบื้องหลังตอนจบเซสชัน ผลอยู่ที่ `scratchpad/e2e-fix.log` (อาจดูไม่ทัน ให้รันใหม่ได้เลย)
-   - หลังรันผ่านให้ copy ภาพจาก `e2e/.results/screens/` เข้า `harness/evidence/feat-123/screens/`
-     แล้วอัปเดต `feature_list.json` ของ feat-123 (ถ้าครบแล้วค่อยเปลี่ยนเป็น done)
-2. **เมนูที่ 5 (`fried-rice`)** ยังไม่เคยขึ้นโต๊ะในรอบที่รัน (เห็น 4 จาก 5) — ผลของ hash เลือกเมนูต่อกลุ่ม ไม่ใช่บั๊ก
-   แต่ยังไม่มีภาพยืนยันครบห้าเมนู
-3. **ลูกค้าพร้อมกันยังไม่ถึง 80** (สูงสุด 52) — ตัวจำกัดคืออัตราเข้าร้าน/เวลาทำอาหารของ engine ไม่ใช่การวาดภาพ
-4. **GPU memory จริง** อ่านจากหน้าเว็บไม่ได้ (มีแค่ JS heap กับจำนวน geometry/texture)
-
-### Defect ที่ยังรอเจ้าของสาย (ยังไม่ได้ส่งให้ใคร — ไม่มี agent อื่นบนเครื่องนี้ และยังไม่ push)
-
-1. `lighting/settings-panel.tsx` (feat-120) ไม่ถูก mount ที่ไหนเลยในแอป
-2. `computeTablePlatePlacement` วางจานไกลเกินระยะเอื้อมคลิป Eat ที่โต๊ะ ≥ 1.2 ม.
-   (ตัวเลข `harness/evidence/feat-118/plate-reach-probe.json`)
+1. **Defect 2 ข้อของสาย Agent 2 ยังรอเจ้าของสายรับไปแก้** (ยังไม่ได้ส่งให้ agent ใด เพราะไม่มี session อื่นบนเครื่องและยังไม่ได้ push — ห้ามอ้างว่าส่งแล้ว และห้ามแก้ private scope ของสายอื่นเองโดยพลการ):
+   - `src/components/preview-3d/lighting/settings-panel.tsx` (feat-120) ไม่ถูก mount ที่ไหนเลยในแอป
+   - `computeTablePlatePlacement` (feat-103/116) วางจานไกลเกินระยะเอื้อมคลิป Eat ที่โต๊ะ ≥ 1.2 ม. (`plateOutOfReach = true` ในผลวัดจริง; ตัวเลขใน `harness/evidence/feat-118/plate-reach-probe.json`)
+2. **ข้อจำกัดที่บันทึกไว้ตามจริง**:
+   - ลูกค้าพร้อมกันในฉากหนาแน่นวัดได้สูงสุด **66 คน** (+ พนักงาน 8 = 74 ตัวละคร) ยังไม่ถึง 80 คนพร้อมกัน เพราะติดเพดานอัตราเข้าร้าน (500 คน/วัน) และเวลาทำอาหารของ engine ไม่ใช่การวาดภาพ
+   - เมนูที่ 5 (`fried-rice`) ยังไม่ขึ้นโต๊ะในผังตัวอย่าง 6 ที่นั่ง (พบ 4 จาก 5 เมนูจากผลของ hash เลือกเมนูต่อกลุ่ม)
+   - GPU memory จริงอ่านจากหน้าเว็บไม่ได้ (วัดได้เฉพาะ JS heap และจำนวน geometry/texture)
 
 ## 2026-10-29 ICT — feat-117→119, feat-122 เสร็จ · feat-123 ตรวจแล้วแต่ยังไม่ปิด
 
