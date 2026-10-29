@@ -55,6 +55,18 @@ export const ANALYZE_TIMEOUT_MS = 60_000;
 /** ไม่มีช่วงคนเยอะ → ดูภาพชั่วโมงแรกหลังเปิดร้าน */
 const DEFAULT_PLAYBACK_SECONDS = 3600;
 
+/**
+ * เวลาที่ยอมทิ้งแล้วตั้งต้นภาพใหม่ทั้งที่ยังเล่นต่อ (วินาทีจำลองหลังหารด้วยตัวคูณความเร็ว)
+ *
+ * ช่องว่างระดับวินาทีเป็นเรื่องปกติของฝั่งภาพ ไม่ใช่สัญญาณว่าการจำลองเสีย: เปิดมุมมอง 3D ครั้งแรก
+ * ต้องโหลด GLB และคอมไพล์ shader ซึ่งบล็อก main thread ได้หลายวินาที เครื่องที่ไม่มี GPU ก็ค้างเป็น
+ * ช่วง ๆ ได้อีก ทุกกรณีนี้ต้องเล่นต่อได้เองโดยไม่ต้องให้ผู้ใช้กด "เล่นต่อ"
+ *
+ * เพดานนี้จึงกว้างพอจะคลุมจังหวะโหลดฉาก แต่ยังแคบกว่าช่องว่างระดับ "เครื่องหลับ/แท็บถูกพักยาว"
+ * (หลายสิบวินาทีขึ้นไป) ซึ่งตัวละครจะกระโดดไกลจนดูไม่รู้เรื่อง จึงยังหยุดภาพไว้ให้ผู้ใช้ตัดสินใจ
+ */
+const MAX_RESYNC_SECONDS = 10;
+
 /** แปลงตัวคูณที่ผู้ใช้เลือกให้เป็นหน่วยที่ Simulation Worker ใช้ */
 export function playbackSpeedToWorkerSpeed(multiplier: number): number {
   return multiplier * REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X;
@@ -299,6 +311,18 @@ export class SimulationController {
     this.emit();
   }
 
+  /**
+   * ตั้งต้นภาพใหม่ให้ตรงกับเวลาจำลองที่ worker บอก โดยไม่หยุดการเล่น
+   * ใช้เมื่อภาพกับเวลาหลุดจากกัน (เครื่องช้า/TICK มาช้า/คิว pacer ล้น) — ตัวละครจะกระโดดเข้าที่ครั้งเดียว
+   * ซึ่งดีกว่าหยุดภาพค้างแล้วรอให้ผู้ใช้กดเล่นต่อเอง
+   */
+  private resync(simulationSeconds: number, now: number) {
+    this.pacer.reset(); this.staffPacer.reset(); this.velocities.clear();
+    this.clock.reset(simulationSeconds, now);
+    this.previous = null; this.current = null;
+    this.resyncOnNextTick = false;
+  }
+
   private resetPacer() {
     this.pacer.reset();
     this.staffPacer.reset();
@@ -315,16 +339,26 @@ export class SimulationController {
     const now = this.deps.now();
     const playback = this.deps.simulation.getState().config.speed;
     const snapshot = this.bridge.current;
-    if (this.resyncOnNextTick) {
-      this.pacer.reset(); this.staffPacer.reset(); this.velocities.clear();
-      this.clock.reset(tick.metrics.time, now); this.previous = null; this.current = null;
-      this.resyncOnNextTick = false;
-    }
-    const timing = this.clock.advance(tick.metrics.time, now, playback, snapshot !== null);
+    if (this.resyncOnNextTick) this.resync(tick.metrics.time, now);
+    let timing = this.clock.advance(tick.metrics.time, now, playback, snapshot !== null);
     if (timing.gap) {
-      this.resyncOnNextTick = true;
-      this.setSim({ message: "หยุดชั่วคราวเพื่อให้ภาพและเวลาตรงกัน" });
-      void this.pause(); return;
+      if (timing.seconds > MAX_RESYNC_SECONDS) {
+        // ช่องว่างยาวจริง (แท็บถูกพัก/เครื่องหยุดไปนาน) — หยุดภาพก่อนให้ตัวละครกระโดดไกล
+        this.resyncOnNextTick = true;
+        // ที่ความเร็วสูงบนเครื่องที่วาดไม่ทัน การหยุดจะเกิดซ้ำเรื่อย ๆ จึงบอกทางแก้ไปด้วย
+        // ไม่ใช่แจ้งแค่ว่าหยุดแล้วปล่อยให้ผู้ใช้กดเล่นต่อวนไปเรื่อย ๆ
+        this.setSim({
+          message: playback > 1
+            ? `หยุดชั่วคราวเพื่อให้ภาพและเวลาตรงกัน — เครื่องวาดภาพไม่ทันที่ ${playback}× ลองลดความเร็วลงแล้วเล่นต่อ`
+            : "หยุดชั่วคราวเพื่อให้ภาพและเวลาตรงกัน",
+        });
+        void this.pause(); return;
+      }
+      // เครื่องช้าทำให้ TICK มาช้าเป็นช่วง ๆ (โหลดโมเดล, GC, ฉากหนาแน่น): ตั้งต้นภาพใหม่ให้ตรงกับ
+      // เวลาจำลองจริงแล้วเล่นต่อทันที — ทิ้งเวลาที่ขาดไปตาม architecture.md §5.3.2 (ไม่ไล่เวลา ไม่เล่นย้อน)
+      // เดิมหยุดทุกกรณีแล้วรอผู้ใช้กด "เล่นต่อ" เอง เครื่องที่วาดได้ 3–4 fps จึงค้างตั้งแต่วินาทีแรก
+      this.resync(tick.metrics.time, now);
+      timing = { seconds: 0, gap: false };
     }
     if (snapshot) for (const customer of snapshot.customers) this.velocities.set(customer.renderAgentId, customer.walkMetersPerSecond);
     const walkSpeed = (id: number) => (this.velocities.get(id) ?? VISUAL_WALK_SPEED) * playback;
@@ -343,9 +377,8 @@ export class SimulationController {
       agents, staff, presentation: snapshot ? alignPresentation(snapshot, agents, staff) : undefined,
       timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, playbackRate: playback },
     };
-    if (this.pacer.needsResync || this.staffPacer.needsResync) {
-      this.resyncOnNextTick = true; void this.pause();
-    }
+    // คิวของ pacer ล้น = ภาพตามตำแหน่งจริงไม่ทัน ตั้งต้นใหม่ใน TICK ถัดไปโดยไม่หยุดภาพ
+    if (this.pacer.needsResync || this.staffPacer.needsResync) this.resyncOnNextTick = true;
     if (tick.heatmap && this.grid) {
       this.heatmap = { values: tick.heatmap, max: tick.heatmapMax ?? 0, ...this.grid };
     }

@@ -30,11 +30,16 @@ export interface AdaptiveQualityOptions {
   windowMs: number;
   /** ไม่นับช่วงแรกหลังเริ่มวัด/เปลี่ยนขั้น (คอมไพล์ shader, โหลดโมเดล ทำเฟรมกระตุกชั่วคราว) */
   warmupMs: number;
-  /** เฟรมที่ห่างกว่านี้ = แท็บถูกซ่อน/เครื่องค้างชั่วคราว ไม่นับ */
+  /**
+   * เฟรมที่ห่างกว่านี้ = แท็บถูกซ่อน/เครื่องค้างชั่วคราว ไม่นับ
+   * ต้องสูงพอให้ "เครื่องช้าจริง" ยังถูกนับ: เดิมตั้งไว้ 250 ms เครื่องที่วาดได้ 3–4 fps
+   * (เฟรม 250–350 ms) จึงถูกทิ้งทุกเฟรมและไม่เคยลดคุณภาพเลย ทั้งที่เป็นเครื่องที่ต้องการที่สุด
+   * แท็บที่ถูกซ่อนจริงหยุดเรียก rAF หรือเรียกราว 1 ครั้ง/วินาที จึงยังถูกตัดด้วยเพดานนี้
+   */
   ignoreAboveMs: number;
 }
 
-const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 250 };
+const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 900 };
 
 export class AdaptiveQuality {
   level = 0;

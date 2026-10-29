@@ -52,4 +52,12 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     expect(run(quality, 40, 2500)).toEqual([]);
     expect(run(quality, 40, 1000)).toEqual([1]);
   });
+
+  it("เครื่องช้ามาก (3–4 fps) ยังลดคุณภาพจนถึงขั้นต่ำสุด ไม่ถูกทิ้งทั้งหมดเหมือนแท็บที่ถูกซ่อน", () => {
+    // feat-137: เครื่องที่ไม่มี GPU วาดฉากหนาแน่นได้เฟรมละ ~270 ms เดิมเพดานทิ้งที่ 250 ms
+    // ทำให้ทุกเฟรมถูกทิ้งและคุณภาพค้างที่ขั้นสูงสุดตลอด
+    const quality = new AdaptiveQuality();
+    expect(run(quality, 270, 30000)).toEqual([1, 2, 3]);
+    expect(quality.current).toEqual(QUALITY_LEVELS[QUALITY_LEVELS.length - 1]);
+  });
 });

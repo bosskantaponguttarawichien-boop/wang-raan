@@ -250,6 +250,48 @@ describe("สเกลเวลาเล่นภาพ", () => {
     expect(sim.getState().status).toBe("running");
   });
 
+  it("เครื่องช้าทำให้ TICK มาช้าเป็นช่วง ๆ → ตั้งต้นภาพใหม่แล้วเล่นต่อเอง ไม่ค้างรอให้กดเล่นต่อ", async () => {
+    // feat-137: เครื่องที่วาดได้ 3–4 fps ทำให้ TICK ถึง main thread ช้ากว่า 0.5 วินาที
+    // เดิมถือเป็นช่องว่างแล้วหยุดภาพทุกครั้ง การจำลองจึงค้างตั้งแต่วินาทีแรกและไม่กลับมาเอง
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    now = 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    // สามรอบที่ TICK มาช้า 700 ms ติดกัน — ต้องยังเล่นอยู่และเวลาจำลองเดินหน้าเรื่อย ๆ
+    for (let round = 0; round < 3; round += 1) {
+      const before = sim.getState().metrics?.time ?? 0;
+      now += 700; fake.tick(700); await flush();
+      expect(sim.getState().status).toBe("running");
+      expect(sim.getState().metrics!.time).toBeGreaterThan(before);
+    }
+    // ตั้งต้นใหม่แล้วต้องมีเฟรมให้วาดจริง และไม่ไล่เวลาที่ทิ้งไป
+    expect(controller.current).not.toBeNull();
+    expect(controller.current!.timing!.deltaSeconds).toBe(0);
+    // เฟรมปกติถัดไปเดินเวลาตามจริงต่อได้
+    now += 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    expect(controller.current!.timing!.deltaSeconds).toBeCloseTo(0.1);
+  });
+
+  it("เปิดมุมมอง 3D ครั้งแรกบล็อก main thread หลายวินาที → เล่นต่อเอง ไม่ต้องกดเล่นต่อ", async () => {
+    // feat-137: โหลด GLB + คอมไพล์ shader ครั้งแรกบล็อก main thread ได้หลายวินาที
+    // เดิมถือเป็นช่องว่างยาวแล้วหยุดภาพ ผู้ใช้จึงเห็น "หยุดชั่วคราว" ทันทีที่เปิด 3D
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    now = 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    const before = sim.getState().metrics!.time;
+    // บล็อก 6 วินาที: worker เดินเวลาต่อ แล้ว TICK ทั้งหมดมาถึงทีเดียว
+    now += 6000; fake.tick(6000); await flush();
+    expect(sim.getState().status).toBe("running");
+    expect(sim.getState().metrics!.time).toBeGreaterThan(before);
+    expect(controller.current!.timing!.deltaSeconds).toBe(0);
+  });
+
   it("tick ขาดหายยาวหยุดภาพก่อนกระโดด และ dispose ถอด listener ของผัง", async () => {
     let now = 0;
     const { fake, controller, sim, layoutState } = setup(cafeLayout(), false, () => now);
