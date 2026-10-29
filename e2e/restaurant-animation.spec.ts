@@ -136,6 +136,10 @@ async function startSimulation(page: Page) {
   const start = page.getByTestId("start-simulation");
   await expect(start).toHaveAttribute("aria-disabled", "false");
   await start.click();
+  // controller หยุดชั่วคราวเองได้เมื่อพบช่องว่างของเวลา (feat-115) — เริ่มเล่นต่อให้ก่อนวัดอะไร
+  await expect(page.getByTestId("simulation-status")).toContainText(/กำลังจำลอง|หยุดชั่วคราว/);
+  const resume = page.getByRole("button", { name: /เล่นต่อ/ });
+  if (await resume.count()) await resume.first().click();
   await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
 }
 
@@ -522,13 +526,20 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     let peak = 0;
     const fillFrom = (await readScene(page)).frame?.simTimeSeconds ?? 0;
     // งบเป็นเวลาจำลอง (1 ชั่วโมงในร้าน) เพื่อให้ผลไม่ขึ้นกับว่าเครื่องว่างแค่ไหน
+    let lastSimTime = fillFrom;
+    let stalled = 0;
+    const fillDeadline = Date.now() + 300_000;
     for (;;) {
       const scene = await readScene(page);
       peak = Math.max(peak, scene.frame?.customerCount ?? 0);
-      const elapsed = (scene.frame?.simTimeSeconds ?? fillFrom) - fillFrom;
-      if (peak >= 70 || elapsed > 3600) break;
+      const simTime = scene.frame?.simTimeSeconds ?? lastSimTime;
+      // นาฬิกาจำลองหยุดเดิน = controller หยุดชั่วคราวเองหรือรอบจบ ไม่ควรวนรอต่อ
+      stalled = simTime > lastSimTime ? 0 : stalled + 1;
+      lastSimTime = Math.max(lastSimTime, simTime);
+      if (peak >= 70 || simTime - fillFrom > 3600 || stalled > 20 || Date.now() > fillDeadline) break;
       await page.waitForTimeout(500);
     }
+    record({ check: "dense-fill", peak, simSecondsElapsed: Number((lastSimTime - fillFrom).toFixed(1)), stalled });
     await setSpeed(page, "1×");
     await page.waitForTimeout(3000);
     const dense = await readScene(page);
