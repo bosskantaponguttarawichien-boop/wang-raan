@@ -3,6 +3,17 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-118 — Customer runtime: รวม GLB ลูกค้าและกินอาหารตามสถานะจริง
+
+- **Export customer GLB**: ลง customer providers ใน `REGISTERED_CLIP_MODULES` แล้ว export ใหม่ ได้ 8 คลิป `Idle/Walk/Sit/Eat/PullChair/SitDown/PushChair/StandUp` พร้อม markers; nodes/skins/meshes/`_PART`/`walkCycleDistance` เท่าเดิมทุกค่า และ staff GLB ไม่ถูกเขียนซ้ำ (sha256 เท่าที่ feat-117 บันทึก)
+- **เงื่อนไขเริ่มกิน 3 ข้อแยกกัน** (`canEat`): engine บอก `eating` **และ** seating lane บอก `phase = seated` **และ** `meal.placedAtSeconds` ผ่านมาแล้ว — ไม่ใช้ "คลิปเล่นจบ" เป็นเงื่อนไข จึงไม่มีเคสเริ่ม Eat ก่อน Sit จบ; `waiting-order`/`waiting-food` นั่งเฉย, `finished` หยุดตักแต่ยังนั่ง, ไม่มี `chairId` เล่นได้แค่ Walk/Idle
+- **จังหวะเป็นของ simulation**: Eat เป็น loop ที่ seam ต่อเนื่อง จึงเขียน `action.time` จาก `simTime − placedAt` ตรง ๆ — pause หยุดคาคำ, playbackRate ไม่ทำให้หลุด และ 3D ที่เปิดกลาง run คำนวณ bite เดียวกับ feature ที่รันมาตลอด (มี test ยืนยัน)
+- **เหลื่อมจังหวะต่อคน**: FNV-1a เดียวกับ feat-110 โดย seed มาจาก `layoutRevision` (snapshot ไม่มี field seed) — test import provider `.mjs` จริงมาเทียบว่า `eatPhaseOffset`/`utensilGripOffset` ไม่ drift ทุกเมนูและทุก seed; runtime ไม่ import `scripts/`
+- **อุปกรณ์ตามเมนู**: ด้ามเลื่อนเข้าฝ่ามือเท่า `length − 0.135` ปลายอุปกรณ์จึงอยู่จุดเดียวทุกชนิด; prop parent เข้า `RightHand` ที่จุดผิวฝ่ามือและชี้ตามแกน local −Y ซึ่งเป็นทิศด้ามที่คลิปล็อกไว้ และถือเฉพาะช่วงที่กินจริง
+- **จุดเชื่อม feat-119**: รับ `CustomerSeatPose` ได้ทั้ง push (`setSeatPose`) และ pull (`options.pose`) โดย push ชนะ; `rise-pull` เล่น PushChair ย้อนเวลา (`phase = 1 − clipPhase`) ไม่สร้างคลิปใหม่; pose ที่ push ถูกลบเมื่อลูกค้าออกจาก snapshot
+- **Defect ส่งกลับสาย food/table (Agent 2)**: `computeTablePlatePlacement` อิง `halfD × 0.56` ระยะจาน-ถึง-คนจึงโตตามโต๊ะ (0.326 ม. ที่โต๊ะ 0.80 ม. → 0.414 ม. ที่ 1.20 ม. → 0.590 ม. ที่ 2.00 ม.) ขณะที่คลิป Eat ล็อกไว้ 0.34 ม.; เคส 1.20 ม. 122 เลื่อนตัวที่นั่งแก้ได้ ~7 ซม. แต่เคส 2.00 ม. ต้องให้สาย food/table จำกัดระยะจานจากขอบโต๊ะ — ตัวเลขวัดจากฟังก์ชันจริงใน `harness/evidence/feat-118/plate-reach-probe.json`
+- **Verify**: `npm test` 104 files / 1,200 tests ผ่าน · lint 0 error (warning เดิม `_initial`) · typecheck ผ่าน · `validate_harness.py` ผ่าน · boundary scan ผ่าน · หลักฐาน `harness/evidence/feat-118/`
+
 ## [2026-10-29] feat-117 — Staff runtime: รวมคลิปพนักงาน ถือเสิร์ฟและเช็ดโต๊ะ
 
 - **Export staff GLB**: ลง `REGISTERED_CLIP_MODULES` ใน `scripts/create-cafe-customer-model.mjs` (ใช้เมื่อไม่มี `--clips`; `--clips` ยังแทนที่ชุด default) แล้ว export `cafe-staff.glb` / `cafe-staff-lite.glb` ใหม่ ได้ 9 คลิป `Idle/Walk/Sit/Work/CarryIdle/CarryWalk/PickUp/PutDown/WipeTable` พร้อม `animationMarkers`; เทียบไฟล์ก่อนแก้แล้ว nodes/skins/meshes/`_PART` 0–6/`walkCycleDistance` 0.9 เท่าเดิมทุกค่า และ `cafe-customer*.glb` ไม่ถูกเขียน (sha256 เท่าสำเนาก่อนเริ่มงาน)

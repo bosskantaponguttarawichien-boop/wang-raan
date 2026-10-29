@@ -37,7 +37,7 @@ const BASE_CLIPS = ["Idle", "Walk", "Sit"] as const;
 /** Work plus the staff lane clips registered for export (feat-109/111 via feat-117). */
 const STAFF_ONLY_CLIPS = ["Work", "CarryIdle", "CarryWalk", "PickUp", "PutDown", "WipeTable"] as const;
 /** Customer lane clips registered for export (feat-110/112 via feat-118). */
-const CUSTOMER_ONLY_CLIPS = [] as const;
+const CUSTOMER_ONLY_CLIPS = ["Eat", "PullChair", "SitDown", "PushChair", "StandUp"] as const;
 
 describe("character models", () => {
   it("gives customers and staff separate files", () => {

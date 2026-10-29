@@ -13,7 +13,7 @@ import { buildCharacter } from "./model-generation/build.mjs";
 
 /** Clip providers that ship with each role's published GLB (feat-109/111 for staff). */
 export const REGISTERED_CLIP_MODULES = {
-  customer: [],
+  customer: ["scripts/character-clips/customer-eat.mjs", "scripts/character-clips/customer-seat.mjs"],
   staff: ["scripts/character-clips/staff-carry.mjs", "scripts/character-clips/staff-clean.mjs"],
 };
 

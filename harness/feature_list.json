@@ -2165,7 +2165,7 @@
     {
       "id": "feat-118",
       "name": "Customer runtime: รวม GLB ลูกค้าและเล่นกินอาหารตามสถานะจริง",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-110",
         "feat-112",
@@ -2206,7 +2206,8 @@
         "exportcustomerไปทับstaffถ้าCLIไม่แยกrole"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-118/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-118/ (summary.md, glb-customer-full.json, glb-customer-lite.json, plate-reach-probe.json, unit-tests.log); customer GLB 2 ไฟล์มี 8 คลิป+markers โดย nodes/skins/meshes/_PART/walkCycleDistance เท่าเดิม; controller 32 tests + feature 14 tests รวม equivalence กับ provider feat-110 จริง; npm test 104 files/1,200 tests, lint 0 error, typecheck, validate_harness และ boundary scan ผ่าน; staff GLB ไม่ถูกเขียนซ้ำ (sha256 เท่า feat-117); พบ defect ระยะวางจานของสาย food/table บันทึกใน summary.md"
     },
     {
       "id": "feat-119",
