@@ -3,6 +3,18 @@
 > **archive**: เก็บ entry เดือนปัจจุบันเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/progress-YYYY-MM.md`
 
+## [2026-10-29] feat-119 — Seating runtime: มือดึงเก้าอี้และเลื่อนนั่งลุกตามพื้นที่จริง
+
+- **แก้ปัญหามือหลุดจากพนักพิง**: คลิป PullChair ตรึงมือไว้เฉพาะ `gripWindow [0.22, 0.46]` ซึ่งเก้าอี้เคลื่อนได้แค่ 0.16 ม. แต่ `CHAIR_PULL` ของฉากคือ 0.30 ม. — เลื่อนเก้าอี้ด้วยนาฬิกาแยกแบบ machine เดิมจะทำให้เก้าอี้เคลื่อนต่ออีก 0.14 ม. หลังมือปล่อยแล้ว จึงผูกระยะเก้าอี้กับ normalized time ของคลิป (`pullChairTravel`): นิ่งก่อน `pullGrip` → เคลื่อนพอดี 0.16 ม. ระหว่าง gripWindow → ที่เหลือหลังปล่อยมือ มี test ยืนยันทั้งสามช่วงและว่าระยะไม่ถอยหลัง
+- **เวลาเป็นของ simulation**: sequence เดินด้วย delta ที่ scale แล้วครั้งเดียว — 15/24/30/60/120 fps ใช้เวลา simulation เท่ากัน, `delta = 0` ตอน pause หยุดทั้ง phase/เก้าอี้/ตัว, และเฟรมเดียวที่ยาวกว่าคลิปทั้งเส้นไม่ข้าม phase
+- **ลำดับไม่ชนกัน**: pull ตัวอยู่ที่ 0 เก้าอี้ออกไป P → sit ตัว 0→P → push ทั้งคู่ P→0 → rise-pull ทั้งคู่ 0→P → rise ตัว P→0 โดยเก้าอี้ยังอยู่ P → depart เก้าอี้กลับหลังตัวพ้น; test ตรวจว่าไม่มี jump เกิน 0.02 ม./เฟรมที่ 120 fps และ `bodyClear` กันเก้าอี้กลับก่อนคนลุกพ้น
+- **พื้นที่คับแคบ**: `chairPullSpace` ฉาย footprint ของผนังและวัตถุลงแกน outward เฉพาะชิ้นที่ซ้อนแถบความกว้างเก้าอี้ (ไม่นับโต๊ะของตัวเอง) → `effectivePull` clamp ที่ `[0.16, 0.30]`; ถ้าน้อยกว่า 0.16 ม. เปลี่ยนเป็น fallback เล่น SitDown/StandUp ตรง ๆ เก้าอี้ไม่ขยับ จึงไม่มีเคสทะลุผนัง/โต๊ะ
+- **หนึ่งเก้าอี้หนึ่งคน**: `claims` ปฏิเสธคนที่ขอเก้าอี้ที่ถูกจองแล้ว (ไม่มี pose/report) ไม่ใช่แย่งนั่ง; ย้ายเก้าอี้ = ปล่อยตัวเก่ากลับบ้านแล้วเริ่มใหม่; ลูกค้าที่ถูกยกเลิกกลางทางไม่ทิ้งเก้าอี้ค้าง (`returning` ลดตาม `CHAIR_RETURN_DELAY`)
+- **ไม่แตะผัง**: เขียนแค่ `object.position` ของเก้าอี้ที่ host ส่งมา; `reset()` คืน `home` ทุกตัวและไม่เหลือ occupant; มี test ที่ `JSON.stringify(layout)` ต้องเท่าเดิมหลังนั่ง-ลุกครบรอบ จึงไม่กระทบ snap/validation/Undo-Redo
+- **จุดเชื่อม feat-118**: feature implement `getSeatPose()` ซึ่งเป็น `CustomerPosePort` ที่ feat-118 ประกาศ จึงเสียบกันได้ใน 122 โดยไม่มีสายไหน import implementation ของอีกสาย; `seat-motion.ts` ของเดิมไม่เปลี่ยนพฤติกรรม `three-view.tsx` จึงยังทำงานได้จนถึง 122
+- **equivalence**: `seat-motion.test.ts` import provider `customer-seat.mjs` จริงมาเทียบ `CHAIR_PULL`/`GRIP_TRAVEL`/marker/ความยาวคลิปกับ `SEAT_MOTION_PROFILE` ทุกค่า และยืนยัน `clipTranslatesRoot === false`
+- **Verify**: `npm test` 107 files / 1,263 tests ผ่าน · lint 0 error · typecheck ผ่าน · `validate_harness.py` ผ่าน · boundary scan ผ่าน · หลักฐาน `harness/evidence/feat-119/`
+
 ## [2026-10-29] feat-118 — Customer runtime: รวม GLB ลูกค้าและกินอาหารตามสถานะจริง
 
 - **Export customer GLB**: ลง customer providers ใน `REGISTERED_CLIP_MODULES` แล้ว export ใหม่ ได้ 8 คลิป `Idle/Walk/Sit/Eat/PullChair/SitDown/PushChair/StandUp` พร้อม markers; nodes/skins/meshes/`_PART`/`walkCycleDistance` เท่าเดิมทุกค่า และ staff GLB ไม่ถูกเขียนซ้ำ (sha256 เท่าที่ feat-117 บันทึก)

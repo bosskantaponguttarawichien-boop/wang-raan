@@ -3,6 +3,9 @@ import {
   CHAIR_PULL,
   CHAIR_RETURN_DELAY,
   CHAIR_SLIDE_SECONDS,
+  GRIP_TRAVEL,
+  SEAT_CLIP_SECONDS,
+  SEAT_MARKER_TIMES,
   createChairSlide,
   startRise,
   startSeat,
@@ -85,5 +88,21 @@ describe("จังหวะนั่ง/ลุกเก้าอี้ (3D)", (
     expect(startRise(motion, chair)).toBe(false);
     expect(chair.occupant).toBeNull();
     expect(chair.target).toBe(0);
+  });
+});
+
+describe("ค่าคงที่ของที่นั่งตรงกับคลิป feat-112", () => {
+  it("ระยะดึง ระยะเกาะพนัก ความยาวคลิป และ marker ตรงกับ SEAT_MOTION_PROFILE จริง", async () => {
+    const provider = await import("../../../scripts/character-clips/customer-seat.mjs");
+    const profile = provider.SEAT_MOTION_PROFILE;
+    expect(CHAIR_PULL).toBe(profile.nominalPullDistance);
+    expect(GRIP_TRAVEL).toBe(profile.gripTravel);
+    expect(GRIP_TRAVEL).toBe(profile.minimumPullDistance);
+    expect(SEAT_MARKER_TIMES).toEqual(profile.markerTimes);
+    expect([SEAT_MARKER_TIMES.pullGrip, SEAT_MARKER_TIMES.pullRelease]).toEqual(profile.gripWindow);
+    expect(SEAT_CLIP_SECONDS.PullChair).toBe(profile.durations.PullChair);
+    expect(SEAT_CLIP_SECONDS.PushChair).toBe(profile.durations.PushChair);
+    // คลิปไม่เลื่อน root ของโมเดล ระยะถอยจึงเป็นของ controller ฝั่งนี้เท่านั้น
+    expect(profile.rootMotion.clipTranslatesRoot).toBe(false);
   });
 });

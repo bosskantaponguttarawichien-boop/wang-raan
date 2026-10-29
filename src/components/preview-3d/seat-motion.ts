@@ -12,6 +12,30 @@ export const CHAIR_SLIDE_SECONDS = 0.45;
 /** ลุกเสร็จแล้วรอเท่านี้ก่อนเลื่อนเก้าอี้กลับ — ให้คนเดินพ้นเก้าอี้ก่อน */
 export const CHAIR_RETURN_DELAY = 0.35;
 
+/**
+ * ระยะที่เก้าอี้เคลื่อนขณะที่มือยังเกาะพนักพิงอยู่ (feat-112 `SEAT_MOTION_PROFILE.gripTravel`)
+ * ที่นั่งซึ่งมีพื้นที่ถอยน้อยกว่านี้ต้องใช้ท่าสำรองแทน PullChair/PushChair
+ */
+export const GRIP_TRAVEL = 0.16;
+
+/** ความยาวคลิปของ feat-112 (วินาที simulation) */
+export const SEAT_CLIP_SECONDS = {
+  PullChair: 1.1,
+  SitDown: 0.9,
+  PushChair: 0.9,
+  StandUp: 0.9,
+} as const;
+
+/** marker ของคลิป feat-112 เป็น normalized time — ไม่พึ่ง callback ของ mixer */
+export const SEAT_MARKER_TIMES = {
+  pullGrip: 0.22,
+  pullRelease: 0.46,
+  sitSupport: 0.35,
+  sitSeated: 0.92,
+  pushGrip: 0.2,
+  standPush: 0.2,
+} as const;
+
 export interface ChairSlide {
   /** 0 = อยู่ที่ตำแหน่งในผัง, 1 = ดึงออกสุด */
   pull: number;

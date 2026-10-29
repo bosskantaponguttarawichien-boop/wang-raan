@@ -2212,7 +2212,7 @@
     {
       "id": "feat-119",
       "name": "Seating runtime: มือดึงเก้าอี้และเลื่อนนั่งลุกตามพื้นที่จริง",
-      "status": "not-started",
+      "status": "done",
       "dependencies": [
         "feat-112",
         "feat-115"
@@ -2252,7 +2252,8 @@
         "ดึงเก้าอี้แล้วชนลูกค้าที่กำลังเดิน"
       ],
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-119/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
-      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6"
+      "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
+      "evidence": "harness/evidence/feat-119/ (summary.md, unit-tests.log); 5 files/77 tests ผ่าน (geometry 17, sequence 21, feature 24, seat-motion+equivalence 4, clip เดิม 11); ผูกระยะเก้าอี้กับ normalized time ของคลิป มือจึงเกาะพนักพอดีช่วง gripWindow และเก้าอี้เคลื่อน 0.16 ม. ตรงช่วงนั้น; fps 15/24/30/60/120 ใช้เวลา simulation เท่ากัน, pause หยุดทุก phase, พื้นที่แคบลดระยะหรือใช้ fallback ไม่ทะลุผนัง/โต๊ะ; unique occupant + reassignment + เก้าอี้กลับบ้านหลังยกเลิก; JSON ของ layout เท่าเดิมหลังนั่ง-ลุกครบรอบ; npm test 107 files/1,263 tests, lint 0 error, typecheck, validate_harness และ boundary scan ผ่าน"
     },
     {
       "id": "feat-120",
