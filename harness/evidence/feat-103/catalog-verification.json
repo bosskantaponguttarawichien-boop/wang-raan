@@ -1,0 +1,81 @@
+{
+  "feature_id": "feat-103",
+  "owner_lane": "food-catalogue",
+  "contract_version": 1,
+  "catalog_version": 1,
+  "menu_items": [
+    {
+      "id": "fried-rice",
+      "label": "ข้าวผัด",
+      "vesselKind": "plate",
+      "utensilKind": "spoon",
+      "footprintDiameter": 0.24,
+      "nominalHeight": 0.068,
+      "urls": {
+        "full": "/assets/models/food/fried-rice/fried-rice.glb",
+        "lite": "/assets/models/food/fried-rice/fried-rice-lite.glb"
+      }
+    },
+    {
+      "id": "noodles",
+      "label": "ก๋วยเตี๋ยว",
+      "vesselKind": "bowl",
+      "utensilKind": "chopsticks-spoon",
+      "footprintDiameter": 0.22,
+      "nominalHeight": 0.092,
+      "urls": {
+        "full": "/assets/models/food/noodles/noodles.glb",
+        "lite": "/assets/models/food/noodles/noodles-lite.glb"
+      }
+    },
+    {
+      "id": "steak",
+      "label": "สเต๊ก",
+      "vesselKind": "steak-plate",
+      "utensilKind": "fork-knife",
+      "footprintDiameter": 0.25,
+      "nominalHeight": 0.056,
+      "urls": {
+        "full": "/assets/models/food/steak/steak.glb",
+        "lite": "/assets/models/food/steak/steak-lite.glb"
+      }
+    },
+    {
+      "id": "salad",
+      "label": "สลัด",
+      "vesselKind": "salad-bowl",
+      "utensilKind": "fork",
+      "footprintDiameter": 0.22,
+      "nominalHeight": 0.078,
+      "urls": {
+        "full": "/assets/models/food/salad/salad.glb",
+        "lite": "/assets/models/food/salad/salad-lite.glb"
+      }
+    },
+    {
+      "id": "cake",
+      "label": "เค้ก",
+      "vesselKind": "dessert-plate",
+      "utensilKind": "dessert-fork",
+      "footprintDiameter": 0.19,
+      "nominalHeight": 0.072,
+      "urls": {
+        "full": "/assets/models/food/cake/cake.glb",
+        "lite": "/assets/models/food/cake/cake-lite.glb"
+      }
+    }
+  ],
+  "budgets": {
+    "maxFullTriangles": 8000,
+    "maxLiteTriangles": 2000,
+    "maxFullBytes": 307200,
+    "maxLiteBytes": 102400,
+    "maxFootprintDiameterMeters": 0.26
+  },
+  "verification": {
+    "unit_tests": "src/components/preview-3d/food/catalog.test.ts (5/5 passed)",
+    "exporter_isolation": "export-one.mjs writes only requested <id>[-lite].glb and has zero import side effects",
+    "rng_isolation": "chooseFoodKind uses stateless 32-bit avalanche hash on (seed, partyId, memberIndex)"
+  }
+}
+

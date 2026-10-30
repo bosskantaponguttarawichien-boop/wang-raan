@@ -1,0 +1,39 @@
+{
+  "feature_id": "feat-106",
+  "foodId": "steak",
+  "owner_lane": "food-steak",
+  "full": {
+    "file": "public/assets/models/food/steak/steak.glb",
+    "bytes": 42820,
+    "triangles": 1444,
+    "vertices": 4332,
+    "meshCount": 12,
+    "footprintDiameter": 0.25,
+    "height": 0.0345,
+    "stateTriangles": {
+      "full": 572,
+      "partial": 320,
+      "empty": 72
+    }
+  },
+  "lite": {
+    "file": "public/assets/models/food/steak/steak-lite.glb",
+    "bytes": 29680,
+    "triangles": 776,
+    "vertices": 2328,
+    "meshCount": 12,
+    "footprintDiameter": 0.25,
+    "height": 0.0345,
+    "stateTriangles": {
+      "full": 284,
+      "partial": 168,
+      "empty": 48
+    }
+  },
+  "screenshots": [
+    "harness/evidence/feat-106/steak-states-3-angles.png",
+    "harness/evidence/feat-106/steak-angles-comparison.png",
+    "harness/evidence/feat-106/steak-tray-and-table.png"
+  ]
+}
+

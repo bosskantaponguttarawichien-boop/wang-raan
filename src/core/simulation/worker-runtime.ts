@@ -18,6 +18,9 @@ const DAY_SECONDS = 24 * 3600;
 export const MAX_TEAM = 20;
 
 const Minute = z.number().int().min(0).max(24 * 60 - 1);
+const BreakWindowSchema = z.object({ startSeconds: z.number().finite().min(0).max(DAY_SECONDS), endSeconds: z.number().finite().min(0).max(DAY_SECONDS) }).refine((rest) => rest.endSeconds > rest.startSeconds);
+const PeakWindowSchema = z.object({ startSeconds: z.number().finite().min(0), endSeconds: z.number().finite().min(0), customersPerHour: z.number().finite().min(0).max(600) }).refine((peak) => peak.endSeconds > peak.startSeconds);
+const PartyWeightsSchema = z.tuple([z.number().min(0).max(100), z.number().min(0).max(100), z.number().min(0).max(100), z.number().min(0).max(100)]).refine((weights) => weights.some((weight) => weight > 0));
 const DayInputSchema = z
   .object({
     openMinute: Minute,
@@ -25,13 +28,25 @@ const DayInputSchema = z
     dailyCustomers: z.number().int().min(1).max(5000),
     peakStartMinute: Minute,
     peakEndMinute: Minute,
+    secondPeak: z.object({ startMinute: Minute, endMinute: Minute }).optional(),
     frontStaff: z.number().int().min(1).max(MAX_TEAM),
+    cashiers: z.number().int().min(0).max(MAX_TEAM - 1).optional(),
     cooks: z.number().int().min(1).max(MAX_TEAM),
     cookMinutesPerDish: z.number().finite().min(0.5).max(120),
     dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]),
     patienceMinutes: z.number().finite().min(1).max(240),
+    tablePatienceMinutes: z.number().finite().min(1).max(240).optional(),
+    partyWeights: PartyWeightsSchema.optional(),
+    varyPatience: z.boolean().optional(),
+    queueBalkAt: z.number().int().min(0).max(100).optional(),
+    varyMenuTimes: z.boolean().optional(),
+    varyStaffSpeed: z.boolean().optional(),
+    teamBreak: BreakWindowSchema.optional(),
+    staggerBreak: z.boolean().optional(),
+    extraDishPercent: z.number().int().min(0).max(100).optional(),
   })
   .refine((d) => d.openMinute !== d.closeMinute, { message: "เวลาเปิดและปิดต้องไม่ตรงกัน" })
+  .refine((d) => (d.cashiers ?? 0) < d.frontStaff, { message: "ต้องมีพนักงานบริการอย่างน้อย 1 คน" })
   .refine((d) => d.dineMinutes[0] <= d.dineMinutes[1], { message: "ช่วงเวลาทานไม่ถูกต้อง" });
 const RequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PING"), requestId: RequestId }),
@@ -57,16 +72,27 @@ const RequestSchema = z.discriminatedUnion("type", [
         })
         .nullable()
         .optional(),
+      peaks: z.array(PeakWindowSchema).max(2).optional(),
       closeSeconds: z.number().finite().positive().max(DAY_SECONDS).nullable().optional(),
       frontStaff: z.number().int().min(1).max(MAX_TEAM).optional(),
+      cashiers: z.number().int().min(0).max(MAX_TEAM - 1).optional(),
       cooks: z.number().int().min(1).max(MAX_TEAM).optional(),
       cookMinutesPerDish: z.number().finite().min(0.5).max(120).optional(),
       dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]).optional(),
       patienceMinutes: z.number().finite().min(1).max(240).optional(),
+      tablePatienceMinutes: z.number().finite().min(1).max(240).optional(),
+      partyWeights: PartyWeightsSchema.optional(),
+      varyPatience: z.boolean().optional(),
+      queueBalkAt: z.number().int().min(0).max(100).optional(),
+      varyMenuTimes: z.boolean().optional(),
+      varyStaffSpeed: z.boolean().optional(),
+      teamBreak: BreakWindowSchema.optional(),
+      staggerBreak: z.boolean().optional(),
+      extraDishPercent: z.number().int().min(0).max(100).optional(),
       startAtSeconds: z.number().finite().min(0).max(DAY_SECONDS).optional(),
       stopAtSeconds: z.number().finite().positive().max(DAY_SECONDS + 6 * 3600).optional(),
       skipQuiet: z.boolean().optional(),
-    }),
+    }).refine((d) => (d.cashiers ?? 0) < (d.frontStaff ?? 2), { message: "ต้องมีพนักงานบริการอย่างน้อย 1 คน" }),
   }),
   z.object({
     type: z.literal("ANALYZE_DAY"),
@@ -93,8 +119,13 @@ export const HEATMAP_EVERY = 5;
 export const QUIET_SPEED = 60;
 /** ร้านว่างทั้งร้าน: ข้ามไปถึงลูกค้ากลุ่มถัดไปได้ในครั้งเดียว ไม่เกินเท่านี้ (วินาทีจำลอง) */
 export const EMPTY_SKIP_SECONDS = 2 * 3600;
+let nextRuntimeId = 1;
 
 export class SimulationWorkerRuntime {
+  private readonly runtimeId = nextRuntimeId++;
+  private generation = 0;
+  private runId = "";
+  private sequence = 0;
   private synced: { layout: StoreLayout; revision: string } | null = null;
   private simulation: Simulation | null = null;
   private running = false;
@@ -127,6 +158,7 @@ export class SimulationWorkerRuntime {
           return this.error(requestId, "STALE_VALIDATION", "ผลตรวจไม่ตรงกับผังล่าสุด กรุณาตรวจผังใหม่");
         }
         if (validation.status === "blocked" || validateLayout(layout).status === "blocked") {
+          this.reset();
           this.synced = null;
           return this.error(requestId, "BLOCKED", "ผังยังไม่ผ่านกฎจำเป็น เริ่มจำลองไม่ได้");
         }
@@ -160,13 +192,16 @@ export class SimulationWorkerRuntime {
         this.speed = speed;
         this.running = true;
         this.ticks = 0;
+        this.runId = `run:${this.runtimeId}:${++this.generation}`;
+        this.sequence = 0;
         const { cols, rows, cellSize } = this.simulation.grid;
         // ส่งภาพตั้งต้นพร้อม STARTED แทนการรอ tick แรก: ร้านเปิดใหม่จึงไม่มีลูกค้า
         // แต่พนักงานต้องยืนประจำเคาน์เตอร์ให้เห็นทันทีในทุก renderer รวมถึง SVG บนมือถือ
         const agents = this.simulation.agentBuffer();
         const staff = this.simulation.staffBuffer();
+        const presentation = this.simulation.presentationSnapshot({ runId: this.runId, layoutRevision: this.synced.revision, sequence: this.sequence });
         return {
-          response: { type: "STARTED", requestId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize }, initial: { agents, staff } },
+          response: { type: "STARTED", requestId, runId: this.runId, seats: this.simulation.seatCount, grid: { cols, rows, cellSize }, initial: { agents, staff, presentation } },
           transfer: [agents.buffer as ArrayBuffer, staff.buffer as ArrayBuffer],
         };
       }
@@ -199,22 +234,25 @@ export class SimulationWorkerRuntime {
 
   /**
    * เดินเวลาไป `realMs` มิลลิวินาทีจริง (× speed วินาทีจำลอง/วินาทีจริง) แล้วคืน TICK; null เมื่อไม่ได้รันอยู่
-   * skipQuiet: ช่วงที่ไม่มีใครเดินเล่นเร็วขึ้นเป็น QUIET_SPEED และกลับมาความเร็วปกติทันทีที่มีคนเริ่มเดิน
-   * ร้านว่างทั้งร้านข้ามไปถึงตอนลูกค้ากลุ่มถัดไปเดินเข้าประตูเลย
+   * ที่ 1× เวลาจำลองเดินเท่าเวลาจริง 1 วินาทีต่อ 1 วินาทีตลอดเวลา (ไม่เร่งความเร็วเองตอนไม่มีใครเดิน)
+   * เมื่อเปิด skipQuiet ตอนเริ่มเล่นภาพที่ร้านว่าง จะให้ลูกค้ากลุ่มแรกมาทันทีใน tick แรกเพื่อไม่ต้องรอนั่งดูร้านว่าง
    */
   tick(realMs: number): HandledMessage<TickMessage> | null {
     if (!this.simulation || !this.running) return null;
-    const quiet = this.skipQuiet && this.speed < QUIET_SPEED && this.simulation.isQuiet();
-    let seconds = quiet && this.simulation.isEmpty() ? EMPTY_SKIP_SECONDS : (realMs / 1000) * (quiet ? QUIET_SPEED : this.speed);
+    if (this.skipQuiet && this.ticks === 0 && this.simulation.isEmpty()) {
+      this.simulation.spawnFirstCustomer();
+    }
+    let seconds = (realMs / 1000) * this.speed;
     if (this.stopAt !== null) seconds = Math.max(0, Math.min(seconds, this.stopAt - this.simulation.getMetrics().time));
-    if (quiet) this.simulation.stepWhileQuiet(seconds);
-    else this.simulation.step(seconds);
+    this.simulation.step(seconds);
     const finished = this.stopAt !== null && this.simulation.getMetrics().time >= this.stopAt - 1e-9;
     if (finished) this.running = false;
     const agents = this.simulation.agentBuffer();
     const paths = this.simulation.drainPaths();
     const staff = this.simulation.staffBuffer();
-    const tick: TickMessage = { type: "TICK", agents, paths, staff, metrics: this.simulation.getMetrics() };
+    const sequence = ++this.sequence;
+    const presentation = this.simulation.presentationSnapshot({ runId: this.runId, layoutRevision: this.synced!.revision, sequence });
+    const tick: TickMessage = { type: "TICK", runId: this.runId, sequence, presentation, agents, paths, staff, metrics: this.simulation.getMetrics() };
     if (finished) tick.finished = true;
     const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer, paths.buffer as ArrayBuffer, staff.buffer as ArrayBuffer];
     if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {
@@ -234,6 +272,8 @@ export class SimulationWorkerRuntime {
     this.skipQuiet = false;
     this.running = false;
     this.ticks = 0;
+    this.runId = "";
+    this.sequence = 0;
   }
 
   private error(requestId: number, code: Extract<WorkerResponse, { type: "ERROR" }>["code"], message: string): HandledMessage {

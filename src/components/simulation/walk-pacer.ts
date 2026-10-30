@@ -1,6 +1,6 @@
 /**
  * WalkPacer — ให้ภาพลูกค้าเดินด้วยความเร็วคนเดินจริง แม้เวลาในร้านเดินเร็วกว่าเวลาจริงหลายสิบเท่า
- * - เวลาจำลองไม่เปลี่ยน: ภาพตามหลังตำแหน่งจริงได้ไม่กี่วินาที แล้วไล่ทันตอนลูกค้านั่ง/ยืนรอ
+ * - เวลาจำลองไม่เปลี่ยน: ใช้ความเร็วของแต่ละคน โดยไม่เร่งไล่ตำแหน่งที่ค้าง
  * - เดินตามทางที่ engine เดินจริง (Simulation.drainPaths) จึงไม่ตัดผ่านโต๊ะ แม้ tick ห่างกันหลายเมตร
  * - นอกร้าน (เฉพาะภาพ — engine เริ่ม/จบที่ช่องประตู): ลูกค้าใหม่เดินมาจากนอกร้านเข้าประตู,
  *   คนที่ยังไม่มีโต๊ะยืนต่อแถวนอกประตู, คนที่กลับเดินออกประตูไปจนพ้นร้านก่อนหายไป
@@ -11,9 +11,8 @@ import { AGENT_STATE_CODE, AGENT_STRIDE } from "@/core/simulation";
 import { entranceSegment } from "@/core/validation";
 
 /** ความเร็วเดินบนภาพ (ม. ต่อวินาทีจริง) ที่ x1 — คูณตามความเร็วเล่นภาพ */
-export const VISUAL_WALK_SPEED = 1.4;
-/** ภาพตามหลังไกลกว่านี้ (วินาทีเดินที่ค้าง) จะเร่งให้ทัน กันภาพหลุดจากการจำลอง */
-export const MAX_VISUAL_LAG_SECONDS = 4;
+export const VISUAL_WALK_SPEED = 1.2;
+export const MAX_QUEUED_WALK_POINTS = 1024;
 /** ลูกค้าใหม่เริ่มเดินจากนอกร้านห่างประตูเท่านี้ (ม.) และคนที่กลับเดินออกไปถึงระยะนี้ก่อนหายไป */
 export const OUTSIDE_DISTANCE = 3;
 /** แถวรอโต๊ะนอกร้าน: คนแรกห่างประตู QUEUE_FIRST ม. คนถัดไปห่างกัน QUEUE_GAP ม. */
@@ -72,6 +71,7 @@ function decodePaths(paths: Float32Array | undefined): Map<number, Float32Array>
   for (let o = 0; o < paths.length; ) {
     const id = paths[o]!;
     const count = paths[o + 1]!;
+    if (!Number.isSafeInteger(count) || count < 0 || o + 2 + count * 2 > paths.length) break;
     out.set(id, paths.subarray(o + 2, o + 2 + count * 2));
     o += 2 + count * 2;
   }
@@ -88,10 +88,15 @@ export class WalkPacer {
   private readonly walkers = new Map<number, Walker>();
   private started = false;
   private door: DoorFrame | null = null;
+  private overflow = false;
+
+  get needsResync() { return this.overflow; }
+  has(id: number) { return this.walkers.has(id); }
 
   reset() {
     this.walkers.clear();
     this.started = false;
+    this.overflow = false;
   }
 
   /** ประตูทางเข้าของผังที่กำลังจำลอง — null = ไม่แสดงการเดินนอกร้าน */
@@ -110,7 +115,7 @@ export class WalkPacer {
    * @param dt วินาทีจริงตั้งแต่ครั้งก่อน
    * @param speed ความเร็วเดินบนภาพ (ม./วินาทีจริง)
    */
-  update(agents: Float32Array, paths: Float32Array | undefined, dt: number, speed: number): Float32Array {
+  update(agents: Float32Array, paths: Float32Array | undefined, dt: number, speed: number | ((id: number) => number)): Float32Array {
     const trails = decodePaths(paths);
     const live = new Set<number>();
     // ลำดับในแถวรอโต๊ะ = ลำดับที่มาถึง (id น้อยมาก่อน)
@@ -174,7 +179,7 @@ export class WalkPacer {
 
     const out: number[] = [];
     for (const [id, walker] of this.walkers) {
-      this.move(walker, dt, speed);
+      this.move(walker, dt, typeof speed === "number" ? speed : speed(id));
       if (walker.gone && walker.queue.length === 0) {
         this.walkers.delete(id);
         continue;
@@ -188,22 +193,21 @@ export class WalkPacer {
     const n = walker.queue.length;
     const lastX = n > 0 ? walker.queue[n - 2]! : walker.x;
     const lastY = n > 0 ? walker.queue[n - 1]! : walker.y;
-    if (Math.hypot(x - lastX, y - lastY) > 1e-4) walker.queue.push(x, y);
+    if (Math.hypot(x - lastX, y - lastY) <= 1e-4) return;
+    if (n >= 4) {
+      const ax = walker.queue[n - 4]!, ay = walker.queue[n - 3]!;
+      if (Math.abs((lastX - ax) * (y - lastY) - (lastY - ay) * (x - lastX)) < 1e-7 && (lastX - ax) * (x - lastX) + (lastY - ay) * (y - lastY) >= 0) {
+        walker.queue[n - 2] = x; walker.queue[n - 1] = y; return;
+      }
+    }
+    if (n >= MAX_QUEUED_WALK_POINTS * 2) { this.overflow = true; return; }
+    walker.queue.push(x, y);
   }
 
   private move(walker: Walker, dt: number, speed: number) {
     const { queue } = walker;
     if (queue.length === 0) return;
-    let left = 0;
-    let px = walker.x;
-    let py = walker.y;
-    for (let i = 0; i < queue.length; i += 2) {
-      left += Math.hypot(queue[i]! - px, queue[i + 1]! - py);
-      px = queue[i]!;
-      py = queue[i + 1]!;
-    }
-    // ค้างเกิน MAX_VISUAL_LAG_SECONDS → เร่งให้ระยะที่ค้างหายไปในเวลาราวนั้น
-    let budget = Math.max(speed, left / MAX_VISUAL_LAG_SECONDS) * dt;
+    let budget = Number.isFinite(speed) && Number.isFinite(dt) ? Math.max(0, speed) * Math.max(0, dt) : 0;
     let consumed = 0;
     while (consumed < queue.length && budget > 0) {
       const dx = queue[consumed]! - walker.x;

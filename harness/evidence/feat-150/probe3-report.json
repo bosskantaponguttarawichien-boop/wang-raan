@@ -1,0 +1,22 @@
+{
+  "peak": 60,
+  "thoughtsOn": {
+    "frames": 21,
+    "medianMs": 320
+  },
+  "thoughtsOff": {
+    "frames": 23,
+    "medianMs": 280
+  },
+  "thoughtsOnAgain": {
+    "frames": 22,
+    "medianMs": 300
+  },
+  "scene": {
+    "customers": 66,
+    "staff": 8,
+    "drawCalls": 693,
+    "triangles": 582820
+  },
+  "errors": []
+}

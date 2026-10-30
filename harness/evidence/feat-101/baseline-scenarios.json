@@ -1,0 +1,176 @@
+[
+  {
+    "config": {},
+    "outcomes": [
+      {
+        "frontStaff": 1,
+        "abandoned": 0,
+        "avgFoodWaitMinutes": 10.174444444444445,
+        "frontStaffBusy": 0.2474074074074074,
+        "fed": 15,
+        "noSeat": 70
+      },
+      {
+        "frontStaff": 3,
+        "abandoned": 0,
+        "avgFoodWaitMinutes": 10.914814814814815,
+        "frontStaffBusy": 0.08305555555555555,
+        "fed": 18,
+        "noSeat": 64
+      }
+    ]
+  },
+  {
+    "config": {
+      "patienceMinutes": 6
+    },
+    "outcomes": [
+      {
+        "frontStaff": 1,
+        "abandoned": 70,
+        "avgFoodWaitMinutes": 0,
+        "frontStaffBusy": 0.7022222222222222,
+        "fed": 0,
+        "noSeat": 18
+      },
+      {
+        "frontStaff": 3,
+        "abandoned": 60,
+        "avgFoodWaitMinutes": 0,
+        "frontStaffBusy": 0.22141975308641976,
+        "fed": 0,
+        "noSeat": 8
+      }
+    ]
+  },
+  {
+    "config": {
+      "patienceMinutes": 3
+    },
+    "outcomes": [
+      {
+        "frontStaff": 1,
+        "abandoned": 52,
+        "avgFoodWaitMinutes": 0,
+        "frontStaffBusy": 0.5336111111111111,
+        "fed": 0,
+        "noSeat": 11
+      },
+      {
+        "frontStaff": 3,
+        "abandoned": 71,
+        "avgFoodWaitMinutes": 0,
+        "frontStaffBusy": 0.259320987654321,
+        "fed": 0,
+        "noSeat": 22
+      }
+    ]
+  },
+  {
+    "config": {
+      "patienceMinutes": 6,
+      "cookMinutesPerDish": 0.5,
+      "dineMinutes": [
+        1,
+        2
+      ]
+    },
+    "outcomes": [
+      {
+        "frontStaff": 1,
+        "abandoned": 27,
+        "avgFoodWaitMinutes": 4.998076923076923,
+        "frontStaffBusy": 0.7008333333333333,
+        "fed": 26,
+        "noSeat": 9
+      },
+      {
+        "frontStaff": 3,
+        "abandoned": 4,
+        "avgFoodWaitMinutes": 5.079444444444444,
+        "frontStaffBusy": 0.3308333333333333,
+        "fed": 60,
+        "noSeat": 22
+      }
+    ]
+  },
+  {
+    "config": {
+      "patienceMinutes": 6,
+      "cookMinutesPerDish": 0.5,
+      "takeOrderSeconds": [
+        300,
+        360
+      ]
+    },
+    "outcomes": [
+      {
+        "frontStaff": 1,
+        "abandoned": 51,
+        "avgFoodWaitMinutes": 0,
+        "frontStaffBusy": 0.773425925925926,
+        "fed": 0,
+        "noSeat": 12
+      },
+      {
+        "frontStaff": 3,
+        "abandoned": 54,
+        "avgFoodWaitMinutes": 5.916666666666667,
+        "frontStaffBusy": 0.32,
+        "fed": 1,
+        "noSeat": 12
+      }
+    ]
+  },
+  {
+    "dailyCustomers": 200,
+    "recommended": {
+      "frontStaff": 2,
+      "cooks": 5
+    },
+    "seating": {
+      "basedOn": "recommended",
+      "noSeat": 0,
+      "noSeatRate": 0,
+      "maxEntranceQueue": 4,
+      "avgVisitMinutes": 29.94595635110367,
+      "capacityPerHour": 96.17325178175037,
+      "busiestCustomersPerHour": 40.816326530612244,
+      "enough": true
+    }
+  },
+  {
+    "dailyCustomers": 300,
+    "recommended": {
+      "frontStaff": 2,
+      "cooks": 5
+    },
+    "seating": {
+      "basedOn": "recommended",
+      "noSeat": 7,
+      "noSeatRate": 0.020348837209302327,
+      "maxEntranceQueue": 21.5,
+      "avgVisitMinutes": 31.022464917632703,
+      "capacityPerHour": 92.83594993649429,
+      "busiestCustomersPerHour": 61.224489795918366,
+      "enough": false
+    }
+  },
+  {
+    "dailyCustomers": 400,
+    "recommended": {
+      "frontStaff": 2,
+      "cooks": 6
+    },
+    "seating": {
+      "basedOn": "recommended",
+      "noSeat": 19,
+      "noSeatRate": 0.04904230398236186,
+      "maxEntranceQueue": 23.5,
+      "avgVisitMinutes": 32.74398341460937,
+      "capacityPerHour": 87.95508974986323,
+      "busiestCustomersPerHour": 81.63265306122449,
+      "enough": false
+    }
+  }
+]

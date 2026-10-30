@@ -4,7 +4,8 @@
  */
 import type { StoreLayout, ValidationResult } from "../layout/types";
 import type { DayAnalysis, DayInput } from "./day-analysis";
-import type { PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
+import type { BreakWindow, PartyWeights, PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
+import type { PresentationSnapshot } from "./presentation-contract";
 
 export interface SimulationStartConfig {
   customersPerHour: number;
@@ -14,12 +15,23 @@ export interface SimulationStartConfig {
   /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-093) — ไม่ส่งใช้ค่าตั้งต้นของ engine */
   serviceStyle?: ServiceStyle;
   peak?: PeakWindow | null;
+  peaks?: PeakWindow[];
   closeSeconds?: number | null;
   frontStaff?: number;
+  cashiers?: number;
   cooks?: number;
   cookMinutesPerDish?: number;
   dineMinutes?: [number, number];
   patienceMinutes?: number;
+  tablePatienceMinutes?: number;
+  partyWeights?: PartyWeights;
+  varyPatience?: boolean;
+  queueBalkAt?: number;
+  varyMenuTimes?: boolean;
+  varyStaffSpeed?: boolean;
+  teamBreak?: BreakWindow;
+  staggerBreak?: boolean;
+  extraDishPercent?: number;
   /** เดินเวลาเบื้องหลังถึงวินาทีนี้ก่อนเริ่มส่งภาพ (เช่น ต้นช่วงคนเยอะ) — heatmap เริ่มนับจากจุดนี้ */
   startAtSeconds?: number;
   /** หยุดเองเมื่อถึงวินาทีนี้ (เช่น จบช่วงคนเยอะ) แล้วส่ง TICK สุดท้ายที่มี finished: true */
@@ -51,6 +63,10 @@ export type WorkerErrorCode = "INVALID_MESSAGE" | "STALE_VALIDATION" | "BLOCKED"
 
 export interface TickMessage {
   type: "TICK";
+  /** Optional during rollout; modern clients reject stale run/sequence headers. */
+  runId?: string;
+  sequence?: number;
+  presentation?: PresentationSnapshot;
   /** ค่าต่อ agent: id, x, y, stateCode (ดู AGENT_STRIDE) */
   agents: Float32Array;
   /** ทางเดินตั้งแต่ tick ก่อน: [id, จำนวนจุด, x1, y1, ...] ต่อคน (ดู Simulation.drainPaths) */
@@ -74,11 +90,12 @@ export type WorkerResponse =
    */
   | {
       type: "STARTED";
+      runId?: string;
       requestId: number;
       seats: number;
       grid: { cols: number; rows: number; cellSize: number };
       /** Worker เวอร์ชันเก่าอาจยังไม่มี field นี้ระหว่าง rollout */
-      initial?: { agents: Float32Array; staff: Float32Array };
+      initial?: { agents: Float32Array; staff: Float32Array; presentation?: PresentationSnapshot };
     }
   | { type: "ACK"; requestId: number; command: "PAUSE" | "RESUME" | "STOP" | "SET_SPEED" }
   | { type: "ANALYSIS"; requestId: number; layoutRevision: string; analysis: DayAnalysis }

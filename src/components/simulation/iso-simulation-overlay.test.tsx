@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { IsometricScene, IsometricView } from "@/components/preview-3d/isometric-view";
 import { projectPoint } from "@/core/preview/isometric";
 import { layoutStore } from "@/store/use-layout-store";
 import { simulationStore } from "@/store/use-simulation-store";
 import { cafeLayout } from "@/test/fixtures/layouts";
-import { projectAgents, seatedFacing } from "./iso-simulation-overlay";
+import type { PresentationSnapshot, TablePresentation } from "@/core/simulation/presentation-contract";
+import { projectAgents, seatedFacing, tableBadges, drawThoughtBubble } from "./iso-simulation-overlay";
 
 afterEach(() => {
   cleanup();
@@ -67,5 +68,78 @@ describe("จำลองลูกค้าในมุมมอง 3D", () => {
     render(<IsometricScene layout={cafeLayout()} />);
     expect(screen.queryByTestId("iso-simulation-overlay")).toBeNull();
     expect(screen.queryByTestId("iso-heatmap")).toBeNull();
+  });
+});
+
+describe("fallback 2D แสดงวงจรบริการจาก snapshot", () => {
+  const snapshotWith = (tables: readonly TablePresentation[], tableId: string): PresentationSnapshot => ({
+    version: 1, runId: "run-1", layoutRevision: "rev-1", sequence: 0, simTimeSeconds: 100,
+    customers: [], tables,
+    meals: tables.flatMap((table) => table.mealIds.map((mealId) => ({
+      mealId, ownerRenderAgentId: 10, tableId, chairId: "chair-1", serviceCycleId: table.serviceCycleId,
+      foodKind: "fried-rice" as const, anchor: { x: 0, y: 0.3 }, progress: "full" as const, consumed: 0,
+      placedAtSeconds: 90,
+    }))),
+    staff: [], milestones: [],
+  });
+  const tableOf = (tableId: string, overrides: Partial<TablePresentation> = {}): TablePresentation => ({
+    tableId, serviceCycleId: "cycle-1", availability: "occupied", surface: "served",
+    mealIds: ["meal-1"], stainAmount: 0, wipeProgress: 0, cleanCompletedAtSeconds: null, ...overrides,
+  });
+
+  it("ไม่วาดอะไรเมื่อ worker ไม่ส่ง metadata", () => {
+    expect(tableBadges(undefined, cafeLayout())).toEqual([]);
+  });
+
+  it("นับจานและหาจุดกลางโต๊ะจากผังจริง", () => {
+    const layout = cafeLayout();
+    const table = layout.objects.find((object) => object.type === "table")!;
+    const badges = tableBadges(snapshotWith([tableOf(table.id, { mealIds: ["meal-1", "meal-2"] })], table.id), layout);
+    expect(badges).toHaveLength(1);
+    expect(badges[0]).toMatchObject({ tableId: table.id, dishCount: 2, surface: "served" });
+    expect(badges[0]!.mx).toBeCloseTo(table.x + table.width / 2, 6);
+    expect(badges[0]!.my).toBeCloseTo(table.y + table.depth / 2, 6);
+  });
+
+  it("คราบจางลงตามการเช็ดแต่ยังเหลือจนงานเช็ดเสร็จ", () => {
+    const layout = cafeLayout();
+    const id = layout.objects.find((object) => object.type === "table")!.id;
+    const dirty = tableBadges(snapshotWith([tableOf(id, { surface: "used", stainAmount: 0.8 })], id), layout)[0]!;
+    expect(dirty.stain).toBeCloseTo(0.8, 6);
+    expect(dirty.wiping).toBe(false);
+    const wiping = tableBadges(snapshotWith([tableOf(id, { surface: "wiping", stainAmount: 0.8, wipeProgress: 0.5 })], id), layout)[0]!;
+    expect(wiping.stain).toBeCloseTo(0.4, 6);
+    expect(wiping.wiping).toBe(true);
+    const clean = tableBadges(snapshotWith([tableOf(id, { surface: "clean", mealIds: [], stainAmount: 0, wipeProgress: 1 })], id), layout)[0]!;
+    expect(clean).toMatchObject({ stain: 0, dishCount: 0 });
+  });
+
+  it("ข้ามโต๊ะที่ไม่อยู่ในผังที่กำลังแสดง", () => {
+    expect(tableBadges(snapshotWith([tableOf("table-ที่ไม่มีจริง")], "table-ที่ไม่มีจริง"), cafeLayout())).toEqual([]);
+  });
+
+  it("drawThoughtBubble draws thought bubbles on canvas context", () => {
+    const fillText = vi.fn();
+    const fill = vi.fn();
+    const stroke = vi.fn();
+    const ctx = {
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      scale: vi.fn(),
+      beginPath: vi.fn(),
+      roundRect: vi.fn(),
+      rect: vi.fn(),
+      arc: vi.fn(),
+      fill,
+      stroke,
+      measureText: vi.fn(() => ({ width: 20 })),
+      fillText,
+    } as unknown as CanvasRenderingContext2D;
+
+    drawThoughtBubble(ctx, 100, 100, { kind: "food-critical", waitSeconds: 900, severity: "critical" }, 1);
+    expect(fillText).toHaveBeenCalled();
+    expect(String(fillText.mock.calls[0]?.[0])).toContain("😤");
+    expect(String(fillText.mock.calls[0]?.[0])).toContain("15น.!");
   });
 });

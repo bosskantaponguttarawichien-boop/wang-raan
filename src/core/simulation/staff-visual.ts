@@ -12,6 +12,7 @@ import type { Meters, Point, Rect, StoreLayout } from "../layout/types";
 import { staffSpots } from "../preview/staff-spots";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
+import type { StaffActivity } from "./presentation-contract";
 
 /** รหัสสถานะพนักงานใน buffer ที่ส่งข้าม thread */
 export const STAFF_STATE_CODE = {
@@ -26,6 +27,8 @@ export const STAFF_STATE_CODE = {
 
 /** ค่าต่อพนักงานใน buffer: index, x, y, stateCode */
 export const STAFF_STRIDE = 4;
+/** Shared physical speed for visual paths and the engine's travel budget. */
+export const STAFF_VISUAL_WALK_SPEED = 1.2;
 
 /**
  * กลางตัวพนักงานห่างผนังร้านอย่างน้อยเท่านี้ (ม.) ตอนเดิน — ไหล่กว้างราว 0.46 ม. และผนังล้ำเข้ามา 0.07 ม.
@@ -41,6 +44,7 @@ interface Phase {
   length: number;
   seconds: number;
   code: number;
+  activity?: StaffActivity;
 }
 
 export interface StaffPlan {
@@ -187,6 +191,7 @@ export class StaffVisuals {
    * (แบ่งตามความยาวแต่ละช่วง) ที่เหลือเป็นเวลายืนทำงานที่โต๊ะ/เคาน์เตอร์
    */
   plan(worker: number, kind: StaffTaskKind, tableId: string | null, total: number, walkSeconds: number): StaffPlan {
+    if (!Number.isFinite(total) || !Number.isFinite(walkSeconds) || total < 0 || walkSeconds < 0) throw new RangeError("Invalid staff task duration");
     const home = this.homes[worker]!;
     const stand = kind === "pay" ? null : this.standCell(worker, tableId);
     const still = (seconds: number, code: number, at: Point = home): Phase => ({ points: [at], length: 0, seconds, code });
@@ -215,11 +220,18 @@ export class StaffVisuals {
     }
     const lengths = legs.map((leg) => polylineLength(leg.points));
     const distance = lengths.reduce((a, b) => a + b, 0);
-    const walk = distance > 0 ? Math.min(total, kind === "deliver" ? total : walkSeconds) : 0;
+    // Use distance/time, not an arbitrary fraction of the entire service task.
+    const walk = distance > 0 ? Math.min(total, distance / STAFF_VISUAL_WALK_SPEED) : 0;
     const phases: Phase[] = legs.map((leg, i) => ({ ...leg, length: lengths[i]!, seconds: distance > 0 ? (walk * lengths[i]!) / distance : 0 }));
     if (work) {
       work.seconds = total - walk;
       phases.splice(1, 0, work);
+    } else if (kind === "deliver" && total > walk && phases.length === 3) {
+      const pickupSeconds = Math.min(5, (total - walk) / 2);
+      const pickup = { ...still(pickupSeconds, STAFF_STATE_CODE.walking, phases[0]!.points.at(-1)!), activity: "pickup" as const };
+      const putDown = { ...still(total - walk - pickupSeconds, STAFF_STATE_CODE.serving, at), activity: "put-down" as const };
+      phases.splice(2, 0, putDown);
+      phases.splice(1, 0, pickup);
     } else if (total > walk) phases.push(still(total - walk, STAFF_STATE_CODE.counter));
     return { phases: phases.filter((p) => p.seconds > 0 && p.points.length > 0), total };
   }

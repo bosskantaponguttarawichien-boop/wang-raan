@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addTableSet, createCounter, createEmptyLayout, createEntrance, createKitchenDoor, createSequentialIds, type StoreLayout } from "@/core/layout";
 import { cafeLayout } from "@/test/fixtures/layouts";
-import { GOOD_TOO_LONG_RATE, analyzeDay, simulateDay, type DayInput } from "./index";
+import { GOOD_NO_SEAT_RATE, GOOD_TOO_LONG_RATE, analyzeDay, simulateDay, type DayInput } from "./index";
 
 /** 10:00–20:00 คนเยอะ 11:30–13:00 */
 function day(input: Partial<DayInput> = {}): DayInput {
@@ -44,6 +44,11 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
     expect(outcome.arrived).toBeLessThan(150);
     expect(outcome.fed + outcome.noSeat + outcome.abandoned).toBeCloseTo(outcome.arrived, 6);
     expect(outcome.unfinished).toBe(0);
+    expect(outcome.ranges.arrived[0]).toBeLessThanOrEqual(outcome.arrived);
+    expect(outcome.ranges.arrived[1]).toBeGreaterThanOrEqual(outcome.arrived);
+    expect(outcome.ranges.noSeat[0]).toBeLessThanOrEqual(outcome.noSeat);
+    expect(outcome.ranges.noSeat[1]).toBeGreaterThanOrEqual(outcome.noSeat);
+    expect(outcome.ranges.avgFoodWaitMinutes).not.toBeNull();
   });
 
   it("ลูกค้าเยอะ → ต้องใช้พ่อครัวมากกว่าลูกค้าน้อย และจำนวนที่แนะนำผ่านเกณฑ์ ส่วนน้อยกว่า 1 คนไม่ผ่าน", { timeout: 30_000 }, () => {
@@ -79,18 +84,33 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
     expect(analysis.cookTime.maxMinutesPerDish).toBeNull();
   });
 
-  it("ที่นั่ง: ร้าน 6 ที่ลูกค้าเยอะมีคิวหน้าเข้า; 48 ที่นั่งแต่มีแค่ 12 โต๊ะก็ยังอาจไม่พอเมื่อห้ามแชร์โต๊ะ", { timeout: 30_000 }, () => {
+  it("ที่นั่ง: คิวสั้นยังรองรับไหว แต่ร้านเล็กหรือกลุ่มเยอะเกินจำนวนโต๊ะต้องรายงานไม่พอ", { timeout: 30_000 }, () => {
     const cramped = analyzeDay(cafeLayout(), day({ dailyCustomers: 200 }));
     expect(cramped.seating.enough).toBe(false);
     expect(cramped.seating.maxEntranceQueue).toBeGreaterThan(20);
     expect(cramped.seating.capacityPerHour).toBeLessThan(cramped.seating.busiestCustomersPerHour);
     const roomy = analyzeDay(bigLayout(), day({ dailyCustomers: 200 }));
     expect(roomy.seating.basedOn).toBe("recommended");
-    expect(roomy.seating.enough).toBe(false);
+    expect(roomy.seating.enough).toBe(true);
     expect(roomy.seating.maxEntranceQueue).toBeGreaterThan(0);
+    expect(roomy.seating.maxEntranceQueue).toBeLessThanOrEqual(roomy.seats * GOOD_NO_SEAT_RATE);
+    expect(roomy.seating.noSeat).toBe(0);
+    // 48 เก้าอี้ไม่ได้แปลว่ารับได้ 48 กลุ่ม: ห้ามแชร์โต๊ะ จึงทดสอบภาระที่ล้น 12 โต๊ะด้วย
+    const overloaded = analyzeDay(bigLayout(), day({ dailyCustomers: 300 }));
+    expect(overloaded.seating.basedOn).toBe("recommended");
+    expect(overloaded.seating.enough).toBe(false);
+    expect(overloaded.seating.maxEntranceQueue).toBeGreaterThan(overloaded.seats * GOOD_NO_SEAT_RATE);
+    expect(overloaded.seating.noSeat).toBeGreaterThan(0);
   });
 
   it("วิเคราะห์ซ้ำได้ผลเดิม", { timeout: 30_000 }, () => {
     expect(analyzeDay(cafeLayout(), day())).toEqual(analyzeDay(cafeLayout(), day()));
+  });
+
+  it("คำแนะนำคงพนักงานบริการอย่างน้อยหนึ่งคนเมื่อมีคนประจำรับเงิน", { timeout: 30_000 }, () => {
+    const analysis = analyzeDay(cafeLayout(), day({ frontStaff: 2, cashiers: 1 }));
+    expect(analysis.staffing.recommended).not.toBeNull();
+    expect(analysis.staffing.recommended!.frontStaff).toBeGreaterThanOrEqual(2);
+    expect(analysis.staffing.frontOptions.every((option) => option.frontStaff >= 2)).toBe(true);
   });
 });

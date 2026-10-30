@@ -1,0 +1,32 @@
+{
+  "browser": "156.0.8078.48",
+  "renderer": {
+    "vendor": "Google Inc. (NVIDIA)",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Ti (0x00001C82) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "width": 1032,
+    "height": 844
+  },
+  "errors": [],
+  "warnings": [
+    "THREE.THREE.Clock: This module has been deprecated. Please use THREE.Timer instead.",
+    "THREE.WebGLShadowMap: PCFSoftShadowMap has been deprecated. Using PCFShadowMap instead."
+  ],
+  "assets": [
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff-lite.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-customer.glb",
+      "status": 200
+    },
+    {
+      "url": "http://localhost:3000/assets/models/cafe-staff.glb",
+      "status": 200
+    }
+  ]
+}

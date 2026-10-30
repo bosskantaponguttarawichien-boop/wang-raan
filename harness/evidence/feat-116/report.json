@@ -1,0 +1,39 @@
+{
+  "featureId": "feat-116",
+  "verifiedAt": "2026-10-28T18:27:24.618Z",
+  "tabletopSurfaceMeters": 0.76,
+  "stainSurfaceOffsetMeters": 0.0016,
+  "maxStainsPerTable": 5,
+  "verifiedMenus": [
+    "fried-rice",
+    "noodles",
+    "steak",
+    "salad",
+    "cake"
+  ],
+  "verifiedStates": [
+    "full",
+    "partial",
+    "empty"
+  ],
+  "verifiedTableShapes": [
+    "rectangle",
+    "round"
+  ],
+  "verifiedTableRotations": [
+    0,
+    90,
+    180,
+    270
+  ],
+  "verifiedPartySizes": [
+    1,
+    2,
+    4
+  ],
+  "screenshots": [
+    "harness/evidence/feat-116/5-menus-3-states.png",
+    "harness/evidence/feat-116/stains-and-wiping.png",
+    "harness/evidence/feat-116/table-rotations-and-shapes.png"
+  ]
+}

@@ -24,6 +24,14 @@ export function CharacterLab() {
   const [facing, setFacing] = React.useState<CharacterFacing>("front");
   const [motion, setMotion] = React.useState<CharacterMotion>("idle");
   const [seated, setSeated] = React.useState(false);
+  const [clips, setClips] = React.useState<readonly string[]>([]);
+  const [clip, setClip] = React.useState<string | null>(null);
+  // เปลี่ยนบทบาท = คลิปชุดใหม่ ต้องเลิกค้างชื่อคลิปของบทบาทเดิม
+  const chooseRole = (next: CharacterRole) => {
+    setRole(next);
+    setClips([]);
+    setClip(null);
+  };
 
   return (
     <main data-surface="playground" className="min-h-dvh bg-surface px-4 py-5 text-ink sm:px-6 lg:px-10 lg:py-8">
@@ -46,10 +54,17 @@ export function CharacterLab() {
 
         <section className="overflow-hidden rounded-[24px] border border-line bg-white p-3 shadow-[0_12px_36px_rgba(29,45,72,0.09)] sm:p-4" aria-labelledby="scene-title">
           <h2 id="scene-title" className="sr-only">ฉากทดลองตัวละคร</h2>
-          <CharacterLabScene role={role} facing={facing} seated={seated} onMotionChange={(next) => {
-            setMotion(next);
-            setSeated(next === "seated");
-          }} />
+          <CharacterLabScene
+            role={role}
+            facing={facing}
+            seated={seated}
+            clip={clip}
+            onClipsAvailable={setClips}
+            onMotionChange={(next) => {
+              setMotion(next);
+              setSeated(next === "seated");
+            }}
+          />
         </section>
 
         <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="role-title">
@@ -64,10 +79,44 @@ export function CharacterLab() {
                   key={option}
                   type="button"
                   aria-pressed={role === option}
-                  onClick={() => setRole(option)}
+                  onClick={() => chooseRole(option)}
                   className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${role === option ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
                 >
                   {CHARACTER_MODELS[option].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[18px] border border-line bg-white p-4" aria-labelledby="clips-title">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 id="clips-title" className="m-0 text-sm font-semibold text-ink">คลิปใน GLB</h2>
+              <p className="m-0 mt-1 text-xs text-secondary">
+                {clips.length > 0
+                  ? "เลือกคลิปเพื่อดูวนรอบ รวมท่าถือเสิร์ฟ กิน เช็ดโต๊ะ และเลื่อนเก้าอี้"
+                  : "กำลังอ่านรายการคลิปจากไฟล์โมเดล…"}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2" role="group" aria-label="เลือกคลิปที่ต้องการดู">
+              <button
+                type="button"
+                aria-pressed={clip === null}
+                onClick={() => setClip(null)}
+                className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${clip === null ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
+              >
+                ตามการเดิน/นั่ง
+              </button>
+              {clips.map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  aria-pressed={clip === name}
+                  onClick={() => setClip(name)}
+                  className={`rounded-[10px] border px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus ${clip === name ? "border-blue bg-blue text-white" : "border-line bg-white text-ink hover:bg-surface"}`}
+                >
+                  {name}
                 </button>
               ))}
             </div>
@@ -131,8 +180,8 @@ export function CharacterLab() {
           <StatusCard label="โมเดล" value={CHARACTER_MODELS[role].label} detail={`${CHARACTER_MODELS[role].description} สูงประมาณ 1.70 ม.`} />
           <StatusCard
             label="ท่าปัจจุบัน"
-            value={motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}
-            detail={motion === "walking" ? "กำลังไปยังจุดที่เลือกบนพื้น" : motion === "seated" ? "ตัวละครนั่งอยู่บนเก้าอี้ตัวอย่าง" : "คลิกบนพื้นเพื่อเริ่มเดิน หรือใช้ปุ่มเพื่อตรวจทิศตัวละคร"}
+            value={clip ? `ดูคลิป ${clip}` : motion === "walking" ? "กำลังเดิน (Walk)" : motion === "seated" ? "นั่ง (Sit)" : "ยืน (Idle)"}
+            detail={clip ? "เล่นวนรอบเพื่อตรวจท่าทั้งเส้น ไม่เดินและไม่สลับท่าเอง" : motion === "walking" ? "กำลังไปยังจุดที่เลือกบนพื้น" : motion === "seated" ? "ตัวละครนั่งอยู่บนเก้าอี้ตัวอย่าง" : "คลิกบนพื้นเพื่อเริ่มเดิน หรือใช้ปุ่มเพื่อตรวจทิศตัวละคร"}
           />
           <StatusCard label="รอบถัดไป" value="หลบสิ่งกีดขวาง" detail="เพิ่มหลังการเดินหาจุดหมายทำงาน" />
         </aside>

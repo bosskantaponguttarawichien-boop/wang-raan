@@ -1,0 +1,175 @@
+{
+ "nodes": [
+  "CafeMannequin",
+  "Head",
+  "Hips",
+  "LeftArm",
+  "LeftFoot",
+  "LeftForeArm",
+  "LeftHand",
+  "LeftLeg",
+  "LeftLowerLeg",
+  "MannequinBody",
+  "Neck",
+  "RightArm",
+  "RightFoot",
+  "RightForeArm",
+  "RightHand",
+  "RightLeg",
+  "RightLowerLeg",
+  "Spine"
+ ],
+ "skins": [
+  [
+   "Hips",
+   "Spine",
+   "Neck",
+   "Head",
+   "LeftArm",
+   "RightArm",
+   "LeftForeArm",
+   "RightForeArm",
+   "LeftHand",
+   "RightHand",
+   "LeftLeg",
+   "RightLeg",
+   "LeftLowerLeg",
+   "RightLowerLeg",
+   "LeftFoot",
+   "RightFoot"
+  ]
+ ],
+ "meshes": [
+  {
+   "name": "",
+   "prims": [
+    {
+     "attributes": [
+      "COLOR_0",
+      "JOINTS_0",
+      "NORMAL",
+      "POSITION",
+      "WEIGHTS_0",
+      "_PART"
+     ],
+     "count": 13879,
+     "indices": 82704,
+     "part": {
+      "count": 13879,
+      "distinct": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "animations": [
+  {
+   "name": "Idle",
+   "channels": 17,
+   "duration": 6
+  },
+  {
+   "name": "Walk",
+   "channels": 15,
+   "duration": 0.949999988079071
+  },
+  {
+   "name": "Sit",
+   "channels": 14,
+   "duration": 0.8999999761581421
+  },
+  {
+   "name": "Eat",
+   "channels": 17,
+   "duration": 3.200000047683716
+  },
+  {
+   "name": "PullChair",
+   "channels": 17,
+   "duration": 1.100000023841858
+  },
+  {
+   "name": "SitDown",
+   "channels": 17,
+   "duration": 0.8999999761581421
+  },
+  {
+   "name": "PushChair",
+   "channels": 17,
+   "duration": 0.8999999761581421
+  },
+  {
+   "name": "StandUp",
+   "channels": 17,
+   "duration": 0.8999999761581421
+  }
+ ],
+ "extras": [
+  [
+   "CafeMannequin",
+   {
+    "walkCycleDistance": 0.9,
+    "animationMarkers": {
+     "Eat": [
+      {
+       "name": "seated",
+       "time": 0
+      },
+      {
+       "name": "food-contact",
+       "time": 0.14
+      },
+      {
+       "name": "hand-contact",
+       "time": 0.45
+      }
+     ],
+     "PullChair": [
+      {
+       "name": "hand-contact",
+       "time": 0.22
+      }
+     ],
+     "SitDown": [
+      {
+       "name": "hand-contact",
+       "time": 0.35
+      },
+      {
+       "name": "seated",
+       "time": 0.92
+      }
+     ],
+     "PushChair": [
+      {
+       "name": "hand-contact",
+       "time": 0.2
+      },
+      {
+       "name": "seated",
+       "time": 0
+      }
+     ],
+     "StandUp": [
+      {
+       "name": "seated",
+       "time": 0
+      },
+      {
+       "name": "hand-contact",
+       "time": 0.2
+      }
+     ]
+    }
+   }
+  ]
+ ]
+}

@@ -1,0 +1,167 @@
+[
+  {
+    "tablePreset": "table-2-seats",
+    "tableWidth": 0.8,
+    "tableDepth": 0.8,
+    "food": "fried-rice",
+    "chairLocalY": 0.55,
+    "plateLocalY": 0.22,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-2-seats",
+    "tableWidth": 0.8,
+    "tableDepth": 0.8,
+    "food": "noodles",
+    "chairLocalY": 0.55,
+    "plateLocalY": 0.22,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-2-seats",
+    "tableWidth": 0.8,
+    "tableDepth": 0.8,
+    "food": "steak",
+    "chairLocalY": 0.55,
+    "plateLocalY": 0.22,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-2-seats",
+    "tableWidth": 0.8,
+    "tableDepth": 0.8,
+    "food": "salad",
+    "chairLocalY": 0.55,
+    "plateLocalY": 0.22,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-2-seats",
+    "tableWidth": 0.8,
+    "tableDepth": 0.8,
+    "food": "cake",
+    "chairLocalY": 0.55,
+    "plateLocalY": 0.22,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-4-seats",
+    "tableWidth": 1.2,
+    "tableDepth": 1.2,
+    "food": "fried-rice",
+    "chairLocalY": 0.75,
+    "plateLocalY": 0.42,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-4-seats",
+    "tableWidth": 1.2,
+    "tableDepth": 1.2,
+    "food": "noodles",
+    "chairLocalY": 0.75,
+    "plateLocalY": 0.42,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-4-seats",
+    "tableWidth": 1.2,
+    "tableDepth": 1.2,
+    "food": "steak",
+    "chairLocalY": 0.75,
+    "plateLocalY": 0.42,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-4-seats",
+    "tableWidth": 1.2,
+    "tableDepth": 1.2,
+    "food": "salad",
+    "chairLocalY": 0.75,
+    "plateLocalY": 0.42,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "table-4-seats",
+    "tableWidth": 1.2,
+    "tableDepth": 1.2,
+    "food": "cake",
+    "chairLocalY": 0.75,
+    "plateLocalY": 0.42,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "wide",
+    "tableWidth": 2,
+    "tableDepth": 2,
+    "food": "fried-rice",
+    "chairLocalY": 1.15,
+    "plateLocalY": 0.82,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "wide",
+    "tableWidth": 2,
+    "tableDepth": 2,
+    "food": "noodles",
+    "chairLocalY": 1.15,
+    "plateLocalY": 0.82,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "wide",
+    "tableWidth": 2,
+    "tableDepth": 2,
+    "food": "steak",
+    "chairLocalY": 1.15,
+    "plateLocalY": 0.82,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "wide",
+    "tableWidth": 2,
+    "tableDepth": 2,
+    "food": "salad",
+    "chairLocalY": 1.15,
+    "plateLocalY": 0.82,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  },
+  {
+    "tablePreset": "wide",
+    "tableWidth": 2,
+    "tableDepth": 2,
+    "food": "cake",
+    "chairLocalY": 1.15,
+    "plateLocalY": 0.82,
+    "forwardDistanceM": 0.33,
+    "correctionM": -0.01,
+    "outOfReach": false
+  }
+]

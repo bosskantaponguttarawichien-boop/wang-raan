@@ -1,0 +1,47 @@
+{
+  "peak": 60,
+  "thoughtsOn": {
+    "frames": 24,
+    "medianMs": 280
+  },
+  "thoughtsOff": {
+    "frames": 24,
+    "medianMs": 260
+  },
+  "thoughtsOnAgain": {
+    "frames": 26,
+    "medianMs": 240
+  },
+  "canvas": {
+    "backingStore": [
+      944,
+      564
+    ],
+    "cssSize": [
+      944,
+      564
+    ],
+    "devicePixelRatio": 1,
+    "shadowProxiesVisible": null
+  },
+  "quality": {
+    "level": 0,
+    "maxPixelRatio": 1.5,
+    "characterShadows": true,
+    "shadowMapSize": 2048,
+    "pixelRatio": 1,
+    "shadowAutoUpdate": true,
+    "visibleShadowProxies": 68
+  },
+  "live": {
+    "running": true,
+    "simSecondsAdvancedIn3s": 4.2
+  },
+  "scene": {
+    "customers": 60,
+    "staff": 8,
+    "drawCalls": 680,
+    "triangles": 541454
+  },
+  "errors": []
+}

@@ -1,0 +1,611 @@
+{
+  "task": "feat-112",
+  "generatedAt": "2026-10-28T18:41:02.866Z",
+  "provider": "scripts/character-clips/customer-seat.mjs",
+  "profile": {
+    "chair": {
+      "seatTopY": 0.45,
+      "backrestTopY": 0.87,
+      "backrestZ": -0.1685,
+      "seatHalfX": 0.1935
+    },
+    "grip": {
+      "x": 0.18,
+      "y": 0.84,
+      "palmLocal": [
+        -0.0099,
+        -0.0864,
+        -0.0253
+      ]
+    },
+    "seatPush": [
+      0.2135,
+      0.45,
+      -0.05
+    ],
+    "gripWindow": [
+      0.22,
+      0.46
+    ],
+    "gripTravel": 0.16,
+    "nominalPullDistance": 0.3,
+    "minimumPullDistance": 0.16,
+    "rootMotion": {
+      "ownedByController": "offset ถอยไปนั่งบนเก้าอี้ที่ดึงออก 0.3 ม. (seat-motion stepSeat)",
+      "clipTranslatesRoot": false,
+      "clipHipsLateralLimit": 0.06
+    },
+    "fallback": "พื้นที่ดึงเก้าอี้ < minimumPullDistance → ข้าม PullChair/PushChair แล้วเล่น SitDown/StandUp ตรง ๆ (เฟรมแรก/ท้ายเป็นท่ายืน-ท่านั่งเดิม จึง blend จาก Idle/Sit ได้)",
+    "markerTimes": {
+      "pullGrip": 0.22,
+      "pullRelease": 0.46,
+      "sitSupport": 0.35,
+      "sitSeated": 0.92,
+      "pushGrip": 0.2,
+      "standPush": 0.2
+    },
+    "durations": {
+      "PullChair": 1.1,
+      "PushChair": 0.9
+    }
+  },
+  "chairCases": [
+    {
+      "label": "chair-0.45-square",
+      "seatTopY": 0.45,
+      "backrest": true,
+      "backrestZ": -0.1685,
+      "seatHalfX": 0.1935
+    },
+    {
+      "label": "chair-0.50-square",
+      "seatTopY": 0.45,
+      "backrest": true,
+      "backrestZ": -0.19,
+      "seatHalfX": 0.215
+    },
+    {
+      "label": "stool-round-no-back",
+      "seatTopY": 0.45,
+      "backrest": false,
+      "backrestZ": null,
+      "seatHalfX": 0.17200000000000001
+    }
+  ],
+  "bodyScales": [
+    0.94,
+    1,
+    1.06
+  ],
+  "markers": {
+    "PullChair": [
+      {
+        "name": "hand-contact",
+        "time": 0.22
+      }
+    ],
+    "SitDown": [
+      {
+        "name": "hand-contact",
+        "time": 0.35
+      },
+      {
+        "name": "seated",
+        "time": 0.92
+      }
+    ],
+    "PushChair": [
+      {
+        "name": "hand-contact",
+        "time": 0.2
+      },
+      {
+        "name": "seated",
+        "time": 0
+      }
+    ],
+    "StandUp": [
+      {
+        "name": "seated",
+        "time": 0
+      },
+      {
+        "name": "hand-contact",
+        "time": 0.2
+      }
+    ]
+  },
+  "metrics": {
+    "full": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "PullChair",
+          "duration": 1.1,
+          "tracks": 17
+        },
+        {
+          "name": "SitDown",
+          "duration": 0.9,
+          "tracks": 17
+        },
+        {
+          "name": "PushChair",
+          "duration": 0.9,
+          "tracks": 17
+        },
+        {
+          "name": "StandUp",
+          "duration": 0.9,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "PullChair",
+          "duration": 1.1,
+          "frames": 36,
+          "hipsLateralMax": 0.04,
+          "hipsRange": [
+            0.87,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.0002,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.22,
+              "palmRight": [
+                0.1801,
+                0.8396,
+                -0.1682
+              ],
+              "hipsY": 0.8702
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.1801,
+              0.8396,
+              -0.1682
+            ],
+            "0.94": [
+              0.1693,
+              0.7892,
+              -0.1581
+            ],
+            "1.06": [
+              0.1909,
+              0.89,
+              -0.1783
+            ]
+          }
+        },
+        {
+          "clip": "SitDown",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.4072,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.35,
+              "palmRight": [
+                0.2,
+                0.8386,
+                -0.1675
+              ],
+              "hipsY": 0.8877
+            },
+            "seated": {
+              "phase": 0.92,
+              "palmRight": [
+                0.1265,
+                0.5662,
+                0.2762
+              ],
+              "hipsY": 0.5912
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.2,
+              0.8386,
+              -0.1675
+            ],
+            "0.94": [
+              0.188,
+              0.7882,
+              -0.1574
+            ],
+            "1.06": [
+              0.212,
+              0.8889,
+              -0.1775
+            ]
+          }
+        },
+        {
+          "clip": "PushChair",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.58
+          ],
+          "plantedAnkleSlip": 0,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.2,
+              "palmRight": [
+                0.2133,
+                0.4503,
+                -0.0492
+              ],
+              "hipsY": 0.58
+            },
+            "seated": {
+              "phase": 0,
+              "palmRight": [
+                0.1103,
+                0.5805,
+                0.3172
+              ],
+              "hipsY": 0.58
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.2133,
+              0.4503,
+              -0.0492
+            ],
+            "0.94": [
+              0.2005,
+              0.4233,
+              -0.0462
+            ],
+            "1.06": [
+              0.2261,
+              0.4774,
+              -0.0521
+            ]
+          }
+        },
+        {
+          "clip": "StandUp",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.4072,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "seated": {
+              "phase": 0,
+              "palmRight": [
+                0.1103,
+                0.5805,
+                0.3172
+              ],
+              "hipsY": 0.58
+            },
+            "hand-contact": {
+              "phase": 0.2,
+              "palmRight": [
+                0.2008,
+                0.8208,
+                -0.1705
+              ],
+              "hipsY": 0.6379
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.1103,
+              0.5805,
+              0.3172
+            ],
+            "0.94": [
+              0.1036,
+              0.5457,
+              0.2982
+            ],
+            "1.06": [
+              0.1169,
+              0.6153,
+              0.3363
+            ]
+          }
+        }
+      ]
+    },
+    "lite": {
+      "rigMutatedBones": [],
+      "walkCycleDistance": 0.9,
+      "clips": [
+        {
+          "name": "PullChair",
+          "duration": 1.1,
+          "tracks": 17
+        },
+        {
+          "name": "SitDown",
+          "duration": 0.9,
+          "tracks": 17
+        },
+        {
+          "name": "PushChair",
+          "duration": 0.9,
+          "tracks": 17
+        },
+        {
+          "name": "StandUp",
+          "duration": 0.9,
+          "tracks": 17
+        }
+      ],
+      "authored": [
+        {
+          "clip": "PullChair",
+          "duration": 1.1,
+          "frames": 36,
+          "hipsLateralMax": 0.04,
+          "hipsRange": [
+            0.87,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.0002,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.22,
+              "palmRight": [
+                0.1801,
+                0.8396,
+                -0.1682
+              ],
+              "hipsY": 0.8702
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.1801,
+              0.8396,
+              -0.1682
+            ],
+            "0.94": [
+              0.1693,
+              0.7892,
+              -0.1581
+            ],
+            "1.06": [
+              0.1909,
+              0.89,
+              -0.1783
+            ]
+          }
+        },
+        {
+          "clip": "SitDown",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.4072,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.35,
+              "palmRight": [
+                0.2,
+                0.8386,
+                -0.1675
+              ],
+              "hipsY": 0.8877
+            },
+            "seated": {
+              "phase": 0.92,
+              "palmRight": [
+                0.1265,
+                0.5662,
+                0.2762
+              ],
+              "hipsY": 0.5912
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.2,
+              0.8386,
+              -0.1675
+            ],
+            "0.94": [
+              0.188,
+              0.7882,
+              -0.1574
+            ],
+            "1.06": [
+              0.212,
+              0.8889,
+              -0.1775
+            ]
+          }
+        },
+        {
+          "clip": "PushChair",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.58
+          ],
+          "plantedAnkleSlip": 0,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "hand-contact": {
+              "phase": 0.2,
+              "palmRight": [
+                0.2133,
+                0.4503,
+                -0.0492
+              ],
+              "hipsY": 0.58
+            },
+            "seated": {
+              "phase": 0,
+              "palmRight": [
+                0.1103,
+                0.5805,
+                0.3172
+              ],
+              "hipsY": 0.58
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.2133,
+              0.4503,
+              -0.0492
+            ],
+            "0.94": [
+              0.2005,
+              0.4233,
+              -0.0462
+            ],
+            "1.06": [
+              0.2261,
+              0.4774,
+              -0.0521
+            ]
+          }
+        },
+        {
+          "clip": "StandUp",
+          "duration": 0.9,
+          "frames": 36,
+          "hipsLateralMax": 0,
+          "hipsRange": [
+            0.58,
+            0.92
+          ],
+          "plantedAnkleSlip": 0.4072,
+          "liftedAnkleTravel": 0,
+          "tableSlabIntrusion": 0,
+          "markerContacts": {
+            "seated": {
+              "phase": 0,
+              "palmRight": [
+                0.1103,
+                0.5805,
+                0.3172
+              ],
+              "hipsY": 0.58
+            },
+            "hand-contact": {
+              "phase": 0.2,
+              "palmRight": [
+                0.2008,
+                0.8208,
+                -0.1705
+              ],
+              "hipsY": 0.6379
+            }
+          },
+          "scaledContacts": {
+            "1": [
+              0.1103,
+              0.5805,
+              0.3172
+            ],
+            "0.94": [
+              0.1036,
+              0.5457,
+              0.2982
+            ],
+            "1.06": [
+              0.1169,
+              0.6153,
+              0.3363
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "temporaryBuild": {
+    "full": {
+      "files": [
+        "cafe-customer.glb"
+      ],
+      "bytes": 310404,
+      "sha256": "96c539c8841ac50568de5ada2b3dc8183cce8ca62f2fe7c6ec6189f2d95d917f",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat112-gJWogb\\full\\cafe-customer.glb",
+        "bytes": 310404,
+        "vertices": 13879,
+        "triangles": 27568,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "PullChair",
+          "SitDown",
+          "PushChair",
+          "StandUp"
+        ]
+      }
+    },
+    "lite": {
+      "files": [
+        "cafe-customer-lite.glb"
+      ],
+      "bytes": 126716,
+      "sha256": "b1dbb6667f1a7cec6ec6bd8d4f3eef8f40d5c6277d3dbd4cbfc9c2c15baa00ec",
+      "report": {
+        "outputFile": "C:\\Users\\boss_\\AppData\\Local\\Temp\\wangraan-feat112-gJWogb\\lite\\cafe-customer-lite.glb",
+        "bytes": 126716,
+        "vertices": 3517,
+        "triangles": 6892,
+        "clips": [
+          "Idle",
+          "Walk",
+          "Sit",
+          "PullChair",
+          "SitDown",
+          "PushChair",
+          "StandUp"
+        ]
+      }
+    }
+  },
+  "publicAssetsUnchanged": true,
+  "publicAssetsSha256": {
+    "cafe-customer-lite.glb": "51b6b44c558e18f8a455cb828fc18614ac9f3aa9f59a42738df1c679b7fdbdf8",
+    "cafe-customer.glb": "12f1715ec32e6269f23957751f6c3e5463a53c757bae45049b019f5be7c349e4",
+    "cafe-staff-lite.glb": "648b8637907cb187b7bb3fca57111d795424a396389fe1a9af93b2691db352cb",
+    "cafe-staff.glb": "5f0c60fa474f523128d6d4b2d048fa78a18a1b05d973d8c508c5baf4350b42a0"
+  }
+}

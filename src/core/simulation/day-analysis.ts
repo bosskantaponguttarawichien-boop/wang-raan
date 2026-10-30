@@ -8,7 +8,7 @@
  */
 import type { StoreLayout } from "../layout/types";
 import { planArrivals, type ArrivalPlan, type DayPlanInput } from "./day-plan";
-import { Simulation, prepareStore, type PreparedStore, type SimulationMetrics } from "./engine";
+import { Simulation, prepareStore, type BreakWindow, type PartyWeights, type PreparedStore, type SimulationMetrics } from "./engine";
 
 /** ลูกค้ารออาหารเกินเวลาที่ยอมได้ไม่เกินสัดส่วนนี้ = "กำลังดี" */
 export const GOOD_TOO_LONG_RATE = 0.1;
@@ -20,24 +20,38 @@ export const MAX_STAFF_SEARCH = 8;
 export const COOK_MINUTES_RANGE: [number, number] = [0.5, 60];
 export const COOK_MINUTES_STEP = 0.5;
 /** seed คงที่ — ผลวิเคราะห์ซ้ำได้ และเฉลี่ยหลายชุดลดการแกว่ง */
-export const ANALYSIS_SEEDS: readonly number[] = [11, 23];
+export const ANALYSIS_SEEDS: readonly number[] = [11, 23, 37, 53, 71, 89];
 /** หลังปิดร้านให้ลูกค้าที่ค้างอยู่ทานจนเสร็จได้ไม่เกินเท่านี้ */
 const DRAIN_SECONDS = 4 * 3600;
 
 export interface DayInput extends DayPlanInput {
   frontStaff: number;
+  cashiers?: number;
   cooks: number;
   cookMinutesPerDish: number;
   dineMinutes: [number, number];
   patienceMinutes: number;
+  tablePatienceMinutes?: number;
+  partyWeights?: PartyWeights;
+  varyPatience?: boolean;
+  queueBalkAt?: number;
+  varyMenuTimes?: boolean;
+  varyStaffSpeed?: boolean;
+  teamBreak?: BreakWindow;
+  staggerBreak?: boolean;
+  extraDishPercent?: number;
 }
 
 export interface DayOutcome {
   arrived: number;
   fed: number;
   noSeat: number;
+  balked: number;
+  noSuitableTable: number;
+  tableWaitTimeout: number;
   /** ออกจากร้านเพราะรออาหารนานเกินกำหนด */
   abandoned: number;
+  wastedDishes: number;
   /** คนที่ยังอยู่ในระบบเมื่อครบเวลาระบายคิวหลังร้านปิด */
   unfinished: number;
   /** จำนวนคนสูงสุดที่ยืนรอโต๊ะสะอาดหน้าร้าน */
@@ -50,6 +64,8 @@ export interface DayOutcome {
   avgVisitMinutes: number;
   frontStaffBusy: number;
   kitchenBusy: number;
+  /** ช่วงต่ำสุด–สูงสุดของวันจำลอง ไม่ใช่ช่วงความเชื่อมั่น */
+  ranges: { arrived: [number, number]; noSeat: [number, number]; avgFoodWaitMinutes: [number, number] | null };
 }
 
 export interface StaffOption {
@@ -66,6 +82,7 @@ export interface DayAnalysis {
   current: DayOutcome;
   currentGood: boolean;
   staffing: {
+    cashiers: number;
     /** null = ถึง MAX_STAFF_SEARCH แล้วยังไม่ผ่านเกณฑ์ */
     recommended: { frontStaff: number; cooks: number } | null;
     /** เทียบพ่อครัว −1 / แนะนำ / +1 (พนักงานหน้าร้านตามที่แนะนำ) */
@@ -99,17 +116,28 @@ function runOnce(store: PreparedStore, input: DayInput, plan: ArrivalPlan, seed:
     serviceStyle: "table-service",
     customersPerHour: plan.customersPerHour,
     peak: plan.peak,
+    peaks: plan.peaks,
     closeSeconds: plan.closeSeconds,
     frontStaff: input.frontStaff,
+    cashiers: input.cashiers,
     cooks: input.cooks,
     cookMinutesPerDish: input.cookMinutesPerDish,
     dineMinutes: input.dineMinutes,
     patienceMinutes: input.patienceMinutes,
+    tablePatienceMinutes: input.tablePatienceMinutes,
+    partyWeights: input.partyWeights,
+    varyPatience: input.varyPatience,
+    queueBalkAt: input.queueBalkAt,
+    varyMenuTimes: input.varyMenuTimes,
+    varyStaffSpeed: input.varyStaffSpeed,
+    teamBreak: input.teamBreak,
+    staggerBreak: input.staggerBreak,
+    extraDishPercent: input.extraDishPercent,
     seed,
   });
   const limit = plan.closeSeconds + DRAIN_SECONDS;
   while (sim.getMetrics().time < plan.closeSeconds) sim.step(60);
-  while (sim.getMetrics().inStore > 0 && sim.getMetrics().time < limit) sim.step(60);
+  while ((sim.getMetrics().inStore > 0 || sim.hasCancelledCooking()) && sim.getMetrics().time < limit) sim.step(60);
   return { metrics: sim.getMetrics(), seats: sim.seatCount };
 }
 
@@ -119,6 +147,8 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
   const plan = planArrivals(input);
   const runs = ANALYSIS_SEEDS.map((seed) => runOnce(prepared, input, plan, seed));
   const mean = (pick: (m: SimulationMetrics) => number) => runs.reduce((sum, r) => sum + pick(r.metrics), 0) / runs.length;
+  const range = (values: number[]): [number, number] => [Math.min(...values), Math.max(...values)];
+  const foodWaits = runs.filter((r) => r.metrics.fed > 0).map((r) => r.metrics.avgFoodWaitMinutes);
   const rate = (pick: (m: SimulationMetrics) => [number, number]) =>
     runs.reduce((sum, r) => {
       const [part, whole] = pick(r.metrics);
@@ -130,7 +160,11 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
       arrived: mean((m) => m.arrived),
       fed: mean((m) => m.fed),
       noSeat: mean((m) => m.noSeat),
+      balked: mean((m) => m.balked),
+      noSuitableTable: mean((m) => m.noSuitableTable),
+      tableWaitTimeout: mean((m) => m.tableWaitTimeout),
       abandoned: mean((m) => m.abandoned),
+      wastedDishes: mean((m) => m.wastedDishes),
       unfinished: mean((m) => m.inStore),
       maxEntranceQueue: mean((m) => m.maxEntranceQueue),
       avgFoodWaitMinutes: mean((m) => m.avgFoodWaitMinutes),
@@ -140,6 +174,11 @@ export function simulateDay(store: StoreLayout | PreparedStore, input: DayInput)
       avgVisitMinutes: mean((m) => m.avgVisitMinutes),
       frontStaffBusy: mean((m) => m.frontStaffBusy),
       kitchenBusy: mean((m) => m.kitchenBusy),
+      ranges: {
+        arrived: range(runs.map((r) => r.metrics.arrived)),
+        noSeat: range(runs.map((r) => r.metrics.noSeat)),
+        avgFoodWaitMinutes: foodWaits.length ? range(foodWaits) : null,
+      },
     },
   };
 }
@@ -174,11 +213,12 @@ export function analyzeDay(layout: StoreLayout, input: DayInput): DayAnalysis {
 
   // 1. หาพ่อครัวก่อน (ให้พนักงานหน้าร้านเต็มที่ ครัวจะได้เป็นตัวแปรเดียว) แล้วหาพนักงานหน้าร้านด้วยพ่อครัวจำนวนนั้น
   const cooks = firstGood((n) => isGood(outcomeOf(MAX_STAFF_SEARCH, n)));
-  const front = cooks === null ? null : firstGood((n) => isGood(outcomeOf(n, cooks)));
+  const minimumFront = (input.cashiers ?? 0) + 1;
+  const front = cooks === null ? null : firstGood((n) => n >= minimumFront && isGood(outcomeOf(n, cooks)));
   const recommended = cooks !== null && front !== null ? { frontStaff: front, cooks } : null;
   const around = (n: number) => [n - 1, n, n + 1].filter((k) => k >= 1 && k <= MAX_STAFF_SEARCH);
   const cookOptions = recommended ? around(recommended.cooks).map((n) => option(recommended.frontStaff, n)) : [];
-  const frontOptions = recommended ? around(recommended.frontStaff).map((n) => option(n, recommended.cooks)) : [];
+  const frontOptions = recommended ? around(recommended.frontStaff).filter((n) => n >= minimumFront).map((n) => option(n, recommended.cooks)) : [];
 
   // 2. เวลาต่อจานที่ช้าที่สุดที่ยังผ่าน (ถือว่ายิ่งช้ายิ่งรอนาน) — binary search บนตารางทีละ COOK_MINUTES_STEP
   const [low, high] = COOK_MINUTES_RANGE;
@@ -210,7 +250,7 @@ export function analyzeDay(layout: StoreLayout, input: DayInput): DayAnalysis {
     seats,
     current,
     currentGood: isGood(current),
-    staffing: { recommended, cookOptions, frontOptions },
+    staffing: { recommended, cashiers: input.cashiers ?? 0, cookOptions, frontOptions },
     cookTime: { maxMinutesPerDish, currentMinutesPerDish: input.cookMinutesPerDish },
     seating: {
       basedOn,

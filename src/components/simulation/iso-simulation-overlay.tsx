@@ -10,6 +10,8 @@
  */
 import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
+import type { CustomerThought, PresentationSnapshot, StaffThought, TableSurface } from "@/core/simulation/presentation-contract";
+import { CLOUD_PATH, getEmoteConfig } from "./character-thought-bubble";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
 import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
@@ -73,6 +75,55 @@ export function seatedFacing(layout: StoreLayout, mx: number, my: number, previo
   return facingFrom(f.x, f.y, previous);
 }
 
+/** สีจาน/คราบบนโต๊ะใน fallback 2D — โทนเดียวกับ design-system (น้ำเงิน/ส้มอุ่น) */
+const DISH_FILL = "#f4f6fb";
+const DISH_EDGE = "#8f9bb3";
+const STAIN_FILL = "#b58150";
+
+/** สถานะโต๊ะที่ fallback 2D ต้องวาดให้เห็นวงจรบริการครบ โดยไม่ต้องมี WebGL */
+export interface IsoTableBadge {
+  tableId: string;
+  /** จุดกลางโต๊ะในพิกัดผัง (เมตร) */
+  mx: number;
+  my: number;
+  dishCount: number;
+  surface: TableSurface;
+  /** 0–1 ความเข้มคราบที่ยังเหลือหลังหักความคืบหน้าการเช็ด */
+  stain: number;
+  wiping: boolean;
+}
+
+/**
+ * แปลง snapshot เป็นสิ่งที่ fallback 2D ต้องวาด: จำนวนจานบนโต๊ะ สถานะผิวโต๊ะ และคราบที่เหลือ
+ * ใช้เฉพาะข้อมูลที่ producer ส่งมา ไม่เดาสถานะเอง และผังที่ไม่มีโต๊ะนั้นถูกข้าม
+ */
+export function tableBadges(
+  presentation: PresentationSnapshot | undefined,
+  layout: StoreLayout,
+): IsoTableBadge[] {
+  if (!presentation) return [];
+  const centers = new Map<string, { x: number; y: number }>();
+  for (const object of layout.objects) {
+    if (object.type !== "table") continue;
+    const rect = footprint(object);
+    centers.set(object.id, { x: rect.x + rect.width / 2, y: rect.y + rect.depth / 2 });
+  }
+  const badges: IsoTableBadge[] = [];
+  for (const table of presentation.tables) {
+    const center = centers.get(table.tableId);
+    if (!center) continue;
+    // คราบยังเหลือจนงานเช็ดเสร็จจริง — wipeProgress ลดความเข้มได้แต่ไม่ลบทิ้ง
+    const stain = Math.max(0, Math.min(1, table.stainAmount)) * (1 - Math.max(0, Math.min(1, table.wipeProgress)));
+    badges.push({
+      tableId: table.tableId, mx: center.x, my: center.y,
+      dishCount: table.mealIds.length, surface: table.surface,
+      stain: Number(stain.toFixed(4)),
+      wiping: table.surface === "wiping",
+    });
+  }
+  return badges;
+}
+
 /** สถานะต่อคนที่ต้องจำข้ามเฟรม: ตำแหน่งล่าสุด ทิศที่หัน และจังหวะก้าว */
 interface Walker {
   look: PersonLook;
@@ -87,6 +138,78 @@ interface Walker {
  * Canvas ทับฉาก 3D — ต้องอยู่ในกล่องเดียวกับ SVG (ขนาดเท่ากัน)
  * มุมมองหมุน: `layout` คือผังที่หมุนแล้ว (ตรงกับฉาก) และ `planSize` คือขนาดผังจริงที่ใช้แปลงพิกัดลูกค้า
  */
+
+export function drawThoughtBubble(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  thought: CustomerThought | StaffThought,
+  size: number,
+) {
+  const config = getEmoteConfig(thought);
+  const bubbleY = cy - 32 * size;
+
+  ctx.save();
+  const fillColor =
+    config.severity === "critical"
+      ? "#fff1f2"
+      : config.severity === "warning"
+      ? "#fffbeb"
+      : "#ffffff";
+
+  const strokeColor =
+    config.severity === "critical"
+      ? "#f43f5e"
+      : config.severity === "warning"
+      ? "#f59e0b"
+      : "#64748b";
+
+  const scaleFactor = 0.38 * size;
+  ctx.save();
+  ctx.translate(cx - 36 * size, bubbleY - 24 * size);
+  ctx.scale(scaleFactor, scaleFactor);
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (typeof Path2D !== "undefined") {
+    const cloud = new Path2D(CLOUD_PATH);
+    ctx.fill(cloud);
+    ctx.stroke(cloud);
+  } else {
+    ctx.beginPath();
+    ctx.arc(50, 30, 24, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Tail circles
+  ctx.beginPath();
+  ctx.arc(66, 66, 4.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(75, 77, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Emoji and badge text
+  ctx.font = `${Math.round(11 * size)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+
+  const text = config.badgeText ? `${config.emoji} ${config.badgeText}` : config.emoji;
+  ctx.fillStyle = config.severity === "critical" ? "#881337" : config.severity === "warning" ? "#78350f" : "#475569";
+  ctx.fillText(text, cx - 16 * size, bubbleY - 13 * size);
+  ctx.restore();
+}
+
 export function IsoSimulationOverlay({
   scene,
   layout,
@@ -101,6 +224,11 @@ export function IsoSimulationOverlay({
   const canvasRef = React.useRef<HTMLCanvasElement>(null);
   const status = useSimulationStore((s) => s.status);
   const active = status === "running" || status === "paused";
+  const showThoughts = useSimulationStore((s) => s.showThoughts);
+  const showThoughtsRef = React.useRef(showThoughts);
+  React.useLayoutEffect(() => {
+    showThoughtsRef.current = showThoughts;
+  });
   // อ่านผังผ่าน ref — ไม่ใส่ใน deps ของ effect ข้างล่าง (ผังล็อกระหว่างจำลองอยู่แล้ว และไม่อยากเริ่ม loop/สถานะท่าเดินใหม่)
   const layoutRef = React.useRef(layout);
   const viewRef = React.useRef({ rotation: viewRotation, plan: planSize ?? layout });
@@ -162,6 +290,39 @@ export function IsoSimulationOverlay({
         const p = rotation ? pointToView({ x, y }, plan, rotation) : { x, y };
         withIds.push([-(i + 1), p.x, p.y, state]);
       });
+      // วงจรบริการใน fallback 2D: จาน → คราบ → เช็ด วาดก่อนคน เพื่อให้คนที่นั่งทับจานได้
+      for (const badge of tableBadges(current.presentation, layoutRef.current)) {
+        const p = rotation ? pointToView({ x: badge.mx, y: badge.my }, plan, rotation) : { x: badge.mx, y: badge.my };
+        const [cx, cy] = projectPoint(p.x, p.y, 0, scene.scale);
+        if (badge.stain > 0.01) {
+          ctx.globalAlpha = 0.18 + 0.5 * badge.stain;
+          ctx.fillStyle = STAIN_FILL;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy - 1.5 * size, 7 * size, 3.6 * size, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        for (let index = 0; index < Math.min(badge.dishCount, 4); index += 1) {
+          const angle = (index / Math.max(1, Math.min(badge.dishCount, 4))) * Math.PI * 2;
+          const dx = Math.cos(angle) * 5.5 * size;
+          const dy = Math.sin(angle) * 2.9 * size;
+          ctx.beginPath();
+          ctx.ellipse(cx + dx, cy - 2.4 * size + dy, 3.1 * size, 1.6 * size, 0, 0, Math.PI * 2);
+          ctx.fillStyle = DISH_FILL;
+          ctx.fill();
+          ctx.lineWidth = 0.5 * size;
+          ctx.strokeStyle = DISH_EDGE;
+          ctx.stroke();
+        }
+        if (badge.wiping) {
+          ctx.lineWidth = 1.4 * size;
+          ctx.strokeStyle = STAFF_COLOR;
+          ctx.beginPath();
+          ctx.moveTo(cx - 6 * size, cy - 2 * size);
+          ctx.lineTo(cx + 6 * size, cy - 2 * size);
+          ctx.stroke();
+        }
+      }
       const door = doorFrame(layoutRef.current);
       const doorView = door ? (rotation ? pointToView(door.center, plan, rotation) : door.center) : null;
       const seen = new Set<number>();
@@ -201,6 +362,14 @@ export function IsoSimulationOverlay({
           ring: isStaff ? STAFF_COLOR : (AGENT_COLORS[sprite.state] ?? AGENT_COLORS[0]),
           size,
         });
+        if (showThoughtsRef.current && current.presentation) {
+          const thought = isStaff
+            ? current.presentation.staff[-(sprite.id + 1)]?.thought
+            : current.presentation.customers.find((c) => c.renderAgentId === sprite.id)?.thought;
+          if (thought) {
+            drawThoughtBubble(ctx, sprite.x, sprite.y, thought, size);
+          }
+        }
       }
       for (const id of walkers.keys()) if (!seen.has(id)) walkers.delete(id);
     };
@@ -247,7 +416,6 @@ export function IsoHeatmapLayer({
   const status = useSimulationStore((s) => s.status);
   const showHeatmap = useSimulationStore((s) => s.showHeatmap);
   const active = status === "running" || status === "paused";
-
   React.useEffect(() => {
     const image = imageRef.current;
     if (!image) return;

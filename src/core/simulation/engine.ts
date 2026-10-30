@@ -19,7 +19,10 @@ import { footprint, objectCenter } from "../layout/geometry";
 import type { Chair, Point, Rect, StoreLayout, Table } from "../layout/types";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
-import { STAFF_STRIDE, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { STAFF_STRIDE, STAFF_VISUAL_WALK_SPEED, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { buildPresentationSnapshot, foodKindFor, renderMemberId, taskMilestones, type PartyView, type TaskView } from "./presentation-snapshot";
+import type { FoodKind } from "./presentation-contract";
+import type { PresentationSnapshot } from "./presentation-contract";
 
 export type ServiceStyle = "table-service" | "counter-order";
 
@@ -54,11 +57,15 @@ export const AGENT_STATE_CODE: Record<AgentState, number> = {
 export const AGENT_STRIDE = 4;
 
 /** ความเร็วเดินของพนักงาน (ม./วินาที) */
-export const STAFF_WALK_SPEED = 1.2;
+export const STAFF_WALK_SPEED = STAFF_VISUAL_WALK_SPEED;
 /** เวลาทำแต่ละจานแกว่งรอบค่าที่ตั้ง ±20% */
 export const COOK_TIME_SPREAD = 0.2;
-/** ค่าเฉลี่ยของกลุ่มที่สุ่ม 1–4 คน = 2.5 คน ใช้แปลงคน/ชม. เป็นกลุ่ม/ชม. */
-const MEAN_PARTY_SIZE = 2.5;
+/** น้ำหนักกลุ่ม 1–4 คน (ไม่จำเป็นต้องรวมเป็น 100) */
+export type PartyWeights = [number, number, number, number];
+/** สัดส่วนเวลาปรุงเทียบกับค่าจานมาตรฐานที่ผู้ใช้กำหนด */
+export const MENU_COOK_FACTORS: Readonly<Record<FoodKind, number>> = {
+  "fried-rice": 1, noodles: 1, steak: 1.5, salad: 0.8, cake: 0.5,
+};
 
 export interface PeakWindow {
   /** วินาทีนับจากเริ่มจำลอง (= เปิดร้าน) */
@@ -67,12 +74,15 @@ export interface PeakWindow {
   customersPerHour: number;
 }
 
+export interface BreakWindow { startSeconds: number; endSeconds: number }
+
 export interface SimulationConfig {
   serviceStyle: ServiceStyle;
   /** ลูกค้าต่อชั่วโมงช่วงปกติ */
   customersPerHour: number;
   /** ช่วงคนเยอะ; null = อัตราเดียวทั้งวัน */
   peak: PeakWindow | null;
+  peaks?: PeakWindow[];
   /** วินาทีที่ปิดร้าน (ไม่มีลูกค้าใหม่หลังจากนี้); null = ไม่ปิด */
   closeSeconds: number | null;
   seed: number;
@@ -86,6 +96,8 @@ export interface SimulationConfig {
   servingSlotsPerCounter: number;
   /** table-service: พนักงานหน้าร้าน (รับออร์เดอร์ เสิร์ฟ รับเงิน) */
   frontStaff: number;
+  /** พนักงานประจำรับเงินจากจำนวนพนักงานหน้าร้าน */
+  cashiers?: number;
   /** table-service: พ่อครัว — 1 คนทำทีละ 1 จาน */
   cooks: number;
   /** table-service: พ่อครัว 1 คนทำ 1 จานใช้กี่นาที */
@@ -98,6 +110,18 @@ export interface SimulationConfig {
   cleanTableSeconds: [number, number];
   /** ลูกค้ารอได้ไม่เกินกี่นาที (นับตั้งแต่นั่งลงจนได้อาหาร) */
   patienceMinutes: number;
+  /** เวลารอโต๊ะ; ไม่ระบุใช้ค่า patienceMinutes เดิม */
+  tablePatienceMinutes?: number;
+  partyWeights?: PartyWeights;
+  varyPatience?: boolean;
+  /** จำนวนคนรอหน้าร้านที่ทำให้บางกลุ่มตัดสินใจกลับ; 0 = ไม่ใช้ */
+  queueBalkAt?: number;
+  varyMenuTimes?: boolean;
+  varyStaffSpeed?: boolean;
+  teamBreak?: BreakWindow;
+  staggerBreak?: boolean;
+  /** โอกาสที่ลูกค้าแต่ละคนจะสั่งเพิ่มหนึ่งจาน */
+  extraDishPercent?: number;
 }
 
 /**
@@ -131,6 +155,12 @@ export interface SimulationMetrics {
   served: number;
   /** มาแล้วไม่มีที่นั่ง */
   noSeat: number;
+  /** ส่วนหนึ่งของ noSeat: กลุ่มที่กลับทันทีเมื่อเห็นคิว */
+  balked: number;
+  /** ส่วนหนึ่งของ noSeat: ไม่มีโต๊ะที่รองรับจำนวนคนในกลุ่ม */
+  noSuitableTable: number;
+  /** ส่วนหนึ่งของ noSeat: รอโต๊ะจนหมดความอดทน */
+  tableWaitTimeout: number;
   inStore: number;
   queuing: number;
   seated: number;
@@ -156,6 +186,8 @@ export interface SimulationMetrics {
   avgEntranceWaitMinutes: number;
   /** table-service: ออกจากร้านเพราะรออาหารนานเกินกำหนด */
   abandoned: number;
+  /** จานที่ปรุงแล้วแต่ถูกยกเลิกก่อนเสิร์ฟ */
+  wastedDishes: number;
 }
 
 /** metrics เริ่มต้น (ค่า 0 ทั้งหมด) */
@@ -165,6 +197,9 @@ export function emptyMetrics(): SimulationMetrics {
     arrived: 0,
     served: 0,
     noSeat: 0,
+    balked: 0,
+    noSuitableTable: 0,
+    tableWaitTimeout: 0,
     inStore: 0,
     queuing: 0,
     seated: 0,
@@ -181,10 +216,12 @@ export function emptyMetrics(): SimulationMetrics {
     maxEntranceQueue: 0,
     avgEntranceWaitMinutes: 0,
     abandoned: 0,
+    wastedDishes: 0,
   };
 }
 
 interface StaffTask {
+  id: string;
   kind: StaffTaskKind;
   agent: Agent | null;
   tableId: string | null;
@@ -192,6 +229,8 @@ interface StaffTask {
 }
 
 interface Worker {
+  startedAt: number;
+  total: number;
   /** วินาทีที่เหลือของงานปัจจุบัน; 0 = ว่าง */
   remaining: number;
   task: StaffTask | null;
@@ -203,6 +242,10 @@ interface Worker {
 const WALKING_STATES: ReadonlySet<AgentState> = new Set(["to-counter", "to-seat", "leaving"]);
 
 interface Agent {
+  renderChairIds: readonly string[];
+  serviceCycleId: string | null;
+  fedAt: number | null;
+  placedAt: number | null;
   id: number;
   state: AgentState;
   x: number;
@@ -216,6 +259,10 @@ interface Agent {
   tableId: string | null;
   /** 1 จุดใน simulation = 1 กลุ่มลูกค้า; ใช้กับความจุโต๊ะและ metrics */
   partySize: number;
+  dishCounts: number[];
+  preparedDishes: number;
+  tablePatienceSeconds: number;
+  foodPatienceSeconds: number;
   entranceQueuedAt: number | null;
   enteredAt: number;
   seatedAt: number;
@@ -233,6 +280,8 @@ interface RuntimeTable {
   id: string;
   chairIds: readonly string[];
   status: TableStatus;
+  cycle: number;
+  cleanCompletedAt: number | null;
 }
 
 function mulberry32(seed: number) {
@@ -244,6 +293,23 @@ function mulberry32(seed: number) {
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** สุ่มแยกจากลำดับลูกค้า/ออร์เดอร์ เพื่อให้เทียบสถานการณ์ด้วย seed เดิมได้ */
+export function patienceFactor(seed: number, partyId: number): number {
+  const random = mulberry32((seed ^ Math.imul(partyId, 0x9e3779b1)) >>> 0);
+  return 0.8 + random() * 0.4;
+}
+
+/** ตัวคูณเวลางาน 0.8–1.2; คนเดียวใช้เวลามาตรฐาน */
+export function staffTimeFactor(index: number, count: number): number {
+  return count <= 1 ? 1 : 0.8 + 0.4 * index / (count - 1);
+}
+
+/** การเลือกจานเพิ่มแยกจากลำดับสุ่มลูกค้า เพื่อเปรียบเทียบสถานการณ์ได้ */
+export function extraDishFor(seed: number, partyId: number, member: number, percent: number): boolean {
+  const keyed = (seed ^ Math.imul(partyId, 0x9e3779b1) ^ Math.imul(member + 1, 0x85ebca6b) ^ 0x2c1b3c6d) >>> 0;
+  return mulberry32(keyed)() * 100 < Math.max(0, Math.min(100, percent));
 }
 
 /** ช่องว่างที่ "ติด" วัตถุ (ศูนย์กลางช่องห่างจากวัตถุไม่เกิน 1 ช่อง) — จุดยืนใช้งานวัตถุนั้น */
@@ -343,6 +409,8 @@ export class Simulation {
   private readonly config: SimulationConfig;
   /** สุ่มลูกค้า (การมาถึงและลักษณะเฉพาะคน) */
   private readonly random: () => number;
+  /** เวลาเก็บโต๊ะแยกจากการมาถึง เพื่อให้เปรียบเทียบพนักงานด้วยลูกค้าชุดเดียวกัน */
+  private readonly serviceRandom: () => number;
   /** สุ่มอื่น ๆ ที่ขึ้นกับสถานะร้าน (เลือกเก้าอี้) */
   private readonly seatRandom: () => number;
   private readonly counterField: FlowField;
@@ -363,9 +431,13 @@ export class Simulation {
   private readonly cooks: Worker[];
   private readonly staffTasks: StaffTask[] = [];
   private readonly queuedCleanTables = new Set<string>();
-  private readonly kitchenOrders: Agent[] = [];
+  private readonly kitchenOrders: { agent: Agent; member: number; dishIndex: number }[] = [];
   private agents: Agent[] = [];
   private nextId = 1;
+  private nextTaskId = 1;
+  private readonly departed = new Map<string, PartyView>();
+  private readonly presentationTasks = new Map<string, { task: StaffTask; startedAt: number; total: number; plan: StaffPlan | null; cycleId: string | null }>();
+  private readonly memberPathPoints = new Map<number, { x: number; y: number; seated: boolean; chairId: string | null }>();
   private nextArrival: number;
   /** จุดที่ลูกค้าเดินผ่านตั้งแต่ drainPaths() ครั้งก่อน (x, y ต่อจุด) — null = ไม่เก็บ */
   private paths: Map<number, number[]> | null = null;
@@ -383,6 +455,7 @@ export class Simulation {
   constructor(store: StoreLayout | PreparedStore, config: Partial<SimulationConfig> = {}) {
     this.config = { ...DEFAULT_SIMULATION_CONFIG, ...config };
     this.random = mulberry32(this.config.seed);
+    this.serviceRandom = mulberry32(this.config.seed ^ 0x3c6ef372);
     this.seatRandom = mulberry32(this.config.seed ^ 0x5bd1e995);
     const prepared = "grid" in store ? store : prepareStore(store);
     this.grid = prepared.grid;
@@ -395,19 +468,19 @@ export class Simulation {
     for (const chair of this.chairs) this.chairById.set(chair.id, chair);
     for (const table of prepared.tables) {
       const chairIds = table.chairIds.filter((id) => this.chairById.has(id));
-      if (chairIds.length > 0) this.tableById.set(table.id, { id: table.id, chairIds, status: "clean" });
+      if (chairIds.length > 0) this.tableById.set(table.id, { id: table.id, chairIds, status: "clean", cycle: 0, cleanCompletedAt: null });
     }
     this.seatFields = prepared.seatFields;
     this.takeOrderWalk = prepared.takeOrderWalk;
     this.deliverWalk = prepared.deliverWalk;
     this.servingSlots = Math.max(1, prepared.counterCount * this.config.servingSlotsPerCounter);
 
-    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null }));
+    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null, startedAt: 0, total: 0 }));
     this.frontStaff = team(this.config.frontStaff);
     this.cooks = team(this.config.cooks);
 
     this.maxPartyRate =
-      Math.max(this.config.customersPerHour, this.config.peak?.customersPerHour ?? 0) / (this.tableService ? MEAN_PARTY_SIZE : 1);
+      Math.max(this.config.customersPerHour, ...(this.config.peaks ?? (this.config.peak ? [this.config.peak] : [])).map((peak) => peak.customersPerHour)) / (this.tableService ? this.meanPartySize() : 1);
     this.nextArrival = this.sampleArrivalGap();
   }
 
@@ -425,14 +498,21 @@ export class Simulation {
 
   /** ลูกค้าต่อชั่วโมง ณ เวลา t */
   rateAt(t: number): number {
-    const { peak, closeSeconds } = this.config;
+    const { peak, peaks, closeSeconds } = this.config;
     if (closeSeconds !== null && t >= closeSeconds) return 0;
-    if (peak && t >= peak.startSeconds && t < peak.endSeconds) return peak.customersPerHour;
+    const active = (peaks ?? (peak ? [peak] : [])).find((interval) => t >= interval.startSeconds && t < interval.endSeconds);
+    if (active) return active.customersPerHour;
     return this.config.customersPerHour;
   }
 
   private partyRateAt(t: number) {
-    return this.tableService ? this.rateAt(t) / MEAN_PARTY_SIZE : this.rateAt(t);
+    return this.tableService ? this.rateAt(t) / this.meanPartySize() : this.rateAt(t);
+  }
+
+  private meanPartySize() {
+    const weights = this.config.partyWeights ?? [1, 1, 1, 1];
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    return total > 0 ? weights.reduce((sum, weight, index) => sum + weight * (index + 1), 0) / total : 2.5;
   }
 
   /** ช่วงห่างการมาถึงที่อัตราสูงสุด (thinning ด้วย rateAt ตอนมาถึงจริง) */
@@ -460,7 +540,9 @@ export class Simulation {
     const cell = entrances[Math.floor(this.random() * entrances.length)]!;
     const p = this.cellCenter(cell);
     const spread = 1 + (this.random() * 2 - 1) * COOK_TIME_SPREAD;
+    const factor = this.config.varyPatience ? patienceFactor(this.config.seed, this.nextId) : 1;
     const agent: Agent = {
+      renderChairIds: [], serviceCycleId: null, fedAt: null, placedAt: null,
       id: this.nextId++,
       state: "to-counter",
       x: p.x,
@@ -472,6 +554,10 @@ export class Simulation {
       chairId: null,
       tableId: null,
       partySize: this.partySize(),
+      dishCounts: [],
+      preparedDishes: 0,
+      tablePatienceSeconds: (this.config.tablePatienceMinutes ?? this.config.patienceMinutes) * 60 * factor,
+      foodPatienceSeconds: this.config.patienceMinutes * 60 * factor,
       entranceQueuedAt: null,
       enteredAt: this.metrics.time,
       seatedAt: 0,
@@ -485,24 +571,44 @@ export class Simulation {
         cookFactor: spread,
       },
     };
+    agent.dishCounts = Array.from({ length: agent.partySize }, (_, member) =>
+      1 + Number(extraDishFor(this.config.seed, agent.id, member, this.config.extraDishPercent ?? 0)));
     this.agents.push(agent);
     this.markPath(agent);
     this.metrics.arrived += agent.partySize;
     // ถ้าไม่มีโต๊ะขนาดรองรับกลุ่มเลย ให้กลับทันที; ถ้ามีแต่ยังไม่สะอาดให้รอหน้าเข้า
     if (this.tableService && !this.goToChair(agent)) {
       if (!this.hasTableForParty(agent.partySize)) {
+        this.metrics.noSuitableTable += agent.partySize;
         this.abandon(agent, true);
       } else {
-        agent.field = null;
-        agent.state = "waiting-entrance";
-        agent.entranceQueuedAt = this.metrics.time;
+        const queuePeople = this.agents.reduce((sum, other) => sum + (other.state === "waiting-entrance" ? other.partySize : 0), 0);
+        const limit = this.config.queueBalkAt ?? 0;
+        const balk = limit > 0 && queuePeople >= limit && mulberry32((this.config.seed ^ Math.imul(agent.id, 0x9e3779b1) ^ 0x7f4a7c15) >>> 0)() < 0.5;
+        if (balk) {
+          this.metrics.balked += agent.partySize;
+          this.abandon(agent, true);
+        } else {
+          agent.field = null;
+          agent.state = "waiting-entrance";
+          agent.entranceQueuedAt = this.metrics.time;
+        }
       }
     }
   }
 
   /** สุ่มจำนวนคนในกลุ่ม 1–4 คน (Agent หนึ่งตัวแทนหนึ่งกลุ่ม) */
   private partySize() {
-    return this.tableService ? 1 + Math.floor(this.random() * 4) : 1;
+    if (!this.tableService) return 1;
+    const weights = this.config.partyWeights ?? [1, 1, 1, 1];
+    const total = weights.reduce((sum, weight) => sum + weight, 0);
+    if (total <= 0) return 1 + Math.floor(this.random() * 4);
+    let draw = this.random() * total;
+    for (let i = 0; i < weights.length; i++) {
+      draw -= weights[i]!;
+      if (draw < 0) return i + 1;
+    }
+    return 4;
   }
 
   /** จองโต๊ะสะอาดที่รองรับทั้งกลุ่ม แล้วให้ leader เดินไปยังเก้าอี้ตัวแรก */
@@ -512,6 +618,8 @@ export class Simulation {
       if (!chair) return false;
       this.occupiedChairs.add(chair.id);
       agent.chairId = chair.id;
+      agent.renderChairIds = [chair.id];
+      agent.serviceCycleId = `counter:${chair.tableId}`;
       agent.field = this.seatFields.get(chair.id)!;
       agent.state = "to-seat";
       return true;
@@ -520,8 +628,13 @@ export class Simulation {
     if (!table) return false;
     const chair = this.chairById.get(table.chairIds[0]!)!;
     table.status = "occupied";
+    table.cycle++;
+    table.cleanCompletedAt = null;
+    this.departed.delete(table.id);
     for (const chairId of table.chairIds) this.occupiedChairs.add(chairId);
     agent.tableId = table.id;
+    agent.renderChairIds = table.chairIds.slice(0, agent.partySize);
+    agent.serviceCycleId = `${table.id}:${table.cycle}`;
     agent.chairId = chair.id;
     agent.field = this.seatFields.get(chair.id)!;
     agent.state = "to-seat";
@@ -563,7 +676,10 @@ export class Simulation {
 
   private pickTable(partySize: number): RuntimeTable | null {
     const free = [...this.tableById.values()].filter((table) => table.status === "clean" && table.chairIds.length >= partySize);
-    return free.length === 0 ? null : free[Math.floor(this.seatRandom() * free.length)]!;
+    if (free.length === 0) return null;
+    const smallest = Math.min(...free.map((table) => table.chairIds.length));
+    const suitable = free.filter((table) => table.chairIds.length === smallest);
+    return suitable[Math.floor(this.seatRandom() * suitable.length)]!;
   }
 
   private pickChair(): Chair | null {
@@ -578,7 +694,7 @@ export class Simulation {
     agent.x = center.x;
     agent.y = center.y;
     agent.jitter = { x: 0, y: 0 };
-    this.markPath(agent);
+    this.markPath(agent, true);
   }
 
   /** ลุกจากเก้าอี้ ออกมายืนที่ช่องว่างข้างเก้าอี้ */
@@ -588,13 +704,18 @@ export class Simulation {
     const chair = this.chairById.get(agent.chairId!)!;
     const standCell = touchingCells(this.grid, footprint(chair)).find((c) => field.distance[c] === 0);
     if (standCell !== undefined) Object.assign(agent, this.cellCenter(standCell));
-    this.markPath(agent);
+    this.markPath(agent, false);
   }
 
   /** เริ่มเก็บทางเดินของลูกค้า ให้ภาพเดินตามทางจริงได้ (ไม่ตัดผ่านโต๊ะ) แม้ tick ห่างกันหลายเมตร */
   trackPaths() {
     this.paths ??= new Map();
     if (this.tableService) this.staffVisuals ??= new StaffVisuals(this.layout, this.frontStaff.length);
+    this.frontStaff.forEach((staff, index) => {
+      if (!staff.task || staff.plan || !this.staffVisuals) return;
+      staff.plan = this.staffVisuals.plan(index, staff.task.kind, staff.task.tableId ?? staff.task.agent?.tableId ?? null, staff.total, this.walkSeconds(staff.task));
+      for (const record of this.presentationTasks.values()) if (record.task.id === staff.task.id) record.plan = staff.plan;
+    });
   }
 
   /** ตำแหน่งพนักงานหน้าร้าน (index, x, y, STAFF_STATE_CODE) — ว่างเมื่อไม่ได้ trackPaths */
@@ -621,6 +742,13 @@ export class Simulation {
     return this.agents.length === 0 && this.frontStaff.every((staff) => !staff.task) && this.cooks.every((cook) => !cook.task);
   }
 
+  /** ให้ลูกค้ากลุ่มแรกมาถึงทันทีตอนเริ่มเล่นภาพ (ไม่ต้องรอนั่งดูร้านว่างหลายนาที โดยเวลาจำลองยังเริ่มจาก 0 และเดิน 1 วิ = 1 วิ) */
+  spawnFirstCustomer() {
+    if (this.agents.length === 0 && this.rateAt(this.metrics.time) > 0) {
+      this.spawn();
+    }
+  }
+
   /** เดินเวลาต่อได้ไม่เกิน maxSeconds ระหว่างที่ยังเงียบอยู่ — หยุดทันทีที่มีคนเริ่มเดิน คืนวินาทีที่เดินไป */
   stepWhileQuiet(maxSeconds: number): number {
     let elapsed = 0;
@@ -635,27 +763,58 @@ export class Simulation {
   /** ทางเดินตั้งแต่ครั้งก่อน: [id, จำนวนจุด, x1, y1, x2, y2, ...] ต่อกันทุกคน (รวมคนที่เพิ่งออกจากร้าน) */
   drainPaths(): Float32Array {
     const out: number[] = [];
+    if (this.paths) for (const agent of this.agents) this.markPath(agent);
     for (const [id, points] of this.paths ?? []) out.push(id, points.length / 2, ...points);
     this.paths?.clear();
     return new Float32Array(out);
   }
 
-  private markPath(agent: Agent) {
+  private memberPosition(agent: Agent, member: number, seated = AGENT_STATE_CODE[agent.state] === 4): Point {
+    const chair = this.chairById.get(agent.renderChairIds[member] ?? "");
+    if (seated && chair) return objectCenter(chair);
+    return { x: agent.x + agent.jitter.x + (member % 2 - 0.5) * 0.14, y: agent.y + agent.jitter.y + (Math.floor(member / 2) - 0.5) * 0.14 };
+  }
+
+  /** Free-cell junctions keep the branch to each assigned chair out of other furniture. */
+  private appendMemberRoute(id: number, from: Point, target: Point, chairId: string, entering: boolean) {
+    const chair = this.chairById.get(chairId)!;
+    const seatField = this.seatFields.get(chairId)!;
+    const stand = touchingCells(this.grid, footprint(chair)).find(cell => seatField.distance[cell] === 0);
+    if (stand === undefined) { this.appendPath(id, target.x, target.y); return; }
+    let cell = this.cellOf(from.x, from.y);
+    const field = entering ? seatField : computeFlowField(this.grid, [this.cellOf(target.x, target.y)]);
+    if (!entering) { cell = stand; const p = this.cellCenter(cell); this.appendPath(id, p.x, p.y); }
+    if (this.grid.cells[cell] !== CELL_FREE) cell = stand;
+    for (let guard = 0; guard < this.grid.cells.length; guard++) {
+      const p = this.cellCenter(cell); this.appendPath(id, p.x, p.y);
+      if (field.distance[cell] === 0 || field.next[cell]! < 0 || !Number.isFinite(field.distance[cell]!)) break;
+      cell = field.next[cell]!;
+    }
+    this.appendPath(id, target.x, target.y);
+  }
+
+  private markPath(agent: Agent, seated = AGENT_STATE_CODE[agent.state] === 4) {
     if (!this.paths) return;
-    const x = agent.x + agent.jitter.x;
-    const y = agent.y + agent.jitter.y;
-    let points = this.paths.get(agent.id);
-    if (!points) this.paths.set(agent.id, (points = []));
+    for (let member = 0; member < agent.partySize; member++) {
+      const id = renderMemberId(agent.id, member), target = this.memberPosition(agent, member, seated);
+      const previous = this.memberPathPoints.get(id);
+      const chairId = agent.renderChairIds[member] ?? null;
+      if (previous && previous.seated === seated && Math.hypot(previous.x - target.x, previous.y - target.y) < 1e-7) continue;
+      if (previous && previous.seated !== seated && chairId) this.appendMemberRoute(id, previous, target, chairId, seated);
+      else this.appendPath(id, target.x, target.y);
+      this.memberPathPoints.set(id, { ...target, seated, chairId });
+    }
+  }
+
+  private appendPath(id: number, x: number, y: number) {
+    let points = this.paths!.get(id);
+    if (!points) this.paths!.set(id, (points = []));
     const n = points.length;
-    // จุดที่อยู่แนวเดียวกับสองจุดก่อนหน้า แทนที่จุดท้ายแทนการต่อเพิ่ม
+    if (n >= 2 && Math.hypot(x - points[n - 2]!, y - points[n - 1]!) < 1e-7) return;
     if (n >= 4) {
       const ax = points[n - 4]!, ay = points[n - 3]!, bx = points[n - 2]!, by = points[n - 1]!;
-      const cross = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
-      const dot = (bx - ax) * (x - bx) + (by - ay) * (y - by);
-      if (Math.abs(cross) < 1e-6 && dot >= 0) {
-        points[n - 2] = x;
-        points[n - 1] = y;
-        return;
+      if (Math.abs((bx - ax) * (y - ay) - (by - ay) * (x - ax)) < 1e-6 && (bx - ax) * (x - bx) + (by - ay) * (y - by) >= 0) {
+        points[n - 2] = x; points[n - 1] = y; return;
       }
     }
     points.push(x, y);
@@ -672,7 +831,7 @@ export class Simulation {
       if (this.staffTasks[i]!.agent === agent) this.staffTasks.splice(i, 1);
     }
     for (let i = this.kitchenOrders.length - 1; i >= 0; i--) {
-      if (this.kitchenOrders[i] === agent) this.kitchenOrders.splice(i, 1);
+      if (this.kitchenOrders[i]!.agent === agent) this.kitchenOrders.splice(i, 1);
     }
   }
 
@@ -680,6 +839,8 @@ export class Simulation {
   private abandon(agent: Agent, noSeat: boolean) {
     if (agent.cancelled) return;
     agent.cancelled = true;
+    this.metrics.wastedDishes += agent.preparedDishes;
+    agent.preparedDishes = 0;
     this.cancelQueuedWork(agent);
     // ลูกค้านั่งอยู่กลาง footprint ของเก้าอี้ จึงต้องลุกไปช่องเดินก่อนหาเส้นออก
     if (agent.tableId && agent.chairId) this.standUp(agent);
@@ -719,7 +880,8 @@ export class Simulation {
     for (const agent of this.agents) {
       switch (agent.state) {
         case "waiting-entrance":
-          if (agent.entranceQueuedAt !== null && this.metrics.time - agent.entranceQueuedAt >= this.config.patienceMinutes * 60) {
+          if (agent.entranceQueuedAt !== null && this.metrics.time - agent.entranceQueuedAt >= agent.tablePatienceSeconds) {
+            this.metrics.tableWaitTimeout += agent.partySize;
             this.abandon(agent, true);
           }
           break;
@@ -730,10 +892,10 @@ export class Simulation {
           }
           break;
         case "queuing":
-        case "waiting-order":
           break;
+        case "waiting-order":
         case "waiting-food":
-          if (this.metrics.time - agent.seatedAt >= this.config.patienceMinutes * 60) this.abandon(agent, false);
+          if (this.metrics.time - agent.seatedAt >= agent.foodPatienceSeconds) this.abandon(agent, false);
           break;
         case "ordering":
           if (this.tableService) break; // จ่ายเงิน: จบเมื่อพนักงานทำงาน pay เสร็จ
@@ -751,6 +913,8 @@ export class Simulation {
               agent.state = "waiting-order";
               this.addTask("take-order", agent);
             } else {
+              agent.fedAt = this.metrics.time;
+              agent.placedAt = this.metrics.time;
               agent.timer = agent.traits.dineSeconds;
               agent.state = "seated";
             }
@@ -797,6 +961,7 @@ export class Simulation {
           this.left += agent.partySize;
           this.totalVisitSeconds += (this.metrics.time - agent.enteredAt) * agent.partySize;
         }
+        for (let member = 0; member < agent.partySize; member++) this.memberPathPoints.delete(renderMemberId(agent.id, member));
         return false;
       }
       return true;
@@ -831,7 +996,7 @@ export class Simulation {
   }
 
   private addTask(kind: StaffTaskKind, agent: Agent) {
-    if (!agent.cancelled) this.staffTasks.push({ kind, agent, tableId: null, createdAt: this.metrics.time });
+    if (!agent.cancelled) this.staffTasks.push({ id: `task:${this.nextTaskId++}`, kind, agent, tableId: null, createdAt: this.metrics.time });
   }
 
   /** ช่องคิวจ่ายเงิน: เรียงจากเคาน์เตอร์ออกไปตาม flow field และไม่ใช้ช่องซ้ำ */
@@ -849,10 +1014,12 @@ export class Simulation {
     const table = this.tableById.get(tableId);
     if (!table || table.status !== "occupied") return;
     table.status = "dirty";
+    const departed = this.agents.find(agent => agent.tableId === tableId && agent.serviceCycleId === `${table.id}:${table.cycle}`);
+    if (departed) this.departed.set(tableId, this.partyView(departed));
     for (const chairId of table.chairIds) this.occupiedChairs.delete(chairId);
     if (!this.queuedCleanTables.has(tableId)) {
       this.queuedCleanTables.add(tableId);
-      this.staffTasks.push({ kind: "clean", agent: null, tableId, createdAt: this.metrics.time });
+      this.staffTasks.push({ id: `task:${this.nextTaskId++}`, kind: "clean", agent: null, tableId, createdAt: this.metrics.time });
     }
   }
 
@@ -864,14 +1031,31 @@ export class Simulation {
       cook.remaining -= dt;
       if (cook.remaining <= 0) {
         const agent = cook.task.agent!;
-        if (!agent.cancelled && --agent.pendingDishes === 0) this.addTask("deliver", agent);
+        if (agent.cancelled) this.metrics.wastedDishes++;
+        else {
+          agent.preparedDishes++;
+          if (--agent.pendingDishes === 0) this.addTask("deliver", agent);
+        }
         cook.task = null;
       }
     }
     for (const staff of this.frontStaff) {
       if (!staff.task) continue;
+      // ลูกค้ายกเลิกแล้ว งานรับออร์เดอร์หรือเสิร์ฟที่กำลังทำต้องหยุดด้วย
+      // เพื่อให้พนักงานไปรับงานถัดไปแทนการทำงานให้ลูกค้าที่ออกไปแล้ว
+      if (staff.task.agent?.cancelled) {
+        staff.task = null;
+        staff.plan = null;
+        continue;
+      }
       this.frontBusySeconds += dt;
       staff.remaining -= dt;
+      if (staff.task.kind === "deliver" && staff.task.agent && !staff.task.agent.cancelled && staff.plan) {
+        const task = staff.task;
+        const placement = taskMilestones({ id: task.id, kind: task.kind, tableId: task.agent!.tableId, cycleId: task.agent!.serviceCycleId,
+          startedAt: staff.startedAt, total: staff.total, plan: staff.plan, party: null }).placedAtSeconds;
+        if (placement !== null && this.metrics.time >= placement) task.agent!.placedAt ??= placement;
+      }
       if (staff.remaining <= 0) {
         this.finishTask(staff.task);
         staff.task = null;
@@ -879,26 +1063,48 @@ export class Simulation {
       }
     }
 
-    for (const cook of this.cooks) {
-      if (cook.task || this.kitchenOrders.length === 0) continue;
-      const agent = this.kitchenOrders.shift()!;
-      cook.task = { kind: "deliver", agent, tableId: null, createdAt: this.metrics.time };
-      cook.remaining = this.config.cookMinutesPerDish * 60 * agent.traits.cookFactor;
+    // งานที่เริ่มแล้วทำให้เสร็จก่อน แต่ไม่รับงานใหม่ระหว่างช่วงพัก
+    for (const [index, cook] of this.cooks.entries()) {
+      if (cook.task || this.isStaffOnBreak(index, this.cooks.length) || this.kitchenOrders.length === 0) continue;
+      const { agent, member, dishIndex } = this.kitchenOrders.shift()!;
+      cook.task = { id: `task:${this.nextTaskId++}`, kind: "deliver", agent, tableId: null, createdAt: this.metrics.time };
+      const menuFactor = this.config.varyMenuTimes ? MENU_COOK_FACTORS[foodKindFor(this.config.seed, agent.id, member + agent.partySize * dishIndex)] : 1;
+      const speedFactor = this.config.varyStaffSpeed ? staffTimeFactor(index, this.cooks.length) : 1;
+      cook.remaining = this.config.cookMinutesPerDish * 60 * agent.traits.cookFactor * menuFactor * speedFactor;
     }
 
     if (this.staffTasks.length === 0) return;
     this.staffTasks.sort((a, b) => this.taskPriority(a) - this.taskPriority(b) || a.createdAt - b.createdAt);
+    for (let i = this.staffTasks.length - 1; i >= 0; i--) if (this.staffTasks[i]!.agent?.cancelled) this.staffTasks.splice(i, 1);
+    const cashiers = Math.min(Math.max(0, Math.floor(this.config.cashiers ?? 0)), this.frontStaff.length - 1);
     for (const [index, staff] of this.frontStaff.entries()) {
-      if (staff.task || this.staffTasks.length === 0) continue;
-      let task = this.staffTasks.shift()!;
-      while (task.agent?.cancelled && this.staffTasks.length > 0) task = this.staffTasks.shift()!;
-      if (task.agent?.cancelled) continue;
+      if (staff.task || this.isStaffOnBreak(index, this.frontStaff.length) || this.staffTasks.length === 0) continue;
+      const taskIndex = this.staffTasks.findIndex((task) => cashiers === 0 || (index < cashiers ? task.kind === "pay" : task.kind !== "pay"));
+      if (taskIndex < 0) continue;
+      const [task] = this.staffTasks.splice(taskIndex, 1);
+      if (!task) continue;
       staff.task = task;
-      staff.remaining = this.taskSeconds(task);
+      staff.remaining = this.taskSeconds(task, index);
+      staff.total = staff.remaining;
+      staff.startedAt = this.metrics.time;
       staff.plan = this.staffVisuals?.plan(index, task.kind, task.tableId ?? task.agent?.tableId ?? null, staff.remaining, this.walkSeconds(task)) ?? null;
+      const tableId = task.tableId ?? task.agent?.tableId ?? null;
+      if (tableId) this.presentationTasks.set(`${tableId}:${task.kind}`, {
+        task, startedAt: staff.startedAt, total: staff.total, plan: staff.plan,
+        cycleId: task.agent?.serviceCycleId ?? `${tableId}:${this.tableById.get(tableId)?.cycle ?? 0}`,
+      });
       if (task.kind === "pay" && task.agent) task.agent.state = "ordering";
       if (task.kind === "clean" && task.tableId) this.tableById.get(task.tableId)!.status = "cleaning";
     }
+  }
+
+  private isStaffOnBreak(index: number, count: number): boolean {
+    const rest = this.config.teamBreak;
+    if (!rest) return false;
+    const duration = rest.endSeconds - rest.startSeconds;
+    const start = rest.startSeconds + (this.config.staggerBreak ? duration * index / count : 0);
+    const end = this.config.staggerBreak ? rest.startSeconds + duration * (index + 1) / count : rest.endSeconds;
+    return this.metrics.time >= start && this.metrics.time < end;
   }
 
   /** ระยะเดินไปจุดบริการที่ใกล้ที่สุดของโต๊ะ ไม่ผูกกับเก้าอี้ตัวแรกของ preset */
@@ -907,17 +1113,22 @@ export class Simulation {
     return table ? Math.min(...table.chairIds.map((chairId) => walks.get(chairId) ?? Infinity)) : 0;
   }
 
-  private taskSeconds(task: StaffTask): number {
+  private taskSeconds(task: StaffTask, index: number): number {
     const party = task.agent?.partySize ?? 1;
+    const cashiers = Math.min(Math.max(0, Math.floor(this.config.cashiers ?? 0)), this.frontStaff.length - 1);
+    // กระจายความเร็วภายในแต่ละบทบาท เพื่อไม่ให้คนประจำรับเงินเร็วหรือช้ากว่าเสมอ
+    const factor = !this.config.varyStaffSpeed ? 1 : cashiers === 0
+      ? staffTimeFactor(index, this.frontStaff.length)
+      : index < cashiers ? staffTimeFactor(index, cashiers) : staffTimeFactor(index - cashiers, this.frontStaff.length - cashiers);
     switch (task.kind) {
       case "take-order":
-        return this.tableWalk(task.agent!.tableId, this.takeOrderWalk) + task.agent!.traits.takeOrderSeconds + (party - 1) * 15;
+        return this.tableWalk(task.agent!.tableId, this.takeOrderWalk) + (task.agent!.traits.takeOrderSeconds + (party - 1) * 15) * factor;
       case "deliver":
-        return this.tableWalk(task.agent!.tableId, this.deliverWalk) + party * 10;
+        return this.tableWalk(task.agent!.tableId, this.deliverWalk) + task.agent!.dishCounts.reduce((sum, count) => sum + count, 0) * 10 * factor;
       case "pay":
-        return task.agent!.traits.paySeconds;
+        return task.agent!.traits.paySeconds * factor;
       case "clean":
-        return this.tableWalk(task.tableId, this.takeOrderWalk) + this.between(this.config.cleanTableSeconds);
+        return this.tableWalk(task.tableId, this.takeOrderWalk) + (this.config.cleanTableSeconds[0] + this.serviceRandom() * (this.config.cleanTableSeconds[1] - this.config.cleanTableSeconds[0])) * factor;
     }
   }
 
@@ -951,16 +1162,21 @@ export class Simulation {
       case "take-order":
         if (agent!.cancelled) break;
         agent!.state = "waiting-food";
-        agent!.pendingDishes = agent!.partySize;
-        for (let dish = 0; dish < agent!.partySize; dish++) this.kitchenOrders.push(agent!);
+        agent!.pendingDishes = agent!.dishCounts.reduce((sum, count) => sum + count, 0);
+        for (let member = 0; member < agent!.partySize; member++) {
+          for (let dishIndex = 0; dishIndex < agent!.dishCounts[member]!; dishIndex++) this.kitchenOrders.push({ agent: agent!, member, dishIndex });
+        }
         break;
       case "deliver": {
         if (agent!.cancelled) break;
+        agent!.preparedDishes = 0;
         const wait = this.metrics.time - agent!.seatedAt;
         this.metrics.fed += agent!.partySize;
         this.totalFoodWaitSeconds += wait * agent!.partySize;
-        if (wait > this.config.patienceMinutes * 60) this.metrics.waitedTooLong += agent!.partySize;
+        if (wait > agent!.foodPatienceSeconds) this.metrics.waitedTooLong += agent!.partySize;
         agent!.timer = agent!.traits.dineSeconds;
+        agent!.fedAt = this.metrics.time;
+        agent!.placedAt ??= this.metrics.time;
         agent!.state = "seated";
         break;
       }
@@ -972,6 +1188,8 @@ export class Simulation {
         const table = this.tableById.get(task.tableId!);
         if (!table) break;
         table.status = "clean";
+        table.cleanCompletedAt = this.metrics.time;
+        this.departed.delete(table.id);
         this.queuedCleanTables.delete(table.id);
         this.seatWaitingParty(table);
         break;
@@ -984,9 +1202,14 @@ export class Simulation {
     const waiting = this.agents.find((agent) => agent.state === "waiting-entrance" && agent.partySize <= table.chairIds.length);
     if (!waiting) return;
     table.status = "occupied";
+    table.cycle++;
+    table.cleanCompletedAt = null;
+    this.departed.delete(table.id);
     for (const chairId of table.chairIds) this.occupiedChairs.add(chairId);
     const chair = this.chairById.get(table.chairIds[0]!)!;
     waiting.tableId = table.id;
+    waiting.renderChairIds = table.chairIds.slice(0, waiting.partySize);
+    waiting.serviceCycleId = `${table.id}:${table.cycle}`;
     waiting.chairId = chair.id;
     waiting.field = this.seatFields.get(chair.id)!;
     waiting.state = "to-seat";
@@ -1005,20 +1228,58 @@ export class Simulation {
     for (const agent of this.agents) {
       for (let member = 0; member < agent.partySize; member++) {
         const o = i++ * AGENT_STRIDE;
-        const column = member % 2;
-        const row = Math.floor(member / 2);
-        buffer[o] = agent.id * 10 + member;
-        buffer[o + 1] = agent.x + agent.jitter.x + (column - 0.5) * 0.14;
-        buffer[o + 2] = agent.y + agent.jitter.y + (row - 0.5) * 0.14;
+        const position = this.memberPosition(agent, member);
+        buffer[o] = renderMemberId(agent.id, member);
+        buffer[o + 1] = position.x;
+        buffer[o + 2] = position.y;
         buffer[o + 3] = AGENT_STATE_CODE[agent.state];
       }
     }
     return buffer;
   }
 
+  private partyView(agent: Agent): PartyView {
+    return { id: agent.id, state: agent.state, partySize: agent.partySize, chairIds: [...agent.renderChairIds],
+      tableId: agent.tableId ?? this.chairById.get(agent.chairId ?? "")?.tableId ?? null,
+      cycleId: agent.serviceCycleId, speed: agent.speed, fedAt: agent.fedAt, placedAt: agent.placedAt, dineSeconds: agent.traits.dineSeconds, cancelled: agent.cancelled, entranceQueuedAt: agent.entranceQueuedAt, seatedAt: agent.seatedAt,
+      tablePatienceSeconds: agent.tablePatienceSeconds, foodPatienceSeconds: agent.foodPatienceSeconds, dishCounts: agent.dishCounts };
+  }
+
+  /** Full metadata without advancing time, changing business state or drawing randomness. */
+  presentationSnapshot(envelope: { runId: string; layoutRevision: string; sequence: number }): PresentationSnapshot {
+    const taskView = (record: { task: StaffTask; startedAt: number; total: number; plan: StaffPlan | null; cycleId: string | null }): TaskView => ({
+      id: record.task.id, kind: record.task.kind, tableId: record.task.tableId ?? record.task.agent?.tableId ?? null,
+      cycleId: record.cycleId, startedAt: record.startedAt, total: record.total, plan: record.plan,
+      party: record.task.agent ? this.partyView(record.task.agent) : null,
+    });
+    const parties = this.agents.map(agent => this.partyView(agent));
+    return buildPresentationSnapshot(this.layout, {
+      ...envelope, time: this.metrics.time, seed: this.config.seed, parties,
+      tablePatienceSeconds: (this.config.tablePatienceMinutes ?? this.config.patienceMinutes) * 60,
+      foodPatienceSeconds: this.config.patienceMinutes * 60,
+      tables: [...this.tableById.values()].map(table => ({
+        id: table.id, cycleId: this.tableService ? `${table.id}:${table.cycle}` : `counter:${table.id}`,
+        status: this.tableService ? table.status : parties.some(party => party.tableId === table.id) ? "occupied" : "clean",
+        cleanCompletedAt: table.cleanCompletedAt,
+      })),
+      departed: [...this.departed.values()], tasks: [...this.presentationTasks.values()].map(taskView),
+      staff: this.frontStaff.map((staff, id) => {
+        const record = [...this.presentationTasks.values()].find(record => record.task.id === staff.task?.id);
+        const active = staff.task ? { task: staff.task, startedAt: staff.startedAt, total: staff.total, plan: staff.plan,
+          cycleId: staff.task.agent?.serviceCycleId ?? record?.cycleId ?? null } : null;
+        return { id, task: active ? taskView(active) : null, onBreak: !active && this.isStaffOnBreak(id, this.frontStaff.length) };
+      }),
+    });
+  }
+
   /** สำเนาข้อมูลภายในสำหรับเทสต์ */
   debugAgents(): ReadonlyArray<Readonly<Pick<Agent, "id" | "state" | "x" | "y" | "chairId" | "tableId" | "partySize">>> {
     return this.agents.map(({ id, state, x, y, chairId, tableId, partySize }) => ({ id, state, x, y, chairId, tableId, partySize }));
+  }
+
+  /** ครัวอาจยังทำจานที่ยกเลิกไปแล้ว แม้ลูกค้าคนสุดท้ายออกจากร้าน */
+  hasCancelledCooking(): boolean {
+    return this.cooks.some((cook) => cook.task?.agent?.cancelled === true);
   }
 
   getMetrics(): SimulationMetrics {

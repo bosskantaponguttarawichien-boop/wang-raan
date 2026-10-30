@@ -1,0 +1,26 @@
+[
+  {
+    "file": "cafe-customer.glb",
+    "bytes": 282772,
+    "sha256": "12f1715ec32e6269f23957751f6c3e5463a53c757bae45049b019f5be7c349e4",
+    "byte_identical": true
+  },
+  {
+    "file": "cafe-customer-lite.glb",
+    "bytes": 99084,
+    "sha256": "51b6b44c558e18f8a455cb828fc18614ac9f3aa9f59a42738df1c679b7fdbdf8",
+    "byte_identical": true
+  },
+  {
+    "file": "cafe-staff.glb",
+    "bytes": 324768,
+    "sha256": "5f0c60fa474f523128d6d4b2d048fa78a18a1b05d973d8c508c5baf4350b42a0",
+    "byte_identical": true
+  },
+  {
+    "file": "cafe-staff-lite.glb",
+    "bytes": 121192,
+    "sha256": "648b8637907cb187b7bb3fca57111d795424a396389fe1a9af93b2691db352cb",
+    "byte_identical": true
+  }
+]

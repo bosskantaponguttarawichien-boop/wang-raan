@@ -12,7 +12,7 @@ export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 /** ค่าฟอร์มจำลองร้าน 1 วัน (feat-095) + ความเร็วเล่นภาพ */
 export interface SimulationConfigState extends DayConfig {
   /**
-   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง (ช่วงที่ไม่มีใครเดิน worker เล่นเร็วขึ้นเอง)
+   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง 1 วินาทีต่อ 1 วินาที
    * แปลงเป็นวินาทีจำลองต่อวินาทีจริงที่ SimulationController ก่อนส่ง Worker
    */
   speed: number;
@@ -26,10 +26,12 @@ export interface SimulationStoreState {
   seats: number;
   config: SimulationConfigState;
   showHeatmap: boolean;
+  showThoughts: boolean;
   /** ผลวิเคราะห์ทั้งวันรอบล่าสุด (feat-094/094) */
   analysis: DayAnalysis | null;
   setConfig: (patch: Partial<SimulationConfigState>) => void;
   setShowHeatmap: (show: boolean) => void;
+  setShowThoughts: (show: boolean) => void;
 }
 
 /** ฐานเวลา x1 = เวลาจริง — ลูกค้าและพนักงานเดินเท่าคนจริง */
@@ -44,9 +46,11 @@ export function createSimulationStore() {
     seats: 0,
     config: { ...DEFAULT_DAY_CONFIG, speed: 1 },
     showHeatmap: true,
+    showThoughts: true,
     analysis: null,
     setConfig: (patch) => set({ config: { ...get().config, ...patch } }),
     setShowHeatmap: (showHeatmap) => set({ showHeatmap }),
+    setShowThoughts: (showThoughts) => set({ showThoughts }),
   }));
 }
 

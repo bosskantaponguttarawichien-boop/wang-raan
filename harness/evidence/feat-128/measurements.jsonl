@@ -1,0 +1,3 @@
+{"check":"cycle-chair-grip","handOnBackrestWhileChairMoves":true,"phasesSeen":["approach","pull","push","seated","sit"],"maxChairPull":0.3,"usesChairClips":true}
+{"check":"cycle-chair-grip","handOnBackrestWhileChairMoves":true,"phasesSeen":["approach","pull","push","seated","sit"],"maxChairPull":0.3,"usesChairClips":true}
+{"check":"cycle-eating","clip":"Eat","utensil":"fork","foodKind":"steak","plateOutOfReach":false,"dishesOnTables":1}

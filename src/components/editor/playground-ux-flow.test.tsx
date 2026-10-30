@@ -353,6 +353,7 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
         served: 20,
         seated: 8,
         noSeat: 2,
+        noSuitableTable: 2,
         inStore: 5,
         queuing: 0,
         maxQueue: 0,
@@ -369,8 +370,8 @@ describe("Playground UX Comprehensive QA Suite (feat-060)", () => {
     expect(summaryCard).toHaveTextContent("ลูกค้าเข้ามา25 คน");
     expect(summaryCard).toHaveTextContent("รับบริการแล้ว20 คน");
     expect(summaryCard).toHaveTextContent("ไม่มีที่นั่ง2 คน");
-    // คำแนะนำที่แนะนำว่าที่นั่งไม่พอ
-    expect(summaryCard).toHaveTextContent("ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ");
+    expect(summaryCard).toHaveTextContent("โต๊ะไม่รองรับขนาดกลุ่ม 2 คน");
+    expect(summaryCard).toHaveTextContent("มีกลุ่มที่ไม่มีโต๊ะขนาดรองรับ");
 
     // สลับกลับไปแท็บ 'เพิ่ม' (add) ยังเห็นผลรอบล่าสุดย่ออยู่
     cleanup();

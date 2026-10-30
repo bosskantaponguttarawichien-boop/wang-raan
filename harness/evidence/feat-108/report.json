@@ -1,0 +1,39 @@
+{
+  "feature_id": "feat-108",
+  "foodId": "cake",
+  "owner_lane": "food-cake",
+  "full": {
+    "file": "public/assets/models/food/cake/cake.glb",
+    "bytes": 32772,
+    "triangles": 1012,
+    "vertices": 3036,
+    "meshCount": 11,
+    "footprintDiameter": 0.19,
+    "height": 0.0659,
+    "stateTriangles": {
+      "full": 440,
+      "partial": 60,
+      "empty": 56
+    }
+  },
+  "lite": {
+    "file": "public/assets/models/food/cake/cake-lite.glb",
+    "bytes": 23584,
+    "triangles": 536,
+    "vertices": 1608,
+    "meshCount": 11,
+    "footprintDiameter": 0.19,
+    "height": 0.0659,
+    "stateTriangles": {
+      "full": 176,
+      "partial": 60,
+      "empty": 48
+    }
+  },
+  "screenshots": [
+    "harness/evidence/feat-108/cake-states-3-angles.png",
+    "harness/evidence/feat-108/cake-angles-comparison.png",
+    "harness/evidence/feat-108/cake-tray-and-table.png"
+  ]
+}
+

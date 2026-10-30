@@ -112,10 +112,10 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     expect(out[STAFF_STRIDE]).toBe(1);
   });
 
-  it("ตามหลังไกลมาก (worker ข้ามช่วงเงียบ) เร่งให้ทันแทนการค้าง", () => {
+  it("ตามหลังไกลมากก็ยังเดินด้วยความเร็วเดิม", () => {
     const pacer = new StaffPacer();
     let out = pacer.update(staff([0, 0, 0, COUNTER]), 0, SPEED);
-    for (let t = 0; t < 1; t += 0.1) out = pacer.update(staff([0, 20, 0, WALKING]), 0.1, SPEED);
-    expect(row(out, 0)![0]).toBeGreaterThan(SPEED);
+    for (let i = 0; i < 10; i++) out = pacer.update(staff([0, 20, 0, WALKING]), 0.1, SPEED);
+    expect(row(out, 0)![0]).toBeCloseTo(SPEED, 5);
   });
 });

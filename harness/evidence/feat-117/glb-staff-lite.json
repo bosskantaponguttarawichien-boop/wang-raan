@@ -1,0 +1,192 @@
+{
+ "nodes": [
+  "CafeMannequin",
+  "Head",
+  "Hips",
+  "LeftArm",
+  "LeftFoot",
+  "LeftForeArm",
+  "LeftHand",
+  "LeftLeg",
+  "LeftLowerLeg",
+  "MannequinBody",
+  "Neck",
+  "RightArm",
+  "RightFoot",
+  "RightForeArm",
+  "RightHand",
+  "RightLeg",
+  "RightLowerLeg",
+  "Spine",
+  "StaffCap"
+ ],
+ "skins": [
+  [
+   "Hips",
+   "Spine",
+   "Neck",
+   "Head",
+   "LeftArm",
+   "RightArm",
+   "LeftForeArm",
+   "RightForeArm",
+   "LeftHand",
+   "RightHand",
+   "LeftLeg",
+   "RightLeg",
+   "LeftLowerLeg",
+   "RightLowerLeg",
+   "LeftFoot",
+   "RightFoot"
+  ]
+ ],
+ "meshes": [
+  {
+   "name": "",
+   "prims": [
+    {
+     "attributes": [
+      "COLOR_0",
+      "NORMAL",
+      "POSITION"
+     ],
+     "count": 310,
+     "indices": 1332,
+     "part": null
+    }
+   ]
+  },
+  {
+   "name": "",
+   "prims": [
+    {
+     "attributes": [
+      "COLOR_0",
+      "JOINTS_0",
+      "NORMAL",
+      "POSITION",
+      "WEIGHTS_0",
+      "_PART"
+     ],
+     "count": 3517,
+     "indices": 20676,
+     "part": {
+      "count": 3517,
+      "distinct": [
+       0,
+       1,
+       2,
+       3,
+       4,
+       5,
+       6
+      ]
+     }
+    }
+   ]
+  }
+ ],
+ "animations": [
+  {
+   "name": "Idle",
+   "channels": 17,
+   "duration": 6
+  },
+  {
+   "name": "Walk",
+   "channels": 15,
+   "duration": 0.949999988079071
+  },
+  {
+   "name": "Sit",
+   "channels": 14,
+   "duration": 0.8999999761581421
+  },
+  {
+   "name": "Work",
+   "channels": 14,
+   "duration": 8
+  },
+  {
+   "name": "CarryIdle",
+   "channels": 17,
+   "duration": 6
+  },
+  {
+   "name": "CarryWalk",
+   "channels": 17,
+   "duration": 0.949999988079071
+  },
+  {
+   "name": "PickUp",
+   "channels": 17,
+   "duration": 1.2000000476837158
+  },
+  {
+   "name": "PutDown",
+   "channels": 17,
+   "duration": 1.399999976158142
+  },
+  {
+   "name": "WipeTable",
+   "channels": 17,
+   "duration": 4
+  }
+ ],
+ "extras": [
+  [
+   "CafeMannequin",
+   {
+    "walkCycleDistance": 0.9,
+    "animationMarkers": {
+     "CarryIdle": [
+      {
+       "name": "hand-contact",
+       "time": 0
+      }
+     ],
+     "CarryWalk": [
+      {
+       "name": "hand-contact",
+       "time": 0
+      }
+     ],
+     "PickUp": [
+      {
+       "name": "hand-contact",
+       "time": 0.4
+      },
+      {
+       "name": "food-contact",
+       "time": 0.58
+      }
+     ],
+     "PutDown": [
+      {
+       "name": "hand-contact",
+       "time": 0.26
+      },
+      {
+       "name": "food-contact",
+       "time": 0.62
+      }
+     ],
+     "WipeTable": [
+      {
+       "name": "hand-contact",
+       "time": 0.12
+      },
+      {
+       "name": "wipe-contact",
+       "time": 0.3
+      },
+      {
+       "name": "clear-complete",
+       "time": 0.82
+      }
+     ]
+    }
+   }
+  ]
+ ]
+}

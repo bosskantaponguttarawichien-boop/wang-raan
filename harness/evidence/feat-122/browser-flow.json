@@ -1,0 +1,34 @@
+{
+  "date": "2026-10-29",
+  "device": {
+    "vendor": "Google Inc. (NVIDIA)",
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce GTX 1050 Ti (0x00001C82) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "note": "hardware WebGL on the reference device recorded in evidence/feat-102 — not software WebGL",
+    "userAgent": "Chrome/152.0.7977.167 (Claude desktop browser pane, Windows NT 10.0 x64)",
+    "devicePixelRatio": 1,
+    "canvasPixels": [688, 612]
+  },
+  "flow": [
+    "loaded the sample cafe layout (8 x 6 m), opened the simulation panel",
+    "switched to the 3D view before starting: scene renders, 0 console errors",
+    "started the one-day simulation, returned to the 3D view while running",
+    "raised playback to 10x",
+    "customer seated at table 1, steak-lite.glb fetched (200) and mounted by table-service",
+    "customer plays Eat with the dish on the table; staff takes an order at table 2",
+    "paused: canvas pixels unchanged over 1.2 s (frozen, not merely slowed)",
+    "resumed, then stopped: chairs back under the tables, no dishes or customers left"
+  ],
+  "assetRequests": [
+    "/assets/models/cafe-customer-lite.glb 200",
+    "/assets/models/cafe-staff-lite.glb 200",
+    "/assets/models/food/steak/steak-lite.glb 200"
+  ],
+  "checks": {
+    "consoleErrors": 0,
+    "webglCanvases": 1,
+    "horizontalOverflowPx": 0,
+    "pauseFreezesFrame": true,
+    "stopClearsTransientState": true
+  },
+  "notSupersedingQa": "performance counters, the 6 breakpoints, the 4 light times and the SVG fallback belong to feat-123"
+}

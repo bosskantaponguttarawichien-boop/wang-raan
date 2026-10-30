@@ -33,8 +33,20 @@ import {
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
 import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
+import { createLegacyLighting } from "./runtime/legacy-lighting";
+import { createLegacyServingProps } from "./runtime/legacy-serving-props";
+import { createSceneRuntime, type SceneRuntime } from "./runtime/scene-runtime";
+import { createThoughtOverlayManager } from "./thought-overlay";
+import { FrameClock } from "./runtime/frame-clock";
+import { createSceneFeatureFactories, type SceneFeatureHandles } from "./runtime/scene-features";
+import { installSceneDiagnostics, readRendererCounters, type SceneFrameInfo } from "./runtime/scene-diagnostics";
+import type { StaffRig } from "./staff-actions/contracts";
+import type { CustomerRig } from "./customer-actions/contracts";
+import type { ChairRig as SeatingChairRig } from "./seating/contracts";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
+import { simulationStore } from "@/store/use-simulation-store";
 import { OUTSIDE_DISTANCE, doorFrame } from "@/components/simulation/walk-pacer";
+import { nextSeatReachShift } from "./customer-actions/customer-action-controller";
 
 export interface ThreeViewProps {
   layout: StoreLayout;
@@ -50,6 +62,11 @@ export interface ThreeViewProps {
 type CustomerAnimation = "Idle" | "Walk" | "Sit";
 /** ระยะเลื่อนตัวที่นั่งไปทางหน้าเก้าอี้ — ติดลบ = ถอยข้อสะโพกไปหลังกลางเบาะ ให้หลังชิดพนักพิง (ไม่จม) */
 const SEATED_FRONT_OFFSET = -0.04;
+/**
+ * เลื่อนตัวที่นั่งเข้าหาโต๊ะได้มากสุดเท่านี้ (ม.) เพื่อให้คลิป Eat เอื้อมถึงจานจริง
+ * เท่ากับระยะที่เก้าอี้สอดใต้โต๊ะได้ (CLEARANCE.chairTuckMax) จึงไม่ดันตัวทะลุขอบโต๊ะ
+ */
+const MAX_SEAT_REACH_SHIFT = 0.1;
 
 type AnimatedCustomer = {
   mixer: THREE.AnimationMixer;
@@ -82,6 +99,7 @@ type ChairRig = {
 /** สถานะของ renderer ที่อยู่ตลอดอายุ component — ผังเปลี่ยนโดยไม่สร้าง WebGL context ใหม่ */
 type Stage = {
   renderer: THREE.WebGLRenderer;
+  runtime: SceneRuntime;
   scene: THREE.Scene;
   camera: THREE.OrthographicCamera;
   key: THREE.DirectionalLight;
@@ -146,6 +164,8 @@ type RoomMotion = {
 };
 
 type StandingStaff = {
+  /** id ของพนักงานตาม buffer/snapshot (ไม่ใช่ลำดับใน array) */
+  staffId: number;
   mixer: THREE.AnimationMixer;
   model: THREE.Object3D;
   body: THREE.SkinnedMesh | null;
@@ -172,6 +192,10 @@ type CharacterAsset = {
   clips: THREE.AnimationClip[];
   /** ความเร็วเดินตามท่า Walk (ระยะต่อรอบ / เวลาต่อรอบ) — ใช้เดินเท้าไม่ไถลบนพื้น */
   walkSpeed: number;
+  /** ระยะที่เดินได้ต่อหนึ่งรอบคลิป Walk (ม.) หลังคูณ scale — feature ใช้ตั้ง timeScale */
+  walkCycleDistance: number;
+  /** animationMarkers ที่ฝังมากับ GLB — อ่าน marker เป็น normalized time ไม่ใช้ callback ของ mixer */
+  markers: Record<string, { name: string; time: number }[]>;
 };
 
 /**
@@ -181,6 +205,9 @@ type CharacterAsset = {
  * geometry ของตัวแทนเงาใช้ร่วมกันทุกตัวของโมเดลเดียวกัน (shadowGeometry) — attribute/index ชุดเดิมของรุ่นเบา
  * ไม่กินหน่วยความจำ GPU เพิ่ม และห้าม dispose เอง (จะลบ buffer ของรุ่นเบาไปด้วย)
  */
+/** ฉากถูกสร้างใหม่กี่ครั้งในหน้านี้ — diagnostics ใช้บอกว่าตัววัดความเร็วเพิ่งเริ่มนับใหม่หรือไม่ */
+let sceneInstances = 0;
+
 const shadowGeometries = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry>();
 function shadowGeometry(liteGeometry: THREE.BufferGeometry) {
   let geometry = shadowGeometries.get(liteGeometry);
@@ -193,13 +220,26 @@ function shadowGeometry(liteGeometry: THREE.BufferGeometry) {
   return geometry;
 }
 
-function attachShadowProxy(body: THREE.SkinnedMesh, liteGeometry: THREE.BufferGeometry, castShadow: boolean) {
+/**
+ * ห้ามให้ตัวแทนเงาใช้ "วัสดุเดียวกับผิวตัวจริง": geometry ของตัวแทนเงาไม่มี morph attributes ของผิวตัว
+ * (เช่น EatGrip) three จึงเห็นว่าวัสดุนั้นต้องใช้ shader ต่างกันในสอง mesh แล้วรีเซ็ตโปรแกรมของวัสดุใหม่
+ * **ทุก draw ทุกเฟรม** (getProgramCacheKey + อัปโหลด uniform ใหม่ทั้งชุด) ซึ่งทำให้ฉากหนาแน่นช้าลงหลายสิบเท่า
+ * ตัวแทนเงาทุกตัวจึงใช้วัสดุร่วมกันตัวเดียวที่ไม่มีใครใช้ร่วม — รอบวาดเงาใช้ depth material ของ three เองอยู่แล้ว
+ */
+function attachShadowProxy(
+  body: THREE.SkinnedMesh,
+  liteGeometry: THREE.BufferGeometry,
+  castShadow: boolean,
+  material: THREE.Material,
+) {
   const geometry = shadowGeometry(liteGeometry);
-  const proxy = new THREE.SkinnedMesh(geometry, body.material);
+  const proxy = new THREE.SkinnedMesh(geometry, material);
   proxy.name = "ShadowProxy";
   proxy.bind(body.skeleton, body.bindMatrix);
   proxy.castShadow = castShadow;
   proxy.receiveShadow = false;
+  // ไม่ทอดเงาตัวละคร = ไม่มีงานให้ตัวแทนเงาทำเลย ปิดทิ้งเพื่อไม่ให้เสีย draw call ในรอบภาพ
+  proxy.visible = castShadow;
   // ผิวขยับตามท่า bounding sphere ตอนยืนไม่ครอบท่าเดิน/นั่ง — ไม่ตัดทิ้งเอง (เป็นแค่เงา)
   proxy.frustumCulled = false;
   proxy.onBeforeRender = () => geometry.setDrawRange(0, 0);
@@ -214,6 +254,7 @@ function attachShadowProxy(body: THREE.SkinnedMesh, liteGeometry: THREE.BufferGe
 
 const characterAsset = (urls: { full: string; lite: string }): CharacterAsset => ({
   urls, template: null, liteBody: null, fullBody: null, fullScene: null, fullRequested: false, clips: [], walkSpeed: 0.44,
+  walkCycleDistance: 0.9 * CHARACTER_SCALE, markers: {},
 });
 
 /** พนักงานเคลื่อนเร็วกว่านี้ (ม./วิ) เล่นท่าเดิน ไม่งั้นเล่นท่าทำงาน (รับออร์เดอร์/เก็บโต๊ะ/ที่เคาน์เตอร์) */
@@ -893,6 +934,9 @@ function mergeStaticMeshes(group: THREE.Group) {
     const mesh = new THREE.Mesh(geometry, source.material);
     mesh.castShadow = source.castShadow;
     mesh.receiveShadow = source.receiveShadow;
+    // ตำแหน่งถูกอบลง vertex แล้ว เมทริกซ์ของ mesh นี้จึงเป็น identity ตลอด ไม่ต้องคิดใหม่ทุกเฟรม
+    mesh.matrixAutoUpdate = false;
+    mesh.updateMatrix();
     group.add(mesh);
     created.push(geometry);
   }
@@ -992,30 +1036,6 @@ function setRoomOpacity(group: THREE.Group, opacityByWall: RoomOpacity) {
 }
 
 /**
- * กล้องเงาค่าเริ่มต้นครอบแค่ ±5 ม. รอบ (0,0,0) = มุมร้าน → เงาวัตถุไกลมุมถูกตัดขาด
- * จึงเล็งไฟไปกลางร้าน และขยาย frustum ให้ครอบทั้งร้าน (2–30 ม.) ตามขนาดผัง
- * ทิศแสงยึดกับโลกของร้าน ไม่ย้ายตามกล้อง เพื่อให้เงาไม่เปลี่ยนระหว่างหมุนมุมมอง
- */
-function fitKeyLight(key: THREE.DirectionalLight, layout: StoreLayout) {
-  const centerX = layout.width / 2;
-  const centerZ = layout.depth / 2;
-  const span = Math.hypot(layout.width, layout.depth) / 2 + 1;
-  const reach = span / 5;
-  // world-space light: กล้องหมุนได้ แต่ตำแหน่ง/ทิศเงายังคงเดิมเสมอ
-  key.position.set(centerX - 4 * reach, 8 * reach, centerZ + 5 * reach);
-  key.target.position.set(centerX, 0, centerZ);
-  key.target.updateMatrixWorld();
-  const shadowCamera = key.shadow.camera;
-  shadowCamera.left = -span;
-  shadowCamera.right = span;
-  shadowCamera.top = span;
-  shadowCamera.bottom = -span;
-  shadowCamera.near = 0.1;
-  shadowCamera.far = span * 6;
-  shadowCamera.updateProjectionMatrix();
-}
-
-/**
  * Orthographic isometric: ระยะเยื้องแกน X/Y/Z ต้องเท่ากัน จึงได้ azimuth 45° และ elevation 35.264°
  * แล้วฉายมุมห้อง (พื้น + ยอดผนัง) ลงพิกัดกล้อง ขยายด้านที่ขาดให้ตรงสัดส่วนจอ — เต็มจอทั้งแนวตั้งและแนวนอน
  * กล้องอยู่มุม "ล่างขวา" ของมุมมองเสมอ (rotation 0 = มุมตะวันออกเฉียงใต้) — หมุนมุมมองแล้วกล้องย้ายมุมตาม
@@ -1095,6 +1115,7 @@ const animationFor = (state: number): CustomerAnimation => (state === AGENT_STAT
 /** มุมมอง WebGL แบบ lazy-loaded สำหรับ Playground เท่านั้น — SVG isometric เป็น fallback อยู่ที่ caller */
 export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = false, onUnavailable }: ThreeViewProps) {
   const hostRef = React.useRef<HTMLDivElement>(null);
+  const overlayRef = React.useRef<HTMLDivElement>(null);
   const stageRef = React.useRef<Stage | null>(null);
   // อ่านค่าล่าสุดใน render loop โดยไม่ต้องสร้าง renderer ใหม่เมื่อค่าเปลี่ยน
   const zoomRef = React.useRef(zoom);
@@ -1129,16 +1150,16 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const scene = new THREE.Scene();
     scene.background = new THREE.Color("#f5f7fb");
     const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 100);
-    const ambient = new THREE.HemisphereLight("#ffffff", "#d4d8df", 2.1);
-    const key = new THREE.DirectionalLight("#fff1dc", 2.4);
-    key.castShadow = true;
-    key.shadow.mapSize.set(2048, 2048);
-    key.shadow.bias = -0.0005;
-    key.shadow.normalBias = 0.02;
-    scene.add(ambient, key, key.target);
+    const lighting = createLegacyLighting(scene);
+    const { key } = lighting;
 
     const clock = new THREE.Clock(false);
+    const frameClock = new FrameClock();
+    // วัสดุของตัวแทนเงาทุกตัว (ดู attachShadowProxy) — ไม่ถูกวาดในรอบภาพเพราะ drawRange เป็น 0
+    const shadowProxyMaterial = new THREE.MeshBasicMaterial({ name: "ShadowProxyMaterial" });
+    const thoughtOverlay = overlayRef.current ? createThoughtOverlayManager(overlayRef.current) : null;
     const customers = new Map<number, AnimatedCustomer>();
+    const seatReachShifts = new Map<number, number>();
     /** เก้าอี้ของผังปัจจุบันตาม id — สร้างใหม่ทุกครั้งที่เปลี่ยนชุดเฟอร์นิเจอร์ */
     let chairRigs = new Map<string, ChairRig>();
     const collectChairRigs = (furniture: THREE.Group) => {
@@ -1172,6 +1193,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const controller = getSimulationController();
     let templateMaterial: THREE.MeshStandardMaterial | null = null;
     const quality = new AdaptiveQuality();
+    sceneInstances += 1;
     const customerAsset = characterAsset(CHARACTER_MODELS.customer);
     const staffAsset = characterAsset(CHARACTER_MODELS.staff);
     const staff: StandingStaff[] = [];
@@ -1214,6 +1236,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       // วัสดุสีเฉพาะตัว (customerMaterial) — geometry ใช้ร่วมกับ template จึงไม่คืนที่นี่
       if (customer.body && customer.body.material !== templateMaterial) (customer.body.material as THREE.Material).dispose();
       customers.delete(id);
+      seatReachShifts.delete(id);
     };
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
@@ -1243,8 +1266,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         }
         asset.clips = gltf.animations;
         const walkClip = THREE.AnimationClip.findByName(asset.clips, "Walk");
-        const stride = gltf.scene.getObjectByName("CafeMannequin")?.userData.walkCycleDistance;
+        const mannequin = gltf.scene.getObjectByName("CafeMannequin");
+        const stride = mannequin?.userData.walkCycleDistance;
+        if (typeof stride === "number" && stride > 0) asset.walkCycleDistance = stride * CUSTOMER_SCALE;
         if (walkClip && typeof stride === "number" && stride > 0) asset.walkSpeed = stride * CUSTOMER_SCALE / walkClip.duration;
+        // markers เป็นของ GLB ที่โหลดได้จริง ไฟล์เก่าที่ไม่มีจะได้ {} แล้ว controller ใช้ค่า fallback
+        const markers = mannequin?.userData.animationMarkers;
+        asset.markers = markers && typeof markers === "object" ? markers as CharacterAsset["markers"] : {};
         onReady();
       };
       loader.load(asset.urls.lite, (gltf) => accept(gltf, false), undefined, () => {
@@ -1285,30 +1313,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
       staff.length = 0;
     };
-    const plateGeometry = new THREE.CylinderGeometry(0.13, 0.1, 0.025, 20);
-    const plateMaterial = new THREE.MeshStandardMaterial({ color: 0xfaf7f0, roughness: 0.5 });
-    const foodGeometry = new THREE.SphereGeometry(0.08, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-    const foodMaterial = new THREE.MeshStandardMaterial({ color: 0xe0a23a, roughness: 0.8 });
-    // ถาดเสิร์ฟ: แผ่นถาดกับขอบถาดบาง ๆ ใต้แผ่น (ใช้ geometry/material ชุดเดียวทั้งร้าน)
-    const trayGeometry = new THREE.BoxGeometry(0.42, 0.022, 0.3);
-    const trayRimGeometry = new THREE.BoxGeometry(0.46, 0.012, 0.34);
-    const trayMaterial = new THREE.MeshStandardMaterial({ color: 0x3c4150, roughness: 0.65 });
-    /** ถาดพร้อมจานอาหาร วางไว้ระดับมือหน้าตัวพนักงาน (ซ่อนไว้จนถึงตอนเสิร์ฟ) */
-    const createTray = () => {
-      const tray = new THREE.Group();
-      const board = new THREE.Mesh(trayGeometry, trayMaterial);
-      const rim = new THREE.Mesh(trayRimGeometry, trayMaterial);
-      rim.position.y = -0.014;
-      const plate = new THREE.Mesh(plateGeometry, plateMaterial);
-      plate.position.y = 0.024;
-      const food = new THREE.Mesh(foodGeometry, foodMaterial);
-      food.position.y = 0.036;
-      tray.add(board, rim, plate, food);
-      tray.position.set(0, TRAY_HEIGHT / CUSTOMER_SCALE, TRAY_FORWARD / CUSTOMER_SCALE);
-      tray.scale.setScalar(1 / CUSTOMER_SCALE);
-      tray.visible = false;
-      return tray;
-    };
+    const servingProps = createLegacyServingProps(CUSTOMER_SCALE, TRAY_HEIGHT, TRAY_FORWARD);
+    const { createTray } = servingProps;
     /** พนักงานหนึ่งคน (ท่าทำงานที่เคาน์เตอร์) — ระหว่างจำลองจะเดินตาม simulation */
     const addStaffMember = (x: number, z: number, rotation: number, index: number): StandingStaff => {
       const model = cloneSkinned(staffAsset.template!);
@@ -1324,10 +1330,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       // ตั้งท่าทันที — ฉากนิ่งวาดเฟรมเดียว พนักงานจึงต้องอยู่ในท่ายืนตั้งแต่เฟรมแรก
       mixer.update(index * STAFF_IDLE_PHASE);
       const body = model.getObjectByName(BODY_MESH_NAME);
-      if (body instanceof THREE.SkinnedMesh && staffAsset.liteBody) attachShadowProxy(body, staffAsset.liteBody, quality.current.characterShadows);
+      if (body instanceof THREE.SkinnedMesh && staffAsset.liteBody) attachShadowProxy(body, staffAsset.liteBody, quality.current.characterShadows, shadowProxyMaterial);
       const cap = model.getObjectByName(STAFF_CAP_NAME);
       if (cap) cap.castShadow = quality.current.characterShadows;
       const member: StandingStaff = {
+        staffId: index,
         mixer, model, body: body instanceof THREE.SkinnedMesh ? body : null,
         target: null, targetRotation: rotation, animation: "Work", action, tray: null,
       };
@@ -1359,7 +1366,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     };
 
     /** ระหว่างจำลอง: พนักงานหน้าร้านตามจำนวนที่ตั้งไว้ เดินรับออร์เดอร์ เสิร์ฟ เก็บโต๊ะตาม simulation */
-    const syncSimStaff = () => {
+    const syncSimStaff = (modern: boolean) => {
       const current = controller.current;
       if (!current) return;
       if (!staffAsset.template) {
@@ -1374,10 +1381,16 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         removeStaff();
         for (let i = 0; i < count; i++) {
           const member = addStaffMember(frame[i * STAFF_STRIDE + 1]!, frame[i * STAFF_STRIDE + 2]!, 0, i);
+          // Snapshot และ buffer ใช้ id ตัวแรกของแต่ละ stride ไม่ใช่ลำดับใน array
+          member.staffId = frame[i * STAFF_STRIDE]!;
           member.target = member.model.position.clone();
           const tray = createTray();
           member.model.add(tray);
           member.tray = tray;
+          if (modern) {
+            member.action?.stop();
+            member.action = null;
+          }
         }
       }
       const tables = layout?.objects.filter((o) => o.type === "table") ?? [];
@@ -1404,13 +1417,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           if (Math.hypot(spot.position.x - x, spot.position.y - z) < 0.05) member.targetRotation = Math.atan2(spot.facing.x, spot.facing.y);
         }
         target.set(x, 0, z);
-        if (member.tray) member.tray.visible = code === STAFF_STATE_CODE.serving;
+        // staff-actions เป็นเจ้าของถาดและคลิปเมื่อมี metadata จึงไม่สลับทับกัน
+        if (member.tray && !modern) member.tray.visible = code === STAFF_STATE_CODE.serving;
         // อยู่ในครัว (หลังผนัง) — ไม่ต้องวาดจนกว่าจะเดินออกมา
         member.model.visible = code !== STAFF_KITCHEN_CODE;
       });
     };
 
-    const syncCustomers = () => {
+    const syncCustomers = (modern: boolean) => {
       const current = controller.current;
       if (!customerAsset.template || !current) return;
       const liveIds = new Set<number>();
@@ -1423,7 +1437,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const z = agents[offset + 2]!;
         const state = agents[offset + 3]!;
         const animation = animationFor(state);
-        const seatedChair = state === AGENT_STATE_SEATED
+        // โหมดใหม่: เก้าอี้ของแต่ละคนมาจาก party.chairIds ผ่านสาย seating ไม่ใช่เก้าอี้ที่ใกล้ที่สุด
+        const seatedChair = !modern && state === AGENT_STATE_SEATED
           ? chairs.reduce<(typeof chairs)[number] | null>((nearest, chair) => {
               const center = objectCenter(chair);
               const currentDistance = (center.x - x) ** 2 + (center.y - z) ** 2;
@@ -1448,7 +1463,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           scene.add(model);
           const body = model.getObjectByName(BODY_MESH_NAME);
           if (body instanceof THREE.SkinnedMesh && templateMaterial) body.material = customerMaterial(templateMaterial, look.colors);
-          if (body instanceof THREE.SkinnedMesh && customerAsset.liteBody) attachShadowProxy(body, customerAsset.liteBody, quality.current.characterShadows);
+          if (body instanceof THREE.SkinnedMesh && customerAsset.liteBody) attachShadowProxy(body, customerAsset.liteBody, quality.current.characterShadows, shadowProxyMaterial);
           customer = {
             mixer: new THREE.AnimationMixer(model),
             action: null,
@@ -1462,7 +1477,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
             idleOffset: (id * 1.37) % 6,
             seat: null,
           };
-          playClip(customer, animation);
+          if (!modern) playClip(customer, animation);
           customers.set(id, customer);
         }
         const dx = targetX - customer.target.x;
@@ -1476,7 +1491,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         customer.target.set(targetX, 0, targetZ);
         // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
         const standing = animation === "Walk" && customer.animation === "Idle";
-        if (animation !== customer.animation && !standing) {
+        // โหมดใหม่: customer-actions/seating เป็นเจ้าของคลิปและจังหวะเก้าอี้ทั้งหมด
+        if (!modern && animation !== customer.animation && !standing) {
           const rig = animation === "Sit" && seatedChair ? chairRigs.get(seatedChair.id) : undefined;
           if (customer.seat) {
             // ลุก: เลื่อนเก้าอี้ออกก่อน (ท่าลุกเริ่มใน stepSeat) — ยังไม่ทันนั่งก็เดินต่อได้เลย
@@ -1528,9 +1544,57 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
     };
 
+    /**
+     * โหมดใหม่: ขยับตำแหน่ง/ทิศของทุกตัวก่อนที่ feature จะอ่าน แล้ว feature จึงตั้งคลิปเองทั้งหมด
+     * - พนักงานและลูกค้าที่ยังเดินใช้เป้าหมายจาก pacer ของ feat-115 เหมือนเดิม
+     * - ลูกค้าที่นั่งใช้ตำแหน่งจากสาย seating (เก้าอี้จริงของคนนั้น) ไม่ใช่เก้าอี้ที่ใกล้ที่สุด
+     */
+    const moveModernCharacters = (
+      delta: number,
+      blend: number,
+      body: THREE.BufferGeometry | null,
+      staffBody: THREE.BufferGeometry | null,
+    ) => {
+      const turnTowards = (object: THREE.Object3D, target: number) => {
+        const turn = target - object.rotation.y;
+        object.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
+      };
+      for (const member of staff) {
+        if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
+        if (!member.target) continue;
+        member.model.position.lerp(member.target, blend);
+        turnTowards(member.model, member.targetRotation);
+      }
+      const seats = new Map((features.seating?.getBodyPlacements() ?? []).map((seat) => [seat.renderAgentId, seat]));
+      const eating = new Map((features.customerActions?.getReports() ?? []).map((report) => [report.renderAgentId, report]));
+      for (const [id, customer] of customers) {
+        if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
+        const seat = seats.get(id);
+        const rig = seat ? chairRigs.get(seat.chairId) : undefined;
+        if (!seat || !rig) {
+          seatReachShifts.delete(id);
+          customer.model.position.lerp(customer.target, blend);
+          turnTowards(customer.model, customer.targetRotation);
+          continue;
+        }
+        // สะโพกถอยชิดพนักพิงเมื่อนั่งแล้ว และขยับเข้าหาโต๊ะเท่าที่คลิป Eat ต้องการ (ไม่เกินระยะที่เก้าอี้สอดใต้โต๊ะ)
+        const report = eating.get(id);
+        const reach = report?.eating
+          ? nextSeatReachShift(seatReachShifts.get(id) ?? 0, report.plateForwardCorrection, MAX_SEAT_REACH_SHIFT)
+          : 0;
+        seatReachShifts.set(id, reach);
+        const along = seat.outwardOffset - (seat.seated ? SEATED_FRONT_OFFSET : 0) - reach;
+        customer.model.position.copy(rig.home).addScaledVector(rig.out, along);
+        turnTowards(customer.model, Math.atan2(seat.facing.x, seat.facing.y));
+      }
+    };
+
     /** ลูกค้าหลายสิบตัว × 2 รอบ (ภาพ + เงา) — ตอนตัวเล็กบนจอใช้ผิวรุ่นเบา ซูมเข้าใกล้ค่อยใช้รุ่นละเอียด */
+    const rendererSize = new THREE.Vector2();
     const wantsLiteBody = () => {
-      const pixelsPerMeter = (renderer.domElement.clientHeight * camera.zoom) / (camera.top - camera.bottom);
+      // ขนาดจาก renderer (ตั้งไว้ตอน resize) ไม่ใช่ clientHeight: การอ่าน clientHeight ทุกเฟรมบังคับ
+      // ให้เบราว์เซอร์คำนวณ layout ใหม่ ซึ่งแพงขึ้นตามจำนวนก้อนความคิดที่เพิ่งขยับในเฟรมก่อน
+      const pixelsPerMeter = (renderer.getSize(rendererSize).y * camera.zoom) / (camera.top - camera.bottom);
       return pixelsPerMeter * CUSTOMER_HEIGHT * CUSTOMER_SCALE < LITE_MAX_SCREEN_HEIGHT;
     };
     /** ผิวที่ควรใช้ตอนนี้ — ซูมใกล้ครั้งแรกค่อยโหลดรุ่นละเอียด (ระหว่างโหลดใช้รุ่นเบาไปก่อน) */
@@ -1546,6 +1610,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, level.maxPixelRatio));
       scene.traverse((object) => {
         if (object.name === "ShadowProxy" || object.name === STAFF_CAP_NAME) object.castShadow = level.characterShadows;
+        if (object.name === "ShadowProxy") object.visible = level.characterShadows;
       });
       if (key.shadow.mapSize.x !== level.shadowMapSize) {
         key.shadow.mapSize.set(level.shadowMapSize, level.shadowMapSize);
@@ -1559,6 +1624,17 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
 
     // วาดตามต้องการ: ฉากนิ่งวาดเฟรมเดียวแล้วหยุด; ระหว่างจำลอง loop ต่อเนื่อง; หยุดจำลองแต่มีลูกค้าค้างอยู่ ~30 fps
     let lastRenderAt = 0;
+    /**
+     * จองเฟรมถัดไปได้ใบเดียวเท่านั้น
+     *
+     * tick ตั้ง `frame = 0` ตอนเริ่ม เพื่อให้ invalidate() ที่ถูกเรียกระหว่างวาด (จาก controller,
+     * store ของแสง, จาน/คราบบนโต๊ะ ฯลฯ) ปลุกเฟรมถัดไปได้ แต่เดิมท้าย tick ยังจองใบใหม่ทับใบที่
+     * invalidate จองไว้ ใบเก่าไม่ถูกยกเลิกและยังทำงาน — หนึ่งเฟรมที่จอแสดงจึงวาดฉากซ้ำหลายรอบ
+     * (วัดได้ ~5–6 รอบในฉากหนาแน่น: ช่วงระหว่าง tick มัธยฐาน 7 ms ขณะที่ภาพออกจริงทุก ~280 ms)
+     */
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(tick);
+    };
     const tick = () => {
       frame = 0;
       if (disposed) return;
@@ -1566,7 +1642,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const simulating = isSimRef.current;
       const running = simulating && !pausedRef.current;
       if (!running && customers.size > 0 && lastRenderAt && now - lastRenderAt < PAUSED_FRAME_MS) {
-        frame = requestAnimationFrame(tick);
+        schedule();
         return;
       }
       // วัดความเร็วเครื่องเฉพาะระหว่างจำลองที่เดินอยู่ (loop เต็มความเร็ว) — ช้าต่อเนื่องก็ลดคุณภาพ
@@ -1574,16 +1650,55 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         if (quality.sample(now - lastRenderAt) !== null) applyQuality();
       } else quality.reset();
       lastRenderAt = now;
-      const delta = Math.min(clock.getDelta(), MAX_FRAME_DELTA);
+      const realDelta = clock.getDelta();
+      // เฟรมช้าไม่ทิ้งเวลา: ส่วนที่เกินเพดานถูกเก็บเป็นหนี้แล้วทยอยคืน (runtime/frame-clock.ts)
+      const step = frameClock.step(realDelta, running);
+      const delta = running ? step.seconds : Math.min(realDelta, MAX_FRAME_DELTA);
       const cameraAnimating = stage.updateCamera(now);
       const roomAnimating = stage.updateRoomTransition(now);
+      const modernFrame = simulating && controller.current?.presentation !== undefined;
       if (simulating) {
-        syncCustomers();
-        syncSimStaff();
+        syncCustomers(modernFrame);
+        syncSimStaff(modernFrame);
       }
       const blend = Math.min(1, delta * 14);
       const body = bodyForZoom(customerAsset);
       const staffBody = staff.length > 0 ? bodyForZoom(staffAsset) : null;
+      const presentation = simulating ? controller.current?.presentation : undefined;
+      // worker รุ่นเก่าหรือยังไม่มี metadata → เดินเส้นทางเดิมทั้งหมด ไม่เดาสถานะอาหาร/คราบ/ที่นั่ง
+      const modern = presentation !== undefined;
+      const frameInput = {
+        nowMs: now, realDeltaSeconds: running ? step.seconds : 0,
+        playbackRate: simulationStore.getState().config.speed,
+        simulating, paused: pausedRef.current, presentation,
+      };
+      frameInfo = {
+        modern, simulating, running,
+        simTimeSeconds: presentation?.simTimeSeconds ?? null,
+        playbackRate: frameInput.playbackRate,
+        frameDebtSeconds: step.debt,
+        customerCount: customers.size,
+        staffCount: staff.length,
+      };
+      if (modern) {
+        // หยุดชั่วคราว = หยุดภาพทั้งหมด ไม่ใช่แค่หยุดเดิน: คลิป loop ต้องไม่ขยับต่อด้วย
+        const animationDelta = running ? delta : 0;
+        moveModernCharacters(animationDelta, running ? blend : 0, body, staffBody);
+        // feature อ่านตำแหน่งที่วาดจริงของเฟรมนี้ แล้วตั้งคลิป/ถาด/เก้าอี้
+        runtime.update(frameInput);
+        for (const member of staff) member.mixer.update(animationDelta);
+        for (const customer of customers.values()) customer.mixer.update(animationDelta);
+        renderer.render(scene, camera);
+        const showThoughts = simulationStore.getState().showThoughts;
+        thoughtOverlay?.update(presentation, camera, renderer, customers, staff, showThoughts, pausedRef.current);
+        if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
+          schedule();
+        } else {
+          clock.stop();
+          lastRenderAt = 0;
+        }
+        return;
+      }
       for (const member of staff) {
         if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
         if (!member.target) {
@@ -1604,6 +1719,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         );
       }
       stepChairs(delta);
+      runtime.update(frameInput);
       for (const customer of customers.values()) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         if (customer.seat) {
@@ -1641,7 +1757,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
       renderer.render(scene, camera);
       if (simulating || customers.size > 0 || cameraAnimating || roomAnimating) {
-        frame = requestAnimationFrame(tick);
+        schedule();
       } else {
         clock.stop();
         lastRenderAt = 0;
@@ -1650,7 +1766,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const invalidate = () => {
       if (disposed || frame) return;
       if (!clock.running) clock.start();
-      frame = requestAnimationFrame(tick);
+      schedule();
     };
 
     const resize = () => {
@@ -1765,8 +1881,73 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       };
       invalidate();
     };
+    /**
+     * พอร์ตที่ host ส่งให้ feature: feature อ่าน rig แล้วคุมคลิป/ถาด/เก้าอี้ แต่ตำแหน่งตัวละคร
+     * ยังมาจาก pacer ของ feat-115 ที่ host เป็นเจ้าของ และ host เป็นผู้เดินเวลา mixer เอง
+     */
+    const reducedMotionActive = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+    const staffRigCache = new WeakMap<StandingStaff, StaffRig>();
+    const staffRigOf = (member: StandingStaff): StaffRig => {
+      let rig = staffRigCache.get(member);
+      if (!rig || rig.staffId !== member.staffId || rig.tray !== member.tray || rig.clips !== staffAsset.clips) {
+        rig = {
+          staffId: member.staffId,
+          model: member.model,
+          mixer: member.mixer,
+          clips: staffAsset.clips,
+          markers: staffAsset.markers,
+          walkCycleDistance: staffAsset.walkCycleDistance,
+          tray: member.tray,
+          getObject: (name: string) => member.model.getObjectByName(name) ?? null,
+        };
+        staffRigCache.set(member, rig);
+      }
+      return rig;
+    };
+    const customerRigCache = new WeakMap<AnimatedCustomer, CustomerRig>();
+    const customerRigOf = (id: number, customer: AnimatedCustomer): CustomerRig => {
+      let rig = customerRigCache.get(customer);
+      if (!rig || rig.renderAgentId !== id || rig.clips !== customerAsset.clips) {
+        rig = {
+          renderAgentId: id,
+          model: customer.model,
+          mixer: customer.mixer,
+          clips: customerAsset.clips,
+          markers: customerAsset.markers,
+          walkCycleDistance: customerAsset.walkCycleDistance,
+          modelScale: CUSTOMER_SCALE,
+          getObject: (name: string) => customer.model.getObjectByName(name) ?? null,
+        };
+        customerRigCache.set(customer, rig);
+      }
+      return rig;
+    };
+    const features: SceneFeatureHandles = createSceneFeatureFactories({
+      staffRigs: { listRigs: () => staff.map(staffRigOf) },
+      customerRigs: { listRigs: () => [...customers].map(([id, customer]) => customerRigOf(id, customer)) },
+      chairRigs: {
+        listChairs: (): readonly SeatingChairRig[] =>
+          [...chairRigs].map(([chairId, rig]) => ({ chairId, object: rig.object, home: rig.home })),
+      },
+      reducedMotion: reducedMotionActive,
+      // แสงจริงรับไฟเดิมของฉากไปใช้ ไม่สร้างดวงที่สองทับ
+      lighting: { existingLights: { sunLight: lighting.key, skyGroundLight: lighting.ambient } },
+    });
+    /** สถานะเฟรมล่าสุดสำหรับ diagnostic hook — อัปเดตใน tick ไม่สร้าง object ใหม่ต่อเฟรม */
+    let frameInfo: SceneFrameInfo = {
+      modern: false, simulating: false, running: false, simTimeSeconds: null,
+      playbackRate: 1, frameDebtSeconds: 0, customerCount: 0, staffCount: 0,
+    };
+    const runtime = createSceneRuntime({
+      scene, camera,
+      getLayout: () => stageRef.current?.layout ?? null,
+      getQuality: () => quality.current,
+      invalidate,
+      invalidateShadows: () => { renderer.shadowMap.needsUpdate = true; invalidate(); },
+    }, features.factories);
     const stage: Stage = {
       renderer,
+      runtime,
       scene,
       camera,
       key,
@@ -1786,6 +1967,39 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       updateRoomTransition,
     };
     stageRef.current = stage;
+    // QA อัตโนมัติอ่านสิ่งที่ feature ตัดสินใจได้ เฉพาะเมื่อมีการตั้ง flag ไว้ก่อนฉากถูกสร้าง
+    const removeDiagnostics = installSceneDiagnostics(typeof window === "undefined" ? undefined : (window as unknown as Record<string, unknown>), {
+      version: 1,
+      staffActions: () => features.staffActions?.getReports() ?? [],
+      customerActions: () => features.customerActions?.getReports() ?? [],
+      seating: () => features.seating?.getReports() ?? [],
+      tableService: () => {
+        const stats = features.tableService?.getStats();
+        if (!stats) return null;
+        const { tableCount, activeDishCount, activeStainTableCount, activeStainMeshCount } = stats;
+        return { tableCount, activeDishCount, activeStainTableCount, activeStainMeshCount };
+      },
+      renderer: () => readRendererCounters(renderer.info),
+      frame: () => frameInfo,
+      quality: () => {
+        let visibleShadowProxies = 0;
+        scene.traverse((object) => {
+          if (object.name === "ShadowProxy" && object.visible) visibleShadowProxies += 1;
+        });
+        const level = quality.current;
+        return {
+          level: quality.level,
+          maxPixelRatio: level.maxPixelRatio,
+          characterShadows: level.characterShadows,
+          shadowMapSize: level.shadowMapSize,
+          pixelRatio: renderer.getPixelRatio(),
+          shadowAutoUpdate: renderer.shadowMap.autoUpdate,
+          visibleShadowProxies,
+          sampler: quality.stats,
+          sceneInstances,
+        };
+      },
+    });
     const observer = new ResizeObserver(resize);
     observer.observe(host);
 
@@ -1796,21 +2010,28 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       disposed = true;
       cancelAnimationFrame(frame);
       observer.disconnect();
-      clearCustomers();
-      disposeContent(stage.room);
-      disposeContent(stage.floor);
-      disposeContent(stage.furniture);
-      // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
-      for (const member of staff) member.mixer.stopAllAction();
-      for (const resource of [plateGeometry, plateMaterial, foodGeometry, foodMaterial, trayGeometry, trayRimGeometry, trayMaterial]) resource.dispose();
-      for (const asset of [customerAsset, staffAsset]) {
-        disposeModel(asset.template);
-        disposeModel(asset.fullScene);
+      removeDiagnostics();
+      try {
+        runtime.dispose();
+      } finally {
+        clearCustomers();
+        disposeContent(stage.room);
+        disposeContent(stage.floor);
+        disposeContent(stage.furniture);
+        // geometry/material ของโมเดลถูกแชร์ระหว่าง clone ทุกตัว — คืนครั้งเดียวที่ template
+        for (const member of staff) member.mixer.stopAllAction();
+        servingProps.dispose();
+        for (const asset of [customerAsset, staffAsset]) {
+          disposeModel(asset.template);
+          disposeModel(asset.fullScene);
+        }
+        lighting.dispose();
+        shadowProxyMaterial.dispose();
+        thoughtOverlay?.dispose();
+        renderer.dispose();
+        renderer.domElement.remove();
+        stageRef.current = null;
       }
-      key.shadow.map?.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
-      stageRef.current = null;
     };
   }, [onUnavailable]);
 
@@ -1828,16 +2049,16 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       setRoomOpacity(room, roomOpacityForView(viewRotation));
       stage.replaceContent(buildFloorContent(layout), room, buildFurnitureContent(layout));
       stage.syncStaff();
+      stage.runtime.syncLayout(layout);
       // เงาฉากนิ่งอาจปิด autoUpdate ไว้ (เครื่องช้า) — แก้ผังจริงจึงต้องวาด shadow map ใหม่
       stage.renderer.shadowMap.needsUpdate = true;
     } else if (viewChanged) {
       stage.animateRoom(viewRotation);
     }
     // การหมุนมุมมองไม่ใช่การเปลี่ยนขนาดร้าน จึงไม่แตะตำแหน่งไฟหรือ shadow camera
-    if (layoutSizeChanged) {
-      fitKeyLight(stage.key, layout);
-      stage.resize();
-    } else if (viewChanged) stage.animateCamera();
+    // ตำแหน่งแดดและ shadow camera เป็นของ feature แสง (feat-121) ซึ่ง fit เองใน syncLayout
+    if (layoutSizeChanged) stage.resize();
+    else if (viewChanged) stage.animateCamera();
     stage.invalidate();
   }, [layout, viewRotation]);
 
@@ -1850,6 +2071,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const stage = stageRef.current;
     if (!stage) return;
     if (!isSim) {
+      stage.runtime.reset();
       stage.clearCustomers();
       // กลับมายืนประจำหลังเคาน์เตอร์
       stage.syncStaff();
@@ -1874,6 +2096,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       data-testid="three-view"
     >
       <div ref={hostRef} className="absolute inset-0" />
+      <div
+        ref={overlayRef}
+        className="pointer-events-none absolute inset-0 z-10 overflow-hidden"
+        data-testid="character-thought-overlay"
+      />
     </figure>
   );
 }

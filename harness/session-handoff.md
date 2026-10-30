@@ -3,108 +3,278 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
-## 2026-10-28 ICT — ลูกค้าดึงเก้าอี้ออกก่อนนั่ง แล้วดันเข้า (3D)
+## 2026-10-30 ICT — ตรวจสอบสมบูรณ์พร้อม Commit (feat-150 & feat-138..155)
 
-- **ผลลัพธ์**: เก้าอี้ใน 3D แยกเป็น object ที่ขยับได้ (ไม่รวมกับเฟอร์นิเจอร์อื่น); นั่ง = ดึงเก้าอี้ออก 0.3 ม. → นั่งลง → ดันเก้าอี้พร้อมคนเข้าโต๊ะ, ลุก = เลื่อนออก → ลุก → เดินไป แล้วเก้าอี้เลื่อนกลับ (`seat-motion.ts`, `three-view.tsx`)
-- **การตรวจ**: `seat-motion.test.ts` 3 ข้อ, `npm test` 981 ผ่าน, ESLint + `tsc` ผ่าน, ดูภาพ Chromium 3D
-- **ข้อควรรู้**: เป็นภาพอย่างเดียว engine ไม่รู้เรื่องเก้าอี้เลื่อน; เวลาเลื่อนเป็นวินาทีจริง ไม่คูณความเร็วจำลอง; 2D/SVG fallback ยังไม่มีภาพเก้าอี้เลื่อน
+- **Review สองสายงานที่รวมกันใน working tree**:
+  1. `feat-150`: แก้ต้นเหตุ 3D framerate กระตุกจากการจอง rAF ซ้ำซ้อน 5–6 รอบต่อเฟรมใน `three-view.tsx` ด้วย `schedule()`, ปรับ matrix updates, shadow proxy, thought overlay viewport sizing และเพิ่ม diagnostic hook `hook.quality()`
+  2. `feat-138..155`: ปรับพฤติกรรมการจำลองร้านอาหาร (ลูกค้ายกเลิกเมื่อรอนาน, จัดโต๊ะพอดีกลุ่ม, แยกเวลารอโต๊ะ/รออาหาร, สัดส่วนกลุ่ม 1–4 คน, ความอดทนกลุ่ม 80–120%, เกณฑ์คิวยาวแล้วกลับทันที, เวลาปรุงตามเมนู, สองช่วงพีค, 6 seeds simulation, คนรับเงินประจำ, ความเร็วงานรายคน, ช่วงพักทีมพร้อมกัน/ทยอยพัก, แยกสาเหตุไม่ได้โต๊ะ, สั่งจานเพิ่ม, นับอาหารที่สูญเสีย)
+- **Verification Gates**:
+  - `npm test`: 113 ไฟล์ 1,354 tests ผ่าน 100%
+  - TypeScript typecheck (`npx tsc --noEmit`): ผ่าน 0 error
+  - ESLint (`npm run lint`): ผ่าน 0 error (1 warning เดิม `_initial`)
+  - Architectural Boundaries: `src/core/` เป็น Pure TypeScript 100% (ไม่มี React, Three.js, DOM, Zustand)
+  - OpenAPI Spec: ผ่าน Redocly lint
+  - Harness Feature List: `scripts/validate_harness.py` ผ่าน (147 done, 2 in-progress, 6 blocked)
+- **Commit**: รวมการแก้ไขทั้งสองชุดเข้าสู่ git repository อย่างสมบูรณ์
 
-## 2026-10-28 ICT — มือถือรันโค้ดจำลองรุ่นเก่า (พนักงานหาย / รอหน้าเข้า undefined)
+## 2026-10-30 ICT — ตรวจความเรียบร้อยการจำลอง
 
-- **ผลลัพธ์**: ต้นเหตุคือ `public/sw.js` ส่งไฟล์เริ่ม worker ของ Turbopack (`turbopack-worker-*.js` ชื่อเดิมทุก build) จากแคชตรง ๆ — worker ได้ URL พร้อม `#params` (รายชื่อ chunk) ของ build ที่แคชครั้งแรก จึงรัน engine รุ่นเก่า (ไม่มี staff / waitingEntrance) แก้โดยห่อ response ใหม่ให้ worker ใช้ URL ของคำขอปัจจุบัน และขึ้น `VERSION` เป็น v3 ล้างแคชเก่า
-- **การตรวจ**: Playwright (iPhone 13, profile เดิมที่มี SW) — ก่อนแก้ build ใหม่ยังรันโค้ดเก่า, หลังแก้ deploy ถัดไปได้โค้ดใหม่ทุกครั้ง; `npm test` 978 ผ่าน; จำลองบนมือถือ 2D/3D เห็นพนักงานครบ
-- **ข้อควรรู้**: มือถือที่เปิดอยู่ต้องโหลดหน้าใหม่ 1–2 ครั้งหลัง deploy ให้ SW v3 ทำงาน
+- ตรวจ harness/boundaries ผ่าน, typecheck ผ่าน, npm test 113 ไฟล์ 1,354 tests ผ่าน, git diff --check ผ่าน; ยังไม่ได้ทดสอบภาพในเบราว์เซอร์รอบนี้
+- ตรวจซ้ำด้วยชุดทดสอบชั่วคราว: skipQuiet บังคับให้ลูกค้ากลุ่มแรกมาเพิ่ม ทำให้ภาพต่างจาก seed เดียวกันในการวิเคราะห์; พบกรณีภาพวางอาหารแล้วแต่ลูกค้ายังหมดความอดทนและออกก่อนงานเสิร์ฟจบ (มีผลต่อ fed/abandoned/wastedDishes)
+- ค่าเฉลี่ยเวลารอใน day-analysis รวมวันที่ไม่มีลูกค้าได้อาหารเป็น 0 ทำให้ค่าเฉลี่ยต่ำกว่าความจริง; โต๊ะเล็กที่ไม่มีที่วางจานเพิ่มยังซ้อนจานได้
+- เป็นการตรวจและรายงาน ยังไม่ได้แก้ปัญหา; ห้ามเพิ่มซื้อกลับบ้านหรือเดลิเวอรี และระวังไฟล์ 3D/evidence จากอีกงานใน workspace
 
-## 2026-10-28 ICT — Code Review: คืนทรัพยากรถาด 3D และแก้ CRLF ใน test design tokens
+## 2026-10-30 ICT — feat-150 เสร็จ: มุมมอง 3D ลื่นไหลขณะจำลอง (ต้นเหตุคือวาดซ้ำ 5–6 รอบต่อเฟรม)
 
-- **ผลลัพธ์**: Review โค้ด commit `1e6a8fc` ผ่านการตรวจสอบ boundary, แก้ memory leak ใน `three-view.tsx` เพิ่ม disposal ทรัพยากรถาดเสิร์ฟ (`trayGeometry`, `trayRimGeometry`, `trayMaterial`), และแก้ CRLF normalization ใน `src/test/design-tokens.test.ts`
-- **การตรวจ**: `design-tokens.test.ts`, `staff-pacer.test.ts`, `staff-visual.test.ts` ผ่านครบ 100%, `npm run lint` ผ่าน, `python scripts/validate_harness.py` ผ่าน
-- **ข้อควรรู้**: การรัน vitest ทั้งหมด 77 ไฟล์พร้อมกันบน Windows อาจเกิด timeout จาก CPU workload แต่เมื่อทดสอบแยกตามชุดไฟล์ผ่านปกติทั้งหมด
+- **ต้นเหตุหลัก**: `three-view.tsx` ตั้ง `frame = 0` ตอนเริ่ม `tick` เพื่อให้ `invalidate()` ที่ถูกเรียก
+  ระหว่างวาด (controller, store ของแสง, จาน/คราบ) ปลุกเฟรมถัดไปได้ แต่ท้าย `tick` จอง rAF ใบใหม่
+  **ทับ** ใบที่ invalidate จองไว้ ใบเก่าไม่ถูกยกเลิกและยังทำงาน → หนึ่งเฟรมที่จอแสดงวาดฉากซ้ำ 5–6 รอบ
+  แก้ด้วย `schedule()` ที่จองได้ใบเดียว (`if (!frame)`)
+- **ผลบนเครื่องอ้างอิง GTX 1050 Ti** (ฉากหนาแน่น 80 ที่นั่ง ลูกค้า 60 + พนักงาน 8, draw calls 677,
+  ขณะจำลองเดินจริง, คุณภาพขั้นสูงสุด): median **860 ms (1.2 fps) → 20 ms (50 fps)** p95 49.5 ·
+  ทุกความเร็ว 1×–30× median 20 ms กระตุก 0% (เดิม 120–240 ms กระตุก 97–98%) ·
+  รันต่อเนื่อง 6 ช่วง × 150 วินาที median 20 ms ทุกช่วง selfPauses 0 heap 43.5 → 29.8 MB
+- **แก้เพิ่มจากที่วัดได้** (ทุกข้อมีตัวเลขรองรับ): `getDishPlacements` ไม่บังคับคำนวณเมทริกซ์ทั้งฉาก
+  ต่อลูกค้าทุกเฟรม · `wantsLiteBody`/`thought-overlay` ใช้ `renderer.getSize()` แทนการอ่าน layout ·
+  ShadowProxy ใช้วัสดุของตัวเอง (geometry ของ proxy ไม่มี morph `EatGrip` ของผิวตัว ทำให้ three
+  รีเซ็ตโปรแกรม shader ทุก draw) และปิด `visible` เมื่อไม่ทอดเงา · mesh ที่รวมแล้ว `matrixAutoUpdate = false` ·
+  `setGrip` จำ mesh · คราบที่ไม่ทอดเงาไม่สั่งวาด shadow map ใหม่ · `adaptive-quality` เพดานทิ้งเฟรม
+  900 → 5000 ms และข้าม 2 ขั้นเมื่อช้ากว่าเป้าเกิน 4 เท่า · ก้อนความคิดไม่เด้งขณะหยุดชั่วคราว
+- **เครื่องมือใหม่**: `hook.quality()` (read-only, เฉพาะเมื่อมี `__wangraanDiagnostics`) รายงาน
+  ขั้นคุณภาพ, `pixelRatio` ที่ renderer ใช้จริง, `shadowAutoUpdate`, `visibleShadowProxies`,
+  `sampler` (ช่วงเฟรมที่ตัววัดเห็น) และ `sceneInstances` — `sampler` คือสิ่งที่ชี้ตัวต้นเหตุรอบนี้
+- **หลักฐานของ feat-123 ถูกแก้ให้ตรงความจริง**: ตัวเลข 50 fps ฉากหนาแน่นเดิมวัดตอน controller
+  หยุดภาพเองไปแล้ว (ฉากค้าง ลูป 3D ไม่ทำงาน แต่ลูปวัดยังเดินตาม vsync) ยืนยันด้วยการรันคอมมิต
+  `2f2fb34` ซ้ำบนเครื่องเดิมแล้วช่วงเติมคนจบด้วย `stalled: 21`
+- **Verify**: unit 1,326 ผ่าน · typecheck ผ่าน · lint 0 error (warning เดิม `_initial`) ·
+  `validate_harness.py` ผ่าน · e2e ชุด animation 31/32 แล้ว 30/32 สองข้อที่ล้ม **ผ่านทั้งคู่เมื่อรันเดี่ยว**
+  และอธิบายได้ครบ: "เริ่ม-จบรอบ 10 ครั้ง" ล้มเพราะไฟล์ trace ของ Playwright ถูกลบกลางรัน
+  (`ENOENT ... .playwright-artifacts-1` จากกระบวนการอื่น) · เทสต์แสงล้มเพราะเทียบภาพไบต์ต่อไบต์
+  แล้วมีพิกเซลเดียวที่ (572, 215) กะพริบแบบสุ่ม (ไล่ไทม์ไลน์ 18 วินาทีแล้ว: พิกเซลอื่น 532,416 จุดนิ่ง,
+  CSS animation 0, error 0) จึงให้รอภาพนิ่งก่อนเทียบและเทียบแบบไม่มีการเปลี่ยนที่ตาเห็น
+  (เพดาน 266 จุด = 0.05%) พร้อมบันทึก `movedPixelsWhilePaused` ลงหลักฐาน — รันซ้ำ 3 รอบผ่านหมด (1, 1, 0)
+- **ยังค้าง**: รันชุดรวม e2e อีกครั้งในสภาพแวดล้อมที่ไม่มีอีกเซสชันแก้ไฟล์พร้อมกัน
+- **ข้อควรรู้ (สำคัญ)**: เซสชันนี้ทำงานทับกับอีกเซสชันใน checkout เดียวกัน (feat-138–144 ของอีกเซสชัน)
+  จึงเลือก id `feat-150` เพื่อไม่ชนลำดับที่เขากำลังใช้ และ **ยังไม่ commit** — ไฟล์ของสองงานปนกันอยู่
+  ใน working tree เดียว (ของงานนี้: `three-view.tsx`, `thought-overlay*`, `table-service.ts`,
+  `customer-actions.ts`, `adaptive-quality*`, `scene-diagnostics*`, `e2e/animation-harness.ts`,
+  `e2e/restaurant-animation-lighting.spec.ts`, `harness/evidence/feat-150/`)
 
-## 2026-10-28 ICT — พนักงานเดินให้พอดี ไม่ชิดผนัง ถือถาด แวะครัว 5 วิ
+## 2026-10-30 ICT — ปรับการจำลองร้านตามคำขอ (ยังทำไม่ครบ)
 
-- **ผลลัพธ์**: พนักงานบนจอเดิน 1.4 ม./วินาทีจริงที่ x1 (`staff-pacer.ts`), เส้นทางห่างผนัง 0.35 ม. (`WALL_CLEARANCE`), เดินเข้าประตูครัวหายไป 5 วินาทีแล้วถือถาดมีจานออกมาเสิร์ฟ (3D `createTray`)
-- **การตรวจ**: `npm test` 978 ผ่าน (เหลือ 3 failure เดิมนอกขอบเขต), ESLint ไฟล์งานและ `tsc --noEmit` ผ่าน
-- **ข้อควรรู้**: รหัส 5 (`STAFF_KITCHEN_CODE`) เป็นรหัสเฉพาะภาพ ไม่ได้มาจาก engine — ผู้วาดต้องข้ามคนที่อยู่ในครัว; เวลารอในครัวย่อตามความเร็วเล่นภาพ (x5 = 1 วินาทีจริง); ยังไม่ได้ตรวจด้วยตาใน Chromium
+- feat-138 เสร็จ: ลูกค้ายกเลิกระหว่างรอรับออร์เดอร์ได้และพนักงานหยุดงานที่ถูกยกเลิก; แสดงลูกค้าที่ได้อาหารและกลับในผลปัจจุบันและผลพนักงานแนะนำ; บอกฐานประเมินโต๊ะและนำคำแนะนำซื้อกลับบ้านออก. npm test 1,326 ผ่าน
+- feat-139 เสร็จ: กลุ่มเลือกโต๊ะสะอาดขนาดเล็กที่สุดที่รองรับได้; npm test 1,327 ผ่าน
+- feat-140 เสร็จ: แยกเวลารอโต๊ะและรออาหารผ่านฟอร์ม, worker, core และภาพ; focused 49 ผ่าน, typecheck ผ่าน, npm test 1,328 ผ่าน
+- feat-141 เสร็จ: กำหนดน้ำหนักกลุ่ม 1–4 คนในฟอร์ม ส่งถึงการวิเคราะห์และภาพ ปรับอัตรากลุ่มตามค่าเฉลี่ยเพื่อให้คนต่อชั่วโมงตรง; focused 49, typecheck, npm test 1,329 และ core boundary ผ่าน
+- feat-142 เสร็จ: กลุ่มลูกค้ายอมรอ 80–120% ของค่าที่ตั้ง เปิด/ปิดได้ ใช้ค่าเดียวกันใน core และภาพ; focused 58 tests, typecheck, eslint, core boundary และ npm test 1,332 ผ่าน
+- feat-143 เสร็จ: ตั้งจำนวนคนที่รอแล้วบางกลุ่มตัดสินใจกลับทันทีได้ (0 = ปิด, เมื่อถึงเกณฑ์สุ่ม 50% จาก seed/กลุ่มโดยแยกจาก random หลัก); ผลสรุปแสดงจำนวนนี้เป็นส่วนหนึ่งของคนไม่มีโต๊ะ; focused 53 tests, typecheck, core boundary และ npm test 1,333 ผ่าน
+- feat-144 เสร็จ: เวลาปรุงใช้ชนิดอาหารเดียวกับภาพ (ข้าวผัด/ก๋วยเตี๋ยว 100%, สเต๊ก 150%, สลัด 80%, เค้ก 50% ของเวลามาตรฐาน) โดยเปิด/ปิดได้; focused 61 tests, typecheck, core boundary และ npm test 1,334 ผ่าน
+- feat-145 เสร็จ: เพิ่มพีคที่สอง ตรวจไม่ทับกัน รองรับข้ามวัน ส่งช่วงทั้งหมดไป worker วิเคราะห์และภาพ; targeted 108 tests, typecheck, npm test 1,337 และ responsive Chromium 18 กรณีผ่าน
+- feat-146 เสร็จ: เพิ่มวันจำลองเป็น 6 seed แสดงช่วงจำนวนลูกค้า/ไม่มีโต๊ะ/รออาหารของคนที่ได้อาหาร และแยก random งานเก็บโต๊ะจากการมาถึงเพื่อเทียบพนักงานด้วยลูกค้าชุดเดียวกัน; targeted 80 tests, typecheck และ npm test 1,338 ผ่าน; ผัง 48 ที่นั่งสองกรณีรวม 4.9 วินาทีในเครื่องนี้
+- feat-147 เสร็จ: ตั้งคนประจำรับเงินจากพนักงานหน้าร้านได้โดยคงคนบริการอย่างน้อยหนึ่งคน; แจกงานตามบทบาทและคำแนะนำคงจำนวนคนรับเงิน; focused 83 tests, targeted เพิ่ม 29, typecheck, eslint, npm test 1,341 และ responsive 18 กรณีผ่าน (ใช้ build ที่มีอยู่ เพราะ sandbox ปฏิเสธการสร้าง mock backend)
+- feat-148 เสร็จ: เปิด/ปิดความเร็วงานรายคน 80–120% แยกกระจายตามบทบาทและพ่อครัว คงเวลาเดินเดิม; focused 91 + 41 tests, typecheck, core boundary และ npm test 1,344 ผ่าน
+- feat-149 เสร็จ: การ์ดเทียบจำนวนพนักงานแสดงผู้ได้อาหารและผู้กลับก่อนกินคู่กับเวลารอ และไม่แสดงรอ 0 นาทีเมื่อไม่มีใครได้อาหาร; day-panel 9 tests, eslint, React checklist และ npm test 1,344 ผ่าน
+- feat-155 เสร็จ: นับจานที่ปรุงเสร็จก่อนหรือหลังยกเลิก ไม่รวมจานที่ยังไม่เริ่ม; focused 52, typecheck, eslint, boundary และ npm test 1,354 ผ่าน
+- feat-154 เสร็จ: แยกไม่มีโต๊ะขนาดรองรับ รอโต๊ะไม่ไหว และเห็นคิวแล้วกลับ; focused 71, typecheck, eslint, boundary และ npm test 1,353 ผ่าน
+- feat-153 เสร็จ: เลือกทยอยพักโดยแบ่งช่วงพักเท่ากันตามจำนวนคนในแต่ละทีม งานเดิมทำจนเสร็จและไม่มีการชดเชยเวลาพัก; focused 47, typecheck, eslint, boundary และ npm test 1,352 ผ่าน
+- feat-151 เสร็จ: ตั้งโอกาสสั่งจานเพิ่ม 0–100% ต่อคน ครัวปรุงและพนักงานเสิร์ฟตามจำนวนจาน ภาพหาตำแหน่งจานบนโต๊ะ; ยังเสิร์ฟพร้อมกันทั้งโต๊ะ และโต๊ะเล็กมากอาจมีจานซ้อน; focused 43 tests, typecheck, eslint, boundary และ npm test 1,350 ผ่าน
+- feat-152 เสร็จ: ตั้งช่วงพักพร้อมกันของทีมหน้าร้านและครัว; งานที่เริ่มแล้วทำต่อจนเสร็จ แต่ไม่มอบงานใหม่ระหว่างพัก; มีสถานะระหว่างเล่นและ thought พนักงานพัก; focused 108 tests, typecheck, eslint และ npm test 1,348 ผ่าน
+- งานที่ผู้ใช้ต้องการยังเหลืออีกมาก: สั่งหลายอย่าง/ทยอยเสิร์ฟ, การเดินจากตำแหน่งล่าสุด/หลายงานต่อเที่ยว/เปลี่ยนกะ (พักรายคน), เปรียบเทียบผังและการเบียดกัน; ห้ามเพิ่มซื้อกลับบ้านหรือเดลิเวอรี
+- ระวังไฟล์ 3D และ evidence ที่มีการแก้จากงานอื่นใน workspace; อย่าทับหรือย้อน
 
-## 2026-10-27 ICT — ลูกค้าเดินมาจากนอกร้าน + แถวรอนอกประตู (feat-100)
+## 2026-10-30 ICT — feat-138 อยู่ระหว่างดำเนินการ: ปรับการจำลองร้าน
 
-- **ผลลัพธ์**: ลูกค้าใหม่เดินมาจากนอกร้านเข้าประตู, รอโต๊ะเป็นแถวนอกร้าน, กลับแล้วเดินออกไปนอกร้าน (`walk-pacer.ts`)
-- **การตรวจ**: `npm test` 965, `make lint` ผ่าน, Chromium 3D
-- **ข้อควรรู้**: waiting-entrance เปลี่ยนรหัสเป็น 6; 2D ยังไม่เห็นคนนอกร้าน; ผู้ใช้จะทำงานต่อบนเครื่อง local (pull branch นี้)
+- ผู้ใช้ขอปรับพฤติกรรมลูกค้า พนักงาน และระบบร้านตามบทสนทนา ยกเว้นซื้อกลับบ้านและเดลิเวอรี ยังต้องทยอยทำอีกหลาย feature; อย่าอ้างว่าทั้งหมดเสร็จ
+- เริ่ม feat-138: ให้ลูกค้าที่รอรับออร์เดอร์หมดความอดทนได้; การ์ดผลแสดงจำนวนได้อาหาร/กลับเพราะไม่มีโต๊ะ/กลับเพราะรอ และระบุฐานจำนวนพนักงานที่ใช้ประเมินโต๊ะ; แก้คำอธิบายการค้นหาพนักงานให้ตรงวิธีคำนวณ
+- ทดสอบเฉพาะ restaurant, day-analysis, day-panel ผ่าน 25 tests; typecheck ผ่าน; ชุดทั้งหมด 1,323 ผ่าน 3 ล้ม: model-generation 2 timeout ที่ 5 วินาที และ scene-diagnostics คาดรายการ getter ไม่ตรง (มี quality เพิ่ม) ซึ่งอยู่ในไฟล์งาน 3D ที่มีการแก้ค้างนอกขอบเขต; ยังไม่ได้ปิด feature
+- ค้าง: ตรวจชุดทั้งหมดและ boundary, แก้ผลทดสอบที่เกี่ยวข้อง, ทบทวนกรณีงานรับออร์เดอร์กำลังทำแล้วลูกค้ายกเลิก, ตรวจ UI; ถัดจากนั้นยังมีการจัดโต๊ะ, ความอดทนแยก, พฤติกรรมพนักงาน, อาหาร, หลายช่วงพีค, หลายสถานการณ์ และการเปรียบเทียบตามที่ตกลง
+- `harness/init.sh` บน Windows ต้องใช้ Git Bash โดยเพิ่ม `/usr/bin` ใน PATH และสร้าง exported function `python3` เรียก `python`; init ผ่าน boundary/harness แต่ชุด test ที่ init เรียกยังต้องตรวจผลแยก
 
-## 2026-10-27 ICT — พฤติกรรมร้านตามที่ตั้งไว้ (feat-099)
+## 2026-10-30 ICT — feat-137 เสร็จ: การจำลองไม่หยุดเองอีกแล้ว (ต้นเหตุจริงของอาการ "กระตุก")
 
-- **ผลลัพธ์**: เล่นภาพตั้งแต่เปิดร้าน (ร้านว่าง); พนักงานหน้าร้านเดินรับออร์เดอร์ ไปรับอาหารที่ประตูครัวมาเสิร์ฟ และเก็บโต๊ะ (`staff-visual.ts`); x1 = เวลาจริง ช่วงไม่มีใครเดินเล่นเร็วเอง (`skipQuiet`)
-- **การตรวจ**: `npm test` 961, `make lint` ผ่าน, Chromium 2D/3D
-- **ข้อควรรู้**: easeIn (feat-097) ถูกลบแล้ว; ปรับความเร็วช่วงเงียบที่ `QUIET_SPEED`; ยังไม่มีภาพโต๊ะสกปรก
+- **ต้นเหตุไม่ใช่ fps ต่ำ แต่เป็นการจำลองหยุดเองแล้วไม่กลับมา**: กดเริ่มจำลองแล้วเปิด 3D ขึ้น
+  "หยุดชั่วคราว" ใน 0.4 วินาทีและค้างตลอด เวลาจำลองไม่เดินเลยทั้ง 6 ช่วงวัด — เกิดกับ **ผังตัวอย่าง
+  6 ที่นั่งที่มีลูกค้าคนเดียว** ด้วย ไม่ใช่เฉพาะฉากหนาแน่น เพราะจังหวะโหลด GLB ครั้งแรกถูกตีความว่าเป็น
+  ช่องว่างของเวลา (`PlaybackClock` คืน gap เมื่อ TICK ห่างเกิน 0.5 วิ) แล้ว controller หยุดภาพรอให้ผู้ใช้กดเอง
+- **แก้ 2 จุด**: `simulation-controller.ts` แยกช่องว่าง ≤ 10 วินาทีจำลอง (หลังหารตัวคูณความเร็ว) ให้ตั้งต้น
+  ภาพใหม่แล้วเล่นต่อเองด้วย delta 0 (ทิ้งเวลาที่ขาด ตาม `animation-contract-v1.md` §2) ส่วนที่ยาวกว่านั้น
+  ยังหยุดเหมือนเดิมและบอกทางแก้เมื่ออยู่ที่ความเร็วสูง; คิว pacer ล้นไม่หยุดภาพแล้ว ·
+  `adaptive-quality.ts` `ignoreAboveMs` 250 → 900 ms เพราะเครื่องที่วาดได้เฟรมละ 250–350 ms เดิมถูกตัด
+  ทุกเฟรมด้วยเหตุ "แท็บถูกซ่อน" คุณภาพจึงไม่เคยลดทั้งที่ควรลดที่สุด
+- **วัดแล้วว่าภาระต่อ TICK ไม่ใช่ต้นเหตุ จึงตั้งใจไม่รื้อ Zod**: บน snapshot ผังหนาแน่น 80 ที่นั่งจริง
+  (134 ลูกค้า 68 KB/TICK) parse 1.203 ms + align 0.018 ms + clone 0.890 ms ≈ 4% ของ 1 คอร์ที่ 20 TICK/วินาที
+- **เทสต์ใหม่ที่เป็นด่านจริง**: `e2e/restaurant-animation-stutter.spec.ts` ข้อผังตัวอย่างรันได้ทุกเครื่อง
+  และพิสูจน์แล้วว่าจับอาการได้ (ย้อน controller เป็นพฤติกรรมเดิมแล้ว build ใหม่ → ล้มด้วย
+  "เวลาจำลองไม่เดิน (ภาพค้าง)" Received 0) · อีก 2 ข้อเป็นฉากหนาแน่น `test.skip` เองบน software renderer ·
+  unit tests เพิ่ม 3 ข้อ (simulation-gate 2, adaptive-quality 1) · แยก helper ร่วมไป `e2e/animation-harness.ts`
+  แล้วให้ `restaurant-animation.spec.ts` import (ยกฟังก์ชันมาทั้งก้อน ไม่เปลี่ยนพฤติกรรม)
+- **Verify**: `npm test -- --maxWorkers=2` ผ่าน 113 ไฟล์ 1,323 ข้อ · typecheck ผ่าน · lint 0 errors
+  (warning เดิม 1 `_initial`) · `validate_harness.py` ผ่าน (129 done, 2 in-progress ที่รอกระบวนการภายนอก) ·
+  core boundary ผ่าน · เบราว์เซอร์จริงหลังแก้: ทุกความเร็วเดินต่อเนื่อง 1×→1.0×, 5×→5.1×, 10×→~10×, 30×→29.7×
+  controller ไม่หยุดภาพเอง 0 ครั้ง; รันต่อเนื่อง heap 16.9→17.3 MB, DOM คงที่ 243, geometries คงที่ 186
+- **ข้อควรรู้สำหรับเซสชันถัดไป (สำคัญ)**:
+  - container นี้ **ไม่มี GPU** (SwiftShader) ฉากหนาแน่นได้ 3–4 fps แม้มีลูกค้า 1 คน (draw calls 207)
+    **ห้ามใช้ตัวเลข fps จากที่นี่อ้างแทนเครื่องอ้างอิง** และเติมคนให้ร้านแน่นไม่ขึ้น (peak 1–4 คน)
+  - เมื่อฉากหนาแน่นจริงที่นี่ main thread แน่นถึงขั้น Playwright คลิกปุ่มไม่ได้ (รอ actionability ไม่จบ)
+    จึงใส่เพดาน 30 วินาทีให้การกดปุ่มความเร็ว และลดเป้าความหนาแน่นเป็น 25 คน
+  - **ยังค้าง**: รัน 2 ข้อที่ถูก skip + ชุด 28 ข้อของ feat-123 (`restaurant-animation*.spec.ts`)
+    บนเครื่องที่มี GPU เพื่อยืนยันเกณฑ์ fps ฉากหนาแน่นหลังการแก้ครั้งนี้
+  - ข้อสังเกตที่ยังไม่ได้ทำ (นอกขอบเขต): ฉากที่แทบไม่มีคนใช้ draw calls 207 เพราะโต๊ะ 20 ชุด/เก้าอี้ 80 ตัว
+    เป็น mesh แยกกัน การรวม geometry ของฉากนิ่งน่าจะช่วยทุกเครื่อง แต่ยังไม่มีหลักฐานว่าผู้ใช้จริงต้องการ
+  - `npm run lint` จะพบ error จำนวนมากถ้ายังมี `e2e/.report`/`e2e/.results` ค้างอยู่ (eslint ไล่เข้าไฟล์ bundle
+    ที่ gitignore แล้ว) — ลบสองโฟลเดอร์นี้ก่อน lint
+  - **ยังไม่ได้ push** ตอนเขียนบันทึกนี้ — ดู commit ล่าสุดบน `codex/animation-foundation`
 
-## 2026-10-27 ICT — ภาพลูกค้าเดินเท่าคนจริง (feat-098)
+## 2026-10-30 ICT — feat-134 ปรับแต่งก้อนความคิด (Thought Bubble Refinement)
 
-- **ผลลัพธ์**: ลูกค้าบนจอ (2D / isometric / 3D) เดิน 1.4 ม./วินาทีจริงที่ x1 ตามทางที่จำลองจริง; เวลาและผลจำลองไม่เปลี่ยน (`walk-pacer.ts`, `Simulation.trackPaths`)
-- **การตรวจ**: `npm test` 959, `make lint` ผ่าน, Chromium ภาพต่อเนื่องเห็นเดินช้า
-- **ข้อควรรู้**: ปรับความเร็วภาพที่ `VISUAL_WALK_SPEED`, ระยะตามหลังสูงสุดที่ `MAX_VISUAL_LAG_SECONDS`; ยังไม่ได้ตรวจ 3D ใน browser รอบนี้
+- **ปรับเส้นขอบ, ขนาดไอคอน และการจัดกึ่งกลาง (Visual Polish)**:
+  - **เส้นขอบอ่อนลง นุ่มนวลขึ้น**: เปลี่ยนสีเส้นขอบจาก `#261612` (ดำเข้ม) เป็น `#64748b` (slate-500) ในสถานะปกติ, `#f59e0b` (amber-500) ในสถานะ warning, และ `#f43f5e` (rose-500) ในสถานะ critical ปรับลดความหนาเส้นขอบเป็น 1.5px และวงกลมหางความคิดเป็น 1.3px
+  - **ไอคอนข้างในเล็กลง**: ลดขนาดอิโมจิเป็น `text-[15px]` (~15px) และข้อความเวลารอเป็น `text-[11px] font-semibold text-slate-600` ไม่ให้แน่นอึดอัด มีระยะหายใจรอบด้านภายในก้อนเมฆ
+  - **จัดวางกึ่งกลางใจก้อนเมฆ (Optical Centering)**: คำนวณพิกัดกึ่งกลางตามรูปทรงก้อนเมฆ (Center X ~39px, Y ~21px) วาง content ในคอนเทนเนอร์ `left: 0; top: 0; width: 78px; height: 42px;` พร้อม `flex items-center justify-center` จัดเนื้อหากึ่งกลางสวยงามลงตัวทั้งในมุมมอง 3D Three.js, React component, และ 2D Isometric Canvas
+- **Verification**:
+  - `thought-overlay.test.ts`, `character-thought-bubble.test.tsx`, `iso-simulation-overlay.test.tsx`, `presentation-snapshot.test.ts` ผ่าน 100% (23/23 tests)
+  - `npm run typecheck` ผ่าน 0 errors
+  - Boundary check: `src/core/` เป็น Pure TS 100%
 
-## 2026-10-27 ICT — เริ่มจำลองแบบค่อย ๆ เร่ง (feat-097)
+## 2026-10-30 ICT — feat-136 ฝ่ามือแนบผ้าขณะเช็ด
 
-- **ผลลัพธ์**: กดเริ่มจำลอง → ภาพเริ่มตอนลูกค้ากลุ่มถัดไปถึงประตู เดินเท่าของจริง 6 วิ แล้วค่อย ๆ เร่งถึงความเร็วที่เลือกใน 4 วิ (`easeIn` ใน START, ค่าคงที่ใน `worker-runtime.ts`)
-- **การตรวจ**: `npm test` 951 ผ่าน, `make lint` ผ่าน, Chromium ตรวจนาฬิกาจำลองค้างช่วงแรกแล้วเร่ง
-- **ข้อควรรู้**: หลังเร่งแล้วลูกค้าที่เข้ามาภายหลังยังเคลื่อนที่เร็วตาม x1 = 1 นาที/วินาที (ผู้ใช้เลือกแบบนี้แทนการชะลอภาพตลอดเวลา); ผู้ใช้ส่งคำขอเป็นข้อ "1" อาจมีข้อถัดไปเรื่องจำลองร้านตามมา
+- แก้ทิศฝ่ามือจากแกน Z ที่เดาผิดเป็นผิวจริงตามแกน X และติดผ้าตามผิวจริง; ผ้าพับหนา 0.03 ม. เพื่อรองนิ้วงอ; ช่วงกวาดไกลสุด 0.43 ม. อัปเดต footprint แล้ว; สร้าง staff GLB ทั้งสอง
+- ตรวจภาพจำลอง 1× หลายจังหวะและตรวจมือคว่ำ/ผ้าแนบโต๊ะ/เท้าไม่ไถล; npm test -- --maxWorkers=2 ผ่าน 1320 ข้อ, boundary scan ผ่าน; init.sh Windows หา dirname ไม่พบ
 
-## 2026-10-27 ICT — แก้ Cloudflare Preview Build (feat-091)
+## 2026-10-30 ICT — feat-135 ปรับท่าเช็ดโต๊ะ
 
-- **สาเหตุและผลลัพธ์**: dependency ที่ไม่เกี่ยวกับงาน UI ถูกติดไปกับ commit `aa5030a`: `zod` 3 → 4 และ OpenNext Cloudflare 1.20.13 → 1.20.9. Zod v4 ทำให้ `next build` ล้มตอน TypeScript ใน mock backend, form schema และ layout import. คืนสอง package และ lockfile แล้ว `npm run build` ผ่านครบ.
-- **การตรวจ**: `npm run lint`, `git diff --check` ผ่าน. `npm test` ยังมี baseline failure 1 ข้อที่ design-token assertion (`globals.css`) ซึ่งไม่เกี่ยวกับ CI failure ครั้งนี้. `npm run cf:build` บน Windows ทำซ้ำไม่ได้เพราะ OpenNext อ่าน parent directory ไม่ได้ตามข้อจำกัด Windows; Cloudflare จะใช้ Linux.
-- **Cloudflare log**: GitHub เปิดเผย Build ID `f2a6995b-7b58-4b96-a0b1-3b888156c1b7`; dashboard ต้อง login จึงอ่านรายละเอียดเพิ่มไม่ได้. ให้ผลของ `npm run build` เป็นหลักฐานยืนยันก่อน rerun preview.
+- ผ้าและจานแนบผิวฝ่ามือ แก้ระนาบ mesh ให้ถูก; ผ้าใช้สีตัดโต๊ะ ลดมุมก้มและระยะย่อตัว; สร้าง staff GLB สองขนาด
+- npm test -- --maxWorkers=2 ผ่าน 1,320; ตรวจภาพจำลองจริงขณะหยุดที่ช่วงเช็ด ภาพก่อนปรับสีผ้า; tests ตรวจการกวาดผ้าในคลิป; init บน Windows หา dirname ไม่พบ
 
-## 2026-10-27 ICT — Customer/Staff behavior (feat-096)
+## 2026-10-30 ICT — feat-134 เสร็จสมบูรณ์: ก้อนความคิดและอิโมจิบอกสถานะตัวละครในระบบจำลอง
 
-- **ผลลัพธ์**: ร้านอาหารแบบ A ใช้ 1 agent = 1 กลุ่ม (สุ่ม 1–4 คน), โต๊ะใช้ได้ทีละกลุ่ม; ไม่มีโต๊ะสะอาดที่พอให้ยืนรอหน้าเข้า; จ่ายและออกแล้วโต๊ะสกปรกจนพนักงานเก็บเสร็จ
-- **พนักงาน**: จัดงาน เสิร์ฟ → รับเงิน → เก็บโต๊ะที่ปลดล็อกคิวหน้าเข้า → รับออเดอร์ → เก็บโต๊ะทั่วไป
-- **การตรวจ**: simulation core 28 tests, day-analysis 6 tests และ lint ผ่าน
-- **ข้อควรรู้**: `customersPerHour`/metrics ยังนับเป็น “คน”; visual 1 ตัวแทนทั้งกลุ่ม จึงยังไม่แสดงเพื่อนร่วมกลุ่มครบทุกคนใน 2D/3D; 48 เก้าอี้ที่มีเพียง 12 โต๊ะไม่เท่ากับ 48 กลุ่ม เพราะไม่อนุญาตให้แชร์โต๊ะ
+- **ก้อนความคิดและอิโมจิ (Character Thought & Emote Bubbles)**:
+  - ปรับทรงก้อนความคิดเป็นก้อนเมฆการ์ตูน (Comic Thought Cloud): เปลี่ยนทรงเป็นก้อนเมฆหยักป่องๆ (Fluffy Cloud SVG) มีวงกลมหางความคิด 2 วงชี้ลงหาตัวละครตรงตามภาพตัวอย่างของผู้ใช้ เส้นขอบหนาคมชัด ขนาด 84×68px อิโมจิ 24px ทั้ง 3D และ 2D fallback
+  - เพิ่มการสะท้อนสถานะและอารมณ์ของลูกค้าใน Simulation:
+    - รอคิวหน้าร้าน: ปกติ 0–5 นาที (📱), นาน 5–10 นาที (⏳ warning สีส้ม), วิกฤต >10 นาที (💢 critical สีแดง เสี่ยง walkout)
+    - รอสั่งอาหาร: 🙋‍♂️ รอพนักงานมารับออร์เดอร์
+    - รออาหาร: ปกติ (🍽️), นาน (⏳ warning), นานมาก (😤 critical สีแดง animate-bounce)
+    - ทานอาหาร: 😋 กำลังทาน
+    - เช็คบิล: 💳 พร้อมชำระเงิน
+  - พนักงานมี emote ตามงาน: 📝 รับออร์เดอร์, 🍲 ถือเสิร์ฟ, 🧹 เช็ดโต๊ะ
+- **Implementation & Boundaries**:
+  - `src/core/simulation/presentation-contract.ts`: เพิ่ม `CustomerThought` / `StaffThought` (Pure TS)
+  - `src/core/simulation/presentation-snapshot.ts`: ฟังก์ชัน `resolveCustomerThought` และ `resolveStaffThought`
+  - `src/components/simulation/character-thought-bubble.tsx`: Accessible component + tooltip บอกเวลารอ
+  - `src/components/preview-3d/thought-overlay.ts`: ตัวคำนวณ 3D world → 2D screen projection จัดการ overlay DOM เหนือ ThreeView
+  - `src/components/simulation/iso-simulation-overlay.tsx`: ฟังก์ชัน `drawThoughtBubble` วาดฟองความคิดลง Canvas 2D fallback
+  - `src/store/use-simulation-store.ts` & `simulation-panel.tsx`: เพิ่ม toggle `showThoughts` ("แสดงความคิด/ความรู้สึกตัวละคร (Emotes)")
+  - `src/components/simulation/presentation-bridge.ts`: เพิ่ม schema parsing สำหรับ `thought`
+- **Verification**:
+  - Unit tests: `presentation-snapshot.test.ts` (7/7), `character-thought-bubble.test.tsx` (5/5), `thought-overlay.test.ts` (2/2), `iso-simulation-overlay.test.tsx` (9/9), `presentation-bridge.test.ts` (6/6) ผ่านทั้งหมด
+  - Targeted simulation test suite: 20 files / 182 tests ผ่าน 100%
+  - TypeScript typecheck: 0 errors
+  - ESLint: 0 errors (1 warning เดิม `_initial`)
+  - Boundary check: `src/core/` เป็น Pure TS 100% ไม่มี React/Zustand/DOM ปนเปื้อน
+  - Harness validation: 126 done, 2 in-progress (Sprint 2 external auth), 6 blocked
 
-## 2026-10-27 ICT — หมุนมุมมองแบบ smooth (feat-091 follow-up)
+## 2026-10-29 ICT — feat-124 เสร็จ: แสงตามเวลาร้าน ไม่ใช้เวลาเครื่อง
 
-- **ผลลัพธ์**: ปุ่มหมุนของ Playground มีแอนิเมชัน 480 ms ใน 2D และ 620 ms ใน 3D; 3D กล้องโคจรเป็น arc รอบร้านพร้อมไล่ orthographic frame ทุกค่า และ key light ถูกตรึงใน world-space (ไม่ย้าย/fit ใหม่เมื่อเปลี่ยนมุมมอง). พื้นและเฟอร์นิเจอร์เป็นชั้นคงที่; ผนัง วงกบ บาน ธรณี และพรมประตูใช้ material ของผนังด้านเดียวกัน สร้างครบ 4 ด้านเพียงชุดเดียวเมื่อผังเปลี่ยน แล้วไล่ opacity รายด้านพร้อมกล้อง แทนการ cross-fade room สองชุด. จึงไม่มีฐานประตูลอยค้างบนพื้น กรอบประตู หรือเงาซ้อน/โผล่ตามหลังระหว่างหมุน. reduced motion ยังใช้ SVG fallback ที่ไม่เคลื่อนไหว.
-- **การตรวจ**: targeted Vitest 4 files / 42 tests, ESLint ไฟล์งาน, diff check และ localhost:3000 หลัง full reload กดหมุนหลายมุม; จับภาพก่อน/หลังและระหว่างแอนิเมชันยืนยันว่าไม่มีกรอบ บาน หรือฐานประตูจากฉากเก่าซ้อน และไม่มี console error.
-- **ข้อควรรู้**: `npm test` ทั้งชุดล่าสุด 940/947 ผ่าน แต่มี 7 failure นอกขอบเขต (Zod v4/schema ใน `mock-backend`, `forms/schemas.ts`, `core/io/layout-file.ts`, heading design token, timeout UX และ guest-merge ที่เหลือ state จาก quota test); `tsc --noEmit` ล้มจาก Zod v4 type/schema เดิม. อย่าแก้รวมกับงานแอนิเมชัน.
-## 2026-10-23 ICT — จำลองร้าน 1 วัน ครบ (feat-094, feat-095)
+- ปรับตามคำขอล่าสุด: เลื่อนเฉพาะช้อน 0.025 ม. ทางนิ้วชี้จาก anchor โดยไม่เปลี่ยนท่าแขน; targeted 34 tests ผ่าน, Chrome จำลองเมนูช้อนผ่าน ภาพ harness/evidence/spoon-offset/screens/; npm test มี 6 ข้อไม่ผ่านระหว่างรันพร้อม build (รวม presentation-bridge ที่ล้มอยู่ก่อนและ timeout หลายข้อ), init.sh รันไม่ได้เพราะ bash ของ Windows ไม่พร้อม; ยังไม่ยืนยันว่าท่าจับนิ้วถูกต้อง
 
-- **ผลลัพธ์**: กด "จำลองร้าน 1 วัน" → worker จำลองทั้งวันเบื้องหลัง (~0.5 วิ ผังตัวอย่าง, ~2.4 วิ ผัง 48 ที่) → การ์ดตอบ 3 ข้อ (จ้างกี่คน / อาหารต้องออกภายในกี่นาที / โต๊ะพอไหม) → เล่นภาพช่วงคนเยอะแล้วหยุดเอง
-- **การตรวจ**: `make test` 943, `make lint` ผ่าน; Playwright chromium a11y/playground-ux/keyboard/responsive ผ่าน; Chromium จริงที่ 1280 และ 320 px
-- **ถัดไป**: (ยังไม่มีใน feature_list) พนักงาน/พ่อครัวเดินให้เห็นใน 2D/3D, จำค่าตั้งค่าไว้กับโปรเจกต์, ตัวเลือกประเภทร้าน A/B เมื่อมีหลายร้าน
-- **ข้อควรรู้**: axe "ระหว่างจำลอง" 1440px ล้ม 1 ครั้งแล้วรันซ้ำผ่าน — ถ้า CI ล้มอีกให้ดู error-context; ค่าฟอร์มอยู่ใน simulation store เท่านั้น (รีเฟรชแล้วกลับค่าตั้งต้น); `analyzeDay` ใช้พนักงานหน้าร้านเต็ม (8) ตอนหาพ่อครัว — ถ้าเปลี่ยนลำดับค้นหาต้องแก้เทสต์ day-analysis
+- งานจับช้อนยังไม่เสร็จ: ผู้ใช้ต้องการด้ามระหว่างนิ้วโป้งกับนิ้วชี้และนิ้วที่เหลือรองด้าม ทดลองย้าย anchor และแยกการงอนิ้ว แต่ภาพจำลองศอกยกสูงผิดธรรมชาติ จึงคืนท่าเดิมและสร้าง customer GLB ใหม่; โมเดลนิ้วไม่มีข้อต่อแยก ต้องออกแบบรูปมือและเส้นทางแขนใหม่พร้อมตรวจภาพหลายจังหวะ อย่าอ้างว่าจับถูกต้องจาก unit test เพียงอย่างเดียว; ภาพทดลองอยู่ harness/evidence/feat-134/screens/.
 
-## 2026-10-23 ICT — Simulation ร้านอาหารแบบ A (feat-093)
+- feat-133: ผู้ใช้ชี้ว่าช้อนเหมือนติดมือ; ปรับ morph หุบนิ้วและนิ้วโป้งให้ใกล้ด้าม, ตรวจระยะและ Chrome เมนูช้อน seed ทดสอบ, npm test 1,310 ผ่าน; ภาพอยู่ harness/evidence/feat-133-last/screens/spoon-close.png; นิ้วยังไม่ใช่ข้อต่อแยก
 
-- **ผลลัพธ์**: ตัวจำลองเล่นร้านอาหารตามสั่งแบบ A (นั่ง → รับออร์เดอร์ → ครัว → เสิร์ฟ → ทาน → จ่ายที่เคาน์เตอร์) พร้อมพนักงาน/พ่อครัว/เวลาต่อจาน/ช่วงพีค/ปิดร้าน; แบบ B เดิมยังใช้ได้ด้วย `serviceStyle: "counter-order"`
-- **การตรวจ**: `make test` 927, `make lint` ผ่าน; Chromium จำลองผังตัวอย่าง
-- **ถัดไป**: feat-094 (วิเคราะห์ทั้งวัน + หาจำนวนพนักงาน + เล่นช่วงพีค) → feat-095 (แผง 3 ส่วนตามร่าง + การ์ดคำตอบ); gate feat-094 ต้องยืนยันเกณฑ์ "กำลังดี" และค่าตั้งต้นใน PRD §9 ข้อ 28
-- **ข้อควรรู้**: UI ตอนนี้ยังส่งแค่ `customersPerHour` → ค่าอื่น worker ใช้ค่าตั้งต้นแบบ A (ผังตัวอย่าง 6 ที่ ลูกค้าเต็มเร็วแล้วกลับเยอะ เป็นเรื่องปกติ); พนักงานยังเป็นคิวงาน ไม่มีตัวเดินบนผัง; อย่าใช้ `this.random` กับสิ่งที่ขึ้นกับสถานะร้าน (ใช้ `seatRandom`) ไม่งั้นลูกค้าชุดจะเปลี่ยนตามจำนวนพนักงาน
+- feat-132: ผู้ใช้แจ้งจับช้อนยังไม่ดี; ย้ายจุดยึดด้ามจากขอบฝ่ามือเข้าแนวกำมือและแก้ IK ให้ใช้จุดเดียวกัน; rebuild customer GLB, Chrome ตรวจส้อม 4 มุม, npm test 1,309 ผ่าน; ดู harness/evidence/feat-132/summary.md
 
-## 2026-10-23 ICT — มือถือเท่าเดสก์ท็อป + PWA
+- feat-131: ผู้ใช้ขอให้ช้อนส้อมตรงมือและการจับ; เปลี่ยน anchor ให้อยู่แนวมือคงที่ แก้ IK ไปถึงอาหาร/ปากโดยข้อมือไม่บิด เพิ่ม EatGrip morph หุบนิ้วเฉพาะตอนกินและคืนรูปตอนเลิก; rebuild customer GLB, Chrome สี่มุมและ npm test 1,308 ผ่าน ดู harness/evidence/feat-131/summary.md
 
-- **ผลลัพธ์**: มือถือมีปุ่มซูม/หมุนมุมมอง แถบสถานะ และสถานะบันทึกครบ; ติดตั้งเป็นแอปได้ (manifest + Service Worker) และเปิดหน้าจัดผังออฟไลน์ได้
-- **การตรวจ**: `make test` 918, `make lint` ผ่าน; next build/start + Chromium มือถือ (ออฟไลน์ reload, 320–1440 px ไม่มีเลื่อนแนวนอน)
-- **ข้อควรรู้**: แก้ `public/sw.js` ต้องเพิ่ม `VERSION` เพื่อล้างแคชเก่า; SW ลงทะเบียนเฉพาะ production (dev ไม่มี); `/playground/[id]` (ผังออนไลน์) ยังไม่เปิดออฟไลน์ — จะได้หน้า /offline แทน
+- feat-130: ผู้ใช้แจ้งข้อมือยังบิดบางมุม; แก้โดยให้มือใช้กรอบปลายแขนโดยตรง ไม่หมุนรอบแกนโดยไม่จำเป็น อุปกรณ์ยังใช้ anchor; rebuild customer GLB, ตรวจ Chrome สี่มุมและ npm test 1,306 ผ่าน ดู harness/evidence/feat-130/summary.md
 
-## 2026-10-21 ICT — ปรับโมเดล (หน้า มือ เสื้อผ้า หมวก ผม รักแร้) + performance ฉาก 3D
+- feat-129: แก้ข้อมือหักตลอดท่ากินโดยเพิ่ม EatUtensilAnchor และสร้างคลิปให้มืออยู่แนวเดียวกับปลายแขน แยกทิศอุปกรณ์; rebuild customer GLB ทั้งสอง; Chrome 1× ภาพ 8 จังหวะและ npm test 1,306 ผ่าน; ดู harness/evidence/feat-129/summary.md
 
-- **ผลลัพธ์**: แก้ทุกข้อจากรีวิวโมเดลยกเว้นคอ; หมวกแก๊ป 6 ชิ้น; ผมมีแสก/ชั้น; ฉาก 3D สามเหลี่ยมต่อเฟรมลด ~70% และโหลดไฟล์ตอนเปิดลดจาก 828 → 220 KB
-- **การตรวจ**: `make test` 910, `make lint` ผ่าน; Chromium จำลองผังตัวอย่าง + bench (drawElements hook, CDP metrics/profiler)
-- **ข้อควรรู้**: ฉากร้านใช้ผิวรุ่นละเอียดเฉพาะตอนตัวละครสูงเกิน 160 px บนจอ (โหลดตอนนั้น); เงามาจาก `ShadowProxy` รุ่นเบาเสมอ — ถ้าเปลี่ยนโครงกระดูก/ไฟล์ lite ต้องให้ตรงกับรุ่นละเอียด; ระหว่างหยุดจำลองที่ยังมีลูกค้าอยู่ ฉากยังวาดต่อเนื่อง (ท่า Idle)
+- feat-128: ผู้ใช้ระบุท่ามือ/แขนยังแปลก ปรับทิศศอกและด้ามอุปกรณ์ตามช่วงกิน ลดมุมหักข้อมือตอนตักและป้องกันศอกซ้อนลำตัว; rebuild customer GLB; Chrome 1× ภาพ 8 จังหวะและ npm test 1,304 ผ่าน; นิ้วยังไม่มีข้อต่อแยก ดู harness/evidence/feat-128-final/summary.md
 
-## 2026-10-21 ICT — บีบอัดโมเดล, ลูกค้าหลายแบบ, กันจุดยืนพนักงาน
+- feat-127: ผู้ใช้ยืนยันท่ากินไม่กระตุกแล้วแต่ยังดูแปลก จึงปรับเส้นทางด้าม องศาข้อมือและทิศข้อศอก พร้อม rebuild customer GLB; ตรวจภาพ 6 เฟรมในร้านและ npm test 1,304 ผ่าน; รายละเอียด harness/evidence/feat-127-final/summary.md
 
-- **ผลลัพธ์**: GLB บีบอัด meshopt (ลูกค้า 234 KB); ลูกค้าแต่ละคนสีเสื้อ/ผม/ผิว/สูงต่างกัน; ลูกค้าเดินอ้อมพนักงานหลังเคาน์เตอร์
-- **การตรวจ**: `make test` 910, `make lint` ผ่าน; Chromium จำลองผังตัวอย่าง
-- **ข้อควรรู้**: โหลด GLB ต้องผ่าน `createCharacterLoader()` (ต้องมี MeshoptDecoder); สีต่อคนอยู่ใน shader ของ three-view อ่าน attribute `_part` — ห้าม prune attribute นี้ทิ้ง
+- feat-126: ผู้ใช้แจ้งท่ากินกระตุกและแปลกที่ 1×; พบ feedback การเลื่อนตัวกับ IK ศอก/ข้อมือพลิก จึงแก้และ rebuild customer GLB สองรุ่น; Chrome วัด 201 เฟรมที่ 1× ตัวไม่สั่น, npm test 1,304 ผ่าน; ดู harness/evidence/feat-126/summary.md
 
-## 2026-10-28 ICT — Simulation behavior corrections (PR #39)
+- feat-125: แก้ท่ากินกระตุกด้วยการเกลี่ยเวลาระหว่าง ticks ใน customer-actions; npm test 1,302 ข้อ, lint, typecheck และ Chrome E2E วงจรบริการผ่าน; รายละเอียด harness/evidence/feat-125/summary.md
 
-- Branch: `fix/simulation-behavior-model`; PR: #39.
-- Party model: a party represents 1–4 diners, creates one kitchen job per diner, and starts dining only after all dishes complete. Customer render buffer emits each party member; heatmap is weighted by party size.
-- Customer exits: impossible party/table matches are counted as `noSeat`; entrance and food waits use `patienceMinutes`; cancellation removes queued work, prevents late delivery, and sends the table to cleaning.
-- Analysis: adds `abandoned` and `unfinished`; unresolved diners after the four-hour drain window make an option not good.
-- Tests updated for patience and per-diner dishes. GitHub CI run 40674434765 was queued at handoff; inspect its result before merging.
+- ตรวจคำถามพนักงานอยู่กับลูกค้านาน: engine ตั้งเวลารับออร์เดอร์เริ่มต้น 60–120 วินาทีจำลองต่อกลุ่ม เพิ่ม 15 วินาทีต่อคนถัดไป; staff-visual ใช้เวลางานส่วนที่เหลือแสดงท่า Work วนที่โต๊ะ ยังไม่ได้ยืนยันเหตุการณ์จากภาพนิ่งหรือแก้โค้ด รอบนี้ init บน Windows ล้มเพราะ bash หา dirname ไม่พบ
+- ตรวจความเร็วจำลอง: targeted tests 5 ไฟล์ 85 ข้อผ่าน รวม 1/2/5/10/30× และ motion clock; Chrome E2E timing 4 ข้อผ่าน วัด 1× = 0.996×, 10× = 9.844×, resume = 0.995×, หลังแท็บซ่อน = 0.995×; ยังไม่ได้วัด 2/5/30× ผ่าน UI; init ยังหา dirname ไม่พบ และ E2E ต้องรันนอก sandbox เพราะ esbuild เข้า parent directory ไม่ได้
+
+- ค่าเริ่มต้น lighting เป็น `simulation`: ใช้ config.openTime + metrics.time ของ simulation store ทุกนาทีจำลอง; ไม่มี wall-clock timer, ไม่คูณ speed ซ้ำ, ไม่แก้ simulation RNG/layout/history
+- ก่อนเริ่ม/starting/จบรอบ คืนเวลาเปิดร้าน; pause คงเวลา; เปิด 3D ใหม่กลางรอบยังคงเวลาปัจจุบัน; fixed preview ยังใช้ได้
+- Source: lighting/clock.ts, settings.ts, scene-lighting.ts, settings-panel.tsx และ use-lighting-store.ts; เอกสาร architecture/design-system อัปเดตแล้ว
+- Verify: npm test 111 files / 1,298 tests ผ่าน; targeted แสง 17 tests; typecheck ผ่าน; lint 0 errors (warning เดิม 1); init + Core/Worker/BFF boundaries + validate_harness ผ่าน
+- E2E Chrome production: 11 กรณีผ่านรวมสองรอบ (10 ผ่านก่อน + regression เจาะจงผ่านหลังแก้การนำทางใน test); เปิด 10:00 สว่าง 0.941432 / เปิด 20:00 สว่าง 0.820340 แม้เปลี่ยนเวลาเครื่อง; pause ที่ 10:01:18 แล้วภาพตรงกันทุกไบต์; stop คืน 10:00
+- หลักฐาน: harness/evidence/feat-124/summary.md, measurements.jsonl และ screens/; ยังไม่ได้ commit/push/deploy
+- Windows init ต้องตั้ง PATH ให้ Git usr/bin + Node/Python แล้ว shim python3 → python และตั้ง PYTHONIOENCODING=utf-8; ไม่ได้แก้ init.sh
+- ข้อควรรู้สำหรับ E2E: ระหว่าง running/paused UI ซ่อน rail และแผงร้าน ต้องใช้ปุ่มจำลองโดยตรง; ตรวจแสงระหว่างจำลองด้วย scene/store tests และภาพ canvas แทนการเปิด shop tab
+
+## 2026-10-29 ICT — feat-123 เสร็จสมบูรณ์ (done) · ปิด Defect ครบทั้ง 3 ข้อ และยืนยันผลรัน `--workers=1` ครบ 28/28 ข้อ
+
+### สิ่งที่ทำและยืนยันแล้วในรอบนี้
+
+- **แก้ไข Defect คงค้าง 2 ข้อของสายอาหาร/โต๊ะและสายแสง**:
+  1. เชื่อมต่อ `LightingSettingsPanel` (`src/components/preview-3d/lighting/settings-panel.tsx`) เข้ากับ `src/components/editor/playground-panel.tsx` ในแท็บ `"shop"` ("ร้าน") ถัดจาก `<RoomSettingsForm />` และยืนยันผ่าน E2E (`e2e/restaurant-animation-lighting.spec.ts`) ว่าสามารถสลับโหมด `Fixed Time` (`12:00` vs `21:30`) จากหน้า UI จริงแล้วความสว่างฉาก 3D เปลี่ยนตามทันที
+  2. แก้ไข `computeTablePlatePlacement` ใน `src/components/preview-3d/food/catalog.ts` ให้วางจานห่างจากขอบโต๊ะด้วยระยะคงที่ `PLATE_EDGE_INSET = 0.18` ม. แทนสัดส่วน `halfD * 0.56` ทำให้โต๊ะขนาด 0.80 ม., 1.20 ม., และ 2.00 ม. มีระยะเอื้อมจากเก้าอี้ถึงจาน `0.33` ม. (`correction = -0.01` ม., `outOfReach = false`) และโต๊ะเล็ก 0.60 ม. จานไม่ชนกันและไม่ล้นขอบ พร้อมอัปเดต `src/components/preview-3d/food/catalog.test.ts` และ `harness/evidence/feat-118/plate-reach-probe.json`
+- รันยืนยันด้วย `--workers=1` ครบทั้ง 3 ไฟล์ (`restaurant-animation-lighting.spec.ts` 10 ข้อ + `restaurant-animation.spec.ts` 14 ข้อ + `restaurant-animation-timing.spec.ts` 4 ข้อ) → **ผ่านครบ 28/28 ข้อ (0 ล้ม)** บน production build + Chrome + NVIDIA GeForce GTX 1050 Ti (hardware WebGL)
+- เก็บผลลัพธ์จริงลง `harness/evidence/feat-123/e2e-run.log`, `measurements.jsonl` (ครบ 25 รายการวัดผล), `summary.md` และ `screens/` (ครบ 27 ภาพ รวมถึง `cycle-*.png` และ `performance-dense.png`)
+- ตรวจสอบทั้ง workspace: `npm test` **110 files / 1,294 tests ผ่าน**, `npm run lint` 0 error, `npm run typecheck` ผ่าน, `python scripts/validate_harness.py` ผ่าน (Done: 115/123, Sprint 5 `feat-100..123` เสร็จครบ 100%)
+
+### ผลที่วัดได้จริงจากรอบ `--workers=1` ล่าสุด
+
+- **เวลาเดิน**: 1× อัตรา `0.999×` (15.00 วิจำลอง ใน 15.02 วิจริง), 10× อัตรา `9.97×`, resume `0.994×`, กลับจากแท็บซ่อน `0.996×` (ไม่ไล่เวลาสะสม)
+- **วงจรบริการ (ผ่าน diagnostic hook จริง)**: ถือเสิร์ฟ `CarryIdle` ถาด 1 จาน → กิน `Eat` ด้วย `fork` เมนู `steak` (`seated = true`, **`plateOutOfReach = false`**) → คราบ 1 โต๊ะ 5 ก้อน → เช็ด `WipeTable` `wipeProgress 0.003 → 0.982` โดย **คราบยังอยู่ครบ 8 ก้อนระหว่างเช็ด** และหลังเช็ดเสร็จ `stainMeshes = 0` → ดึงเก้าอี้ `handOnBackrest = true` ขณะเก้าอี้เคลื่อน เห็นครบ `approach → pull → sit → push → seated` ระยะดึงสูงสุด **0.30 ม.** พอดี `CHAIR_PULL`
+- **Performance ฉากหนาแน่น (ผัง 80 ที่นั่ง นำเข้าผ่านช่อง JSON จริงขึ้น Ready)**: **ลูกค้า 66 คน + พนักงาน 8 คน** (นั่ง 45/80 ที่ · รอหน้าร้าน 15 คน · `stalled = 0`) จานบนโต๊ะ 41 ใบ · median **50.0 fps** / p95 **49.8 fps** · **draw calls 693** · triangles 582,820 · geometries 298 / textures 81 / programs 8 · JS heap 53.3 MB · frame debt 0
+- **เริ่ม–จบรอบ 10 ครั้ง**: ผ่านครบ, canvas คงเหลือ 1 ตัว, heap 18.5 → 21.3 MB
+
+### สถานะงานคงค้างของโปรเจกต์ (นอก Sprint 5)
+
+- Sprint 5 (`feat-100` ถึง `feat-123`) เสร็จสมบูรณ์ครบทุกข้อ (`done`)
+- งานที่ยังเป็น `in-progress` ในโปรเจกต์เหลือเพียงงาน Sprint 2 เดิมที่รอกระบวนการภายนอก: `feat-041` (รอทดสอบ Google OAuth จริงบน Railway/Cloudflare) และ `feat-043` (รอ push ขึ้น GitHub เพื่อรัน Actions และตั้ง branch protection)
+
+## 2026-10-29 ICT — feat-117→119, feat-122 เสร็จ · feat-123 ตรวจแล้วแต่ยังไม่ปิด
+
+- ทำบนเครื่องนี้ (ไม่ได้ย้ายไป Cloud) บนสาขา `codex/animation-foundation` commit ล่าสุด `6bd11c7`; 117/118/119/122 = done, **123 = in-progress**
+- ฐานตรวจ: `npm test` 109 files / 1,283 tests ผ่าน · lint 0 error (เหลือ warning เดิม `_initial`) · typecheck ผ่าน · `validate_harness.py` ผ่าน · boundary scan ผ่าน · e2e 3 spec ใหม่ 27 tests ผ่านบน production build + Chrome + GTX 1050 Ti (hardware WebGL)
+- `./harness/init.sh` รันผ่านได้เฉพาะเมื่อ shim `python3` → `python` เพราะ Windows มี stub `python3` ของ Store ที่ exit 49; ไม่ได้แก้ init.sh ไว้ ต้อง shim ซ้ำในเซสชันถัดไปหรือแก้สคริปต์ให้ fallback เป็น `python`
+- **ยังไม่ได้ส่ง defect ให้ agent ใด** — `ListAgents` ไม่มี session อื่นบนเครื่องนี้ และยังไม่ได้ push ขึ้น GitHub; defect อยู่ในรีโปอย่างเดียว ห้ามอ้างว่ามีเจ้าของสายรับไปแล้ว
+
+### Defect ที่รอเจ้าของสายรับ (อยู่ในรีโป ยังไม่มีใครรับ)
+
+1. **สาย lighting (Agent 2, feat-120)** — `src/components/preview-3d/lighting/settings-panel.tsx` ไม่ถูก mount ที่ไหนเลยในแอป ผู้ใช้เปลี่ยนเวลา/พิกัด/ทิศเหนือไม่ได้ และ QA ใช้ fixed-clock ของสายนั้นไม่ได้ (ต้องตรึงเวลาเครื่องด้วย `page.clock` แทน) · รายละเอียด `harness/evidence/feat-123/summary.md`
+2. **สาย food/table (Agent 2, feat-103/116)** — `computeTablePlatePlacement` อิง `halfD × 0.56` ระยะจาน-ถึง-คนจึงโตตามโต๊ะ (0.326 ม. ที่โต๊ะ 0.80 ม. → 0.414 ม. ที่ 1.20 ม. → 0.590 ม. ที่ 2.00 ม.) เกินระยะที่คลิป Eat ล็อกไว้ 0.34 ม. · 122 ชดเชยให้ได้สูงสุด 0.10 ม. เคสโต๊ะ ≥ 2 ม. จึงยังเอื้อมไม่ถึง · ตัวเลขวัดจริง `harness/evidence/feat-118/plate-reach-probe.json`
+3. **ไม่ใช่ defect แต่ต้องรู้** — คลิป PullChair ของ feat-112 ตรึงมือไว้ที่พนักพิงเฉพาะช่วงที่เก้าอี้เคลื่อน 0.16 ม. ขณะที่ฉากดึง 0.30 ม. · แก้แล้วที่ feat-119 โดยผูกระยะเก้าอี้กับ normalized time ของคลิป ไม่ต้องแก้คลิป
+
+### สิ่งที่ feat-123 ยังปิดไม่ได้ และต้องการจาก integrator
+
+- diagnostic hook อ่านอย่างเดียวบน `window` (เปิดเฉพาะ non-production/flag) คืน `staffActions`/`customerActions`/`seating` reports, `tableService.getStats()` และ `renderer.info` — เพื่อยืนยันคราบ/การเช็ด/ท่าถือเสิร์ฟเป็นภาพรายข้อ และวัด draw calls
+- ผัง fixture ที่นั่ง ≥ 80 เพื่อวัด performance baseline ฉากหนาแน่น (ผังตัวอย่างมี 6 ที่นั่ง วัดได้แค่ฉากลูกค้า 1–2 คน: median 50.0 fps / p95 49.3 fps)
+
+### ข้อควรระวังของเส้นทางใหม่
+
+- `modern = simulating && presentation !== undefined` — worker รุ่นเก่ายังเดินเส้นทาง legacy ทั้งเส้น อย่าลบโค้ดเดิมทิ้ง
+- host เป็นเจ้าของ rig และเป็นผู้เดิน `mixer.update()` เพียงที่เดียว · feature ตั้ง action เท่านั้น · คลิป one-shot ถูก `paused` แล้วเขียน `action.time` จากเวลาจำลอง
+- pause ต้องส่ง delta 0 และ blend 0 ทั้งคู่ (เคยพลาดมาแล้ว คลิป loop เล่นต่อทั้งที่กดหยุด — แก้ที่ feat-123)
+
+## 2026-10-29 ICT — รอผู้ใช้เปิด Cloud จาก codex/animation-foundation
+
+- ผู้ใช้เลือก **รอเปิดงานใน Cloud** จึงยังไม่เริ่ม117/118/119/122/123บนเครื่องนี้ รายละเอียดส่งต่ออยู่ `harness/cloud-handoff.md`
+- บันทึกเอกสารแล้วแต่pushGitHubไม่สำเร็จเพราะยังไม่ได้ยืนยันตัวตน (`could not read Username`);เอกสารcommitยังอยู่local ต้องpushหลังloginหรือคัดลอกคำสั่งไปCloudเอง ไม่อ้างว่าส่งCloudแล้ว
+- ฐานimplementationล่าสุด6e0c527;109–116และ120–121done เงื่อนไข117/118/119พร้อมทั้งหมด;122รอสามงานนี้และ123รอ122 ตรวจworkspaceล่าสุด100files/1117testsและtypecheckผ่านแล้ว ข้อผิดพลาดคลิปที่115เคยรายงานแก้แล้ว
+- งานCloud:ตรวจงานรับ/จุดเชื่อม →117→118→119ตามgate →122รวมฉาก →123QA;ส่งdefectเฉพาะส่วนกลับownerAgent2/3 ห้ามแก้ทับกัน;ระวังผิวโต๊ะ0.76/contract0.74,ถาดrootกับhandbone,PullChair0.16ม.และเท้าไถลเดิม
+- โควตาตรวจเริ่มต้นused70%/เหลือ30%รอบ5ชั่วโมง;หยุดเมื่อเหลือ<=10%(used>=90),checkpointก่อนหยุด แล้วตั้งcontinuationครั้งถัดไป05:00Asia/Bangkokจากสิ่งที่เหลือ ไม่มีautomationถูกสร้างในแชตlocalนี้และยังไม่ได้ย้ายexecutionไปCloud
+- Cloudต้องตรวจcapabilityGPU/browserก่อนปิด123;ต้องไม่ใช้softwareWebGLอ้างผ่านreferenceGPUperformance BashinitบนWindowsติดdirname/launcherจึงต้องรันinitซ้ำในCloud ห้ามอ้างว่าlocalinitผ่าน
+
+## 2026-10-29 ICT — Agent 3: feat-109 → feat-112 เสร็จครบสายคลิปตัวละคร (ยังไม่ export GLB กลาง)
+
+- **ส่งมอบ**: `scripts/character-clips/staff-carry.mjs` (CarryIdle/CarryWalk/PickUp/PutDown), `customer-eat.mjs` (Eat), `staff-clean.mjs` (WipeTable), `customer-seat.mjs` (PullChair/SitDown/PushChair/StandUp) — ชื่อคลิปและชื่อ marker ตรงตารางสัญญา v1 §3 ทุกตัว ไม่มีคลิป/marker ชื่ออื่นเพิ่ม
+- **สิ่งที่ 117/118/119 ต้องอ่านต่อ** (export ชื่อจริงจาก provider แต่ละไฟล์): `STAFF_CARRY_PROFILE` (grip ถาด/ระดับรับถาด/จุดวางจาน), `CUSTOMER_EAT_PROFILE` + `EAT_UTENSILS` + `utensilGripOffset()` + `eatPhaseOffset()`, `STAFF_CLEAN_PROFILE` (`stainWindow`) + `WIPE_FOOTPRINT`, `SEAT_MOTION_PROFILE` (`gripWindow`/`gripTravel`/`rootMotion`/`fallback`) — ค่าสัมผัสทั้งหมดอยู่ใน `harness/evidence/feat-109..112/contact-metrics.json` และภาพโครงกระดูกใน `preview.svg`
+- **ยังไม่ได้ export GLB กลาง** ตามกฎ ownership: ทุกการ build ลง OS temp แล้วลบ `public/assets/models/*.glb` ไม่เปลี่ยนแม้ไบต์เดียว (sha256 ตรงก่อน-หลัง) — 117 เป็นผู้ export staff สองรุ่น และ 118 เป็นผู้ export customer สองรุ่น โดยส่ง `--clips` ของ lane ที่เกี่ยวข้องพร้อมกัน (build ปัจจุบันทดสอบไฟล์ละ provider เดียว ควรทดสอบรวม staff-carry + staff-clean และ customer-eat + customer-seat ตอน export จริง)
+- **ต้องแก้ที่ระดับทีม — ผิวโต๊ะ 0.76 ไม่ใช่ 0.74**: `three-view.tsx` วางกล่องโต๊ะหนา 0.04 ม. โดยให้จุดกลางอยู่ที่ 0.74 (`placeMesh` ตั้ง `mesh.position.y`) ผิวสัมผัสจริงจึงเป็น 0.76 ม. เท่ากับที่ feat-116 ใช้ ขณะที่สัญญา v1 §3 เขียน "tabletop 0.74" — คลิปสายนี้ปรับมาใช้ 0.76 แล้วทั้งหมด เสนอให้ 122 แก้ถ้อยคำในสัญญาให้ตรงของจริง
+- **ข้อจำกัดที่ยกมาจากคลิปเดิม ไม่ได้เพิ่มใหม่**: SitDown/StandUp ใช้ท่อนล่างของ Sit เดิมทุกค่า ซึ่งตัวมันเองเลื่อนข้อเท้าไปหน้า 0.407 ม. ระหว่างพับขา (เท้าไถล) — คลิปใหม่ไม่ได้ทำให้แย่ลง แต่ถ้า 119/122 ต้องการเท้านิ่ง ต้องเขียนท่อนล่างของ Sit ใหม่ ซึ่งอยู่นอก write_scope ของ 112
+- **จุดเชื่อมที่ต้องระวัง**: ถาดของฉากติด root ของโมเดล คลิป carry จึงตรึงฝ่ามือไว้ที่พิกัดคงที่ให้ถาดอยู่กับที่ — ถ้า 117 เปลี่ยนไปผูกถาดกับกระดูกมือ ต้องถอดการตรึงนี้ออกพร้อมกัน; `PullChair` ปล่อยมือหลังเก้าอี้เคลื่อน 0.16 ม. ดังนั้น 119 ต้องตั้งจังหวะเลื่อนเก้าอี้ให้เคลื่อนเท่านี้พอดีภายใน `gripWindow`
+- **แก้สองข้อที่ Agent 1 รายงานค้างไว้ใน feat-115**: ชื่อ attribute ที่ GLTFLoader ตั้งคือ `_part` (ไม่ใช่ `part`) และพารามิเตอร์ `Buffer<ArrayBuffer>` แก้ typecheck `ArrayBuffer | SharedArrayBuffer` — ตอนนี้ `npx vitest run` ทั้ง workspace ผ่าน 100 files / 1117 tests
+- **การตรวจ**: เทสต์ใหม่ 4 ไฟล์ / 42 tests ผ่าน, `eslint` บนไฟล์ของ Agent 3 ผ่าน 0 warning/error, `tsc --noEmit` ผ่านทั้ง workspace, `validate_harness.py` ผ่าน (Done 110/123)
+- **Code Review (2026-10-29)**: ปรับ `LightingSettingsPanel` ให้ใช้ Design Tokens โทนสีน้ำเงิน–ขาว (`bg-white`, `bg-surface`, `bg-blue-soft`, `border-line`, `text-ink`, `text-secondary-strong`) และ `line-height` ภาษาไทยตาม `SKILL.md` กฎข้อ 2–3; แก้ `usedLiteVariant` ใน `table-service.ts` เมื่อ `lite` โหลดเสร็จก่อน `full` ให้อัปเกรดเป็น `full` ได้ครบ; และซิงก์เวลา `clock` 60 วินาทีเข้า `use-lighting-store.ts` ใน `scene-lighting.ts`
+- **ขอบเขต**: ไม่แตะ `three-view.tsx`, `scripts/create-cafe-customer-model.mjs`, `scripts/model-generation/*`, `runtime/contracts.ts`, GLB ตัวละคร หรือไฟล์ของ Agent 1/2; แก้เฉพาะ write_scope ของ 109–112 บวก `harness/feature_list.json` (สถานะ+หลักฐาน 4 งาน), `harness/progress.md`, `harness/session-handoff.md`
+- **ถัดไปของ Agent 3**: `117` (staff-actions + export staff GLB, รอ 114), `118` (customer-actions + export customer GLB, รอ 114 และอาหาร), `119` (seating, รอ 115 ซึ่งเสร็จแล้ว)

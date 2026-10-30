@@ -5,7 +5,6 @@ import { block, cafeLayout } from "@/test/fixtures/layouts";
 import {
   AGENT_STRIDE,
   CELL_FREE,
-  QUIET_SPEED,
   STAFF_STATE_CODE,
   STAFF_STRIDE,
   HEATMAP_EVERY,
@@ -222,6 +221,12 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
   const layout = cafeLayout();
   const validation = validateLayout(layout);
 
+  it("ปฏิเสธการตั้งพนักงานทั้งหมดเป็นผู้รับเงินโดยไม่มีผู้บริการ", () => {
+    const rt = new SimulationWorkerRuntime();
+    const result = rt.handle({ type: "START", requestId: 1, layoutRevision: "x", config: { customersPerHour: 40, speed: 1, frontStaff: 2, cashiers: 2 } });
+    expect(result.response).toMatchObject({ type: "ERROR", code: "INVALID_MESSAGE" });
+  });
+
   function started(speed = 60) {
     const rt = new SimulationWorkerRuntime();
     expect(rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } }).response.type).toBe("STATUS");
@@ -348,23 +353,26 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
     expect(rt.tick(100)).toBeNull();
   });
 
-  it("START skipQuiet: ช่วงไม่มีใครเดินเล่นเร็วเป็น QUIET_SPEED และกลับเวลาจริงเมื่อมีคนเดิน", () => {
+  it("START skipQuiet: ลูกค้ากลุ่มแรกมาทันทีตอนเริ่ม และเวลาจำลองเดิน 1 วิ = 1 วิ ตลอดเวลา", () => {
     const rt = new SimulationWorkerRuntime();
     rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } });
-    const config = { customersPerHour: 30, speed: 1, seed: 4, serviceStyle: "table-service", stopAtSeconds: 7200, skipQuiet: true };
+    const config = { customersPerHour: 10, speed: 1, seed: 4, serviceStyle: "table-service", stopAtSeconds: 7200, skipQuiet: true };
     rt.handle({ type: "START", requestId: 2, layoutRevision: validation.layoutRevision, config });
     const steps: number[] = [];
     let time = 0;
     let tick: TickMessage | null = null;
-    for (let i = 0; i < 400; i++) {
+    for (let i = 0; i < 60; i++) {
       tick = rt.tick(50)!.response;
       steps.push(tick.metrics.time - time);
       time = tick.metrics.time;
+      if (i === 0) {
+        expect(tick.metrics.arrived).toBeGreaterThan(0); // ลูกค้ากลุ่มแรกมาใน tick แรกทันที
+      }
     }
     expect(tick!.staff).toHaveLength(2 * STAFF_STRIDE);
-    expect(steps.some((d) => d > 0.05 * 2 && d <= 0.05 * QUIET_SPEED + 1e-9)).toBe(true); // ร้านว่าง → เร่ง
-    expect(steps.filter((d) => Math.abs(d - 0.05) < 1e-9).length).toBeGreaterThan(20); // มีคนเดิน → เวลาจริง
-    // ไม่ส่ง skipQuiet → เวลาจริงตลอด
+    expect(steps.every((d) => Math.abs(d - 0.05) < 1e-9)).toBe(true); // 1 วิ = 1 วิ ตลอดเวลา ไม่เร่งเองตอนไม่มีใครเดิน
+    expect(time).toBeCloseTo(3, 9);
+    // ไม่ส่ง skipQuiet → เวลาจริงตลอดเช่นกัน
     rt.handle({ type: "START", requestId: 3, layoutRevision: validation.layoutRevision, config: { ...config, skipQuiet: undefined } });
     expect(rt.tick(50)!.response.metrics.time).toBeCloseTo(0.05, 9);
   });

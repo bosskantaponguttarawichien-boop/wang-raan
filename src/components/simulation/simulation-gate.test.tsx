@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationWorkerRuntime } from "@/core/simulation";
 import { useLiveValidation } from "@/components/validation/use-live-validation";
+import { formatClockSeconds } from "@/lib/day-config";
 import type { WorkerLike } from "@/lib/simulation-client";
 import { createLayoutStore, layoutStore } from "@/store/use-layout-store";
 import { SPEED_OPTIONS, createSimulationStore, simulationStore } from "@/store/use-simulation-store";
@@ -45,12 +46,13 @@ function fakeWorker(legacyStarted = false) {
     const result = runtime.tick(ms);
     if (result) port2.postMessage(result.response, result.transfer);
   };
-  return { worker, runtime, posted, tick };
+  const emit = (data: unknown) => listeners.forEach(listener => listener({ data } as MessageEvent));
+  return { worker, runtime, posted, tick, emit };
 }
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
-function setup(layout = cafeLayout(), legacyStarted = false) {
+function setup(layout = cafeLayout(), legacyStarted = false, now = () => performance.now()) {
   const fake = fakeWorker(legacyStarted);
   const layoutState = createLayoutStore({ initialLayout: layout });
   const sim = createSimulationStore();
@@ -58,7 +60,7 @@ function setup(layout = cafeLayout(), legacyStarted = false) {
     createWorker: () => fake.worker,
     layout: layoutState,
     simulation: sim,
-    now: () => performance.now(),
+    now,
     metricsThrottleMs: 0,
   });
   return { fake, layoutState, sim, controller };
@@ -101,6 +103,16 @@ describe("P2 Gate ใน SimulationController", () => {
     await expect(controller.start()).resolves.toEqual({ ok: true });
     expect(sim.getState().status).toBe("running");
     expect(controller.current).toBeNull(); // รอ TICK แรกตามพฤติกรรมเดิม
+  });
+
+  it("สองช่วงพีคส่งไปวิเคราะห์และเล่นภาพจนจบช่วงสุดท้าย", async () => {
+    const { fake, sim, controller } = setup();
+    disposers.push(() => controller.dispose());
+    sim.getState().setConfig({ secondPeakEnabled: true, secondPeakStart: "17:30", secondPeakEnd: "19:00" });
+    await expect(controller.start()).resolves.toEqual({ ok: true });
+    expect(fake.posted.find((message) => (message as { type: string }).type === "ANALYZE_DAY"))
+      .toMatchObject({ input: { secondPeak: { startMinute: 1050, endMinute: 1140 } } });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { stopAtSeconds: 32400, peaks: [{ startSeconds: 5400, endSeconds: 10800 }, { startSeconds: 27000, endSeconds: 32400 }] } });
   });
 
   it("จบช่วงคนเยอะ → หยุดเอง กลับโหมดแก้ผัง เก็บผลและ heatmap ไว้", async () => {
@@ -185,6 +197,125 @@ describe("สเกลเวลาเล่นภาพ", () => {
   it("x1 = เวลาจริง และทุกตัวเลือกแปลงเป็นหน่วย Worker ถูกต้อง", () => {
     expect(SPEED_OPTIONS.map(playbackSpeedToWorkerSpeed)).toEqual([1, 2, 5, 10, 30]);
   });
+
+  it("controller ใช้ความเร็วแต่ละคนจาก metadata และพนักงานเดิน 6 เมตรใน 5 วินาที", async () => {
+    let now = 0;
+    const { fake, controller } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    const start = controller.current!.staff;
+    const x = start[1]!, y = start[2]!;
+    let previous: Float32Array | null = null;
+    const distances = [0, 0];
+    for (let i = 0; i <= 50; i++) {
+      now = i * 100;
+      const tick = fake.runtime.tick(i === 0 ? 0 : 100)!.response;
+      const presentation = tick.presentation!;
+      fake.emit({ ...tick,
+        agents: new Float32Array([10, x + 60, y, 3, 11, x + 60, y + 1, 3]),
+        paths: i === 0 ? new Float32Array([10, 2, x, y, x + 60, y, 11, 2, x, y + 1, x + 60, y + 1]) : undefined,
+        staff: new Float32Array([0, x + 6, y, 3]),
+        presentation: { ...presentation, customers: [10, 11].map((id, index) => ({
+          renderAgentId: id, partyId: 1, memberIndex: index, tableId: null, chairId: null,
+          serviceCycleId: null, activity: "walking", seatingPhase: null, walkMetersPerSecond: index ? 1.4 : 1, mealId: null,
+        })) },
+      });
+      const current = controller.current!.agents;
+      if (previous) for (let member = 0; member < 2; member++) {
+        const offset = member * 4;
+        distances[member]! += Math.hypot(current[offset + 1]! - previous[offset + 1]!, current[offset + 2]! - previous[offset + 2]!);
+      }
+      previous = current;
+    }
+    expect(controller.current!.staff[1]! - x).toBeCloseTo(6, 4);
+    // Includes the entrance corner; sampled chords may be slightly shorter than the complete path.
+    expect(distances[0]).toBeGreaterThan(4.75); expect(distances[0]).toBeLessThanOrEqual(5.001);
+    expect(distances[1]).toBeGreaterThan(6.65); expect(distances[1]).toBeLessThanOrEqual(7.001);
+    expect(controller.current!.presentation?.customers.map(c => c.walkMetersPerSecond)).toEqual([1, 1.4]);
+    expect(controller.current!.timing).toMatchObject({ simulationSeconds: expect.closeTo(5), deltaSeconds: expect.closeTo(0.1), playbackRate: 1 });
+  });
+
+  it("ซ่อนแท็บ 60 วินาทีหยุด Worker แล้วกลับมาไม่เดินชดเชย; manual pause ยังคงหยุด", async () => {
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    now = 100; fake.tick(100); await flush();
+    await controller.setVisibility(true);
+    const time = sim.getState().metrics!.time;
+    now += 60_000; fake.tick(60_000); await flush();
+    expect(sim.getState().status).toBe("paused");
+    expect(sim.getState().metrics!.time).toBe(time);
+    await controller.setVisibility(false);
+    expect(sim.getState().status).toBe("running");
+    now += 100; fake.tick(100); await flush();
+    expect(controller.current!.timing!.deltaSeconds).toBeCloseTo(0.1);
+    now += 100; fake.tick(100); await flush();
+    expect(controller.current!.timing!.deltaSeconds).toBeCloseTo(0.1);
+    await controller.pause(); await controller.setVisibility(true); await controller.setVisibility(false);
+    expect(sim.getState().status).toBe("paused");
+    // Rapid hide/show settles in the latest requested state.
+    await controller.resume();
+    await Promise.all([controller.setVisibility(true), controller.setVisibility(false)]);
+    expect(sim.getState().status).toBe("running");
+  });
+
+  it("เครื่องช้าทำให้ TICK มาช้าเป็นช่วง ๆ → ตั้งต้นภาพใหม่แล้วเล่นต่อเอง ไม่ค้างรอให้กดเล่นต่อ", async () => {
+    // feat-137: เครื่องที่วาดได้ 3–4 fps ทำให้ TICK ถึง main thread ช้ากว่า 0.5 วินาที
+    // เดิมถือเป็นช่องว่างแล้วหยุดภาพทุกครั้ง การจำลองจึงค้างตั้งแต่วินาทีแรกและไม่กลับมาเอง
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    now = 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    // สามรอบที่ TICK มาช้า 700 ms ติดกัน — ต้องยังเล่นอยู่และเวลาจำลองเดินหน้าเรื่อย ๆ
+    for (let round = 0; round < 3; round += 1) {
+      const before = sim.getState().metrics?.time ?? 0;
+      now += 700; fake.tick(700); await flush();
+      expect(sim.getState().status).toBe("running");
+      expect(sim.getState().metrics!.time).toBeGreaterThan(before);
+    }
+    // ตั้งต้นใหม่แล้วต้องมีเฟรมให้วาดจริง และไม่ไล่เวลาที่ทิ้งไป
+    expect(controller.current).not.toBeNull();
+    expect(controller.current!.timing!.deltaSeconds).toBe(0);
+    // เฟรมปกติถัดไปเดินเวลาตามจริงต่อได้
+    now += 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    expect(controller.current!.timing!.deltaSeconds).toBeCloseTo(0.1);
+  });
+
+  it("เปิดมุมมอง 3D ครั้งแรกบล็อก main thread หลายวินาที → เล่นต่อเอง ไม่ต้องกดเล่นต่อ", async () => {
+    // feat-137: โหลด GLB + คอมไพล์ shader ครั้งแรกบล็อก main thread ได้หลายวินาที
+    // เดิมถือเป็นช่องว่างยาวแล้วหยุดภาพ ผู้ใช้จึงเห็น "หยุดชั่วคราว" ทันทีที่เปิด 3D
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    now = 100; fake.tick(100); await flush();
+    expect(sim.getState().status).toBe("running");
+    const before = sim.getState().metrics!.time;
+    // บล็อก 6 วินาที: worker เดินเวลาต่อ แล้ว TICK ทั้งหมดมาถึงทีเดียว
+    now += 6000; fake.tick(6000); await flush();
+    expect(sim.getState().status).toBe("running");
+    expect(sim.getState().metrics!.time).toBeGreaterThan(before);
+    expect(controller.current!.timing!.deltaSeconds).toBe(0);
+  });
+
+  it("tick ขาดหายยาวหยุดภาพก่อนกระโดด และ dispose ถอด listener ของผัง", async () => {
+    let now = 0;
+    const { fake, controller, sim, layoutState } = setup(cafeLayout(), false, () => now);
+    await controller.start();
+    const before = controller.current;
+    now = 60_000; fake.tick(60_000); await flush();
+    expect(sim.getState().status).toBe("paused");
+    expect(controller.current).toBe(before);
+    controller.dispose(); controller.dispose();
+    sim.setState({ status: "idle", message: "after dispose" });
+    layoutState.getState().loadLayout(cafeLayout());
+    expect(sim.getState().message).toBe("after dispose");
+    await expect(controller.start()).resolves.toMatchObject({ ok: false });
+  });
 });
 
 function Panel() {
@@ -257,9 +388,12 @@ describe("ปุ่มเริ่มจำลอง (feat-020, feat-055)", () =
 });
 
 describe("Overlay helpers", () => {
-  it("formatSimTime", () => {
+  it("formatSimTime และ formatClockSeconds", () => {
     expect(formatSimTime(59)).toBe("0 นาที");
     expect(formatSimTime(125 * 60)).toBe("2 ชม. 05 นาที");
+    expect(formatClockSeconds(600, 0)).toBe("10:00:00");
+    expect(formatClockSeconds(600, 5)).toBe("10:00:05");
+    expect(formatClockSeconds(600, 65)).toBe("10:01:05");
   });
 
   it("interpolateAgents: เลื่อนระหว่าง 2 tick ตาม id และไม่ interpolate เมื่อกระโดดไกล", () => {

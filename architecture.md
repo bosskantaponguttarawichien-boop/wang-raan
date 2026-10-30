@@ -255,12 +255,69 @@ interface LayoutStoreState {
    - ไฮไลต์ชิ้นงานที่มี Issue ด้วยวงแหวนสีตามระดับความรุนแรง (Blocked = แดง, Warning = ส้ม/เหลือง)
 2. **3D View (Three.js/WebGL)**:
    - โหลด Three.js เฉพาะเมื่อผู้ใช้เลือกมุมมอง 3D แล้วแปลงข้อมูล `StoreLayout` เป็น scene ของห้องและเฟอร์นิเจอร์
-   - โหลด GLB ที่อยู่ใน `public/assets/models/` เท่านั้น; ใช้ animation clip `Idle`/`Walk` สำหรับลูกค้า และไม่รับ URL โมเดลจากผู้ใช้
+   - โหลด GLB ที่อยู่ใน `public/assets/models/` เท่านั้น และไม่รับ URL โมเดลจากผู้ใช้
+   - คลิปในไฟล์ตัวละคร: ลูกค้ามี `Idle`/`Walk`/`Sit` และ `Eat`/`PullChair`/`SitDown`/`PushChair`/`StandUp`;
+     พนักงานมี `Idle`/`Walk`/`Sit`/`Work` และ `CarryIdle`/`CarryWalk`/`PickUp`/`PutDown`/`WipeTable`
+     โดย marker ของแต่ละคลิปเก็บเป็น normalized time ใน `CafeMannequin.userData.animationMarkers`
    - SVG Isometric เดิมยังคงอยู่เป็น static fallback สำหรับ reduced motion หรือเบราว์เซอร์ที่สร้าง WebGL context ไม่ได้
 3. **P2 Simulation Layer**:
    - ใช้งาน HTML5 `<canvas>` ซ้อนทับบน Artboard แบบ Transparent
    - ตัวเรนเดอร์ Canvas จะรับพิกัด Agent และ Heatmap Delta จาก Web Worker ผ่าน `requestAnimationFrame` เพื่อแสดงจุดแออัดโดยไม่ทำให้ DOM Re-render
    - **ในมุมมอง 3D:** Three.js รับตำแหน่ง/สถานะลูกค้าจาก controller เดียวกับ P2 overlay 2D และเล่น animation GLB; `iso-simulation-overlay.tsx` และ heatmap SVG เดิมเป็นส่วนของ SVG fallback เท่านั้น
+
+#### 5.3.1 Scene feature registry ของมุมมอง 3D (sprint 5)
+
+ฉาก 3D ถูกแยกเป็น **หกช่องฟีเจอร์คงที่** ตาม `src/components/preview-3d/runtime/contracts.ts`
+(`food`, `table-service`, `staff-actions`, `customer-actions`, `seating`, `lighting`) โดย
+`runtime/scene-features.ts` เป็นจุดเดียวที่ประกอบ factory จริงเข้าด้วยกัน:
+
+| ช่อง | เจ้าของภาพ | เชื่อมกับใคร |
+| :--- | :--- | :--- |
+| `food` | ยัง no-op — แคตตาล็อกอาหารเป็นข้อมูลที่ `table-service` เป็นผู้วาด | — |
+| `table-service` | จานทั้ง 5 เมนูบนโต๊ะ, สถานะกิน, คราบ | ถูกอ่านโดย staff-actions และ customer-actions |
+| `staff-actions` | คลิปพนักงาน ถาด ผ้าเช็ด จานที่เก็บ | อ่าน table-service (จานถึงโต๊ะแล้วหรือยัง) |
+| `customer-actions` | คลิปลูกค้า การกิน อุปกรณ์ตามเมนู | อ่าน table-service (จานอยู่ตรงไหนจริง) และ seating (นั่งจริงหรือยัง) |
+| `seating` | ตำแหน่งเก้าอี้และตัวตามจังหวะดึง/นั่ง/ดัน/ลุก | เผยแพร่ `CustomerPosePort` ให้ customer-actions |
+| `lighting` | แดดตามเวลาเปิดร้าน + เวลาจำลอง เงา และไฟในร้านยามค่ำ | อ่านนาฬิกาจำลองจาก store ทุกนาทีจำลอง (ไม่คูณ speed ซ้ำ/ไม่อ่านเวลาเครื่อง); รับไฟเดิมผ่าน `existingLights` |
+
+กฎความเป็นเจ้าของที่ห้ามละเมิด:
+
+- **host เป็นเจ้าของ rig**: ตำแหน่ง การหมุน สเกล และ `mixer.update(delta)` อยู่ที่ `three-view.tsx`
+  เสมอ; feature ตั้งค่า action แต่ไม่เดินเวลาเอง จึงไม่มีการเดินเวลาซ้อนกัน
+- **เวลาเป็นของ simulation ไม่ใช่ของ mixer**: คลิปที่เล่นครั้งเดียว (PickUp/PutDown/WipeTable/
+  SitDown/StandUp) ถูกตั้ง `paused = true` แล้วเขียน `action.time` จากเวลาจำลองทุกเฟรม
+  pause จึงหยุดคาท่า และ playbackRate ไม่ทำให้ท่าหลุดจากข้อมูล — ไม่ใช้ callback `finished` ของ mixer
+- **หนึ่ง bone channel มีเจ้าของเดียว**: ไม่ blend คลิปที่แย่งสะโพก/ขากัน (เช่น CarryWalk กับ Walk
+  หรือ Eat กับ Sit) แต่สลับคลิปตรง ๆ
+- **ข้ามสายได้เฉพาะผ่าน typed port** ที่ประกาศใน `contracts.ts` ของสายนั้น ไม่ import
+  implementation ของสายอื่น และไม่ส่ง Three.js เข้า Core/Worker/BFF
+- feature ไม่เคยเขียนลง `StoreLayout`: ตำแหน่งเก้าอี้/จาน/คราบขณะจำลองเป็น presentation state
+  ล้วน ๆ จึงไม่กระทบ snap 0.25 ม., validation หรือ Undo/Redo
+
+#### 5.3.2 เวลาเฟรมและการไม่ทิ้งเวลาที่ fps ต่ำ
+
+`runtime/frame-clock.ts` รับ delta จาก renderer แล้ว clamp ที่ 0.1 วิ/เฟรมเหมือนเดิม แต่เก็บส่วนที่
+เกินไว้เป็น "หนี้" แล้วทยอยคืนไม่เกิน 40% ของ delta เฟรมถัดไป เครื่องที่ตกลงไป 15 fps จึงไม่ทำให้
+แอนิเมชันค่อย ๆ ล้าหลังนาฬิกาจำลอง และการกระตุกยาวเกิน 0.5 วิ ถูกทิ้งแทนการเล่นย้อน (ไม่มี catch-up)
+ตาม `animation-contract-v1.md` §2; การ pause ล้างหนี้ทิ้ง จึงไม่มีการไล่เวลาเมื่อกลับมาเล่นต่อ
+
+เมื่อ TICK มาถึง main thread ช้าจนภาพกับเวลาหลุดจากกัน (`PlaybackClock` คืน `gap`) `SimulationController`
+แยกสองกรณี: ช่องว่างที่ไม่เกิน 2 วินาที (หลังหารด้วยตัวคูณความเร็ว) เป็นอาการของเครื่องช้า โหลดโมเดล
+หรือ GC จึง **ตั้งต้นภาพใหม่ให้ตรงเวลาจำลองแล้วเล่นต่อทันทีด้วย delta 0** — ทิ้งเวลาช่วงที่ขาดไปตาม
+`animation-contract-v1.md` §2 ไม่ไล่เวลาและไม่เล่นย้อน; ช่องว่างที่ยาวกว่านั้น (แท็บถูกพัก/เครื่องหยุด
+ไปนาน) ตัวละครจะกระโดดไกลเกินไป จึงหยุดภาพไว้ให้ผู้ใช้กดเล่นต่อเองเหมือนเดิม การหยุดทุกกรณีทำให้
+เครื่องที่วาดได้ 3–4 fps ค้างตั้งแต่วินาทีแรกและไม่กลับมาเอง (feat-137)
+
+`adaptive-quality.ts` ไม่นับเฟรมที่ห่างเกิน `ignoreAboveMs` เพราะถือว่าแท็บถูกซ่อน เพดานนี้คือ 900 ms
+ไม่ใช่ 250 ms: เครื่องที่วาดฉากหนาแน่นได้เฟรมละ 250–350 ms ต้องถูกนับว่าช้าเพื่อให้ลดคุณภาพลงได้จริง
+ส่วนแท็บที่ถูกซ่อนจะไม่เรียก rAF หรือเรียกราว 1 ครั้ง/วินาที จึงยังถูกตัดด้วยเพดานนี้ (feat-137)
+
+#### 5.3.3 Fallback 2D/SVG ของวงจรบริการ
+
+`iso-simulation-overlay.tsx` อ่าน `presentation` ชุดเดียวกันแล้ววาดจาน คราบ และจังหวะเช็ดลงบนโต๊ะ
+(`tableBadges`) เครื่องที่เปิด WebGL ไม่ได้หรือผู้ใช้ตั้ง `prefers-reduced-motion` จึงยังเห็นวงจร
+รับอาหาร → กิน → คราบ → เช็ด ครบ โดยไม่ต้องเดาสถานะเอง; worker รุ่นเก่าที่ไม่ส่ง metadata จะไม่วาด
+อะไรเพิ่มเลย
 
 ### 5.4 การจัดการฟอร์ม (Form Management ด้วย React Hook Form + Zod)
 

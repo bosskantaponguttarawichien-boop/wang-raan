@@ -1,0 +1,6 @@
+{"check":"cycle-chair-grip","handOnBackrestWhileChairMoves":true,"phasesSeen":["approach","pull","push","seated","sit"],"maxChairPull":0.3,"usesChairClips":true}
+{"check":"cycle-carrying","clip":"CarryWalk","tier":"carry","meals":1}
+{"check":"cycle-eating","clip":"Eat","utensil":"fork","foodKind":"steak","plateOutOfReach":false,"dishesOnTables":1}
+{"check":"cycle-stained","stainTables":1,"stainMeshes":1}
+{"check":"cycle-wiping","clip":"WipeTable","wipeProgress":0.037919706121595634,"tableId":"table-ad7691bb-c571-4ec9-a6c6-774f3b2ca091","stainMeshesStillThere":8}
+{"check":"cycle-wipe-complete","wipeProgress":0.9559087489918855,"tableId":"table-ad7691bb-c571-4ec9-a6c6-774f3b2ca091","stainMeshes":4,"dishesOnTables":2}

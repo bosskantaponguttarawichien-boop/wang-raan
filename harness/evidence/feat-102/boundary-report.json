@@ -1,0 +1,7 @@
+{
+  "checked_source_files": 52,
+  "forbidden_import_or_DOM_errors": [],
+  "contract_version": 1,
+  "foundation_101_commit": "ad1d3b3",
+  "verification": "npm test 80 files / 1001 tests; lint exit0 one existing warning; typecheck exit0; browser flow passed"
+}

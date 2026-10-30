@@ -120,6 +120,10 @@
   --iso-door-frame: #f2a46b;
   --iso-doormat: #f28c45;
   --iso-shadow: #2e3440;
+  /* §2.4.1 วงจรบริการระหว่างจำลอง — จานและคราบบนโต๊ะใน fallback 2D */
+  --iso-dish: #f4f6fb;
+  --iso-dish-edge: #8f9bb3;
+  --iso-stain: #b58150;
 
   /* §2.5 Illustration-Only Palette — ห้ามใช้เป็นพื้นหลัง/ตัวอักษร UI */
   --illus-cobalt: #3b62f4;
