@@ -44,6 +44,11 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
     expect(outcome.arrived).toBeLessThan(150);
     expect(outcome.fed + outcome.noSeat + outcome.abandoned).toBeCloseTo(outcome.arrived, 6);
     expect(outcome.unfinished).toBe(0);
+    expect(outcome.ranges.arrived[0]).toBeLessThanOrEqual(outcome.arrived);
+    expect(outcome.ranges.arrived[1]).toBeGreaterThanOrEqual(outcome.arrived);
+    expect(outcome.ranges.noSeat[0]).toBeLessThanOrEqual(outcome.noSeat);
+    expect(outcome.ranges.noSeat[1]).toBeGreaterThanOrEqual(outcome.noSeat);
+    expect(outcome.ranges.avgFoodWaitMinutes).not.toBeNull();
   });
 
   it("ลูกค้าเยอะ → ต้องใช้พ่อครัวมากกว่าลูกค้าน้อย และจำนวนที่แนะนำผ่านเกณฑ์ ส่วนน้อยกว่า 1 คนไม่ผ่าน", { timeout: 30_000 }, () => {
@@ -100,5 +105,12 @@ describe("วิเคราะห์ร้านทั้งวัน (feat-094
 
   it("วิเคราะห์ซ้ำได้ผลเดิม", { timeout: 30_000 }, () => {
     expect(analyzeDay(cafeLayout(), day())).toEqual(analyzeDay(cafeLayout(), day()));
+  });
+
+  it("คำแนะนำคงพนักงานบริการอย่างน้อยหนึ่งคนเมื่อมีคนประจำรับเงิน", { timeout: 30_000 }, () => {
+    const analysis = analyzeDay(cafeLayout(), day({ frontStaff: 2, cashiers: 1 }));
+    expect(analysis.staffing.recommended).not.toBeNull();
+    expect(analysis.staffing.recommended!.frontStaff).toBeGreaterThanOrEqual(2);
+    expect(analysis.staffing.frontOptions.every((option) => option.frontStaff >= 2)).toBe(true);
   });
 });

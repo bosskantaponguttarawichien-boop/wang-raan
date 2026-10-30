@@ -4,7 +4,7 @@
  */
 import type { StoreLayout, ValidationResult } from "../layout/types";
 import type { DayAnalysis, DayInput } from "./day-analysis";
-import type { PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
+import type { BreakWindow, PartyWeights, PeakWindow, ServiceStyle, SimulationMetrics } from "./engine";
 import type { PresentationSnapshot } from "./presentation-contract";
 
 export interface SimulationStartConfig {
@@ -15,12 +15,23 @@ export interface SimulationStartConfig {
   /** ค่าร้าน/ลูกค้าเพิ่มเติม (feat-093) — ไม่ส่งใช้ค่าตั้งต้นของ engine */
   serviceStyle?: ServiceStyle;
   peak?: PeakWindow | null;
+  peaks?: PeakWindow[];
   closeSeconds?: number | null;
   frontStaff?: number;
+  cashiers?: number;
   cooks?: number;
   cookMinutesPerDish?: number;
   dineMinutes?: [number, number];
   patienceMinutes?: number;
+  tablePatienceMinutes?: number;
+  partyWeights?: PartyWeights;
+  varyPatience?: boolean;
+  queueBalkAt?: number;
+  varyMenuTimes?: boolean;
+  varyStaffSpeed?: boolean;
+  teamBreak?: BreakWindow;
+  staggerBreak?: boolean;
+  extraDishPercent?: number;
   /** เดินเวลาเบื้องหลังถึงวินาทีนี้ก่อนเริ่มส่งภาพ (เช่น ต้นช่วงคนเยอะ) — heatmap เริ่มนับจากจุดนี้ */
   startAtSeconds?: number;
   /** หยุดเองเมื่อถึงวินาทีนี้ (เช่น จบช่วงคนเยอะ) แล้วส่ง TICK สุดท้ายที่มี finished: true */

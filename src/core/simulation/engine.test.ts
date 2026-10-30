@@ -221,6 +221,12 @@ describe("SimulationWorkerRuntime — START / PAUSE / STOP / TICK", () => {
   const layout = cafeLayout();
   const validation = validateLayout(layout);
 
+  it("ปฏิเสธการตั้งพนักงานทั้งหมดเป็นผู้รับเงินโดยไม่มีผู้บริการ", () => {
+    const rt = new SimulationWorkerRuntime();
+    const result = rt.handle({ type: "START", requestId: 1, layoutRevision: "x", config: { customersPerHour: 40, speed: 1, frontStaff: 2, cashiers: 2 } });
+    expect(result.response).toMatchObject({ type: "ERROR", code: "INVALID_MESSAGE" });
+  });
+
   function started(speed = 60) {
     const rt = new SimulationWorkerRuntime();
     expect(rt.handle({ type: "SYNC_LAYOUT", requestId: 1, payload: { layout, validation } }).response.type).toBe("STATUS");

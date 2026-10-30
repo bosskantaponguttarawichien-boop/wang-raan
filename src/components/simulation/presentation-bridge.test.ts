@@ -21,6 +21,14 @@ function snapshot(sequence = 0) {
 }
 
 describe("presentation transport and gate", () => {
+  it("ส่งสถานะพักผ่าน worker และตัวอ่านภาพ", () => {
+    const rt = runtime();
+    const result = rt.handle({ type: "START", requestId: 9, layoutRevision: validation.layoutRevision,
+      config: { customersPerHour: 30, seed: 4, speed: 1, teamBreak: { startSeconds: 0, endSeconds: 600 } } });
+    if (result.response.type !== "STARTED") throw new Error("not started");
+    const snapshot = parsePresentation(result.response.initial!.presentation);
+    expect(snapshot?.staff.every((staff) => staff.thought?.kind === "resting")).toBe(true);
+  });
   it("sends initial/full TICK snapshots with stable run identity, without detaching engine state", () => {
     const rt = runtime(), started = start(rt);
     const initial = structuredClone(started.response, { transfer: started.transfer });

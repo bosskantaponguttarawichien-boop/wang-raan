@@ -105,6 +105,16 @@ describe("P2 Gate ใน SimulationController", () => {
     expect(controller.current).toBeNull(); // รอ TICK แรกตามพฤติกรรมเดิม
   });
 
+  it("สองช่วงพีคส่งไปวิเคราะห์และเล่นภาพจนจบช่วงสุดท้าย", async () => {
+    const { fake, sim, controller } = setup();
+    disposers.push(() => controller.dispose());
+    sim.getState().setConfig({ secondPeakEnabled: true, secondPeakStart: "17:30", secondPeakEnd: "19:00" });
+    await expect(controller.start()).resolves.toEqual({ ok: true });
+    expect(fake.posted.find((message) => (message as { type: string }).type === "ANALYZE_DAY"))
+      .toMatchObject({ input: { secondPeak: { startMinute: 1050, endMinute: 1140 } } });
+    expect(fake.posted.at(-1)).toMatchObject({ type: "START", config: { stopAtSeconds: 32400, peaks: [{ startSeconds: 5400, endSeconds: 10800 }, { startSeconds: 27000, endSeconds: 32400 }] } });
+  });
+
   it("จบช่วงคนเยอะ → หยุดเอง กลับโหมดแก้ผัง เก็บผลและ heatmap ไว้", async () => {
     const { fake, sim, controller } = setup();
     disposers.push(() => controller.dispose());

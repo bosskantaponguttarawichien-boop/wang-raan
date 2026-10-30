@@ -1,0 +1,38 @@
+{
+  "peak": 60,
+  "thoughtsOn": {
+    "frames": 22,
+    "medianMs": 300
+  },
+  "thoughtsOff": {
+    "frames": 23,
+    "medianMs": 280
+  },
+  "thoughtsOnAgain": {
+    "frames": 24,
+    "medianMs": 260.1
+  },
+  "canvas": {
+    "backingStore": [
+      944,
+      564
+    ],
+    "cssSize": [
+      944,
+      564
+    ],
+    "devicePixelRatio": 1,
+    "shadowProxiesVisible": null
+  },
+  "live": {
+    "running": true,
+    "simSecondsAdvancedIn3s": 4.15
+  },
+  "scene": {
+    "customers": 66,
+    "staff": 8,
+    "drawCalls": 692,
+    "triangles": 575928
+  },
+  "errors": []
+}

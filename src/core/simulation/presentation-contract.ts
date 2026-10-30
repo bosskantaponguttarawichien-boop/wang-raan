@@ -31,7 +31,7 @@ export interface CustomerThought {
   readonly severity: "normal" | "warning" | "critical";
 }
 
-export type StaffThoughtKind = "taking-order" | "serving" | "cleaning";
+export type StaffThoughtKind = "taking-order" | "serving" | "cleaning" | "resting";
 
 export interface StaffThought {
   readonly kind: StaffThoughtKind;

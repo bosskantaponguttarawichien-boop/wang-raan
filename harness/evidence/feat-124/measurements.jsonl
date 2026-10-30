@@ -7,3 +7,23 @@
 {"check":"room-size","meters":2,"meanLuminance":0.9068755808139436}
 {"check":"room-size","meters":30,"meanLuminance":0.9412738232428567}
 {"check":"restaurant-clock","day":0.9414320086597024,"night":0.8203398445533152,"paused":"หยุดชั่วคราว · 10:01:18 น.","deviceClockIgnored":true}
+{"check":"lighting-time","time":"morning","iso":"2026-06-21T07:30:00+07:00","meanLuminance":0.9067791058275599}
+{"check":"lighting-time","time":"noon","iso":"2026-06-21T12:00:00+07:00","meanLuminance":0.9172622801465351}
+{"check":"lighting-time","time":"evening","iso":"2026-06-21T17:45:00+07:00","meanLuminance":0.868477500163168}
+{"check":"lighting-time","time":"night","iso":"2026-06-21T21:30:00+07:00","meanLuminance":0.8202611062090891}
+{"check":"noon-vs-night","noon":0.9172613570800866,"night":0.8202600841502656}
+{"check":"rotation-luminance","levels":[0.9067791890111113,0.9241543848444345,0.8988752398144275,0.9045290743460374,0.9066693881124194]}
+{"check":"room-size","meters":2,"meanLuminance":0.9067789894059914}
+{"check":"room-size","meters":30,"meanLuminance":0.9412660625538587}
+{"check":"restaurant-clock","day":0.9413090591771327,"night":0.8202604842591978,"paused":"หยุดชั่วคราว · 10:01:22 น.","deviceClockIgnored":true}
+{"check":"lighting-time","time":"morning","iso":"2026-06-21T07:30:00+07:00","meanLuminance":0.906779709095534}
+{"check":"lighting-time","time":"noon","iso":"2026-06-21T12:00:00+07:00","meanLuminance":0.9172626738965349}
+{"check":"lighting-time","time":"evening","iso":"2026-06-21T17:45:00+07:00","meanLuminance":0.8684773346947587}
+{"check":"lighting-time","time":"night","iso":"2026-06-21T21:30:00+07:00","meanLuminance":0.8202607752722699}
+{"check":"noon-vs-night","noon":0.9172615464183215,"night":0.8202602117374113}
+{"check":"rotation-luminance","levels":[0.9067795002039216,0.9241537824751538,0.8988739116690032,0.9045287982703291,0.9066710893651427]}
+{"check":"room-size","meters":2,"meanLuminance":0.9067792235835515}
+{"check":"room-size","meters":30,"meanLuminance":0.9412660770282596}
+{"check":"restaurant-clock","day":0.9413095543296383,"night":0.8202603915168233,"paused":"หยุดชั่วคราว · 10:01:21 น.","deviceClockIgnored":true,"movedPixelsWhilePaused":1}
+{"check":"restaurant-clock","day":0.9413095499587231,"night":0.8202608631807665,"paused":"หยุดชั่วคราว · 10:01:23 น.","deviceClockIgnored":true,"movedPixelsWhilePaused":1}
+{"check":"restaurant-clock","day":0.9413093651820347,"night":0.8202606299835988,"paused":"หยุดชั่วคราว · 10:01:25 น.","deviceClockIgnored":true,"movedPixelsWhilePaused":0}

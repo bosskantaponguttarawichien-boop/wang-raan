@@ -18,6 +18,9 @@ const DAY_SECONDS = 24 * 3600;
 export const MAX_TEAM = 20;
 
 const Minute = z.number().int().min(0).max(24 * 60 - 1);
+const BreakWindowSchema = z.object({ startSeconds: z.number().finite().min(0).max(DAY_SECONDS), endSeconds: z.number().finite().min(0).max(DAY_SECONDS) }).refine((rest) => rest.endSeconds > rest.startSeconds);
+const PeakWindowSchema = z.object({ startSeconds: z.number().finite().min(0), endSeconds: z.number().finite().min(0), customersPerHour: z.number().finite().min(0).max(600) }).refine((peak) => peak.endSeconds > peak.startSeconds);
+const PartyWeightsSchema = z.tuple([z.number().min(0).max(100), z.number().min(0).max(100), z.number().min(0).max(100), z.number().min(0).max(100)]).refine((weights) => weights.some((weight) => weight > 0));
 const DayInputSchema = z
   .object({
     openMinute: Minute,
@@ -25,13 +28,25 @@ const DayInputSchema = z
     dailyCustomers: z.number().int().min(1).max(5000),
     peakStartMinute: Minute,
     peakEndMinute: Minute,
+    secondPeak: z.object({ startMinute: Minute, endMinute: Minute }).optional(),
     frontStaff: z.number().int().min(1).max(MAX_TEAM),
+    cashiers: z.number().int().min(0).max(MAX_TEAM - 1).optional(),
     cooks: z.number().int().min(1).max(MAX_TEAM),
     cookMinutesPerDish: z.number().finite().min(0.5).max(120),
     dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]),
     patienceMinutes: z.number().finite().min(1).max(240),
+    tablePatienceMinutes: z.number().finite().min(1).max(240).optional(),
+    partyWeights: PartyWeightsSchema.optional(),
+    varyPatience: z.boolean().optional(),
+    queueBalkAt: z.number().int().min(0).max(100).optional(),
+    varyMenuTimes: z.boolean().optional(),
+    varyStaffSpeed: z.boolean().optional(),
+    teamBreak: BreakWindowSchema.optional(),
+    staggerBreak: z.boolean().optional(),
+    extraDishPercent: z.number().int().min(0).max(100).optional(),
   })
   .refine((d) => d.openMinute !== d.closeMinute, { message: "เวลาเปิดและปิดต้องไม่ตรงกัน" })
+  .refine((d) => (d.cashiers ?? 0) < d.frontStaff, { message: "ต้องมีพนักงานบริการอย่างน้อย 1 คน" })
   .refine((d) => d.dineMinutes[0] <= d.dineMinutes[1], { message: "ช่วงเวลาทานไม่ถูกต้อง" });
 const RequestSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("PING"), requestId: RequestId }),
@@ -57,16 +72,27 @@ const RequestSchema = z.discriminatedUnion("type", [
         })
         .nullable()
         .optional(),
+      peaks: z.array(PeakWindowSchema).max(2).optional(),
       closeSeconds: z.number().finite().positive().max(DAY_SECONDS).nullable().optional(),
       frontStaff: z.number().int().min(1).max(MAX_TEAM).optional(),
+      cashiers: z.number().int().min(0).max(MAX_TEAM - 1).optional(),
       cooks: z.number().int().min(1).max(MAX_TEAM).optional(),
       cookMinutesPerDish: z.number().finite().min(0.5).max(120).optional(),
       dineMinutes: z.tuple([z.number().finite().min(1).max(240), z.number().finite().min(1).max(240)]).optional(),
       patienceMinutes: z.number().finite().min(1).max(240).optional(),
+      tablePatienceMinutes: z.number().finite().min(1).max(240).optional(),
+      partyWeights: PartyWeightsSchema.optional(),
+      varyPatience: z.boolean().optional(),
+      queueBalkAt: z.number().int().min(0).max(100).optional(),
+      varyMenuTimes: z.boolean().optional(),
+      varyStaffSpeed: z.boolean().optional(),
+      teamBreak: BreakWindowSchema.optional(),
+      staggerBreak: z.boolean().optional(),
+      extraDishPercent: z.number().int().min(0).max(100).optional(),
       startAtSeconds: z.number().finite().min(0).max(DAY_SECONDS).optional(),
       stopAtSeconds: z.number().finite().positive().max(DAY_SECONDS + 6 * 3600).optional(),
       skipQuiet: z.boolean().optional(),
-    }),
+    }).refine((d) => (d.cashiers ?? 0) < (d.frontStaff ?? 2), { message: "ต้องมีพนักงานบริการอย่างน้อย 1 คน" }),
   }),
   z.object({
     type: z.literal("ANALYZE_DAY"),

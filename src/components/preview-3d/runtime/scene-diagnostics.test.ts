@@ -19,6 +19,12 @@ function fakeDiagnostics(): SceneDiagnostics {
       modern: false, simulating: false, running: false, simTimeSeconds: null,
       playbackRate: 1, frameDebtSeconds: 0, customerCount: 0, staffCount: 0,
     }),
+    quality: () => ({
+      level: 0, maxPixelRatio: 1.5, characterShadows: true, shadowMapSize: 2048,
+      pixelRatio: 1, shadowAutoUpdate: true, visibleShadowProxies: 0,
+      sampler: { samplesInWindow: 0, measuredMs: 0, warmupMs: 0, lastSampleMs: 0 },
+      sceneInstances: 1,
+    }),
   };
 }
 
@@ -69,7 +75,7 @@ describe("scene diagnostics hook", () => {
     installSceneDiagnostics(scope, { ...fakeDiagnostics(), staffActions });
     const hook = scope[DIAGNOSTICS_KEY] as SceneDiagnostics;
     expect(Object.keys(hook).filter(key => typeof (hook as unknown as Record<string, unknown>)[key] === "function").sort())
-      .toEqual(["customerActions", "frame", "renderer", "seating", "staffActions", "tableService"]);
+      .toEqual(["customerActions", "frame", "quality", "renderer", "seating", "staffActions", "tableService"]);
     hook.staffActions();
     expect(staffActions).toHaveBeenCalledTimes(1);
   });

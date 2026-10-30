@@ -42,6 +42,27 @@ export interface SceneFrameInfo {
   readonly staffCount: number;
 }
 
+/**
+ * สถานะคุณภาพที่ใช้วาดอยู่จริงในเฟรมล่าสุด — ตัวเลข fps ไม่มีความหมายถ้าไม่รู้ว่าวาดที่คุณภาพใด
+ * (AdaptiveQuality ลดคุณภาพเองเมื่อเครื่องวาดไม่ทัน ผลวัดสองรอบจึงอาจไม่ได้วัดงานชุดเดียวกัน)
+ */
+export interface SceneQualityInfo {
+  readonly level: number;
+  readonly maxPixelRatio: number;
+  readonly characterShadows: boolean;
+  readonly shadowMapSize: number;
+  /** ค่าที่ renderer ใช้จริง (อาจต่ำกว่าเพดานของขั้น ตาม devicePixelRatio ของจอ) */
+  readonly pixelRatio: number;
+  /** true = วาด shadow map ใหม่ทุกเฟรม (เงาตัวละครขยับได้) */
+  readonly shadowAutoUpdate: boolean;
+  /** ตัวแทนเงาที่ยังถูกสั่งวาด — ควรเป็น 0 เมื่อ characterShadows เป็น false */
+  readonly visibleShadowProxies: number;
+  /** สิ่งที่ตัววัดความเร็วเห็น (ช่วงเฟรมล่าสุด, ความคืบหน้าของช่วงวัด) */
+  readonly sampler: { samplesInWindow: number; measuredMs: number; warmupMs: number; lastSampleMs: number };
+  /** จำนวนครั้งที่ฉาก 3D ถูกสร้างใหม่ในหน้านี้ — มากกว่า 1 แปลว่า effect สร้างฉากใหม่ (ตัววัดเริ่มนับใหม่ด้วย) */
+  readonly sceneInstances: number;
+}
+
 export interface SceneTableServiceStats {
   readonly tableCount: number;
   readonly activeDishCount: number;
@@ -57,6 +78,7 @@ export interface SceneDiagnostics {
   tableService(): SceneTableServiceStats | null;
   renderer(): SceneRendererCounters | null;
   frame(): SceneFrameInfo;
+  quality(): SceneQualityInfo;
 }
 
 type DiagnosticsScope = Record<string, unknown>;

@@ -19,6 +19,9 @@ export interface PartyView {
   cancelled: boolean;
   entranceQueuedAt?: number | null;
   seatedAt?: number;
+  tablePatienceSeconds?: number;
+  foodPatienceSeconds?: number;
+  dishCounts?: readonly number[];
 }
 export interface TableView { id: string; cycleId: string; status: TableAvailability; cleanCompletedAt: number | null }
 export interface TaskView {
@@ -31,13 +34,15 @@ export interface TaskView {
   plan: StaffPlan | null;
   party: PartyView | null;
 }
-export interface StaffView { id: number; task: TaskView | null }
+export interface StaffView { id: number; task: TaskView | null; onBreak?: boolean }
 export interface SnapshotInput {
   runId: string;
   layoutRevision: string;
   sequence: number;
   time: number;
   seed: number;
+  tablePatienceSeconds?: number;
+  foodPatienceSeconds?: number;
   parties: readonly PartyView[];
   tables: readonly TableView[];
   /** Last departed party per table; replaced on the next allocation. */
@@ -182,7 +187,7 @@ function staffPresentation(staff: StaffView, now: number, meals: readonly MealPr
     walkMetersPerSecond: 1.2,
     carryMealIds: current === "carrying" ? meals.filter(meal => meal.serviceCycleId === task?.cycleId).map(meal => meal.mealId) : [],
     servicePoint, phaseStartedAtSeconds: start, phaseEndsAtSeconds: end,
-    thought: resolveStaffThought(current),
+    thought: staff.onBreak && !task ? { kind: "resting" } : resolveStaffThought(current),
   };
 }
 
@@ -212,14 +217,18 @@ export function buildPresentationSnapshot(layout: StoreLayout, input: SnapshotIn
       const dx = center.x - middle.x, dy = center.y - middle.y;
       const x = (dx * Math.cos(angle) - dy * Math.sin(angle)) * 0.5;
       const y = (dx * Math.sin(angle) + dy * Math.cos(angle)) * 0.5;
-      meals.push({
-        mealId: `${party.cycleId}:meal:${renderMemberId(party.id, member)}`,
-        ownerRenderAgentId: renderMemberId(party.id, member), tableId: table.id, chairId: chair.id,
-        serviceCycleId: party.cycleId, foodKind: foodKindFor(input.seed, party.id, member),
-        anchor: { x: Math.max(-table.width / 2 + 0.13, Math.min(table.width / 2 - 0.13, x)), y: Math.max(-table.depth / 2 + 0.13, Math.min(table.depth / 2 - 0.13, y)) },
-        consumed, progress: consumed >= 1 ? "empty" : consumed > 0 ? "partial" : "full",
-        placedAtSeconds: placed !== null && placed <= input.time ? placed : null,
-      });
+      const count = Math.max(1, Math.min(2, party.dishCounts?.[member] ?? 1));
+      for (let dishIndex = 0; dishIndex < count; dishIndex++) {
+        const shift = dishIndex === 0 ? 0 : 0.14;
+        meals.push({
+          mealId: `${party.cycleId}:meal:${renderMemberId(party.id, member)}${dishIndex ? `:extra:${dishIndex}` : ""}`,
+          ownerRenderAgentId: renderMemberId(party.id, member), tableId: table.id, chairId: chair.id,
+          serviceCycleId: party.cycleId, foodKind: foodKindFor(input.seed, party.id, member + party.partySize * dishIndex),
+          anchor: { x: Math.max(-table.width / 2 + 0.13, Math.min(table.width / 2 - 0.13, x + shift)), y: Math.max(-table.depth / 2 + 0.13, Math.min(table.depth / 2 - 0.13, y)) },
+          consumed, progress: consumed >= 1 ? "empty" : consumed > 0 ? "partial" : "full",
+          placedAtSeconds: placed !== null && placed <= input.time ? placed : null,
+        });
+      }
     }
   }
   const customers = input.parties.flatMap(party => Array.from({ length: party.partySize }, (_, member) => {
@@ -227,7 +236,7 @@ export function buildPresentationSnapshot(layout: StoreLayout, input: SnapshotIn
     const seated = party.state === "seated" || party.state === "waiting-order" || party.state === "waiting-food";
     const ownMeal = meals.find(meal => meal.ownerRenderAgentId === id);
     const consumed = ownMeal?.consumed ?? 0;
-    const thought = resolveCustomerThought(party, input.time, member, consumed);
+    const thought = resolveCustomerThought(party, input.time, member, consumed, party.state === "waiting-entrance" ? party.tablePatienceSeconds ?? input.tablePatienceSeconds : party.foodPatienceSeconds ?? input.foodPatienceSeconds);
     return {
       renderAgentId: id, partyId: party.id, memberIndex: member, tableId: party.tableId,
       chairId: party.chairIds[member] ?? null, serviceCycleId: party.cycleId,

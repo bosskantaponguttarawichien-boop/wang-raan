@@ -459,11 +459,43 @@ export function resolveTableDishAnchor(params: {
   readonly tableShape: "round" | "rectangle";
   readonly chair: Chair | undefined;
   readonly siblingMealsOnTable: readonly MealPresentation[];
+  readonly chairs?: ReadonlyMap<string, Chair>;
 }): {
   readonly localAnchor: PresentationPoint;
   readonly rotationRadians: number;
 } {
-  const { meal, table, tableShape, chair, siblingMealsOnTable } = params;
+  const { meal, table, tableShape, chair, siblingMealsOnTable, chairs } = params;
+
+  // จานหลักยังอยู่หน้าเก้าอี้เหมือนเดิม ส่วนจานเพิ่มหาที่ว่างบนโต๊ะ
+  // โดยคำนึงถึงจานหลักของทุกคนและจานเพิ่มที่วางไปแล้ว
+  if (meal.mealId.includes(":extra:") && chairs) {
+    const primaries = siblingMealsOnTable.filter((item) => !item.mealId.includes(":extra:"));
+    const extras = siblingMealsOnTable.filter((item) => item.mealId.includes(":extra:")).sort((a, b) => a.mealId.localeCompare(b.mealId));
+    const occupied = primaries.map((item) => ({
+      anchor: resolveTableDishAnchor({ ...params, meal: item, chair: chairs.get(item.chairId), chairs: undefined }).localAnchor,
+      radius: FOOD_CATALOG[item.foodKind].footprintDiameter / 2,
+    }));
+    for (const extra of extras) {
+      const base = resolveTableDishAnchor({ ...params, meal: extra, chair: chairs.get(extra.chairId), chairs: undefined });
+      const radius = FOOD_CATALOG[extra.foodKind].footprintDiameter / 2;
+      const maxX = table.width / 2 - radius - 0.025;
+      const maxY = table.depth / 2 - radius - 0.025;
+      let best: PresentationPoint | undefined;
+      let bestDistance = Infinity;
+      for (let x = -maxX; x <= maxX + 0.0001; x += 0.025) {
+        for (let y = -maxY; y <= maxY + 0.0001; y += 0.025) {
+          if (tableShape === "round" && Math.hypot(x, y) > Math.min(table.width, table.depth) / 2 - radius - 0.025) continue;
+          if (occupied.some((item) => Math.hypot(x - item.anchor.x, y - item.anchor.y) < radius + item.radius + 0.005)) continue;
+          const distance = Math.hypot(x - base.localAnchor.x, y - base.localAnchor.y);
+          if (distance < bestDistance) { best = { x, y }; bestDistance = distance; }
+        }
+      }
+      // บางโต๊ะเล็กเกินกว่าจะวางจานทั้งหมดได้ จึงใช้ตำแหน่งสำรองแทนการซ่อนอาหาร
+      const anchor = best ?? base.localAnchor;
+      if (extra.mealId === meal.mealId) return { localAnchor: anchor, rotationRadians: base.rotationRadians };
+      occupied.push({ anchor, radius });
+    }
+  }
 
   if (chair) {
     const chairCenter = objectCenter(chair);
@@ -517,6 +549,7 @@ export function createTableServiceFeature(
 ): TableServiceFeature {
   const indexedTables = new Map<string, IndexedTable>();
   const indexedChairs = new Map<string, Chair>();
+  const dishAnchorCache = new Map<string, { signature: string; anchors: Map<string, ReturnType<typeof resolveTableDishAnchor>> }>();
   const activeDishes = new Map<string, ActiveDishInstance>();
   const activeStains = new Map<string, ActiveStainCluster>();
 
@@ -750,6 +783,7 @@ export function createTableServiceFeature(
     }
     indexedTables.clear();
     indexedChairs.clear();
+    dishAnchorCache.clear();
   };
 
   const ensureStainCluster = (
@@ -892,13 +926,16 @@ export function createTableServiceFeature(
 
   const applySnapshot = (snapshot: PresentationSnapshot): void => {
     let changed = false;
+    // คราบไม่ทอดเงา (castShadow = false) การจางลงทีละเฟรมขณะเช็ดจึงไม่ต้องวาด shadow map ใหม่
+    // ต่างจากจาน/อาหารที่ทอดเงาจริง — แยกสองเรื่องนี้ ไม่ให้ฉากที่มีคนเช็ดโต๊ะวาดเงาใหม่ทุกเฟรม
+    let shadowsChanged = false;
 
     // If runId or layoutRevision changed, clear stale props from previous run
     if (
       (lastRunId !== null && lastRunId !== snapshot.runId) ||
       (lastLayoutRevision !== null && lastLayoutRevision !== snapshot.layoutRevision)
     ) {
-      if (clearAllDynamicProps()) changed = true;
+      if (clearAllDynamicProps()) { changed = true; shadowsChanged = true; }
     }
     lastRunId = snapshot.runId;
     lastLayoutRevision = snapshot.layoutRevision;
@@ -928,17 +965,22 @@ export function createTableServiceFeature(
       const indexed = indexedTables.get(tableId);
       if (!indexed) continue;
 
+      const signature = JSON.stringify(mealsOnTable.map((item) => [item.mealId, item.chairId, item.foodKind, item.anchor.x, item.anchor.y]));
+      let cached = dishAnchorCache.get(tableId);
+      if (!cached || cached.signature !== signature) {
+        const anchors = new Map<string, ReturnType<typeof resolveTableDishAnchor>>();
+        for (const item of mealsOnTable) {
+          anchors.set(item.mealId, resolveTableDishAnchor({ meal: item, table: indexed.table, tableShape: indexed.shape,
+            chair: indexedChairs.get(item.chairId), siblingMealsOnTable: mealsOnTable, chairs: indexedChairs }));
+        }
+        cached = { signature, anchors };
+        dishAnchorCache.set(tableId, cached);
+      }
+
       for (const meal of mealsOnTable) {
         liveMealIds.add(meal.mealId);
         const progress: FoodProgress = meal.progress ?? foodProgressFromConsumed(meal.consumed);
-        const chair = indexedChairs.get(meal.chairId);
-        const { localAnchor, rotationRadians } = resolveTableDishAnchor({
-          meal,
-          table: indexed.table,
-          tableShape: indexed.shape,
-          chair,
-          siblingMealsOnTable: mealsOnTable,
-        });
+        const { localAnchor, rotationRadians } = cached.anchors.get(meal.mealId)!;
 
         let instance = activeDishes.get(meal.mealId);
         if (
@@ -977,6 +1019,7 @@ export function createTableServiceFeature(
           };
           activeDishes.set(meal.mealId, instance);
           changed = true;
+          shadowsChanged = true;
         } else {
           // Update existing dish position & state if changed
           if (
@@ -989,12 +1032,14 @@ export function createTableServiceFeature(
             instance.root.position.set(localAnchor.x, 0, localAnchor.y);
             instance.root.rotation.y = rotationRadians;
             changed = true;
+            shadowsChanged = true;
           }
           instance.consumed = meal.consumed;
           if (instance.progress !== progress) {
             instance.progress = progress;
             applyFoodProgressVisibility(instance.content, progress);
             changed = true;
+            shadowsChanged = true;
           }
         }
       }
@@ -1003,7 +1048,7 @@ export function createTableServiceFeature(
     // Remove dishes that are no longer on any table (e.g., table cleaned or new cycle)
     for (const mealId of [...activeDishes.keys()]) {
       if (!liveMealIds.has(mealId)) {
-        if (removeDishInstance(mealId)) changed = true;
+        if (removeDishInstance(mealId)) { changed = true; shadowsChanged = true; }
       }
     }
 
@@ -1019,10 +1064,8 @@ export function createTableServiceFeature(
       }
     }
 
-    if (changed) {
-      context.invalidateShadows();
-      context.invalidate();
-    }
+    if (shadowsChanged) context.invalidateShadows();
+    if (changed) context.invalidate();
   };
 
   return {
@@ -1102,7 +1145,9 @@ export function createTableServiceFeature(
     },
 
     getDishPlacements(tableId?: string): readonly TableDishPlacementInfo[] {
-      context.root.updateMatrixWorld(true);
+      // ห้ามบังคับคำนวณเมทริกซ์ทั้งฉากที่นี่: ฟังก์ชันนี้ถูกเรียกต่อ "ลูกค้าหนึ่งคน" ในทุกเฟรม
+      // ฉากหนาแน่น (ลูกค้า 66 คน ล้วนมีกระดูกของตัวเอง) จึงไล่ทั้ง scene graph ซ้ำ 66 รอบต่อเฟรม
+      // getWorldPosition() อัปเดตเมทริกซ์ของสายพ่อแม่ให้เองอยู่แล้ว (updateWorldMatrix(true, false))
       const out: TableDishPlacementInfo[] = [];
       for (const dish of activeDishes.values()) {
         if (tableId !== undefined && dish.tableId !== tableId) continue;

@@ -2,6 +2,186 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-155",
+      "name": "อาหารที่สูญเสียเมื่อยกเลิกออร์เดอร์",
+      "status": "done",
+      "dependencies": ["feat-154"],
+      "role": "frontend",
+      "summary": "นับจานที่ทำแล้วและต้องทิ้งเมื่อลูกค้ากลับก่อนรับอาหาร",
+      "sprint": 5,
+      "evidence": "นับจานที่เสร็จก่อนยกเลิกหรือเสร็จภายหลังเมื่อลูกค้ากลับ ไม่รวมจานที่ยังไม่ได้เริ่ม; แสดงในผลเฉลี่ยและรอบล่าสุด; focused 52 tests, typecheck, eslint, boundary, npm test 113 files / 1354 tests ผ่าน"
+    },
+    {
+      "id": "feat-154",
+      "name": "แยกสาเหตุลูกค้าไม่ได้โต๊ะ",
+      "status": "done",
+      "dependencies": ["feat-153"],
+      "role": "frontend",
+      "summary": "แสดงแยกโต๊ะไม่รองรับขนาดกลุ่ม รอโต๊ะไม่ไหว และกลับเมื่อเห็นคิว",
+      "sprint": 5,
+      "evidence": "แยกและแสดง 3 สาเหตุในผลวิเคราะห์และผลรอบล่าสุด; ยอด noSeat เดิมรวมสาเหตุทั้งหมดและค่าเฉลี่ยแสดงหมายเหตุปัดเศษ; focused 71 tests, typecheck, eslint, boundary, npm test 113 files / 1353 tests ผ่าน"
+    },
+    {
+      "id": "feat-153",
+      "name": "ทยอยพักพนักงาน",
+      "status": "done",
+      "dependencies": ["feat-152"],
+      "role": "frontend",
+      "summary": "แบ่งช่วงพักเป็นรอบรายคนแยกทีมหน้าร้านและครัว",
+      "sprint": 5,
+      "evidence": "ตัวเลือกทยอยพักรายคนแบ่งเวลาตามจำนวนแต่ละทีม; งานค้างทำให้เสร็จและไม่ชดเชยเวลาพัก; รองรับร้านข้ามวันและคนเดียว; focused 47 tests, typecheck, eslint, boundary, npm test 113 files / 1352 tests ผ่าน"
+    },
+    {
+      "id": "feat-151",
+      "name": "ลูกค้าสั่งอาหารมากกว่าหนึ่งจาน",
+      "status": "done",
+      "dependencies": ["feat-152"],
+      "role": "frontend",
+      "summary": "ตั้งโอกาสสั่งจานเพิ่มต่อคน และให้คิวครัวกับภาพแสดงจานตรงกัน",
+      "sprint": 5,
+      "evidence": "โอกาสจานเพิ่ม 0–100% ต่อคน; ครัวปรุงแต่ละจานและเวลาเสิร์ฟคิดตามจำนวน; ภาพแสดงจานเพิ่มและหาที่ว่างบนโต๊ะ; focused 43 tests, typecheck, eslint, harness boundary และ npm test 113 files / 1350 tests ผ่าน"
+    },
+    {
+      "id": "feat-152",
+      "name": "ช่วงพักของทีมร้าน",
+      "status": "done",
+      "dependencies": ["feat-149"],
+      "role": "frontend",
+      "summary": "กำหนดช่วงพักของทีมหน้าร้านและครัว โดยไม่รับงานใหม่จนกว่าจะหมดช่วงพัก",
+      "sprint": 5,
+      "evidence": "ตั้งช่วงพักพร้อมกันของทีมหน้าร้านและครัวรวมร้านข้ามวัน; งานเดิมทำจนเสร็จ ไม่เริ่มงานใหม่ก่อนหมดพัก; แสดงสถานะพักผ่าน worker และภาพ; focused 108 tests, typecheck, eslint, npm test 113 files / 1348 tests ผ่าน"
+    },
+    {
+      "id": "feat-149",
+      "name": "เปรียบเทียบผลจากจำนวนพนักงาน",
+      "status": "done",
+      "dependencies": ["feat-148"],
+      "role": "frontend",
+      "summary": "แสดงผลเวลารอ ลูกค้าได้รับอาหารและลูกค้าที่กลับ สำหรับจำนวนพนักงานที่เปรียบเทียบ",
+      "sprint": 5,
+      "evidence": "การ์ดเทียบพนักงานแสดงคนได้อาหาร กลับก่อนกิน และเวลารอเฉพาะเมื่อมีคนได้อาหาร; day-panel 9 tests, eslint, React checklist และ npm test 113 files / 1344 tests ผ่าน"
+    },
+    {
+      "id": "feat-148",
+      "name": "ความเร็วการทำงานของพนักงานต่างกัน",
+      "status": "done",
+      "dependencies": ["feat-147"],
+      "role": "frontend",
+      "summary": "ให้พนักงานแต่ละคนใช้เวลาทำงานต่างกันโดยคงความเร็วเดินและใช้ตรงกันทั้งผลวิเคราะห์กับภาพ",
+      "sprint": 5,
+      "evidence": "เปิด/ปิดเวลาทำงานรายคน 80–120% กระจายภายในแต่ละบทบาท; คนเดียวใช้มาตรฐานและเวลาเดินไม่เปลี่ยน; focused 91 + 41 tests, typecheck, core boundary และ npm test 113 files / 1344 tests ผ่าน"
+    },
+    {
+      "id": "feat-147",
+      "name": "แบ่งพนักงานประจำรับเงินและบริการ",
+      "status": "done",
+      "dependencies": ["feat-146"],
+      "role": "frontend",
+      "summary": "กำหนดพนักงานประจำรับเงินแยกจากพนักงานรับออร์เดอร์ เสิร์ฟและเก็บโต๊ะ",
+      "sprint": 5,
+      "evidence": "ตั้งพนักงานประจำรับเงินและพนักงานบริการแยกได้ คงคนบริการอย่างน้อย 1 คน; worker ปฏิเสธค่าผิด; คำแนะนำรวมคนประจำรับเงิน; focused 83 tests, targeted เพิ่ม 29, typecheck, eslint, npm test 113 files / 1341 tests และ responsive 18 กรณีผ่าน (ใช้ build ที่มีอยู่หลัง mock build ถูกจำกัดสิทธิ์)"
+    },
+    {
+      "id": "feat-146",
+      "name": "แสดงความผันผวนของผลจำลองหลายวัน",
+      "status": "done",
+      "dependencies": ["feat-145"],
+      "role": "frontend",
+      "summary": "วิเคราะห์หลายชุดลูกค้าและแสดงช่วงผลเพื่อให้เห็นความไม่แน่นอน",
+      "sprint": 5,
+      "evidence": "วิเคราะห์ 6 seed แสดงช่วงต่ำสุด–สูงสุดของลูกค้าเข้า/ไม่มีโต๊ะ/เวลารอเฉลี่ยของคนได้อาหาร; แยก random งานเก็บโต๊ะให้ arrival เหมือนกันเมื่อเปลี่ยนพนักงาน; focused 80 tests, typecheck, npm test 113 files / 1338 tests ผ่าน; ทดสอบสองผัง 48 ที่นั่งรวม 4.9 วินาทีในเครื่องนี้"
+    },
+    {
+      "id": "feat-145",
+      "name": "ตั้งช่วงคนเยอะได้สองช่วง",
+      "status": "done",
+      "dependencies": ["feat-144"],
+      "role": "frontend",
+      "summary": "รองรับช่วงคนเยอะสองช่วงในวันเดียวกันทั้งผลวิเคราะห์และภาพจำลอง",
+      "sprint": 5,
+      "evidence": "รองรับพีคสองช่วงรวมข้ามเที่ยงคืน ตรวจไม่ทับกัน กระจายลูกค้าตามเวลาพีคทั้งหมด และส่งชุดเดียวกันให้วิเคราะห์/ภาพ ภาพหยุดหลังช่วงสุดท้าย; targeted 108 tests, typecheck, npm test 113 files / 1337 tests; responsive Chromium 18 กรณีผ่าน"
+    },
+    {
+      "id": "feat-144",
+      "name": "เวลาปรุงอาหารตามเมนู",
+      "status": "done",
+      "dependencies": ["feat-143"],
+      "role": "frontend",
+      "summary": "ให้จานอาหารแต่ละเมนูใช้เวลาปรุงต่างกันตามอาหารที่แสดงในภาพ",
+      "sprint": 5,
+      "evidence": "ใช้ foodKindFor เดียวกับภาพกำหนดเวลาจานรายคน; ข้าวผัด/ก๋วยเตี๋ยว 100%, สเต๊ก 150%, สลัด 80%, เค้ก 50% ของเวลามาตรฐาน เปิด/ปิดได้; focused 61 tests, typecheck, core boundary, npm test 113 files / 1334 tests ผ่าน"
+    },
+    {
+      "id": "feat-150",
+      "name": "มุมมอง 3D ลื่นไหลขณะจำลอง (วาดรอบเดียวต่อเฟรม)",
+      "status": "done",
+      "dependencies": ["feat-137"],
+      "role": "frontend",
+      "summary": "ฉากหนาแน่นเดินลื่นเต็มเฟรมเรตและอ่านสถานะคุณภาพที่ใช้วาดจริงได้",
+      "sprint": 5,
+      "evidence": "ต้นเหตุหลัก: หนึ่งเฟรมที่จอแสดงถูกวาดซ้ำ 5-6 รอบ เพราะ tick ตั้ง frame = 0 ตอนเริ่ม (ให้ invalidate() ระหว่างวาดปลุกเฟรมถัดไปได้) แต่ท้าย tick จอง rAF ใบใหม่ทับใบที่ invalidate จองไว้ ใบเก่าไม่ถูกยกเลิก - แก้ด้วย schedule() ที่จองได้ใบเดียว · วัดจาก diagnostic hook: ช่วงระหว่าง tick มัธยฐาน 7.2 ms ขณะภาพออกจริงทุก ~280 ms, ย่อ viewport เป็น 464x160 แล้วเวลาเฟรมไม่ลด (ไม่ใช่ fill rate), AdaptiveQuality จึงค้างที่ level 0 เพราะเห็นมัธยฐาน 7 ms · แก้เพิ่ม: getDishPlacements ไม่บังคับคำนวณ เมทริกซ์ทั้งฉากต่อลูกค้าทุกเฟรม (getWorldPosition อัปเดตสายพ่อแม่เองแล้ว), wantsLiteBody และ thought-overlay ใช้ renderer.getSize() แทนการอ่าน layout ทุกเฟรม, ShadowProxy ใช้วัสดุของตัวเองเพราะ geometry ของ proxy ไม่มี morph attributes ของผิวตัว (three รีเซ็ตโปรแกรม shader ทุก draw ตาม WebGLRenderer.js:2404) และปิด visible เมื่อไม่ทอดเงา, mesh ที่รวมแล้วตั้ง matrixAutoUpdate = false, setGrip จำ SkinnedMesh, คราบที่ castShadow = false ไม่สั่งวาด shadow map ใหม่, adaptive-quality ignoreAboveMs 900 -> 5000 ms และข้าม 2 ขั้นเมื่อช้ากว่าเป้าเกิน 4 เท่า, ก้อนความคิดไม่เด้งขณะหยุดชั่วคราว · ผลบนเครื่องอ้างอิง GTX 1050 Ti (hardware WebGL) ฉากหนาแน่น 80 ที่นั่ง ลูกค้า 60 + พนักงาน 8 draw calls 677 ขณะจำลองเดินจริงที่คุณภาพขั้นสูงสุด: median 860 ms (1.2 fps) -> 20 ms (50 fps) p95 49.5 fps; ทุกความเร็ว 1x-30x median 20 ms กระตุก 0% (เดิม 120-240 ms กระตุก 97-98%); รันต่อเนื่อง 6 ช่วง x 150 วินาที median 20 ms ทุกช่วง selfPauses 0 heap 43.5 -> 29.8 MB · เพิ่ม hook.quality() read-only รายงานขั้นคุณภาพ pixelRatio ที่ใช้จริง shadowAutoUpdate visibleShadowProxies sampler และ sceneInstances · แก้หลักฐาน feat-123: ตัวเลข 50 fps เดิมวัดตอน controller หยุดภาพเองไปแล้ว ยืนยันด้วยการรันคอมมิต 2f2fb34 ซ้ำบนเครื่องเดิมได้ stalled: 21 · verify: unit 1,326 ผ่าน, typecheck, lint 0 error, validate_harness, e2e animation 31/32 (ข้อที่ล้มคือเทสต์แสงที่แข่งจังหวะโหลด GLB ผ่านเมื่อรันเดี่ยว จึงให้รอภาพนิ่งก่อนเทียบ) · harness/evidence/feat-150/summary.md"
+    },
+    {
+      "id": "feat-143",
+      "name": "ลูกค้าตัดสินใจจากคิวหน้าร้าน",
+      "status": "done",
+      "dependencies": ["feat-142"],
+      "role": "frontend",
+      "summary": "ลูกค้าบางกลุ่มเห็นคิวยาวแล้วกลับ โดยผู้ใช้กำหนดระดับคิวได้",
+      "sprint": 5,
+      "evidence": "ตั้งเกณฑ์จำนวนคนรอ (0 ปิด) กลุ่มใหม่ครึ่งหนึ่งกลับทันทีเมื่อถึงเกณฑ์; นับ balked เป็นส่วนหนึ่งของ noSeat และแสดงผล; focused 53 tests, typecheck, core boundary, npm test 113 files / 1333 tests ผ่าน"
+    },
+    {
+      "id": "feat-142",
+      "name": "ความอดทนของลูกค้าแต่ละกลุ่ม",
+      "status": "done",
+      "dependencies": ["feat-141"],
+      "role": "frontend",
+      "summary": "ให้ลูกค้าแต่ละกลุ่มมีเวลาที่ยอมรอต่างกันได้ โดยแสดงค่าและใช้ตรงกันในการวิเคราะห์และภาพ",
+      "sprint": 5,
+      "evidence": "แต่ละกลุ่มยอมรอ 80–120% ของค่าที่ตั้ง เปิด/ปิดได้; factor แยก random stream และภาพ/วิเคราะห์ใช้ค่าเดียวกัน; focused 58 tests, typecheck, eslint, core boundary และ npm test 113 files / 1332 tests ผ่าน"
+    },
+    {
+      "id": "feat-141",
+      "name": "ตั้งรูปแบบกลุ่มลูกค้า",
+      "status": "done",
+      "dependencies": ["feat-140"],
+      "role": "frontend",
+      "summary": "กำหนดรูปแบบขนาดกลุ่มลูกค้าให้เหมาะกับร้านและใช้สอดคล้องทั้งการวิเคราะห์กับภาพ",
+      "sprint": 5,
+      "evidence": "ตั้งน้ำหนักกลุ่ม 1–4 คน ส่งทั้งวิเคราะห์และภาพ; อัตรากลุ่มหารด้วยขนาดเฉลี่ยเพื่อรักษาอัตราคน; focused 49 tests, typecheck, npm test 113 files / 1329 tests และ core boundary ผ่าน"
+    },
+    {
+      "id": "feat-140",
+      "name": "แยกเวลารอโต๊ะและรออาหาร",
+      "status": "done",
+      "dependencies": ["feat-139"],
+      "role": "frontend",
+      "summary": "ตั้งเวลาที่ลูกค้ายอมรอโต๊ะและรออาหารแยกกันได้ทั้งผลวิเคราะห์และภาพจำลอง",
+      "sprint": 5,
+      "evidence": "แยกค่ารอโต๊ะและรออาหารในฟอร์ม worker การวิเคราะห์และภาพ; focused 49 tests, typecheck, npm test 113 files / 1328 tests ผ่าน, core boundary ผ่าน"
+    },
+    {
+      "id": "feat-139",
+      "name": "จัดโต๊ะให้เหมาะกับขนาดกลุ่มลูกค้า",
+      "status": "done",
+      "dependencies": ["feat-138"],
+      "role": "frontend",
+      "summary": "ให้ลูกค้าเลือกโต๊ะสะอาดที่มีขนาดพอดีที่สุดก่อน",
+      "sprint": 5,
+      "evidence": "เลือกโต๊ะสะอาดขนาดเล็กที่สุดที่รองรับกลุ่ม สุ่มเฉพาะโต๊ะขนาดเท่ากัน; เทสต์ 20 seeds และ npm test 113 files / 1327 tests ผ่าน, core boundary ผ่าน"
+    },
+    {
+      "id": "feat-138",
+      "name": "ความถูกต้องของการรอและผลจำลองร้าน",
+      "status": "done",
+      "dependencies": ["feat-095"],
+      "role": "frontend",
+      "summary": "นับเวลารอรับออร์เดอร์และแสดงลูกค้าที่เสียไปพร้อมเงื่อนไขผลวิเคราะห์",
+      "sprint": 5,
+      "evidence": "รอรับออร์เดอร์ครบเวลายกเลิกได้ พนักงานหยุดงานที่ยกเลิก; แสดงผลลูกค้าที่ได้อาหารและกลับ ทั้งค่าปัจจุบันและคำแนะนำ; แสดงฐานประเมินโต๊ะ; npm test 113 files / 1326 tests ผ่าน, boundary init ผ่าน, day-panel 6 tests ผ่าน"
+    },
+    {
       "id": "feat-137",
       "name": "ลดอาการกระตุกระหว่างจำลอง",
       "status": "done",

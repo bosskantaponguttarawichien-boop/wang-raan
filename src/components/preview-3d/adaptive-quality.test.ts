@@ -43,9 +43,9 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     expect(changes).toEqual([]);
   });
 
-  it("ช่วงที่แท็บถูกซ่อน (เฟรมห่างมาก) ไม่นับ และ reset เริ่มวัดใหม่", () => {
+  it("ช่วงที่เครื่องหลับ (เฟรมห่างหลายวินาที) ไม่นับ และ reset เริ่มวัดใหม่", () => {
     const quality = new AdaptiveQuality();
-    expect(run(quality, 1000, 60000)).toEqual([]);
+    expect(run(quality, 8000, 120000)).toEqual([]);
     run(quality, 40, 1500);
     quality.reset();
     // หลัง reset ต้องอุ่นเครื่องใหม่ ยังไม่ครบช่วงวัด
@@ -53,11 +53,18 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     expect(run(quality, 40, 1000)).toEqual([1]);
   });
 
-  it("เครื่องช้ามาก (3–4 fps) ยังลดคุณภาพจนถึงขั้นต่ำสุด ไม่ถูกทิ้งทั้งหมดเหมือนแท็บที่ถูกซ่อน", () => {
-    // feat-137: เครื่องที่ไม่มี GPU วาดฉากหนาแน่นได้เฟรมละ ~270 ms เดิมเพดานทิ้งที่ 250 ms
-    // ทำให้ทุกเฟรมถูกทิ้งและคุณภาพค้างที่ขั้นสูงสุดตลอด
+  it("ฉากหนาแน่นที่วาดเฟรมละเกิน 1 วินาที ยังต้องถูกนับ (ไม่ใช่สัญญาณว่าแท็บถูกซ่อน)", () => {
+    // การจำลองหยุดเองเมื่อแท็บถูกซ่อน (controller ใช้ document.hidden) ลูปจึงไม่ได้วัดช่วงนั้น
+    // เพดานความยาวเฟรมจึงต้องไม่ตัดเครื่องที่ช้าจริงทิ้ง — เดิมตัดที่ 900 ms
     const quality = new AdaptiveQuality();
-    expect(run(quality, 270, 30000)).toEqual([1, 2, 3]);
+    expect(run(quality, 1200, 60000).length).toBeGreaterThan(0);
+    expect(quality.current).toEqual(QUALITY_LEVELS[QUALITY_LEVELS.length - 1]);
+  });
+
+  it("เครื่องช้ามาก (3–4 fps) ข้ามขั้นลงไปหาคุณภาพที่ไหวเร็วขึ้น", () => {
+    // ลดทีละขั้นต้องรออุ่นเครื่อง + ครบช่วงวัดใหม่ทุกขั้น เครื่องที่ช้ากว่าเป้าหลายเท่าจึงรอนานเกินไป
+    const quality = new AdaptiveQuality();
+    expect(run(quality, 270, 30000)).toEqual([2, 3]);
     expect(quality.current).toEqual(QUALITY_LEVELS[QUALITY_LEVELS.length - 1]);
   });
 });

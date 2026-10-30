@@ -16,6 +16,7 @@ import {
   buildProceduralFoodFallback,
   computeDeterministicStainSpecs,
   createTableServiceFeature,
+  resolveTableDishAnchor,
   type FoodAssetLoaderLike,
 } from "./table-service";
 
@@ -141,6 +142,29 @@ function makeSnapshot(params: {
 }
 
 describe("feat-116: Table visuals (5 foods, consumption states, deterministic stains, wiping & lifecycle)", () => {
+  it("วางจานเพิ่มแยกจากจานหลักบนโต๊ะเล็กทั้งทรงกลมและสี่เหลี่ยม", () => {
+    for (const shape of ["round", "rectangle"] as const) {
+      const table = makeTable({ id: "t", x: 0, y: 0, width: 0.8, depth: 0.8, shape });
+      const chair = makeChair({ id: "c", tableId: "t", x: 0.175, y: -0.5 });
+      const primary: MealPresentation = {
+        mealId: "m", ownerRenderAgentId: 1, tableId: "t", chairId: "c", serviceCycleId: "s",
+        foodKind: "fried-rice", anchor: { x: 0, y: 0 }, progress: "full", consumed: 0, placedAtSeconds: 5,
+      };
+      const extra: MealPresentation = { ...primary, mealId: "m:extra:1" };
+      const siblingMealsOnTable = [primary, extra];
+      const chairs = new Map([[chair.id, chair]]);
+      const args = { table, tableShape: shape, chair, siblingMealsOnTable, chairs };
+      const first = resolveTableDishAnchor({ ...args, meal: primary }).localAnchor;
+      const second = resolveTableDishAnchor({ ...args, meal: extra }).localAnchor;
+      const radius = FOOD_CATALOG[primary.foodKind].footprintDiameter / 2;
+      expect(Math.hypot(first.x - second.x, first.y - second.y)).toBeGreaterThanOrEqual(radius * 2);
+      if (shape === "round") expect(Math.hypot(second.x, second.y) + radius).toBeLessThanOrEqual(0.4);
+      else {
+        expect(Math.abs(second.x) + radius).toBeLessThanOrEqual(0.4);
+        expect(Math.abs(second.y) + radius).toBeLessThanOrEqual(0.4);
+      }
+    }
+  });
   it("places all 5 food kinds across small/large round/rectangle tables rotated 0/90/180/270 without sinking, floating, or overlapping for party sizes 1, 2, and 4", () => {
     const rotations: readonly (0 | 90 | 180 | 270)[] = [0, 90, 180, 270];
     const shapes: readonly ("rectangle" | "round")[] = ["rectangle", "round"];

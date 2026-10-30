@@ -14,6 +14,8 @@ export interface ThoughtOverlayManager {
     customers: Map<number, { model: THREE.Object3D }>,
     staff: Array<{ model: THREE.Object3D }>,
     showThoughts: boolean,
+    /** หยุดชั่วคราว = ภาพต้องนิ่งทั้งหมด ก้อนความคิดจึงต้องไม่เด้งต่อ */
+    paused?: boolean,
   ): void;
   clear(): void;
   dispose(): void;
@@ -22,6 +24,7 @@ export interface ThoughtOverlayManager {
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {
   const nodes = new Map<number, HTMLDivElement>();
   const projVec = new THREE.Vector3();
+  const viewport = new THREE.Vector2();
   // Keep the bubble DOM stable across animation frames.
   const contentKeys = new WeakMap<HTMLDivElement, string>();
 
@@ -32,14 +35,18 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
     customers: Map<number, { model: THREE.Object3D }>,
     staff: Array<{ model: THREE.Object3D }>,
     showThoughts: boolean,
+    paused = false,
   ) => {
     if (!showThoughts || !presentation) {
       if (nodes.size > 0) clear();
       return;
     }
 
-    const width = renderer.domElement.clientWidth || 800;
-    const height = renderer.domElement.clientHeight || 600;
+    // ขนาดจาก renderer (ตั้งไว้ตอน resize) ไม่ใช่ clientWidth/clientHeight: การอ่านค่าจาก DOM
+    // หลังเพิ่งย้ายก้อนความคิดหลายสิบก้อนในเฟรมก่อน บังคับให้เบราว์เซอร์คำนวณ layout ใหม่ทุกเฟรม
+    renderer.getSize(viewport);
+    const width = viewport.x || 800;
+    const height = viewport.y || 600;
     const activeIds = new Set<number>();
 
     // 1. Process customer thoughts
@@ -73,7 +80,9 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       let el = nodes.get(id);
       if (!el) {
         el = document.createElement("div");
-        el.className = "absolute left-0 top-0 pointer-events-auto select-none transition-transform duration-75 cursor-default";
+        // ไม่ใส่ transition ให้ transform: ตำแหน่งถูกเขียนใหม่ทุกเฟรมอยู่แล้ว การสั่ง transition ซ้อนกัน
+        // ทำให้เบราว์เซอร์ต้อง composite ก้อนความคิดทุกก้อนต่อเนื่อง และภาพยังตามหลังตัวละครอีก
+        el.className = "absolute left-0 top-0 pointer-events-auto select-none cursor-default";
         el.dataset.agentId = String(id);
         el.setAttribute("role", "status");
         container.appendChild(el);
@@ -88,7 +97,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       const fillColor = isCritical ? "#fff1f2" : isWarning ? "#fffbeb" : "#ffffff";
       const strokeColor = isCritical ? "#f43f5e" : isWarning ? "#f59e0b" : "#64748b";
       const badgeColor = isCritical ? "text-rose-800" : isWarning ? "text-amber-800" : "text-slate-600";
-      const bounceClass = isCritical ? "animate-bounce" : "";
+      // หยุดชั่วคราวแล้วภาพต้องนิ่งสนิท (เหมือนที่คลิปตัวละครหยุดด้วย delta 0)
+      const bounceClass = isCritical && !paused ? "animate-bounce" : "";
 
       const badgeHtml = config.badgeText
         ? `<span class="text-[11px] font-semibold tracking-tight ${badgeColor}">${config.badgeText}</span>`
@@ -97,7 +107,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       el.style.display = "block";
       // Position tail circle (~70% x, 100% y) directly above customer's head
       el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-65%, -100%)`;
-      const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity]);
+      const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity, bounceClass]);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
         el.setAttribute("aria-label", config.label);
@@ -144,7 +154,9 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       let el = nodes.get(staffKey);
       if (!el) {
         el = document.createElement("div");
-        el.className = "absolute left-0 top-0 pointer-events-auto select-none transition-transform duration-75 cursor-default";
+        // ไม่ใส่ transition ให้ transform: ตำแหน่งถูกเขียนใหม่ทุกเฟรมอยู่แล้ว การสั่ง transition ซ้อนกัน
+        // ทำให้เบราว์เซอร์ต้อง composite ก้อนความคิดทุกก้อนต่อเนื่อง และภาพยังตามหลังตัวละครอีก
+        el.className = "absolute left-0 top-0 pointer-events-auto select-none cursor-default";
         el.dataset.staffId = String(staffIdx);
         el.setAttribute("role", "status");
         container.appendChild(el);

@@ -26,6 +26,59 @@ function record(measurement: Record<string, unknown>) {
   appendFileSync("harness/evidence/feat-124/measurements.jsonl", `${JSON.stringify(measurement)}\n`, "utf8");
 }
 
+/**
+ * จำนวนพิกเซลที่ต่างกันจริงระหว่างสองภาพ (เทียบในเบราว์เซอร์ จึงอ่านภาพที่ composite แล้ว)
+ *
+ * ไม่เทียบไบต์ต่อไบต์: ฉาก WebGL ที่มี DOM ทับอยู่มีพิกเซลขอบ subpixel กะพริบได้ 1–2 จุดต่อเฟรม
+ * (วัดแล้ว: 1 พิกเซลที่ตำแหน่งเดิมสลับไปมาแบบสุ่ม ทั้งที่เวลาและแสงไม่ขยับ) ขณะที่การเปลี่ยนจริง
+ * เช่นดวงอาทิตย์ขยับหรือโมเดลโหลดเสร็จ เปลี่ยนพิกเซลเป็นพันจุด
+ */
+async function differentPixels(page: Page, a: Buffer, b: Buffer): Promise<number> {
+  return page.evaluate(async ([first, second]) => {
+    const decode = async (base64: string) => {
+      const blob = await (await fetch(`data:image/png;base64,${base64}`)).blob();
+      const bitmap = await createImageBitmap(blob);
+      const surface = document.createElement("canvas");
+      surface.width = bitmap.width;
+      surface.height = bitmap.height;
+      const context = surface.getContext("2d")!;
+      context.drawImage(bitmap, 0, 0);
+      return context.getImageData(0, 0, bitmap.width, bitmap.height);
+    };
+    const one = await decode(first!);
+    const two = await decode(second!);
+    if (one.width !== two.width || one.height !== two.height) return Number.MAX_SAFE_INTEGER;
+    let changed = 0;
+    for (let index = 0; index < one.data.length; index += 4) {
+      if (
+        Math.abs(one.data[index]! - two.data[index]!) > 2 ||
+        Math.abs(one.data[index + 1]! - two.data[index + 1]!) > 2 ||
+        Math.abs(one.data[index + 2]! - two.data[index + 2]!) > 2
+      ) changed += 1;
+    }
+    return changed;
+  }, [a.toString("base64"), b.toString("base64")]);
+}
+
+/**
+ * ภาพของ canvas ที่ "นิ่งแล้วจริง" — เทียบสองภาพติดกันจนเหมือนกันก่อนคืนค่า
+ *
+ * การกดหยุดชั่วคราวหยุดเวลาและคลิปทั้งหมด แต่ไม่ได้หยุดการโหลดไฟล์โมเดล: ตัวละครที่ GLB
+ * เพิ่งโหลดเสร็จต้องปรากฏขึ้นมา (ไม่ใช่หายไป) ภาพจึงเปลี่ยนได้หนึ่งครั้งหลังกดหยุด
+ * ถ้าถ่ายภาพเทียบในจังหวะนั้นพอดี เทสต์จะล้มด้วยเหตุที่ไม่เกี่ยวกับสิ่งที่ต้องการตรวจ
+ */
+async function settledShot(page: Page, canvas: Locator, timeoutMs = 20_000) {
+  const deadline = Date.now() + timeoutMs;
+  let previous = await canvas.screenshot();
+  while (Date.now() < deadline) {
+    await page.waitForTimeout(400);
+    const next = await canvas.screenshot();
+    if (next.equals(previous)) return next;
+    previous = next;
+  }
+  return previous;
+}
+
 function watchErrors(page: Page) {
   const errors: string[] = [];
   page.on("console", (message) => {
@@ -137,15 +190,17 @@ test.describe("feat-124: แสงตามเวลาร้าน", () => {
     await expect(page.getByTestId("simulation-status")).toContainText("หยุดชั่วคราว");
     await page.waitForTimeout(500);
     const paused = await page.getByTestId("simulation-status").innerText();
-    const pausedShot = await runningCanvas.screenshot();
+    const pausedShot = await settledShot(page, runningCanvas);
     await page.clock.setFixedTime(new Date("2045-01-01T01:00:00+07:00"));
     await page.waitForTimeout(2500);
     expect(await page.getByTestId("simulation-status").innerText()).toBe(paused);
-    expect((await runningCanvas.screenshot()).equals(pausedShot)).toBe(true);
+    const movedPixels = await differentPixels(page, pausedShot, await runningCanvas.screenshot());
+    // เพดาน 0.05% ของภาพ (~266 จุดจาก 532,416) — แสงที่ขยับตามเวลาเครื่องจะเปลี่ยนเป็นพันจุด
+    expect(movedPixels, `พิกเซลที่เปลี่ยนขณะหยุดชั่วคราว ${movedPixels} จุด`).toBeLessThan(266);
     await page.getByTestId("stop-simulation").click();
     await openTab(page, "shop");
     await expect(summary).toContainText("10:00 น.");
-    record({ check: "restaurant-clock", day, night, paused, deviceClockIgnored: true });
+    record({ check: "restaurant-clock", day, night, paused, deviceClockIgnored: true, movedPixelsWhilePaused: movedPixels });
     expect(errors).toEqual([]);
   });
 

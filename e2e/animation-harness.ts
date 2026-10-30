@@ -46,12 +46,18 @@ export interface SceneReports {
   tableService: { tableCount: number; activeDishCount: number; activeStainTableCount: number; activeStainMeshCount: number } | null;
   renderer: { calls: number; triangles: number; geometries: number; textures: number; programs: number } | null;
   frame: { modern: boolean; running: boolean; simTimeSeconds: number | null; frameDebtSeconds: number; customerCount: number; staffCount: number } | null;
+  quality: {
+    level: number; maxPixelRatio: number; characterShadows: boolean; shadowMapSize: number;
+    pixelRatio: number; shadowAutoUpdate: boolean; visibleShadowProxies: number;
+    sampler: { samplesInWindow: number; measuredMs: number; warmupMs: number; lastSampleMs: number };
+    sceneInstances: number;
+  } | null;
 }
 
 export async function readScene(page: Page): Promise<SceneReports> {
   return page.evaluate(() => {
     const hook = (window as unknown as { __wangraanScene?: Record<string, (() => unknown) | undefined> }).__wangraanScene;
-    if (!hook) return { staff: [], customers: [], seating: [], tableService: null, renderer: null, frame: null };
+    if (!hook) return { staff: [], customers: [], seating: [], tableService: null, renderer: null, frame: null, quality: null };
     return {
       staff: (hook.staffActions?.() ?? []) as SceneReports["staff"],
       customers: (hook.customerActions?.() ?? []) as SceneReports["customers"],
@@ -59,6 +65,7 @@ export async function readScene(page: Page): Promise<SceneReports> {
       tableService: (hook.tableService?.() ?? null) as SceneReports["tableService"],
       renderer: (hook.renderer?.() ?? null) as SceneReports["renderer"],
       frame: (hook.frame?.() ?? null) as SceneReports["frame"],
+      quality: (hook.quality?.() ?? null) as SceneReports["quality"],
     };
   });
 }

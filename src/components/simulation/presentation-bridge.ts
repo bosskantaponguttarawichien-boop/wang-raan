@@ -15,7 +15,7 @@ const snapshotSchema = z.object({
     surface: z.enum(["empty", "served", "eating", "used", "wiping", "clean"]), mealIds: z.array(id).max(100), stainAmount: ratio, wipeProgress: ratio, cleanCompletedAtSeconds: nullableTime })).max(10000),
   staff: z.array(z.object({ staffId: integer, taskId: id.nullable(), taskKind: z.enum(["deliver", "pay", "clean", "take-order"]).nullable(), tableId: id.nullable(), serviceCycleId: id.nullable(),
     activity: z.enum(["counter", "walking", "taking-order", "pickup", "carrying", "put-down", "wiping", "clearing"]), walkMetersPerSecond: number.positive().max(10),
-    carryMealIds: z.array(id).max(100), servicePoint: point.nullable(), phaseStartedAtSeconds: time, phaseEndsAtSeconds: time, thought: z.object({ kind: z.enum(["taking-order", "serving", "cleaning"]) }).nullable().optional() })).max(100),
+    carryMealIds: z.array(id).max(100), servicePoint: point.nullable(), phaseStartedAtSeconds: time, phaseEndsAtSeconds: time, thought: z.object({ kind: z.enum(["taking-order", "serving", "cleaning", "resting"]) }).nullable().optional() })).max(100),
   milestones: z.array(z.object({ taskId: id, serviceCycleId: id, pickedUpAtSeconds: nullableTime, placedAtSeconds: nullableTime,
     wipeStartedAtSeconds: nullableTime, wipeFinishedAtSeconds: nullableTime, clearedAtSeconds: nullableTime, taskCompletedAtSeconds: time })).max(40000),
 });

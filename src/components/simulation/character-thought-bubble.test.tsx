@@ -42,6 +42,7 @@ describe("CharacterThoughtBubble & getEmoteConfig", () => {
     expect(getEmoteConfig(order)).toMatchObject({ emoji: "📝" });
     expect(getEmoteConfig(serve)).toMatchObject({ emoji: "🍲" });
     expect(getEmoteConfig(clean)).toMatchObject({ emoji: "🧹" });
+    expect(getEmoteConfig({ kind: "resting" })).toMatchObject({ emoji: "☕", label: "กำลังพัก" });
   });
 
   it("renders bubble with accessible role and displays tooltip on hover", () => {

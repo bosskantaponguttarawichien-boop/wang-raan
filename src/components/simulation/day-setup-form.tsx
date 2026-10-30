@@ -115,18 +115,18 @@ function TimeRange({
   );
 }
 
-function Stepper({ label, value, disabled, onChange }: { label: string; value: number; disabled: boolean; onChange: (value: number) => void }) {
+function Stepper({ label, value, disabled, onChange, min = STAFF_LIMITS.min, max = STAFF_LIMITS.max }: { label: string; value: number; disabled: boolean; onChange: (value: number) => void; min?: number; max?: number }) {
   const button =
     "flex size-7 items-center justify-center rounded-[8px] border border-line bg-white text-[14px] text-ink hover:bg-surface disabled:cursor-not-allowed disabled:text-secondary focus-visible:outline-3 focus-visible:outline-solid focus-visible:outline-focus cursor-pointer";
   return (
     <div className="flex items-center gap-2" role="group" aria-label={`จำนวน${label}`}>
-      <button type="button" className={button} aria-label={`ลด${label}`} disabled={disabled || value <= STAFF_LIMITS.min} onClick={() => onChange(value - 1)}>
+      <button type="button" className={button} aria-label={`ลด${label}`} disabled={disabled || value <= min} onClick={() => onChange(value - 1)}>
         −
       </button>
       <output className="min-w-5 text-center text-[13px] font-semibold tabular-nums text-ink" aria-label={`${label} ${value} คน`}>
         {value}
       </output>
-      <button type="button" className={button} aria-label={`เพิ่ม${label}`} disabled={disabled || value >= STAFF_LIMITS.max} onClick={() => onChange(value + 1)}>
+      <button type="button" className={button} aria-label={`เพิ่ม${label}`} disabled={disabled || value >= max} onClick={() => onChange(value + 1)}>
         +
       </button>
     </div>
@@ -192,8 +192,14 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
           title="พนักงานหน้าร้าน"
           source={`มีเพราะผังมีเคาน์เตอร์ ${counters} จุด · รับออร์เดอร์ เสิร์ฟ และรับเงิน`}
           missing={counters === 0 ? "วางเคาน์เตอร์ในผังก่อน ถึงจะมีพนักงานหน้าร้าน" : null}
-          control={<Stepper label="พนักงานหน้าร้าน" value={config.frontStaff} disabled={disabled} onChange={(frontStaff) => set({ frontStaff })} />}
-        />
+          control={<Stepper label="พนักงานหน้าร้าน" value={config.frontStaff} disabled={disabled} onChange={(frontStaff) => set({ frontStaff, cashiers: Math.min(config.cashiers, frontStaff - 1) })} />}
+        >
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <span className="text-[11.5px] text-secondary-strong">ในจำนวนนี้ ประจำรับเงิน</span>
+            <Stepper label="พนักงานประจำรับเงิน" value={config.cashiers} min={0} max={config.frontStaff - 1} disabled={disabled} onChange={(cashiers) => set({ cashiers })} />
+          </div>
+          <p className="m-0 mt-1 text-[11px] leading-[1.6] text-secondary-strong">{config.cashiers === 0 ? "ทุกคนช่วยกันรับเงินและบริการ" : `ประจำรับเงิน ${config.cashiers} คน · บริการที่โต๊ะ ${config.frontStaff - config.cashiers} คน`}</p>
+        </Role>
         <Role
           title="พ่อครัว"
           source="มีเพราะผังมีประตูครัว"
@@ -213,9 +219,32 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
             <Calc>
               ครัวทำได้ราว {formatNumber(dishesPerHour)} จาน/ชม.
               {config.cooks > 1 && ` (${config.cooks} คน × ${formatNumber(60 / config.cookMinutesPerDish)} จาน)`}
+              {(config.varyMenuTimes || config.varyStaffSpeed) && " เมื่อคิดจากเวลามาตรฐาน; เวลาจริงของแต่ละจานหรือคนอาจต่างกัน"}
             </Calc>
+            <label className="mt-2 flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+              <input type="checkbox" checked={config.varyMenuTimes} disabled={disabled} onChange={(event) => set({ varyMenuTimes: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+              <span>เมนูใช้เวลาปรุงต่างกัน <span className="text-secondary-strong">(ข้าวผัด/ก๋วยเตี๋ยว 100%, สเต๊ก 150%, สลัด 80%, เค้ก 50% ของเวลาจานมาตรฐาน)</span></span>
+            </label>
           </div>
         </Role>
+        <label className="flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+          <input type="checkbox" checked={config.varyStaffSpeed} disabled={disabled} onChange={(event) => set({ varyStaffSpeed: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+          <span>พนักงานแต่ละคนใช้เวลาทำงานต่างกัน <span className="text-secondary-strong">(80–120% ของเวลามาตรฐาน ไม่รวมเวลาเดิน)</span></span>
+        </label>
+        <label className="flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+          <input type="checkbox" checked={config.teamBreakEnabled} disabled={disabled} onChange={(event) => set({ teamBreakEnabled: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+          <span>ตั้งช่วงพักพนักงานหน้าร้านและครัว</span>
+        </label>
+        {config.teamBreakEnabled && <div>
+          <TimeRange label="ช่วงเวลาพัก" from={{ value: config.teamBreakStart, label: "เวลาเริ่มพักทีม" }} to={{ value: config.teamBreakEnd, label: "เวลาจบพักทีม" }} disabled={disabled}
+            onChange={(which, value) => set(which === "from" ? { teamBreakStart: value } : { teamBreakEnd: value })} />
+          <p className="m-0 mt-1 text-[11px] leading-[1.6] text-secondary-strong">งานที่รับไว้ทำจนเสร็จ จากนั้นหยุดรับงานใหม่จนหมดช่วงพัก หากงานยาวเกินช่วงพักจะไม่ได้ชดเชยเวลา</p>
+          <label className="mt-2 flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+            <input type="checkbox" checked={config.staggerBreak} disabled={disabled} onChange={(event) => set({ staggerBreak: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+            <span>ทยอยพักทีละคน <span className="text-secondary-strong">(แบ่งช่วงพักเท่ากันตามจำนวนคน แยกทีมหน้าร้านและครัว)</span></span>
+          </label>
+          {!day.ok && day.reason.startsWith("ช่วงพักทีม") && <p role="alert" className="m-0 mt-1 text-[11px] text-danger">{day.reason}</p>}
+        </div>}
       </Section>
 
       <Section icon={<CustomerIcon />} title="ลูกค้าวันนี้">
@@ -228,6 +257,27 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
           disabled={disabled}
           onChange={(dailyCustomers) => set({ dailyCustomers })}
         />
+        <fieldset className="m-0 min-w-0 border-0 p-0">
+          <legend className="mb-1.5 p-0 text-[12px] text-secondary-strong">สัดส่วนกลุ่มลูกค้า</legend>
+          <div className="grid grid-cols-4 gap-2">
+            {config.partyWeights.map((weight, index) => (
+              <label key={index} className="min-w-0 text-[11px] text-secondary-strong">
+                <span className="block">{index + 1} คน</span>
+                <input
+                  type="number" min={0} max={100} step={1} value={weight} disabled={disabled}
+                  aria-label={`น้ำหนักกลุ่ม ${index + 1} คน`}
+                  onChange={(event) => {
+                    const weights = [...config.partyWeights] as typeof config.partyWeights;
+                    weights[index] = Math.max(0, Math.min(100, Number(event.target.value) || 0));
+                    set({ partyWeights: weights });
+                  }}
+                  className="h-8 w-full min-w-0 rounded-[8px] border border-line bg-white px-2 text-[12px] text-ink"
+                />
+              </label>
+            ))}
+          </div>
+          <p className="m-0 mt-1 text-[11px] text-secondary-strong">ใส่สัดส่วนเทียบกัน เช่น 1 : 2 : 1 : 0 หมายถึงกลุ่ม 2 คนพบมากเป็นสองเท่า</p>
+        </fieldset>
         <div>
           <TimeRange
             label="ช่วงที่คนเข้าเยอะที่สุด"
@@ -242,12 +292,23 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
                 ช่วงนี้ลูกค้าเข้าราว {formatNumber(day.plan.peak.customersPerHour)} คน/ชม. · ช่วงอื่นราว {formatNumber(day.plan.customersPerHour)} คน/ชม.
               </Calc>
             )
-          ) : (
+          ) : !day.reason.startsWith("ช่วงพักทีม") ? (
             <p role="alert" className="m-0 mt-1.5 text-[11.5px] leading-[1.7] text-danger">
               {day.reason}
             </p>
-          )}
+          ) : null}
         </div>
+        <label className="flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+          <input type="checkbox" checked={config.secondPeakEnabled} disabled={disabled} onChange={(event) => set({ secondPeakEnabled: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+          <span>เพิ่มช่วงคนเยอะอีกช่วง</span>
+        </label>
+        {config.secondPeakEnabled && <TimeRange
+          label="ช่วงคนเยอะที่สอง"
+          from={{ value: config.secondPeakStart, label: "เวลาเริ่มช่วงคนเยอะที่สอง" }}
+          to={{ value: config.secondPeakEnd, label: "เวลาจบช่วงคนเยอะที่สอง" }}
+          disabled={disabled}
+          onChange={(which, value) => set(which === "from" ? { secondPeakStart: value } : { secondPeakEnd: value })}
+        />}
         <Slider
           id="sim-dine-minutes"
           label="ลูกค้านั่งกินประมาณ"
@@ -258,8 +319,36 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
           onChange={(dineMinutes) => set({ dineMinutes })}
         />
         <Slider
+          id="sim-extra-dish"
+          label="ลูกค้าสั่งจานเพิ่ม"
+          value={config.extraDishPercent}
+          display={`${config.extraDishPercent}%`}
+          min={0} max={100} step={5} disabled={disabled}
+          onChange={(extraDishPercent) => set({ extraDishPercent })}
+          hint="โอกาสที่ลูกค้าแต่ละคนจะสั่งเพิ่ม 1 จาน ครัวทำครบทั้งโต๊ะก่อนเสิร์ฟ"
+        />
+        <Slider
+          id="sim-table-patience"
+          label={config.varyPatience ? "ลูกค้ารอโต๊ะได้ประมาณ" : "ลูกค้ารอโต๊ะได้ไม่เกิน"}
+          value={config.tablePatienceMinutes}
+          display={`${config.tablePatienceMinutes} นาที`}
+          {...PATIENCE_LIMITS}
+          disabled={disabled}
+          onChange={(tablePatienceMinutes) => set({ tablePatienceMinutes })}
+          hint="นับตั้งแต่เริ่มรอหน้าร้าน"
+        />
+        <Slider
+          id="sim-queue-balk"
+          label="กลับเมื่อเห็นคิวยาว"
+          value={config.queueBalkAt}
+          display={config.queueBalkAt === 0 ? "ไม่ใช้" : `${config.queueBalkAt} คน`}
+          min={0} max={30} step={1} disabled={disabled}
+          onChange={(queueBalkAt) => set({ queueBalkAt })}
+          hint="เมื่อคิวถึงจำนวนนี้ ประมาณครึ่งหนึ่งของกลุ่มใหม่จะกลับทันทีหากไม่มีโต๊ะว่าง"
+        />
+        <Slider
           id="sim-patience"
-          label="ลูกค้ารอได้ไม่เกิน"
+          label={config.varyPatience ? "ลูกค้ารออาหารได้ประมาณ" : "ลูกค้ารออาหารได้ไม่เกิน"}
           value={config.patienceMinutes}
           display={`${config.patienceMinutes} นาที`}
           {...PATIENCE_LIMITS}
@@ -267,6 +356,10 @@ export function DaySetupForm({ disabled }: { disabled: boolean }) {
           onChange={(patienceMinutes) => set({ patienceMinutes })}
           hint="นับตั้งแต่นั่งลงจนได้อาหาร"
         />
+        <label className="flex items-start gap-2 text-[12px] leading-[1.6] text-ink">
+          <input type="checkbox" checked={config.varyPatience} disabled={disabled} onChange={(event) => set({ varyPatience: event.target.checked })} className="mt-1 size-4 shrink-0 accent-blue" />
+          <span>ลูกค้าแต่ละกลุ่มยอมรอต่างกัน <span className="text-secondary-strong">(ประมาณ 80–120% ของเวลาที่ตั้ง)</span></span>
+        </label>
       </Section>
     </div>
   );

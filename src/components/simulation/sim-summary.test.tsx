@@ -37,6 +37,7 @@ describe("feat-057: สรุปผลจบรอบ + ใช้ผลรอบ
         arrived: 25,
         served: 20,
         noSeat: 3,
+        noSuitableTable: 3,
         inStore: 2,
         queuing: 0,
         seated: 2,
@@ -54,7 +55,7 @@ describe("feat-057: สรุปผลจบรอบ + ใช้ผลรอบ
     expect(card).toHaveTextContent("25 คน");
     expect(card).toHaveTextContent("20 คน");
     expect(card).toHaveTextContent("3 คน"); // ไม่มีที่นั่ง
-    expect(card).toHaveTextContent("ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ");
+    expect(card).toHaveTextContent("มีกลุ่มที่ไม่มีโต๊ะขนาดรองรับ");
 
     // ปุ่มเริ่มกลายเป็น "จำลองร้านอีกครั้ง"
     const startBtn = screen.getByTestId("start-simulation");

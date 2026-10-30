@@ -93,6 +93,8 @@ export function getEmoteConfig(thought: CustomerThought | StaffThought): EmoteCo
       return { emoji: "🍲", label: "กำลังถือเสิร์ฟอาหาร", severity: "normal" };
     case "cleaning":
       return { emoji: "🧹", label: "กำลังเช็ดทำความสะอาดโต๊ะ", severity: "normal" };
+    case "resting":
+      return { emoji: "☕", label: "กำลังพัก", severity: "normal" };
   }
 }
 

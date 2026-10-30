@@ -1,0 +1,62 @@
+{
+  "peak": 60,
+  "thoughtsOn": {
+    "frames": 22,
+    "medianMs": 300
+  },
+  "thoughtsOff": {
+    "frames": 22,
+    "medianMs": 300
+  },
+  "thoughtsOnAgain": {
+    "frames": 24,
+    "medianMs": 279.9
+  },
+  "tinyViewport": {
+    "frames": 23,
+    "medianMs": 280
+  },
+  "tinyCanvas": [
+    464,
+    160
+  ],
+  "canvas": {
+    "backingStore": [
+      944,
+      564
+    ],
+    "cssSize": [
+      944,
+      564
+    ],
+    "devicePixelRatio": 1,
+    "shadowProxiesVisible": null
+  },
+  "quality": {
+    "level": 0,
+    "maxPixelRatio": 1.5,
+    "characterShadows": true,
+    "shadowMapSize": 2048,
+    "pixelRatio": 1,
+    "shadowAutoUpdate": true,
+    "visibleShadowProxies": 74,
+    "sampler": {
+      "samplesInWindow": 118,
+      "measuredMs": 855.5,
+      "warmupMs": 1019.4,
+      "lastSampleMs": 7.2
+    },
+    "sceneInstances": 1
+  },
+  "live": {
+    "running": true,
+    "simSecondsAdvancedIn3s": 4.15
+  },
+  "scene": {
+    "customers": 66,
+    "staff": 8,
+    "drawCalls": 693,
+    "triangles": 575942
+  },
+  "errors": []
+}

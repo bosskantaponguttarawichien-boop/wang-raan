@@ -15,6 +15,7 @@ export interface DayPlanInput {
   dailyCustomers: number;
   peakStartMinute: number;
   peakEndMinute: number;
+  secondPeak?: { startMinute: number; endMinute: number };
 }
 
 export interface ArrivalPlan {
@@ -24,6 +25,7 @@ export interface ArrivalPlan {
   customersPerHour: number;
   /** ช่วงคนเยอะ (วินาทีนับจากเปิดร้าน); null = ไม่มีช่วงคนเยอะที่อยู่ในเวลาเปิด */
   peak: { startSeconds: number; endSeconds: number; customersPerHour: number } | null;
+  peaks: { startSeconds: number; endSeconds: number; customersPerHour: number }[];
 }
 
 /** "10:30" → 630; รูปแบบผิดคืน null */
@@ -50,15 +52,26 @@ export function planArrivals(input: DayPlanInput): ArrivalPlan {
     const offset = (minute - input.openMinute + 24 * 60) % (24 * 60);
     return Math.min(offset * 60, closeSeconds);
   };
-  const startSeconds = toOffset(input.peakStartMinute);
-  const endSeconds = Math.max(startSeconds, toOffset(input.peakEndMinute));
-  const peakHours = (endSeconds - startSeconds) / 3600;
+  const windows = [
+    { startSeconds: toOffset(input.peakStartMinute), endSeconds: toOffset(input.peakEndMinute) },
+    ...(input.secondPeak ? [{ startSeconds: toOffset(input.secondPeak.startMinute), endSeconds: toOffset(input.secondPeak.endMinute) }] : []),
+  ].filter((interval) => interval.endSeconds > interval.startSeconds).sort((a, b) => a.startSeconds - b.startSeconds);
+  // รวมช่วงที่ทับกันเพื่อไม่ให้นับเวลาหรือความหนาแน่นซ้ำ แม้เรียก core โดยตรง
+  const merged: typeof windows = [];
+  for (const interval of windows) {
+    const previous = merged.at(-1);
+    if (previous && interval.startSeconds <= previous.endSeconds) previous.endSeconds = Math.max(previous.endSeconds, interval.endSeconds);
+    else merged.push({ ...interval });
+  }
+  const peakHours = merged.reduce((sum, interval) => sum + interval.endSeconds - interval.startSeconds, 0) / 3600;
 
   // ลูกค้าทั้งวัน = ปกติ × (ชม.ทั้งหมด − ชม.พีค) + ปกติ × PEAK_FACTOR × ชม.พีค
   const base = hours > 0 ? input.dailyCustomers / (hours + (PEAK_FACTOR - 1) * peakHours) : 0;
+  const peaks = merged.map((interval) => ({ ...interval, customersPerHour: base * PEAK_FACTOR }));
   return {
     closeSeconds,
     customersPerHour: base,
-    peak: peakHours > 0 ? { startSeconds, endSeconds, customersPerHour: base * PEAK_FACTOR } : null,
+    peak: peaks[0] ?? null,
+    peaks,
   };
 }

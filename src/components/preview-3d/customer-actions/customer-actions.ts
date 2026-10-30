@@ -63,6 +63,9 @@ interface RigState {
   utensilKind: UtensilSpec["utensil"] | null;
   lastPosition: THREE.Vector3 | null;
   groundSpeed: number;
+  /** ผิวตัวที่มี morph "EatGrip" — หาไว้ครั้งเดียวต่อ rig ไม่ไล่ชื่อทุกเฟรม */
+  gripBody?: THREE.SkinnedMesh | null;
+  gripIndex?: number;
 }
 
 const ZERO_SPEED_FRAME = 1e-4;
@@ -152,7 +155,9 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
     };
 
     const releaseRig = (state: RigState) => {
-      setGrip(state.rig, false);
+      setGrip(state, false);
+      state.gripBody = undefined;
+      state.gripIndex = undefined;
       for (const action of state.actions.values()) action.stop();
       state.actions.clear();
       state.active = null;
@@ -162,13 +167,23 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       state.utensilKind = null;
     };
 
-    const setGrip = (rig: CustomerRig, eating: boolean): number | null => {
-      const body = rig.getObject("MannequinBody");
-      if (!(body instanceof THREE.SkinnedMesh)) return null;
-      const index = body.morphTargetDictionary?.EatGrip;
-      if (index === undefined || !body.morphTargetInfluences) return null;
-      body.morphTargetInfluences[index] = eating ? 1 : 0;
-      return body.morphTargetInfluences[index]!;
+    /**
+     * เปิด/ปิด morph "EatGrip" ของผิวตัว — จำ mesh ที่หาได้ไว้ใน state
+     * (การไล่หาชื่อในทุกเฟรมคือการเดินทั้ง subtree ของตัวละคร คูณจำนวนลูกค้าในร้าน)
+     */
+    const setGrip = (state: RigState, eating: boolean): number | null => {
+      if (state.gripBody === undefined) {
+        const found = state.rig.getObject("MannequinBody");
+        const body = found instanceof THREE.SkinnedMesh ? found : null;
+        state.gripBody = body;
+        state.gripIndex = body?.morphTargetDictionary?.EatGrip;
+      }
+      const body = state.gripBody;
+      const index = state.gripIndex;
+      if (!body || index === undefined || !body.morphTargetInfluences) return null;
+      const weight = eating ? 1 : 0;
+      if (body.morphTargetInfluences[index] !== weight) body.morphTargetInfluences[index] = weight;
+      return weight;
     };
 
     const stateFor = (rig: CustomerRig): RigState => {
@@ -308,7 +323,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         if (resolved) applyClip(state, resolved, decision);
         // The utensil only exists while a bite is actually being taken.
         syncUtensil(state, decision.eating ? decision.utensil : null);
-        const gripWeight = setGrip(state.rig, decision.eating);
+        const gripWeight = setGrip(state, decision.eating);
 
         const offset = decision.eating ? plateOffset(rig, customer.chairId, meal) : null;
         const reach = plateReach(offset ? offset.y : null);

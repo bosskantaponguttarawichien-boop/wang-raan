@@ -19,7 +19,7 @@ import {
   SPEED_OPTIONS,
   useSimulationStore,
 } from "@/store/use-simulation-store";
-import { formatClock, formatClockSeconds, formatNumber } from "@/lib/day-config";
+import { formatClock, formatClockSeconds, formatNumber, toDayInput } from "@/lib/day-config";
 import { parseClock } from "@/core/simulation";
 import { DayAnswers } from "./day-answers";
 import { DaySetupForm } from "./day-setup-form";
@@ -64,6 +64,9 @@ export function SimulationPanel({
   const blocked = live.result.status === "blocked";
   const openMinute = parseClock(config.openTime) ?? 0;
   const isRunningOrPaused = status === "running" || status === "paused";
+  const day = toDayInput(config);
+  const rest = day.ok ? day.input.teamBreak : undefined;
+  const onBreak = !!metrics && !!rest && metrics.time >= rest.startSeconds && metrics.time < rest.endSeconds;
   const controller = () => getSimulationController();
 
   const blockedIssues = live.humanIssues?.filter((i) => i.severity === "blocked") ?? [];
@@ -142,6 +145,8 @@ export function SimulationPanel({
             </dl>
           )}
 
+          {onBreak && <p role="status" className="rounded-[8px] bg-blue-soft p-2 text-[12px] text-blue-hover">{config.staggerBreak ? "อยู่ในช่วงทยอยพัก" : "อยู่ในช่วงพักทั้งทีม"} · งานที่รับไว้ยังทำจนเสร็จ</p>}
+
           <div className="mb-3.5 space-y-2.5">
             <div>
               <label className="mb-1 block text-[11.5px] text-secondary">ความเร็วจำลอง <span className="text-secondary">(x1 = เวลาจริง 1 วิ ต่อ 1 วิ)</span></label>
@@ -189,8 +194,7 @@ export function SimulationPanel({
 
           {analysis?.plan.peak && (
             <p className="mb-3 text-[11.5px] leading-[1.7] text-secondary-strong">
-              กำลังดูช่วงคนเยอะ {formatClock(openMinute + analysis.plan.peak.startSeconds / 60)}–
-              {formatClock(openMinute + analysis.plan.peak.endSeconds / 60)} น. · ภาพจะหยุดเองเมื่อจบช่วงนี้
+              เล่นตั้งแต่เปิดร้านถึงจบช่วงคนเยอะสุดท้าย {formatClock(openMinute + (analysis.plan.peaks.at(-1)?.endSeconds ?? analysis.plan.peak.endSeconds) / 60)} น. · ภาพจะหยุดเองเมื่อจบช่วงนี้
             </p>
           )}
           {analysis && <DayAnswers analysis={analysis} openMinute={openMinute} />}
@@ -244,7 +248,7 @@ export function SimulationPanel({
                 </b>
                 <span className="text-[11px] text-secondary tabular-nums">
                   {analysis?.plan.peak
-                    ? `ช่วง ${formatClock(openMinute + analysis.plan.peak.startSeconds / 60)}–${formatClock(openMinute + metrics.time / 60)} น.`
+                    ? `ช่วง ${formatClock(openMinute)}–${formatClock(openMinute + metrics.time / 60)} น.`
                     : formatSimTime(metrics.time)}
                 </span>
               </div>
@@ -267,6 +271,14 @@ export function SimulationPanel({
                   <dd className="m-0 font-semibold text-ink tabular-nums">{metrics.noSeat} คน</dd>
                 </div>
               </dl>
+              {metrics.wastedDishes > 0 && <p className="m-0 mt-1 text-[11px] text-secondary-strong">อาหารที่ทำแล้วต้องทิ้ง {metrics.wastedDishes} จาน</p>}
+              {(metrics.noSuitableTable > 0 || metrics.tableWaitTimeout > 0 || metrics.balked > 0) && <p className="m-0 mt-1 text-[11px] text-secondary-strong">
+                {[
+                  metrics.noSuitableTable > 0 && `โต๊ะไม่รองรับขนาดกลุ่ม ${metrics.noSuitableTable} คน`,
+                  metrics.tableWaitTimeout > 0 && `รอโต๊ะไม่ไหว ${metrics.tableWaitTimeout} คน`,
+                  metrics.balked > 0 && `เห็นคิวแล้วกลับ ${metrics.balked} คน`,
+                ].filter(Boolean).join(" · ")}
+              </p>}
 
               {/* คำแนะนำ 1 ประโยค (PRD §9 ข้อ 11, feat-057) */}
               <div className="mt-2.5 flex items-start gap-2 rounded-[8px] bg-[#fffbeb] border border-[#fef3c7] p-2 text-[11.5px] text-[#92400e]">
@@ -279,7 +291,7 @@ export function SimulationPanel({
                     : "การสัญจรลื่นไหลดี ไม่พบจุดที่คนเดินแออัด"}
                   {metrics.maxEntranceQueue > 0
                     ? " · มีคิวรอหน้าเข้า ลองเพิ่มโต๊ะหรือเพิ่มพนักงานเก็บโต๊ะ"
-                    : metrics.noSeat > 0 && " · ที่นั่งไม่พอช่วงพีค ลองเพิ่มโต๊ะ"}
+                    : metrics.noSuitableTable > 0 && " · มีกลุ่มที่ไม่มีโต๊ะขนาดรองรับ ลองจัดโต๊ะให้เหมาะกับขนาดกลุ่ม"}
                 </span>
               </div>
 

@@ -6,7 +6,7 @@
  * ข้อความเป็นภาษาคน ไม่ใช้ศัพท์เทคนิค; ตัวเลขทุกตัวปัดให้อ่านง่าย
  */
 import type { DayAnalysis, StaffOption } from "@/core/simulation";
-import { GOOD_TOO_LONG_RATE, MAX_STAFF_SEARCH } from "@/core/simulation";
+import { ANALYSIS_SEEDS, GOOD_TOO_LONG_RATE, MAX_STAFF_SEARCH } from "@/core/simulation";
 import { cn } from "@/lib/cn";
 import { formatClock, formatNumber } from "@/lib/day-config";
 
@@ -53,7 +53,9 @@ function Compare({ options, label }: { options: StaffOption[]; label: (o: StaffO
           )}
         >
           <span className="block font-semibold">{label(o)}</span>
-          <span className="block">รอ {minutes(o.outcome.avgFoodWaitMinutes)}</span>
+          <span className="block">{o.outcome.fed > 0 ? `รอ ${minutes(o.outcome.avgFoodWaitMinutes)}` : "ไม่มีคนได้อาหาร"}</span>
+          <span className="block">ได้อาหาร {people(o.outcome.fed)} คน</span>
+          <span className="block">กลับก่อนกิน {people(o.outcome.noSeat + o.outcome.abandoned)} คน</span>
         </li>
       ))}
     </ul>
@@ -63,6 +65,7 @@ function Compare({ options, label }: { options: StaffOption[]; label: (o: StaffO
 export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; openMinute: number }) {
   const { staffing, cookTime, seating, current, plan } = analysis;
   const rec = staffing.recommended;
+  const recommendedOutcome = rec ? staffing.cookOptions.find((option) => option.cooks === rec.cooks)?.outcome : undefined;
   const peak = plan.peak;
   const allowed = percent(GOOD_TOO_LONG_RATE);
 
@@ -72,8 +75,26 @@ export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; op
         <b className="block text-[13px] font-semibold leading-[1.5] text-ink">คำตอบสำหรับร้านคุณ</b>
         <span className="block text-[11px] text-secondary-strong">
           ลูกค้าทั้งวันราว {people(current.arrived)} คน · {analysis.seats} ที่นั่ง
-          {peak && ` · คนเยอะ ${formatClock(openMinute + peak.startSeconds / 60)}–${formatClock(openMinute + peak.endSeconds / 60)}`}
+          {peak && ` · คนเยอะ ${plan.peaks.map((window) => `${formatClock(openMinute + window.startSeconds / 60)}–${formatClock(openMinute + window.endSeconds / 60)}`).join(", ")}`}
         </span>
+        <p className="m-0 mt-1 text-[11px] leading-[1.7] text-secondary-strong">
+          จากค่าที่ตั้งไว้: ได้อาหารประมาณ {people(current.fed)} คน · กลับเพราะไม่มีโต๊ะ {people(current.noSeat)} คน
+          {current.balked > 0 && ` (รวม ${people(current.balked)} คนที่กลับทันทีเมื่อเห็นคิว)`}
+          {` · กลับเพราะรออาหาร ${people(current.abandoned)} คน`}
+          {current.wastedDishes > 0 && ` · อาหารที่ทำแล้วต้องทิ้งเฉลี่ย ${formatNumber(current.wastedDishes)} จาน`}
+          {current.unfinished > 0 && ` · ยังไม่เสร็จ ${people(current.unfinished)} คน`}
+        </p>
+        {(current.noSuitableTable > 0 || current.tableWaitTimeout > 0) && <p className="m-0 text-[11px] leading-[1.7] text-secondary-strong">
+          {current.noSuitableTable > 0 && `ไม่มีโต๊ะรองรับขนาดกลุ่ม ${people(current.noSuitableTable)} คน`}
+          {current.noSuitableTable > 0 && current.tableWaitTimeout > 0 && " · "}
+          {current.tableWaitTimeout > 0 && `รอโต๊ะไม่ไหว ${people(current.tableWaitTimeout)} คน`}
+          {" (แต่ละตัวเลขปัดเศษจากค่าเฉลี่ย)"}
+        </p>}
+        <p className="m-0 mt-1 text-[11px] leading-[1.7] text-secondary-strong">
+          ทดลอง {ANALYSIS_SEEDS.length} วัน: ลูกค้าเข้า {people(current.ranges.arrived[0])}–{people(current.ranges.arrived[1])} คน · กลับเพราะไม่มีโต๊ะ {people(current.ranges.noSeat[0])}–{people(current.ranges.noSeat[1])} คน
+          {current.ranges.avgFoodWaitMinutes && ` · คนที่ได้อาหารรอเฉลี่ย ${formatNumber(current.ranges.avgFoodWaitMinutes[0])}–${formatNumber(current.ranges.avgFoodWaitMinutes[1])} นาที`}
+          {" · เป็นช่วงผลจำลอง ไม่ใช่การรับประกันผลจริง"}
+        </p>
       </div>
 
       <div className="space-y-2.5">
@@ -85,7 +106,9 @@ export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; op
         >
           {rec ? (
             <>
-              <p className="m-0">จำนวนน้อยที่สุดที่มีลูกค้ารออาหารนานเกินไม่ถึง {allowed}</p>
+              <p className="m-0">จำนวนที่มีลูกค้ารอเกินเวลาที่ยอมรับได้ไม่เกิน {allowed} โดยหาจำนวนพ่อครัวก่อน · ลูกค้าที่กลับเพราะไม่มีโต๊ะแสดงแยกด้านบน</p>
+              {staffing.cashiers > 0 && <p className="m-0">จำนวนหน้าร้านนี้รวมพนักงานประจำรับเงิน {staffing.cashiers} คน</p>}
+              {recommendedOutcome && <p className="m-0">หากใช้จำนวนพนักงานนี้: ได้อาหารประมาณ {people(recommendedOutcome.fed)} คน · กลับเพราะไม่มีโต๊ะ {people(recommendedOutcome.noSeat)} คน · กลับเพราะรออาหาร {people(recommendedOutcome.abandoned)} คน</p>}
               <Compare options={staffing.cookOptions} label={(o) => `พ่อครัว ${o.cooks}`} />
               {staffing.frontOptions.length > 1 && <Compare options={staffing.frontOptions} label={(o) => `หน้าร้าน ${o.frontStaff}`} />}
             </>
@@ -102,7 +125,7 @@ export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; op
         >
           {cookTime.maxMinutesPerDish !== null ? (
             <p className="m-0">
-              ถึงจะไม่มีใครรอเกินเวลาที่ตั้งไว้ (เกินได้ไม่ถึง {allowed}) · ตอนนี้ตั้งไว้ {minutes(cookTime.currentMinutesPerDish)}
+              เพื่อให้ลูกค้ารอเกินเวลาที่ยอมรับได้ไม่เกิน {allowed} · ตอนนี้ตั้งไว้ {minutes(cookTime.currentMinutesPerDish)}
               {cookTime.currentMinutesPerDish > cookTime.maxMinutesPerDish
                 ? ` มีลูกค้ารอนานเกิน ${percent(current.tooLongRate)}`
                 : ` รออาหารเฉลี่ย ${minutes(current.avgFoodWaitMinutes)}`}
@@ -120,12 +143,13 @@ export function DayAnswers({ analysis, openMinute }: { analysis: DayAnalysis; op
           answer={seating.enough ? "พอ" : "ไม่พอ"}
           tone={seating.enough ? "good" : "bad"}
         >
+          <p className="m-0">{seating.basedOn === "recommended" ? "ประเมินเมื่อใช้จำนวนพนักงานที่แนะนำ" : "ประเมินจากจำนวนพนักงานที่ตั้งไว้"}</p>
           <p className="m-0">
             อยู่ในร้านเฉลี่ย {minutes(seating.avgVisitMinutes)} ร้านนี้รับได้ราว {formatNumber(seating.capacityPerHour)} คน/ชม. · ช่วงคนเยอะเข้า{" "}
             {formatNumber(seating.busiestCustomersPerHour)} คน/ชม.
             {seating.maxEntranceQueue >= 1 && ` · คิวรอหน้าเข้าสูงสุด ${people(seating.maxEntranceQueue)} คน`}
           </p>
-          {!seating.enough && <p className="m-0">ควรเพิ่มโต๊ะ หรือเน้นขายกลับบ้านช่วงคนเยอะ</p>}
+          {!seating.enough && <p className="m-0">ลองเพิ่มโต๊ะ หรือปรับการจัดโต๊ะให้เหมาะกับกลุ่มลูกค้า</p>}
         </Question>
       </div>
     </div>

@@ -31,15 +31,16 @@ export interface AdaptiveQualityOptions {
   /** ไม่นับช่วงแรกหลังเริ่มวัด/เปลี่ยนขั้น (คอมไพล์ shader, โหลดโมเดล ทำเฟรมกระตุกชั่วคราว) */
   warmupMs: number;
   /**
-   * เฟรมที่ห่างกว่านี้ = แท็บถูกซ่อน/เครื่องค้างชั่วคราว ไม่นับ
-   * ต้องสูงพอให้ "เครื่องช้าจริง" ยังถูกนับ: เดิมตั้งไว้ 250 ms เครื่องที่วาดได้ 3–4 fps
-   * (เฟรม 250–350 ms) จึงถูกทิ้งทุกเฟรมและไม่เคยลดคุณภาพเลย ทั้งที่เป็นเครื่องที่ต้องการที่สุด
-   * แท็บที่ถูกซ่อนจริงหยุดเรียก rAF หรือเรียกราว 1 ครั้ง/วินาที จึงยังถูกตัดด้วยเพดานนี้
+   * เฟรมที่ห่างกว่านี้ = เครื่องหลับ/แท็บถูกพักยาว ไม่นับ
+   *
+   * เพดานนี้ไม่ใช่ตัวตรวจ "แท็บถูกซ่อน" อีกต่อไป: การจำลองหยุดเองเมื่อแท็บถูกซ่อน (controller
+   * ใช้ document.hidden จริง) ลูปจึงไม่ได้วัดช่วงนั้นอยู่แล้ว · เดิมตั้งไว้ 250 แล้วขยับเป็น 900 ms
+   * ซึ่งยังตัดฉากหนาแน่นที่วาดเฟรมละเกิน 0.9 วินาทีทิ้งทั้งหมด = ไม่เคยลดคุณภาพให้เครื่องที่ช้าที่สุด
    */
   ignoreAboveMs: number;
 }
 
-const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 900 };
+const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 5000 };
 
 export class AdaptiveQuality {
   level = 0;
@@ -47,6 +48,7 @@ export class AdaptiveQuality {
   private intervals: number[] = [];
   private measured = 0;
   private warmup = 0;
+  private lastSample = 0;
 
   constructor(options: Partial<AdaptiveQualityOptions> = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -54,6 +56,16 @@ export class AdaptiveQuality {
 
   get current(): QualityLevel {
     return QUALITY_LEVELS[this.level]!;
+  }
+
+  /** สิ่งที่ตัววัดเห็นอยู่จริง — ใช้ตอบว่า "ทำไมคุณภาพไม่ลด" ได้โดยไม่ต้องเดา (diagnostics ของ feat-123) */
+  get stats(): { samplesInWindow: number; measuredMs: number; warmupMs: number; lastSampleMs: number } {
+    return {
+      samplesInWindow: this.intervals.length,
+      measuredMs: Number(this.measured.toFixed(1)),
+      warmupMs: Number(this.warmup.toFixed(1)),
+      lastSampleMs: Number(this.lastSample.toFixed(1)),
+    };
   }
 
   /** เริ่มช่วงวัดใหม่ (เช่นหยุดจำลอง หรือเพิ่งเปลี่ยนขั้น) */
@@ -69,6 +81,7 @@ export class AdaptiveQuality {
    */
   sample(intervalMs: number): number | null {
     const { slowFrameMs, windowMs, warmupMs, ignoreAboveMs } = this.options;
+    this.lastSample = intervalMs;
     if (!(intervalMs > 0) || intervalMs > ignoreAboveMs) return null;
     if (this.warmup < warmupMs) {
       this.warmup += intervalMs;
@@ -82,7 +95,10 @@ export class AdaptiveQuality {
     this.intervals = [];
     this.measured = 0;
     if (median <= slowFrameMs || this.level >= QUALITY_LEVELS.length - 1) return null;
-    this.level += 1;
+    // ช้ากว่าเป้าหลายเท่า = ลดทีละขั้นต้องรอหลายวินาทีกว่าจะถึงขั้นที่ไหว ข้ามให้เร็วขึ้นตามระยะที่ห่าง
+    // (ยังไม่เพิ่มกลับเอง จึงไม่เกิดภาพกระพริบสลับคุณภาพ)
+    const steps = median > slowFrameMs * 4 ? 2 : 1;
+    this.level = Math.min(QUALITY_LEVELS.length - 1, this.level + steps);
     this.warmup = 0;
     return this.level;
   }

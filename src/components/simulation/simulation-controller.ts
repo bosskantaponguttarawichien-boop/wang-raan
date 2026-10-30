@@ -193,7 +193,7 @@ export class SimulationController {
       const { plan } = analyzed.analysis;
       // เริ่มตั้งแต่เปิดร้าน ร้านยังว่าง แล้วดูลูกค้าทยอยเข้าจนจบช่วงคนเยอะ
       const startAt = 0;
-      const stopAt = plan.peak?.endSeconds ?? Math.min(plan.closeSeconds, DEFAULT_PLAYBACK_SECONDS);
+      const stopAt = plan.peaks.at(-1)?.endSeconds ?? Math.min(plan.closeSeconds, DEFAULT_PLAYBACK_SECONDS);
       const { input } = day;
       const started = await client.request({
         type: "START",
@@ -202,12 +202,23 @@ export class SimulationController {
           serviceStyle: "table-service",
           customersPerHour: plan.customersPerHour,
           peak: plan.peak,
+          peaks: plan.peaks,
           closeSeconds: plan.closeSeconds,
           frontStaff: input.frontStaff,
+          cashiers: input.cashiers,
           cooks: input.cooks,
           cookMinutesPerDish: input.cookMinutesPerDish,
           dineMinutes: input.dineMinutes,
           patienceMinutes: input.patienceMinutes,
+          tablePatienceMinutes: input.tablePatienceMinutes,
+          partyWeights: input.partyWeights,
+          varyPatience: input.varyPatience,
+          queueBalkAt: input.queueBalkAt,
+          varyMenuTimes: input.varyMenuTimes,
+          varyStaffSpeed: input.varyStaffSpeed,
+          teamBreak: input.teamBreak,
+          staggerBreak: input.staggerBreak,
+          extraDishPercent: input.extraDishPercent,
           // ลูกค้าชุดเดียวกับที่วิเคราะห์ ภาพจะตรงกับคำตอบ
           seed: ANALYSIS_SEEDS[0],
           speed: playbackSpeedToWorkerSpeed(config.speed),
