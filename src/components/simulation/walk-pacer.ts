@@ -99,6 +99,27 @@ export class WalkPacer {
     this.overflow = false;
   }
 
+  /**
+   * ลูกค้าที่ยังอยู่ในร้านค้างหลังการจำลองนานสุดกี่วินาทีจริง (คนที่ออกจากร้านแล้วไม่นับ)
+   * @param speed ความเร็วเดินบนภาพ (ม./วินาทีจริง) ต่อคน
+   */
+  backlogSeconds(speed: (id: number) => number): number {
+    let worst = 0;
+    for (const [id, walker] of this.walkers) {
+      if (walker.gone || walker.queue.length === 0) continue;
+      const pace = speed(id);
+      if (!(pace > 0)) continue;
+      let distance = 0;
+      let x = walker.x, y = walker.y;
+      for (let i = 0; i < walker.queue.length; i += 2) {
+        distance += Math.hypot(walker.queue[i]! - x, walker.queue[i + 1]! - y);
+        x = walker.queue[i]!; y = walker.queue[i + 1]!;
+      }
+      worst = Math.max(worst, distance / pace);
+    }
+    return worst;
+  }
+
   /** ประตูทางเข้าของผังที่กำลังจำลอง — null = ไม่แสดงการเดินนอกร้าน */
   setDoor(door: DoorFrame | null) {
     this.door = door;

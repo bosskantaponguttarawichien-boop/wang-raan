@@ -228,7 +228,9 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
       const rigs = options.rigs.listRigs();
       const live = new Set<number>();
       const reducedMotion = options.reducedMotion?.() ?? false;
-      const deltaSeconds = Math.max(0, frame.realDeltaSeconds) * Math.max(frame.playbackRate, 1e-6);
+      // ความเร็วเดินวัดเป็นเมตรต่อวินาทีจริง เพราะ mixer เดินด้วยเวลาจริง — ขาก้าวพอดีกับระยะที่เลื่อนบนจอ
+      // แม้ภาพเดินช้ากว่าเวลาจำลองที่เร่งอยู่ (เวลาย่อแบบเกม)
+      const deltaSeconds = Math.max(0, frame.realDeltaSeconds);
       const milestones = new Map(snapshot.milestones.map(entry => [entry.taskId, entry]));
       for (const rig of rigs) {
         if (rig.removed) continue;

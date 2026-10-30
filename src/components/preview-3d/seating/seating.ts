@@ -127,7 +127,8 @@ export function createSeatingFeature(options: SeatingOptions) {
 
     const updateFrom = (snapshot: PresentationSnapshot, frame: SceneFrame) => {
       const reducedMotion = options.reducedMotion?.() ?? false;
-      const deltaSeconds = Math.max(0, frame.realDeltaSeconds) * Math.max(frame.playbackRate, 1e-6);
+      // ท่าดึงเก้าอี้/นั่ง/ลุกเล่นตามเพดานท่าทาง ไม่เร่งตามเวลาจำลอง
+      const deltaSeconds = Math.max(0, frame.realDeltaSeconds) * Math.max(frame.motionRate ?? frame.playbackRate, 1e-6);
       const rigs = new Map(options.chairs.listChairs().filter(rig => !rig.removed).map(rig => [rig.chairId, rig]));
       const live = new Set<number>();
 

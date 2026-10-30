@@ -12,7 +12,8 @@ export type SimulationStatus = "idle" | "starting" | "running" | "paused";
 /** ค่าฟอร์มจำลองร้าน 1 วัน (feat-095) + ความเร็วเล่นภาพ */
 export interface SimulationConfigState extends DayConfig {
   /**
-   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง 1 วินาทีต่อ 1 วินาที
+   * ตัวคูณเวลาเล่นภาพ: x1 = เวลาจริง 1 วินาทีต่อ 1 วินาที (ค่าเริ่มต้น DEFAULT_SPEED)
+   * ที่ตัวคูณสูง ท่าทางบนภาพไม่เร่งตาม (เวลาย่อแบบเกม — motion/pacing-governor.ts)
    * แปลงเป็นวินาทีจำลองต่อวินาทีจริงที่ SimulationController ก่อนส่ง Worker
    */
   speed: number;
@@ -37,6 +38,8 @@ export interface SimulationStoreState {
 /** ฐานเวลา x1 = เวลาจริง — ลูกค้าและพนักงานเดินเท่าคนจริง */
 export const REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X = 1;
 export const SPEED_OPTIONS = [1, 2, 5, 10, 30] as const;
+/** เริ่มที่ 30×: ลูกค้ากิน 20 นาทีดูจริงราว 40 วินาที เปิดร้าน 10 ชม. ดูจบราว 20 นาที */
+export const DEFAULT_SPEED = 30;
 
 export function createSimulationStore() {
   return createStore<SimulationStoreState>()((set, get) => ({
@@ -44,7 +47,7 @@ export function createSimulationStore() {
     message: null,
     metrics: null,
     seats: 0,
-    config: { ...DEFAULT_DAY_CONFIG, speed: 1 },
+    config: { ...DEFAULT_DAY_CONFIG, speed: DEFAULT_SPEED },
     showHeatmap: true,
     showThoughts: true,
     analysis: null,

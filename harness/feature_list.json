@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-156",
+      "name": "เวลาย่อแบบเกม: เร่งเวลา 30× แต่ท่าทางไม่เร่งตาม",
+      "status": "done",
+      "dependencies": ["feat-150"],
+      "role": "frontend",
+      "summary": "ค่าเริ่มต้น 30× ท่าเดิน/นั่ง/กินเร็วกว่าคนจริงไม่เกิน 1.75× และชะลอนาฬิกาเนียน ๆ เมื่อภาพพนักงานค้างหลัง",
+      "sprint": 5,
+      "evidence": "PacingGovernor (motion/pacing-governor.ts) ลดตัวคูณที่ Worker ใช้ได้ถึง 2/3 ของที่เลือกทีละไม่เกิน 6%/วินาทีเมื่อภาพพนักงานค้างหลังเกิน 2 วินาที แล้วจึงเร่งท่าเดินได้ถึง 3× (resync เดิมเป็นทางสุดท้าย); ไม่ข้ามเวลาจำลองจึงไม่เปลี่ยนตัวเลขผล · WalkPacer/StaffPacer เดินที่ min(ตัวคูณ, 1.75)× ความเร็วคนและรายงาน backlogSeconds · ฉาก 3D: playbackRate = ตัวคูณจริงของ Worker, seating ใช้ motionRate, คำที่กินยืดด้วย clipStretch, ความเร็วขาวัดต่อวินาทีจริง · UI: DEFAULT_SPEED 30, ป้ายยังเป็นตัวคูณที่เลือก, นาฬิการะหว่างเล่นโชว์ HH:MM (formatClockMinutes) · unit: pacing-governor.test.ts, simulation-gate (ค่าเริ่มต้น 30×, เดิน ≤1.75× + ชะลอ ≥20× ทีละ ≤0.4×/เฟรม, 1× ยังเดิน 6 ม. ใน 5 วินาที), staff-pacer backlog, seating motionRate, customer-actions clipStretch; npm test 114 files / 1,365 tests, typecheck, lint 0 error, validate_harness ผ่าน; Chrome headless ผังคาเฟ่ 160 วินาที: ตัวคูณจริง 28–30×, นาฬิกา HH:MM; ยังไม่ได้วัดช่วงคนเยอะ/ผังหนาแน่น"
+    },
+    {
       "id": "feat-155",
       "name": "อาหารที่สูญเสียเมื่อยกเลิกออร์เดอร์",
       "status": "done",

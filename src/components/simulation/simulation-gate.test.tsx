@@ -6,10 +6,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SimulationWorkerRuntime } from "@/core/simulation";
 import { useLiveValidation } from "@/components/validation/use-live-validation";
-import { formatClockSeconds } from "@/lib/day-config";
+import { formatClockMinutes, formatClockSeconds } from "@/lib/day-config";
 import type { WorkerLike } from "@/lib/simulation-client";
 import { createLayoutStore, layoutStore } from "@/store/use-layout-store";
-import { SPEED_OPTIONS, createSimulationStore, simulationStore } from "@/store/use-simulation-store";
+import { DEFAULT_SPEED, SPEED_OPTIONS, createSimulationStore, simulationStore } from "@/store/use-simulation-store";
 import { cafeLayout, withoutType } from "@/test/fixtures/layouts";
 import { playbackSpeedToWorkerSpeed, SimulationController } from "./simulation-controller";
 import { interpolateAgents, paintHeatmap } from "./simulation-overlay";
@@ -52,10 +52,12 @@ function fakeWorker(legacyStarted = false) {
 
 const flush = () => new Promise((r) => setTimeout(r, 20));
 
-function setup(layout = cafeLayout(), legacyStarted = false, now = () => performance.now()) {
+/** ชุดทดสอบนี้ตรวจสัญญาเวลา 1× (เวลาจริง) เป็นหลัก — ค่าเริ่มต้นของแอปคือ DEFAULT_SPEED */
+function setup(layout = cafeLayout(), legacyStarted = false, now = () => performance.now(), speed = 1) {
   const fake = fakeWorker(legacyStarted);
   const layoutState = createLayoutStore({ initialLayout: layout });
   const sim = createSimulationStore();
+  sim.getState().setConfig({ speed });
   const controller = new SimulationController({
     createWorker: () => fake.worker,
     layout: layoutState,
@@ -196,6 +198,47 @@ describe("P2 Gate ใน SimulationController", () => {
 describe("สเกลเวลาเล่นภาพ", () => {
   it("x1 = เวลาจริง และทุกตัวเลือกแปลงเป็นหน่วย Worker ถูกต้อง", () => {
     expect(SPEED_OPTIONS.map(playbackSpeedToWorkerSpeed)).toEqual([1, 2, 5, 10, 30]);
+  });
+
+  it("ค่าเริ่มต้นเล่นที่ 30× และส่งตัวคูณนี้ให้ Worker", async () => {
+    expect(DEFAULT_SPEED).toBe(30);
+    expect(createSimulationStore().getState().config.speed).toBe(30);
+    const { fake, controller } = setup(cafeLayout(), false, () => performance.now(), DEFAULT_SPEED);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    expect(fake.posted.find((m) => (m as { type: string }).type === "START")).toMatchObject({ config: { speed: 30 } });
+  });
+
+  it("เวลาย่อแบบเกมที่ 30×: พนักงานเดินบนจอไม่เกิน 1.75 เท่าคนจริง และนาฬิกาชะลอเนียน ๆ ให้ภาพไล่ทัน", async () => {
+    let now = 0;
+    const { fake, controller, sim } = setup(cafeLayout(), false, () => now, 30);
+    disposers.push(() => controller.dispose());
+    await controller.start();
+    const start = controller.current!.staff;
+    const x = start[1]!, y = start[2]!;
+    let previousX = x;
+    let fastest = 0;
+    const speeds: number[] = [];
+    for (let i = 0; i <= 40; i++) {
+      now = i * 100;
+      const tick = fake.runtime.tick(i === 0 ? 0 : 100)!.response;
+      // การจำลองพาพนักงานไปไกล 30 ม. ทันที — เกินกว่าที่ภาพเดินทันมาก
+      fake.emit({ ...tick, staff: new Float32Array([0, x + 30, y, 1]) });
+      await flush();
+      const staffX = controller.current!.staff[1]!;
+      if (i > 0) fastest = Math.max(fastest, (staffX - previousX) / 0.1);
+      previousX = staffX;
+      speeds.push(controller.current!.timing!.playbackRate);
+    }
+    // ท่าเดินช่วงแรก: เร็วกว่าคนจริง (1.2 ม./วิ) ไม่เกิน 1.75 เท่า ไม่วิ่งวูบตามเวลา 30×
+    expect(fastest).toBeGreaterThan(1.2);
+    expect(fastest).toBeLessThanOrEqual(1.2 * 1.75 + 1e-6);
+    // นาฬิกาค่อย ๆ ชะลอทีละไม่เกิน ~1% ต่อเฟรม ไม่กระโดด และไม่ต่ำกว่า 20×; ป้ายความเร็วที่ผู้ใช้เลือกยังเป็น 30×
+    expect(Math.min(...speeds)).toBeLessThan(30);
+    expect(Math.min(...speeds)).toBeGreaterThanOrEqual(20 - 1e-6);
+    for (let i = 1; i < speeds.length; i++) expect(Math.abs(speeds[i]! - speeds[i - 1]!)).toBeLessThanOrEqual(0.4);
+    expect(sim.getState().config.speed).toBe(30);
+    expect(fake.posted.some((m) => (m as { type: string; speed?: number }).type === "SET_SPEED" && (m as { speed: number }).speed < 30)).toBe(true);
   });
 
   it("controller ใช้ความเร็วแต่ละคนจาก metadata และพนักงานเดิน 6 เมตรใน 5 วินาที", async () => {
@@ -394,6 +437,10 @@ describe("Overlay helpers", () => {
     expect(formatClockSeconds(600, 0)).toBe("10:00:00");
     expect(formatClockSeconds(600, 5)).toBe("10:00:05");
     expect(formatClockSeconds(600, 65)).toBe("10:01:05");
+    // นาฬิการะหว่างเล่นภาพโชว์แค่นาที (ปัดลง)
+    expect(formatClockMinutes(600, 0)).toBe("10:00");
+    expect(formatClockMinutes(600, 119)).toBe("10:01");
+    expect(formatClockMinutes(1439, 120)).toBe("00:01");
   });
 
   it("interpolateAgents: เลื่อนระหว่าง 2 tick ตาม id และไม่ interpolate เมื่อกระโดดไกล", () => {

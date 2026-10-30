@@ -292,7 +292,9 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       const rigs = options.rigs.listRigs();
       const live = new Set<number>();
       const reducedMotion = options.reducedMotion?.() ?? false;
-      const deltaSeconds = Math.max(0, frame.realDeltaSeconds) * Math.max(frame.playbackRate, 1e-6);
+      // ความเร็วเดินวัดเป็นเมตรต่อวินาทีจริง เพราะ mixer เดินด้วยเวลาจริง — ขาก้าวพอดีกับระยะที่เลื่อนบนจอ
+      // แม้ภาพเดินช้ากว่าเวลาจำลองที่เร่งอยู่ (เวลาย่อแบบเกม)
+      const deltaSeconds = Math.max(0, frame.realDeltaSeconds);
       const visualTime = smoothAnimationTime(snapshot, frame);
       const seed = seedFromRevision(snapshot.layoutRevision);
       const meals = new Map(snapshot.meals.map(meal => [meal.mealId, meal]));
@@ -315,7 +317,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
           reducedMotion,
           walkCycleDistance: rig.walkCycleDistance,
           walkClipDuration: walkClip?.duration ?? 0.95,
-          eatClipDuration: eatClip?.duration ?? EAT_CLIP_SECONDS,
+          // เร่งเวลาแล้วคำที่กินไม่รัว: หนึ่งคำกินเวลาจำลองนานขึ้นตามที่ยืด
+          eatClipDuration: (eatClip?.duration ?? EAT_CLIP_SECONDS) * Math.max(1, frame.clipStretch ?? 1),
           markers: markersOf(rig),
         });
         const available = rig.clips.map(clip => clip.name);
