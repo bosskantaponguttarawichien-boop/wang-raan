@@ -364,7 +364,10 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     expect(errors).toEqual([]);
   });
 
-  test("performance บนเครื่องอ้างอิง: ฉากหนาแน่น 80 ที่นั่ง + พนักงาน 8 คน", async ({ page }) => {
+  test("performance บนเครื่องอ้างอิง: ฉากหนาแน่น 80 ที่นั่ง + พนักงาน 8 คน", async ({ page, browserName }) => {
+    // เกณฑ์ 30 fps วัดบน Chrome + GPU จริง (evidence/feat-150) — WebKit บน CI รายงานชื่อ GPU ที่แยกไม่ออกว่าเป็น
+    // software renderer หรือไม่ จึงไม่ใช้วัดเกณฑ์นี้
+    test.skip(browserName !== "chromium", "เกณฑ์ fps ของฉากหนาแน่นวัดบน Chrome ของเครื่องอ้างอิงเท่านั้น");
     test.setTimeout(900_000);
     const errors = watchErrors(page);
     await enableDiagnostics(page);
