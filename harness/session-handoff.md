@@ -3,6 +3,13 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-31 ICT — feat-157..159 หลังเวลาย่อแบบเกม
+
+- feat-157: ชะลอให้ภาพพนักงานทันเห็นงานที่โต๊ะ (ถึง 1/4 ของที่เลือก), ท่ากินใช้นาฬิกาท่าทาง, e2e อ่านเวลาจาก `data-sim-seconds`
+- feat-158: แก้ e2e ที่ล้มค้าง (keyboard, ผังหนาแน่นรอวิเคราะห์ 60 วินาที/ข้ามบน software renderer), job E2E Node timeout 45 นาที, `previews: {}` ใน wrangler.jsonc
+- feat-159: `motion/delivery-hold.ts` ให้ถือถาดจนถึงโต๊ะแล้ววางจาน (`StaffPacer.holdAt`); เก็บจานนับเวลาจนเช็ดเสร็จ
+- ค้าง: Cloudflare Workers Builds ต้องเปลี่ยน Build command เป็น `npm run cf:build` ใน dashboard; ยังไม่ได้ตรวจด้วยตาคนช่วงคนเยอะที่ 30×
+
 ## 2026-10-30 ICT — feat-156 เวลาย่อแบบเกม
 
 - เปลี่ยนค่าเริ่มต้นเป็น 30× และแยก "เวลาจำลอง" ออกจาก "ความเร็วท่าทาง": `motion/pacing-governor.ts` คุมตัวคูณจริงของ Worker (ส่ง `SET_SPEED` เอง ไม่แตะ `config.speed`) และความเร็วเดินของ pacer; ฉาก 3D รับ `motionRate`/`clipStretch` ผ่าน `SimulationFrame.timing`

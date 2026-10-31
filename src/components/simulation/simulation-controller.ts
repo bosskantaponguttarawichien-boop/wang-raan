@@ -30,6 +30,7 @@ import { VISUAL_WALK_SPEED, WalkPacer, doorFrame, wallDoorFrame } from "./walk-p
 import { PresentationBridge } from "./presentation-bridge";
 import { PlaybackClock } from "./motion/playback-clock";
 import { alignPresentation } from "./motion/presentation-frame";
+import { DeliveryHold, PUT_DOWN_SECONDS } from "./motion/delivery-hold";
 import {
   CUSTOMER_BACKLOG_GRACE_SECONDS, MIN_TASK_SHOW_SECONDS, PacingGovernor, motionRate, type PacingState,
 } from "./motion/pacing-governor";
@@ -76,8 +77,8 @@ const DEFAULT_PLAYBACK_SECONDS = 3600;
 const MAX_RESYNC_SECONDS = 10;
 /** ส่ง SET_SPEED ห่างกันอย่างน้อยเท่านี้ (ms) ระหว่างชะลอ/เร่งนาฬิกา */
 const PACING_SEND_INTERVAL_MS = 100;
-/** งานที่พนักงานต้องยืนทำที่โต๊ะ — ภาพต้องเดินไปถึงทันเห็น */
-const TABLE_TASKS = new Set(["taking-order", "put-down", "clearing", "wiping"]);
+/** งานที่พนักงานต้องยืนทำที่โต๊ะ — ภาพต้องเดินไปถึงทันเห็น (วางจานใช้ DeliveryHold แทน) */
+const TABLE_TASKS = new Set(["taking-order", "clearing", "wiping"]);
 /** ภาพพนักงานอยู่ใกล้จุดทำงานเท่านี้ (ม.) ถือว่าถึงแล้ว (ตรงกับ alignPresentation) */
 const AT_SERVICE_POINT = 0.12;
 
@@ -109,6 +110,9 @@ export class SimulationController {
   private readonly clock = new PlaybackClock();
   private readonly velocities = new Map<number, number>();
   private readonly governor = new PacingGovernor();
+  private readonly deliveries = new DeliveryHold();
+  /** วินาทีจริงที่ภาพเล่นไปแล้ว ไม่นับช่วงหยุด/แท็บซ่อน — นาฬิกาของท่าวางจาน (DeliveryHold) */
+  private playedSeconds = 0;
   /** ตัวคูณเวลาที่ Worker ใช้อยู่ (ส่งไปล่าสุด) */
   private workerSpeed = 1;
   private pacing: PacingState = { speed: 1, walkRate: 1 };
@@ -349,7 +353,7 @@ export class SimulationController {
    * ซึ่งดีกว่าหยุดภาพค้างแล้วรอให้ผู้ใช้กดเล่นต่อเอง
    */
   private resync(simulationSeconds: number, now: number) {
-    this.pacer.reset(); this.staffPacer.reset(); this.velocities.clear();
+    this.pacer.reset(); this.staffPacer.reset(); this.velocities.clear(); this.deliveries.reset();
     this.clock.reset(simulationSeconds, now);
     this.previous = null; this.current = null;
     this.resyncOnNextTick = false;
@@ -391,9 +395,12 @@ export class SimulationController {
   private taskSpeedLimit(staff: Float32Array, snapshot: PresentationSnapshot | null, staffSpeed: number): number {
     if (!snapshot) return Number.POSITIVE_INFINITY;
     let limit = Number.POSITIVE_INFINITY;
+    const milestones = new Map(snapshot.milestones.map(entry => [entry.taskId, entry]));
     for (const member of snapshot.staff) {
       if (!TABLE_TASKS.has(member.activity) || !member.servicePoint) continue;
-      const remaining = member.phaseEndsAtSeconds - snapshot.simTimeSeconds;
+      // เก็บจานต่อด้วยเช็ดที่จุดเดิม: นับเวลาจนเช็ดเสร็จ ไม่ใช่แค่ช่วงเก็บจานที่สั้นมาก (ไม่งั้นชะลอสุดทุกครั้ง)
+      const wipeEnd = member.activity === "clearing" && member.taskId ? milestones.get(member.taskId)?.wipeFinishedAtSeconds ?? null : null;
+      const remaining = Math.max(member.phaseEndsAtSeconds, wipeEnd ?? 0) - snapshot.simTimeSeconds;
       if (!(remaining > 0)) continue;
       let offset = 0;
       while (offset < staff.length && staff[offset] !== member.staffId) offset += 4;
@@ -405,8 +412,20 @@ export class SimulationController {
     return limit;
   }
 
+  /** จานเสิร์ฟตามภาพพนักงาน (ถือถาดจนถึงโต๊ะ แล้วหยุดวางจาน) — ไม่ใช่ตามเวลาจำลองที่วางไปก่อนแล้ว */
+  private holdDeliveries(snapshot: PresentationSnapshot, staff: Float32Array, playedDelta: number) {
+    // ใช้เวลาที่ภาพเล่นจริง ไม่ใช่นาฬิกาเครื่อง: หยุดชั่วคราวนาน ๆ แล้วเล่นต่อ ถาดต้องยังอยู่ในมือและท่าวางไม่ข้าม
+    this.playedSeconds += Math.max(0, playedDelta);
+    const held = this.deliveries.apply(snapshot, staff, this.playedSeconds, this.workerSpeed);
+    for (const stop of this.deliveries.newStops) {
+      this.staffPacer.holdAt(stop.staffId, stop.point.x, stop.point.y, PUT_DOWN_SECONDS * this.workerSpeed);
+    }
+    return held;
+  }
+
   private resetPacer() {
     this.pacer.reset();
+    this.deliveries.reset();
     this.staffPacer.reset();
     this.clock.reset();
     this.bridge.reset();
@@ -458,7 +477,7 @@ export class SimulationController {
     for (const id of this.velocities.keys()) if (!this.pacer.has(id)) this.velocities.delete(id);
     this.current = {
       at: now,
-      agents, staff, presentation: snapshot ? alignPresentation(snapshot, agents, staff) : undefined,
+      agents, staff, presentation: snapshot ? alignPresentation(this.holdDeliveries(snapshot, staff, timing.seconds), agents, staff) : undefined,
       timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, ...this.rates() },
     };
     this.updatePacing(selected, timing.seconds, now, staff, snapshot);
