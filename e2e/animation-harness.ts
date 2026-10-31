@@ -131,8 +131,10 @@ export async function openReadyCafe(page: Page) {
   await expect(statusBar(page)).toHaveAttribute("data-status", "ready");
 }
 
-export async function startSimulation(page: Page) {
+/** @param speed ตั้งความเร็วก่อนเริ่ม — ค่าเริ่มต้นของแอปคือ 30× (feat-156) จังหวะสั้น ๆ ช่วงแรกจะผ่านไปก่อนเปลี่ยนความเร็วทัน */
+export async function startSimulation(page: Page, speed?: "1×" | "2×" | "5×" | "10×" | "30×") {
   await openTab(page, "check");
+  if (speed) await setSpeed(page, speed);
   const start = page.getByTestId("start-simulation");
   await expect(start).toHaveAttribute("aria-disabled", "false");
   await start.click();

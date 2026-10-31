@@ -209,7 +209,7 @@ describe("สเกลเวลาเล่นภาพ", () => {
     expect(fake.posted.find((m) => (m as { type: string }).type === "START")).toMatchObject({ config: { speed: 30 } });
   });
 
-  it("เวลาย่อแบบเกมที่ 30×: พนักงานเดินบนจอไม่เกิน 1.75 เท่าคนจริง และนาฬิกาชะลอเนียน ๆ ให้ภาพไล่ทัน", async () => {
+  it("เวลาย่อแบบเกมที่ 30×: พนักงานเดินบนจอไม่เกิน 1.75 เท่าคนจริง และนาฬิกาชะลอทีละน้อยให้ภาพไล่ทัน", async () => {
     let now = 0;
     const { fake, controller, sim } = setup(cafeLayout(), false, () => now, 30);
     disposers.push(() => controller.dispose());
@@ -218,6 +218,7 @@ describe("สเกลเวลาเล่นภาพ", () => {
     const x = start[1]!, y = start[2]!;
     let previousX = x;
     let fastest = 0;
+    let fastestOverall = 0;
     const speeds: number[] = [];
     for (let i = 0; i <= 40; i++) {
       now = i * 100;
@@ -226,17 +227,20 @@ describe("สเกลเวลาเล่นภาพ", () => {
       fake.emit({ ...tick, staff: new Float32Array([0, x + 30, y, 1]) });
       await flush();
       const staffX = controller.current!.staff[1]!;
-      if (i > 0) fastest = Math.max(fastest, (staffX - previousX) / 0.1);
+      if (i > 0 && i <= 8) fastest = Math.max(fastest, (staffX - previousX) / 0.1);
+      if (i > 0) fastestOverall = Math.max(fastestOverall, (staffX - previousX) / 0.1);
       previousX = staffX;
       speeds.push(controller.current!.timing!.playbackRate);
     }
     // ท่าเดินช่วงแรก: เร็วกว่าคนจริง (1.2 ม./วิ) ไม่เกิน 1.75 เท่า ไม่วิ่งวูบตามเวลา 30×
     expect(fastest).toBeGreaterThan(1.2);
     expect(fastest).toBeLessThanOrEqual(1.2 * 1.75 + 1e-6);
-    // นาฬิกาค่อย ๆ ชะลอทีละไม่เกิน ~1% ต่อเฟรม ไม่กระโดด และไม่ต่ำกว่า 20×; ป้ายความเร็วที่ผู้ใช้เลือกยังเป็น 30×
+    // ค้างหลังมากจนชะลอสุดแล้ว เร่งท่าเดินได้ไม่เกิน 3 เท่าคนจริง
+    expect(fastestOverall).toBeLessThanOrEqual(1.2 * 3 + 1e-6);
+    // นาฬิกาชะลอทีละขั้นเล็ก ๆ ไม่กระโดด และไม่ต่ำกว่า 7.5× (1/4 ของที่เลือก เมื่อรอให้ภาพไปถึงงานที่โต๊ะ); ป้ายความเร็วที่ผู้ใช้เลือกยังเป็น 30×
     expect(Math.min(...speeds)).toBeLessThan(30);
-    expect(Math.min(...speeds)).toBeGreaterThanOrEqual(20 - 1e-6);
-    for (let i = 1; i < speeds.length; i++) expect(Math.abs(speeds[i]! - speeds[i - 1]!)).toBeLessThanOrEqual(0.4);
+    expect(Math.min(...speeds)).toBeGreaterThanOrEqual(7.5 - 1e-6);
+    for (let i = 1; i < speeds.length; i++) expect(Math.abs(speeds[i]! - speeds[i - 1]!)).toBeLessThanOrEqual(30 * 0.4 * 0.1 + 0.2);
     expect(sim.getState().config.speed).toBe(30);
     expect(fake.posted.some((m) => (m as { type: string; speed?: number }).type === "SET_SPEED" && (m as { speed: number }).speed < 30)).toBe(true);
   });

@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-  BACKLOG_LIMIT_SECONDS, MAX_CATCH_UP_MOTION_RATE, MIN_SPEED_FRACTION, PacingGovernor, VISUAL_MOTION_RATE, clipStretch, motionRate,
+  BACKLOG_LIMIT_SECONDS, MAX_CATCH_UP_MOTION_RATE, MIN_SPEED_FRACTION, PacingGovernor, VISUAL_MOTION_RATE, motionRate,
 } from "./pacing-governor";
 
 /** เดินเวลา `seconds` วินาทีด้วยเฟรมละ 0.1 วินาทีที่ค้างหลังคงที่ */
-function run(governor: PacingGovernor, selected: number, backlog: number, seconds: number) {
+function run(governor: PacingGovernor, selected: number, backlog: number, seconds: number, taskLimit = Number.POSITIVE_INFINITY) {
   let state = governor.state(selected);
-  for (let t = 0; t < seconds; t += 0.1) state = governor.update(selected, backlog, 0.1);
+  for (let t = 0; t < seconds; t += 0.1) state = governor.update(selected, backlog, 0.1, taskLimit);
   return state;
 }
 
@@ -14,8 +14,6 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
   it("ท่าทางเร็วกว่าคนจริงไม่เกินเพดาน ส่วนความเร็วต่ำเล่นตามจริง", () => {
     expect(motionRate(1)).toBe(1);
     expect(motionRate(30)).toBe(VISUAL_MOTION_RATE);
-    expect(clipStretch(1)).toBe(1);
-    expect(clipStretch(30)).toBeCloseTo(30 / VISUAL_MOTION_RATE);
   });
 
   it("ภาพไม่ค้างหลัง → เล่นที่ความเร็วที่เลือกเต็ม ๆ และเดินตามเพดานภาพ", () => {
@@ -28,8 +26,8 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
     let previous = 30;
     for (let t = 0; t < 30; t += 0.1) {
       const { speed, walkRate } = governor.update(30, BACKLOG_LIMIT_SECONDS * 3, 0.1);
-      // เปลี่ยนทีละน้อย: ตาจับไม่ได้
-      expect(Math.abs(speed - previous)).toBeLessThanOrEqual(30 * 0.06 * 0.1 + 1e-9);
+      // เปลี่ยนทีละน้อย ไม่กระโดด
+      expect(Math.abs(speed - previous)).toBeLessThanOrEqual(30 * 0.4 * 0.1 + 1e-9);
       expect(speed).toBeGreaterThanOrEqual(30 * MIN_SPEED_FRACTION - 1e-9);
       expect(walkRate).toBeLessThanOrEqual(MAX_CATCH_UP_MOTION_RATE + 1e-9);
       previous = speed;
@@ -43,6 +41,13 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
     const governor = new PacingGovernor();
     run(governor, 30, BACKLOG_LIMIT_SECONDS * 3, 30);
     expect(run(governor, 30, 0, 30)).toEqual({ speed: 30, walkRate: VISUAL_MOTION_RATE });
+  });
+
+  it("งานที่โต๊ะที่ภาพยังเดินไม่ถึง → ชะลอตามที่ต้องการได้ถึง 1/4 ของที่เลือก และกลับเมื่อพ้นงาน", () => {
+    const governor = new PacingGovernor();
+    expect(run(governor, 30, 0, 5, 12).speed).toBeCloseTo(12);
+    expect(run(governor, 30, 0, 5, 1).speed).toBeCloseTo(7.5);
+    expect(run(governor, 30, 0, 30).speed).toBe(30);
   });
 
   it("ความเร็วต่ำกว่าเพดานภาพไม่ถูกคุม", () => {

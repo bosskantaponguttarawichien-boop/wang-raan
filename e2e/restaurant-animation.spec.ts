@@ -200,7 +200,8 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
     const errors = watchErrors(page);
     await enableDiagnostics(page);
     await openReadyCafe(page);
-    await startSimulation(page);
+    // ลูกค้ากลุ่มแรกนั่งทันทีที่เริ่ม — ต้องเป็น 1× ตั้งแต่ก่อนเริ่ม ไม่งั้นช่วงดึงเก้าอี้ผ่านไปที่ 30×
+    await startSimulation(page, "1×");
     const canvas = await show3D(page);
     await setSpeed(page, "1×");
     expect((await readScene(page)).frame?.modern, "ฉากไม่ได้ใช้ metadata ของ simulation").toBe(true);

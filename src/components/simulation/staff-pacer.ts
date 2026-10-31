@@ -61,20 +61,24 @@ export class StaffPacer {
    * @param timeScale วินาทีจำลองต่อวินาทีจริง ใช้กับเวลาที่ยืนรอ
    */
   backlogSeconds(speed: number, timeScale: number): number {
-    if (!(speed > 0) || !(timeScale > 0)) return 0;
     let worst = 0;
-    for (const server of this.servers.values()) {
-      let distance = 0;
-      let hold = server.holding;
-      let x = server.x, y = server.y;
-      for (const step of server.queue) {
-        distance += Math.hypot(step.x - x, step.y - y);
-        hold += step.hold;
-        x = step.x; y = step.y;
-      }
-      worst = Math.max(worst, distance / speed + hold / timeScale);
-    }
+    for (const index of this.servers.keys()) worst = Math.max(worst, this.backlogFor(index, speed, timeScale));
     return worst;
+  }
+
+  /** ภาพของพนักงานคนนี้ยังต้องเดิน/ยืนรออีกกี่วินาทีจริงจึงถึงตำแหน่งล่าสุดของการจำลอง */
+  backlogFor(index: number, speed: number, timeScale: number): number {
+    const server = this.servers.get(index);
+    if (!server || !(speed > 0) || !(timeScale > 0)) return 0;
+    let distance = 0;
+    let hold = server.holding;
+    let x = server.x, y = server.y;
+    for (const step of server.queue) {
+      distance += Math.hypot(step.x - x, step.y - y);
+      hold += step.hold;
+      x = step.x; y = step.y;
+    }
+    return distance / speed + hold / timeScale;
   }
 
   /** ประตูครัวของผังที่กำลังจำลอง — null = ไม่ต้องแวะเข้าครัว (รับอาหารหน้าประตูเหมือนเดิม) */

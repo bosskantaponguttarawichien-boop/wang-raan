@@ -160,7 +160,8 @@ export function PlaygroundStatusBar({ live, onFocusIssue, onRevealPanel }: Playg
     >
       <div className="flex min-w-0 flex-1 items-center gap-2 text-[13px] text-ink" id="stMsg">
         <span aria-hidden="true" className={cn("size-2.5 shrink-0 rounded-full", dotColor)} />
-        <span className="truncate" data-testid="simulation-status">{statusText}</span>
+        {/* นาฬิกาบนจอโชว์แค่นาที (feat-156) — เทสต์วัดอัตราเวลาจากวินาทีจำลองใน data-sim-seconds */}
+        <span className="truncate" data-testid="simulation-status" data-sim-seconds={isSim ? Math.floor(simMetrics?.time ?? 0) : undefined}>{statusText}</span>
         {actionBtn}
       </div>
       {cta}

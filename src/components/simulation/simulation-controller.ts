@@ -30,7 +30,9 @@ import { VISUAL_WALK_SPEED, WalkPacer, doorFrame, wallDoorFrame } from "./walk-p
 import { PresentationBridge } from "./presentation-bridge";
 import { PlaybackClock } from "./motion/playback-clock";
 import { alignPresentation } from "./motion/presentation-frame";
-import { CUSTOMER_BACKLOG_GRACE_SECONDS, PacingGovernor, clipStretch, motionRate, type PacingState } from "./motion/pacing-governor";
+import {
+  CUSTOMER_BACKLOG_GRACE_SECONDS, MIN_TASK_SHOW_SECONDS, PacingGovernor, motionRate, type PacingState,
+} from "./motion/pacing-governor";
 
 export interface SimulationFrame {
   /** เวลาที่ได้รับ (performance.now) */
@@ -42,9 +44,9 @@ export interface SimulationFrame {
   /**
    * Tick time for scene actions; delta is simulation time, already scaled once.
    * playbackRate = ตัวคูณเวลาที่ Worker ใช้จริง (อาจถูกชะลอจากที่ผู้ใช้เลือก),
-   * motionRate = ท่าทางเร็วกว่าคนจริงกี่เท่า, clipStretch = คลิปที่ผูกเวลาจำลองยืดกี่เท่า
+   * motionRate = ท่าทางเร็วกว่าคนจริงกี่เท่า
    */
-  timing?: { simulationSeconds: number; deltaSeconds: number; playbackRate: number; motionRate?: number; clipStretch?: number };
+  timing?: { simulationSeconds: number; deltaSeconds: number; playbackRate: number; motionRate?: number };
 }
 
 export interface HeatmapFrame {
@@ -74,6 +76,10 @@ const DEFAULT_PLAYBACK_SECONDS = 3600;
 const MAX_RESYNC_SECONDS = 10;
 /** ส่ง SET_SPEED ห่างกันอย่างน้อยเท่านี้ (ms) ระหว่างชะลอ/เร่งนาฬิกา */
 const PACING_SEND_INTERVAL_MS = 100;
+/** งานที่พนักงานต้องยืนทำที่โต๊ะ — ภาพต้องเดินไปถึงทันเห็น */
+const TABLE_TASKS = new Set(["taking-order", "put-down", "clearing", "wiping"]);
+/** ภาพพนักงานอยู่ใกล้จุดทำงานเท่านี้ (ม.) ถือว่าถึงแล้ว (ตรงกับ alignPresentation) */
+const AT_SERVICE_POINT = 0.12;
 
 /** แปลงตัวคูณที่ผู้ใช้เลือกให้เป็นหน่วยที่ Simulation Worker ใช้ */
 export function playbackSpeedToWorkerSpeed(multiplier: number): number {
@@ -260,7 +266,7 @@ export class SimulationController {
           agents: this.pacer.update(started.initial.agents, undefined, 0, walkSpeed),
           staff: this.staffPacer.update(started.initial.staff, 0, STAFF_WALK_SPEED * this.pacing.walkRate, this.workerSpeed, this.bridge.current !== null),
           presentation: this.bridge.current ?? undefined,
-          timing: { simulationSeconds: this.bridge.current?.simTimeSeconds ?? 0, deltaSeconds: 0, ...this.rates(config.speed) },
+          timing: { simulationSeconds: this.bridge.current?.simTimeSeconds ?? 0, deltaSeconds: 0, ...this.rates() },
         };
         this.clock.reset(this.bridge.current?.simTimeSeconds ?? null, initialAt);
         this.emit();
@@ -357,15 +363,18 @@ export class SimulationController {
   }
 
   /** ตัวคูณที่ฉาก 3D ใช้: เวลาจำลองตามที่ Worker เดินจริง ท่าทางตามเพดานภาพ */
-  private rates(selected: number) {
-    return { playbackRate: this.workerSpeed, motionRate: motionRate(this.workerSpeed), clipStretch: clipStretch(selected) };
+  private rates() {
+    return { playbackRate: this.workerSpeed, motionRate: motionRate(this.workerSpeed) };
   }
 
   /** ชะลอ/เร่งนาฬิกาตามที่ภาพค้างหลัง — ส่งให้ Worker เฉพาะเมื่อเปลี่ยนพอสมควร ไม่ถี่เกิน */
-  private updatePacing(selected: number, dt: number, now: number) {
-    const staffBacklog = this.staffPacer.backlogSeconds(STAFF_WALK_SPEED * this.pacing.walkRate, this.workerSpeed);
+  private updatePacing(selected: number, dt: number, now: number, staff: Float32Array, snapshot: PresentationSnapshot | null) {
+    const staffSpeed = STAFF_WALK_SPEED * this.pacing.walkRate;
+    const staffBacklog = this.staffPacer.backlogSeconds(staffSpeed, this.workerSpeed);
     const customerBacklog = this.pacer.backlogSeconds(id => (this.velocities.get(id) ?? VISUAL_WALK_SPEED) * this.pacing.walkRate);
-    this.pacing = this.governor.update(selected, Math.max(staffBacklog, customerBacklog - CUSTOMER_BACKLOG_GRACE_SECONDS), dt);
+    this.pacing = this.governor.update(
+      selected, Math.max(staffBacklog, customerBacklog - CUSTOMER_BACKLOG_GRACE_SECONDS), dt, this.taskSpeedLimit(staff, snapshot, staffSpeed),
+    );
     const target = this.pacing.speed;
     if (!this.client || target === this.workerSpeed || now - this.lastPacingSentAt < PACING_SEND_INTERVAL_MS) return;
     const settled = target === selected;
@@ -373,6 +382,27 @@ export class SimulationController {
     this.workerSpeed = target;
     this.lastPacingSentAt = now;
     void this.client.request({ type: "SET_SPEED", speed: playbackSpeedToWorkerSpeed(target) }).catch(() => undefined);
+  }
+
+  /**
+   * ตัวคูณสูงสุดที่ภาพพนักงานยังเดินไปถึงงานที่โต๊ะ (ที่การจำลองเริ่มแล้ว) ทันเห็นอย่างน้อย MIN_TASK_SHOW_SECONDS
+   * ไม่มีงานรอ → Infinity
+   */
+  private taskSpeedLimit(staff: Float32Array, snapshot: PresentationSnapshot | null, staffSpeed: number): number {
+    if (!snapshot) return Number.POSITIVE_INFINITY;
+    let limit = Number.POSITIVE_INFINITY;
+    for (const member of snapshot.staff) {
+      if (!TABLE_TASKS.has(member.activity) || !member.servicePoint) continue;
+      const remaining = member.phaseEndsAtSeconds - snapshot.simTimeSeconds;
+      if (!(remaining > 0)) continue;
+      let offset = 0;
+      while (offset < staff.length && staff[offset] !== member.staffId) offset += 4;
+      if (offset >= staff.length) continue;
+      if (Math.hypot(staff[offset + 1]! - member.servicePoint.x, staff[offset + 2]! - member.servicePoint.y) <= AT_SERVICE_POINT) continue;
+      const arrival = this.staffPacer.backlogFor(member.staffId, staffSpeed, this.workerSpeed);
+      limit = Math.min(limit, remaining / (arrival + MIN_TASK_SHOW_SECONDS));
+    }
+    return limit;
   }
 
   private resetPacer() {
@@ -429,9 +459,9 @@ export class SimulationController {
     this.current = {
       at: now,
       agents, staff, presentation: snapshot ? alignPresentation(snapshot, agents, staff) : undefined,
-      timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, ...this.rates(selected) },
+      timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, ...this.rates() },
     };
-    this.updatePacing(selected, timing.seconds, now);
+    this.updatePacing(selected, timing.seconds, now, staff, snapshot);
     // คิวของ pacer ล้น = ภาพตามตำแหน่งจริงไม่ทัน ตั้งต้นใหม่ใน TICK ถัดไปโดยไม่หยุดภาพ
     if (this.pacer.needsResync || this.staffPacer.needsResync) this.resyncOnNextTick = true;
     if (tick.heatmap && this.grid) {

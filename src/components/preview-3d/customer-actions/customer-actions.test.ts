@@ -212,14 +212,19 @@ describe("customer-actions feature", () => {
     expect(feature.getReports()[0]!.phase).toBe(caughtUp);
   });
 
-  it("stretches each bite by clipStretch so 30× time does not make the diner chew 30× faster", () => {
-    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310, 0), { playbackRate: 30, clipStretch: 30 / 1.75 }));
+  it("bites at the gesture pace (motionRate), not the 30× clock, and keep that pace when the clock slows", () => {
+    const rates = { playbackRate: 30, motionRate: 1.75 };
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310, 0), rates));
     const before = feature.getReports()[0]!.phase!;
-    const next = snapshot([customerOf()], [mealOf()], 311.5, 1);
-    feature.update(frameOf(next, { realDeltaSeconds: 0.01, playbackRate: 30, clipStretch: 30 / 1.75 }));
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 311.5, 1), { realDeltaSeconds: 0.01, ...rates }));
     const first = feature.getReports()[0]!.phase!;
-    // 0.01 วินาทีจริง = 0.3 วินาทีจำลอง → ท่ากินขยับเท่ากับ 0.0175 วินาทีของคลิป (1.75×) ไม่ใช่ 0.3
-    expect((first - before + 1) % 1).toBeCloseTo((0.3 / (30 / 1.75)) / 3.2, 6);
+    // 0.01 วินาทีจริง = 0.3 วินาทีจำลองที่ 30× → ท่ากินขยับ 0.0175 วินาทีของคลิป (1.75×) ไม่ใช่ 0.3
+    expect((first - before + 1) % 1).toBeCloseTo(0.01 * 1.75 / 3.2, 6);
+    // นาฬิกาชะลอเหลือ 7.5× ท่ากินยังขยับเท่าเดิมต่อวินาทีจริง ไม่กระโดด
+    const slow = { playbackRate: 7.5, motionRate: 1.75 };
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 312, 2), { realDeltaSeconds: 0.01, ...slow }));
+    const second = feature.getReports()[0]!.phase!;
+    expect((second - first + 1) % 1).toBeCloseTo(0.01 * 1.75 / 3.2, 6);
   });
 
   it("takes the seating pose feat-119 pushes in, and forgets it when told to", () => {

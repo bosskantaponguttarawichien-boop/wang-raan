@@ -113,6 +113,11 @@ export interface CustomerActionInput {
   readonly walkCycleDistance: number;
   readonly walkClipDuration: number;
   readonly eatClipDuration: number;
+  /**
+   * วินาทีของท่ากินที่เล่นไปแล้วตั้งแต่จานวาง (เวลาท่าทาง ไม่ใช่เวลาจำลอง) — เวลาย่อแบบเกมให้คำที่กินไม่รัว
+   * และไม่ช้าลงเมื่อนาฬิกาถูกชะลอ; ไม่ระบุ = นับจากเวลาจำลองตรง ๆ
+   */
+  readonly eatElapsedSeconds?: number;
   readonly markers: CustomerMarkerTable;
 }
 
@@ -190,7 +195,7 @@ export function resolveCustomerAction(input: CustomerActionInput): CustomerActio
   const meal = input.meal!;
   const duration = input.eatClipDuration > 0 ? input.eatClipDuration : EAT_CLIP_SECONDS;
   const offset = eatPhaseOffset(input.seed, customer.partyId, customer.memberIndex);
-  const elapsed = Math.max(0, input.simTimeSeconds - (meal.placedAtSeconds ?? input.simTimeSeconds));
+  const elapsed = input.eatElapsedSeconds ?? Math.max(0, input.simTimeSeconds - (meal.placedAtSeconds ?? input.simTimeSeconds));
   const bite = fract(offset + elapsed / duration);
   return {
     ...base, clip: "Eat", tier: "eat", loop: true,
