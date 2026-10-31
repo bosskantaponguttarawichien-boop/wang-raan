@@ -139,7 +139,8 @@ export async function startSimulation(page: Page, speed?: "1×" | "2×" | "5×" 
   await expect(start).toHaveAttribute("aria-disabled", "false");
   await start.click();
   // controller หยุดชั่วคราวเองได้เมื่อพบช่องว่างของเวลา (feat-115) — เริ่มเล่นต่อให้ก่อนวัดอะไร
-  await expect(page.getByTestId("simulation-status")).toContainText(/กำลังจำลอง|หยุดชั่วคราว/);
+  // ผังหนาแน่น 80 ที่นั่ง/ลูกค้า 500 คนคำนวณทั้งวันราว 6 วินาทีก่อนเริ่มเล่น จึงรอได้ถึงเพดานของ controller (60 วินาที)
+  await expect(page.getByTestId("simulation-status")).toContainText(/กำลังจำลอง|หยุดชั่วคราว/, { timeout: 60_000 });
   const resume = page.getByRole("button", { name: /เล่นต่อ/ });
   if (await resume.count()) await resume.first().click();
   await expect(page.getByTestId("simulation-status")).toContainText("กำลังจำลอง");
@@ -157,4 +158,17 @@ export async function setSpeed(page: Page, label: "1×" | "2×" | "5×" | "10×"
   const button = page.getByTestId("simulation-panel").getByRole("button", { name: label, exact: true });
   await button.last().click();
 }
+
+/** ชื่อ GPU ที่วาดมุมมอง 3D อยู่ ("" เมื่ออ่านไม่ได้) */
+export async function rendererName(page: Page): Promise<string> {
+  return page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-testid='three-canvas']");
+    const gl = canvas?.getContext("webgl2") ?? canvas?.getContext("webgl");
+    const info = gl?.getExtension("WEBGL_debug_renderer_info");
+    return info && gl ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
+  });
+}
+
+/** วาดด้วย CPU (ไม่มี GPU จริง เช่น runner ของ CI) — ตัวเลข fps ของฉากหนาแน่นเทียบกับเครื่องอ้างอิงไม่ได้ */
+export const isSoftwareRenderer = (renderer: string) => /swiftshader|software|llvmpipe|basic render/i.test(renderer);
 

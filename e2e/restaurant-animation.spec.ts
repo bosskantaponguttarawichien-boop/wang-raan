@@ -1,7 +1,7 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import {
-  enableDiagnostics, importDenseLayout, openReadyCafe, readScene,
+  enableDiagnostics, importDenseLayout, isSoftwareRenderer, openReadyCafe, readScene, rendererName,
   setSpeed, show3D, startSimulation, watchErrors, watchModelRequests,
   type SceneReports,
 } from "./animation-harness";
@@ -389,6 +389,9 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
 
     await startSimulation(page);
     await show3D(page);
+    // ชื่อเทสต์คือ "บนเครื่องอ้างอิง": เกณฑ์ 30 fps ใช้กับ GPU จริงเท่านั้น เหมือนชุด stutter (feat-137)
+    const renderer = await rendererName(page);
+    test.skip(isSoftwareRenderer(renderer), `ฉากหนาแน่นต้องวัดบนเครื่องที่มี GPU จริง — เครื่องนี้เป็น software renderer (${renderer})`);
     await setSpeed(page, "30×");
     // เร่ง 30× เป็นเวลาคงที่เพื่อให้ร้านเต็มเท่าที่ engine จะพาไปได้ แล้วค่อยวัดที่ 1×
     // (ไม่ตั้งเป้าจำนวนคนตายตัว เพราะจำนวนที่นั่งเต็มขึ้นกับอัตราเข้าร้านของ engine ไม่ใช่ของภาพ)

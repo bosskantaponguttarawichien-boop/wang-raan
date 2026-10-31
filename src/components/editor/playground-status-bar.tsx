@@ -65,6 +65,10 @@ export function PlaygroundStatusBar({ live, onFocusIssue, onRevealPanel }: Playg
         {simAnalysis ? `${formatClockMinutes(simOpenMinute, simMetrics?.time ?? 0)} น.` : formatSimTime(simMetrics?.time ?? 0)}
       </span>
     );
+  } else if (simStatus === "starting") {
+    // ผังใหญ่ใช้เวลาคำนวณทั้งวันหลายวินาที — บอกว่ากำลังทำงาน ไม่ใช่ "พร้อมจำลอง" ค้างไว้
+    dotColor = "bg-[#1d9e75]";
+    statusText = <span>กำลังคำนวณทั้งวัน…</span>;
   } else if (!hasTables) {
     dotColor = "bg-[#8492a5]";
     statusText = <span>ยังไม่มีโต๊ะ — เพิ่มชุดโต๊ะอย่างน้อย 1 ชุด</span>;
