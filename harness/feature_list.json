@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-157",
+      "name": "แก้ E2E หลังเวลาย่อแบบเกม และไม่ให้งานที่โต๊ะหายที่ 30×",
+      "status": "done",
+      "dependencies": ["feat-156"],
+      "role": "frontend",
+      "summary": "ภาพพนักงานไปถึงทันเห็นงานที่โต๊ะ, ท่ากินไม่ช้าลงเมื่อชะลอเวลา, e2e อ่านเวลาจาก data-sim-seconds",
+      "sprint": 5,
+      "evidence": "CI ของ #41 ล้ม 9 ข้อ: timing 4 ข้ออ่าน HH:MM:SS ไม่ได้ → แถบสถานะเพิ่ม data-sim-seconds และ spec อ่านจากนั้น; วงจรบริการ: ค่าเริ่มต้น 30× ทำให้ช่วงดึงเก้าอี้ผ่านไปก่อนเปลี่ยนเป็น 1× → startSimulation(page, speed) ตั้งความเร็วก่อนเริ่ม และพบว่าที่ 30× ไม่เคยเห็นท่าเช็ดเพราะภาพไปถึงหลังงานจบ → controller.taskSpeedLimit + PacingGovernor ชะลอได้ถึง 1/4 ให้ทันเห็นงานที่โต๊ะ ≥1.5 วินาที, คำที่กินใช้นาฬิกาท่าทาง (eatElapsedSeconds) แทน clipStretch; keyboard focus ring, stutter 2 ข้อ และ performance ผังหนาแน่นล้มที่คอมมิต 2999366 (ก่อน #41) ด้วยอาการเดียวกันในเครื่อง จึงไม่ได้แก้ในงานนี้; npm test ผ่าน, typecheck, lint 0 error"
+    },
+    {
       "id": "feat-156",
       "name": "เวลาย่อแบบเกม: เร่งเวลา 30× แต่ท่าทางไม่เร่งตาม",
       "status": "done",

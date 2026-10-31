@@ -88,6 +88,12 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
     let disposed = false;
     let animationTime: number | null = null;
     let animationRun: string | null = null;
+    // นาฬิกาท่าทาง: เดินตามเวลาจำลองที่หารด้วยตัวยืดของเฟรมนั้น (ตัวคูณเวลา ÷ ความเร็วท่าทาง)
+    // คำที่กินจึงเล่นที่ความเร็วท่าทางเสมอ แม้นาฬิกาจำลองถูกเร่งหรือชะลอ (เวลาย่อแบบเกม feat-156)
+    let gestureClock = 0;
+    let gestureRun: string | null = null;
+    let gestureVisualTime: number | null = null;
+    const biteStarts = new Map<number, { mealId: string; start: number }>();
 
     // Follow the latest worker time from behind, spreading each tick over render frames.
     // The worker remains authoritative; never predict a future bite or replay a long pause.
@@ -288,6 +294,17 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       };
     };
 
+    /** วินาทีท่ากินตั้งแต่จานวาง — เริ่มนับจากเวลาจำลองที่ผ่านไปแล้วหารตัวยืด ฉาก 3D ที่เปิดกลางคันจึงต่อได้ตรงกัน */
+    const biteElapsed = (renderAgentId: number, meal: MealPresentation | null, visualTime: number, stretch: number) => {
+      if (!meal || meal.placedAtSeconds === null || visualTime < meal.placedAtSeconds) return undefined;
+      let entry = biteStarts.get(renderAgentId);
+      if (!entry || entry.mealId !== meal.mealId) {
+        entry = { mealId: meal.mealId, start: gestureClock - (visualTime - meal.placedAtSeconds) / stretch };
+        biteStarts.set(renderAgentId, entry);
+      }
+      return Math.max(0, gestureClock - entry.start);
+    };
+
     const updateFrom = (snapshot: PresentationSnapshot, frame: SceneFrame) => {
       const rigs = options.rigs.listRigs();
       const live = new Set<number>();
@@ -296,6 +313,12 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       // แม้ภาพเดินช้ากว่าเวลาจำลองที่เร่งอยู่ (เวลาย่อแบบเกม)
       const deltaSeconds = Math.max(0, frame.realDeltaSeconds);
       const visualTime = smoothAnimationTime(snapshot, frame);
+      const stretch = Math.max(1, frame.playbackRate / Math.max(frame.motionRate ?? frame.playbackRate, 1e-6));
+      if (gestureRun !== snapshot.runId) {
+        gestureRun = snapshot.runId; gestureClock = 0; gestureVisualTime = visualTime; biteStarts.clear();
+      }
+      gestureClock += Math.max(0, visualTime - (gestureVisualTime ?? visualTime)) / stretch;
+      gestureVisualTime = visualTime;
       const seed = seedFromRevision(snapshot.layoutRevision);
       const meals = new Map(snapshot.meals.map(meal => [meal.mealId, meal]));
       for (const rig of rigs) {
@@ -317,8 +340,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
           reducedMotion,
           walkCycleDistance: rig.walkCycleDistance,
           walkClipDuration: walkClip?.duration ?? 0.95,
-          // เร่งเวลาแล้วคำที่กินไม่รัว: หนึ่งคำกินเวลาจำลองนานขึ้นตามที่ยืด
-          eatClipDuration: (eatClip?.duration ?? EAT_CLIP_SECONDS) * Math.max(1, frame.clipStretch ?? 1),
+          eatClipDuration: eatClip?.duration ?? EAT_CLIP_SECONDS,
+          eatElapsedSeconds: biteElapsed(rig.renderAgentId, meal, visualTime, stretch),
           markers: markersOf(rig),
         });
         const available = rig.clips.map(clip => clip.name);
@@ -347,6 +370,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
           plateOutOfReach: reach.outOfReach,
         });
       }
+      for (const renderAgentId of biteStarts.keys()) if (!live.has(renderAgentId)) biteStarts.delete(renderAgentId);
       for (const [renderAgentId, state] of states) if (!live.has(renderAgentId)) {
         releaseRig(state);
         states.delete(renderAgentId);
@@ -387,6 +411,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         reports.length = 0;
         animationTime = null;
         animationRun = null;
+        gestureRun = null;
+        biteStarts.clear();
         for (const state of states.values()) releaseRig(state);
         states.clear();
         pushedPoses.clear();

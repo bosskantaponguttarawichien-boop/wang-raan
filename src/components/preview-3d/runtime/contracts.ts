@@ -13,8 +13,6 @@ export interface SceneFrame {
   readonly playbackRate: number;
   /** ท่าทาง (นั่ง/ลุก) เล่นเร็วกว่าคนจริงกี่เท่า — ไม่เร่งตามเวลาจำลอง; ไม่ระบุ = playbackRate */
   readonly motionRate?: number;
-  /** คลิปที่ผูกกับเวลาจำลอง (คำที่กิน) ยืดกี่เท่า ให้ท่าทางไม่รัวเมื่อเร่งเวลา; ไม่ระบุ = 1 */
-  readonly clipStretch?: number;
   readonly simulating: boolean;
   readonly paused: boolean;
   /** Absent until feat-114/115/122 connect optional Worker metadata. */

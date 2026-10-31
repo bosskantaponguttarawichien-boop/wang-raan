@@ -38,12 +38,14 @@ async function setSpeed(page: Page, label: "1×" | "2×" | "5×" | "10×" | "30�
   await page.getByTestId("simulation-panel").getByRole("button", { name: label, exact: true }).last().click();
 }
 
-/** เวลาในร้านเป็นวินาที จากข้อความ "กำลังจำลอง · HH:MM:SS น." */
+/**
+ * เวลาในร้านเป็นวินาทีจำลอง จาก data-sim-seconds ของแถบสถานะ
+ * (นาฬิกาบนจอโชว์แค่ HH:MM ตั้งแต่ feat-156 จึงละเอียดไม่พอสำหรับวัดอัตรา)
+ */
 async function storeSeconds(page: Page): Promise<number> {
-  const text = (await page.getByTestId("simulation-status").innerText()).trim();
-  const match = text.match(/(\d{1,2}):(\d{2}):(\d{2})/);
-  if (!match) throw new Error(`อ่านเวลาในร้านไม่ได้จากข้อความ: ${text}`);
-  return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]);
+  const value = await page.getByTestId("simulation-status").getAttribute("data-sim-seconds");
+  if (value === null || !Number.isFinite(Number(value))) throw new Error(`อ่านเวลาในร้านไม่ได้: ${value}`);
+  return Number(value);
 }
 
 /** คู่ (เวลาในร้าน, เวลาจริง) ที่อ่านพร้อมกัน */
