@@ -13,6 +13,9 @@
     "binding": "ASSETS"
   },
   "observability": { "enabled": true },
+  // Workers Builds ของ branch อื่นที่ไม่ใช่ production รัน `npx wrangler preview` ซึ่งต้องมี block นี้ (ว่างได้)
+  // ค่า assets/compatibility/flags ด้านบนใช้กับ Preview ด้วย ไม่ต้องใส่ซ้ำในนี้
+  "previews": {},
   "env": {
     // ทดสอบในเครื่อง: BFF ต้อง fetch ไป Backend จำลองที่ localhost ได้ จึงไม่ใช้ global_fetch_strictly_public
     "local": {
