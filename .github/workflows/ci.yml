@@ -45,7 +45,8 @@ jobs:
   e2e:
     name: E2E (Node — Chromium + WebKit)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # รันสองเบราว์เซอร์ — ชุดเดียวกันแค่ Chromium ใช้ 9–22 นาทีในอีกสอง job จึงเกิน 25 นาทีและถูกยกเลิกทุกรอบ
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

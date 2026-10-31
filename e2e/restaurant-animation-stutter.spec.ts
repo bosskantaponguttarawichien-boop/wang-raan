@@ -1,7 +1,8 @@
 import { appendFileSync, mkdirSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import {
-  enableDiagnostics, importDenseLayout, openReadyCafe, readScene, show3D, startSimulation, watchErrors,
+  enableDiagnostics, importDenseLayout, isSoftwareRenderer, openReadyCafe, readScene, rendererName, show3D, startSimulation,
+  watchErrors,
 } from "./animation-harness";
 import { openTab } from "./helpers";
 
@@ -187,14 +188,9 @@ async function openDenseRun(page: Page) {
   await show3D(page);
   // เครื่องที่ไม่มี GPU วาดฉากหนาแน่นได้ 3-4 fps จน main thread แน่นเกินกว่าจะสั่งงานหน้าเว็บได้
   // (คลิกปุ่มค้าง) วัดต่อไปก็ไม่มีความหมายและเทียบกับเครื่องอ้างอิงไม่ได้ จึงข้ามอย่างชัดเจน
-  const renderer = await page.evaluate(() => {
-    const canvas = document.querySelector<HTMLCanvasElement>("canvas[data-testid='three-canvas']");
-    const gl = canvas?.getContext("webgl2") ?? canvas?.getContext("webgl");
-    const info = gl?.getExtension("WEBGL_debug_renderer_info");
-    return info && gl ? String(gl.getParameter(info.UNMASKED_RENDERER_WEBGL)) : "";
-  });
+  const renderer = await rendererName(page);
   record({ check: "renderer", renderer });
-  test.skip(/swiftshader|software|llvmpipe|basic render/i.test(renderer),
+  test.skip(isSoftwareRenderer(renderer),
     `ฉากหนาแน่นต้องวัดบนเครื่องที่มี GPU จริง — เครื่องนี้เป็น software renderer (${renderer})`);
 }
 

@@ -90,7 +90,9 @@ test.describe("Playground", () => {
   test("ทุกตัวควบคุมที่ Tab ถึงมี focus ring และชื่อที่อ่านได้", async ({ page }) => {
     await page.goto("/playground");
     await addItem(page, "โต๊ะ");
-    await page.locator("body").click({ position: { x: 1, y: 1 } });
+    // เริ่มไล่ Tab จากต้นหน้า: ปลดโฟกัสจากช่องที่เพิ่งใช้
+    // (เดิมคลิก body ที่มุมซ้ายบน แต่ Playwright รอให้ body "มองเห็นและนิ่ง" ไม่จบจนหมดเวลา)
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
     for (let i = 0; i < 30; i++) {
       await page.keyboard.press("Tab");
       const f = await focusedOutline(page);

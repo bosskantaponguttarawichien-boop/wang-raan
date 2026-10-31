@@ -119,6 +119,13 @@ describe("feat-056: โหมดจำลอง — ล็อกผังแล�
     expect(screen.getByRole("button", { name: /กลับไปแก้ผัง/i })).toBeInTheDocument();
   });
 
+  it("กำลังคำนวณทั้งวัน (starting): แถบสถานะบอกว่ากำลังคำนวณ ไม่ขึ้นพร้อมจำลองค้างไว้", () => {
+    simulationStore.setState({ status: "starting" });
+    render(<StatusBarHarness />);
+    expect(screen.getByTestId("simulation-status")).toHaveTextContent("กำลังคำนวณทั้งวัน…");
+    expect(screen.getByTestId("simulation-status")).not.toHaveTextContent("พร้อมจำลอง");
+  });
+
   it("หยุดชั่วคราว (paused): ผังยังคงล็อกอยู่", async () => {
     const user = userEvent.setup();
     const onToast = vi.fn();

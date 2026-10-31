@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-158",
+      "name": "แก้ E2E ที่ล้มค้างใน CI (keyboard, ผังหนาแน่น, Node job timeout)",
+      "status": "done",
+      "dependencies": ["feat-157"],
+      "role": "qa",
+      "summary": "keyboard ไม่คลิก body, แถบสถานะบอกกำลังคำนวณ, ผังหนาแน่นรอวิเคราะห์ได้ถึง 60 วินาทีและข้ามเกณฑ์ fps บน software renderer",
+      "sprint": 5,
+      "evidence": "CI ของ #42 ล้ม 4 ข้อเดียวกับที่ล้มตั้งแต่ก่อน #41: keyboard.spec:90 คลิก body แล้ว Playwright รอ visible/stable จนหมดเวลา → blur activeElement แทน; ผังหนาแน่น 80 ที่นั่ง/ลูกค้า 500 คำนวณทั้งวัน ~5.7 วินาที (วัดใน Node) เกิน 5 วินาทีที่ harness รอ → รอได้ถึง 60 วินาที (ANALYZE_TIMEOUT_MS) และแถบสถานะขึ้น \"กำลังคำนวณทั้งวัน…\" ระหว่าง starting แทน \"พร้อมจำลอง\"; performance ฉากหนาแน่นข้ามบน software renderer แบบเดียวกับชุด stutter (rendererName/isSoftwareRenderer ใน animation-harness); job E2E Node (Chromium+WebKit) ถูกยกเลิกที่ 25 นาทีทุกรอบ → timeout 45 นาที · Chrome ในเครื่อง: keyboard 6/6, stutter 1 ผ่าน 2 ข้าม, performance ข้าม (SwiftShader); npm test ผ่าน, typecheck, lint 0 error"
+    },
+    {
       "id": "feat-157",
       "name": "แก้ E2E หลังเวลาย่อแบบเกม และไม่ให้งานที่โต๊ะหายที่ 30×",
       "status": "done",
