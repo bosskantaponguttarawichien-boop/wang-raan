@@ -111,6 +111,8 @@ export class SimulationController {
   private readonly velocities = new Map<number, number>();
   private readonly governor = new PacingGovernor();
   private readonly deliveries = new DeliveryHold();
+  /** วินาทีจริงที่ภาพเล่นไปแล้ว ไม่นับช่วงหยุด/แท็บซ่อน — นาฬิกาของท่าวางจาน (DeliveryHold) */
+  private playedSeconds = 0;
   /** ตัวคูณเวลาที่ Worker ใช้อยู่ (ส่งไปล่าสุด) */
   private workerSpeed = 1;
   private pacing: PacingState = { speed: 1, walkRate: 1 };
@@ -411,8 +413,10 @@ export class SimulationController {
   }
 
   /** จานเสิร์ฟตามภาพพนักงาน (ถือถาดจนถึงโต๊ะ แล้วหยุดวางจาน) — ไม่ใช่ตามเวลาจำลองที่วางไปก่อนแล้ว */
-  private holdDeliveries(snapshot: PresentationSnapshot, staff: Float32Array, now: number) {
-    const held = this.deliveries.apply(snapshot, staff, now / 1000, this.workerSpeed);
+  private holdDeliveries(snapshot: PresentationSnapshot, staff: Float32Array, playedDelta: number) {
+    // ใช้เวลาที่ภาพเล่นจริง ไม่ใช่นาฬิกาเครื่อง: หยุดชั่วคราวนาน ๆ แล้วเล่นต่อ ถาดต้องยังอยู่ในมือและท่าวางไม่ข้าม
+    this.playedSeconds += Math.max(0, playedDelta);
+    const held = this.deliveries.apply(snapshot, staff, this.playedSeconds, this.workerSpeed);
     for (const stop of this.deliveries.newStops) {
       this.staffPacer.holdAt(stop.staffId, stop.point.x, stop.point.y, PUT_DOWN_SECONDS * this.workerSpeed);
     }
@@ -473,7 +477,7 @@ export class SimulationController {
     for (const id of this.velocities.keys()) if (!this.pacer.has(id)) this.velocities.delete(id);
     this.current = {
       at: now,
-      agents, staff, presentation: snapshot ? alignPresentation(this.holdDeliveries(snapshot, staff, now), agents, staff) : undefined,
+      agents, staff, presentation: snapshot ? alignPresentation(this.holdDeliveries(snapshot, staff, timing.seconds), agents, staff) : undefined,
       timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, ...this.rates() },
     };
     this.updatePacing(selected, timing.seconds, now, staff, snapshot);

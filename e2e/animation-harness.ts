@@ -169,6 +169,10 @@ export async function rendererName(page: Page): Promise<string> {
   });
 }
 
-/** วาดด้วย CPU (ไม่มี GPU จริง เช่น runner ของ CI) — ตัวเลข fps ของฉากหนาแน่นเทียบกับเครื่องอ้างอิงไม่ได้ */
-export const isSoftwareRenderer = (renderer: string) => /swiftshader|software|llvmpipe|basic render/i.test(renderer);
+/**
+ * วาดด้วย CPU (ไม่มี GPU จริง เช่น runner ของ CI) หรืออ่านชื่อ GPU ไม่ได้ — ตัวเลข fps ของฉากหนาแน่นเทียบกับเครื่องอ้างอิงไม่ได้
+ * WebKit ไม่เปิด WEBGL_debug_renderer_info หรือคืนชื่อกลาง ๆ ("WebKit WebGL") จึงยืนยันไม่ได้ว่าเป็นเครื่องอ้างอิง
+ */
+export const isSoftwareRenderer = (renderer: string) =>
+  renderer.trim() === "" || /swiftshader|software|llvmpipe|basic render|^webkit webgl$/i.test(renderer.trim());
 
