@@ -249,6 +249,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
       ready: (scene: SceneReports) => boolean,
       detail: (scene: SceneReports) => Record<string, unknown>,
       simSecondsBudget = 5400,
+      pollMs = 250,
     ) => {
       const start = (await readScene(page)).frame?.simTimeSeconds ?? 0;
       let seen: SceneReports | null = null;
@@ -259,7 +260,7 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
         if (seen) return "found";
         return elapsed > simSecondsBudget ? "out-of-sim-time" : "waiting";
       }, {
-        timeout: 600_000, intervals: [250],
+        timeout: 600_000, intervals: [pollMs],
         message: `ไม่พบช่วง "${name}" ภายใน ${simSecondsBudget} วินาทีจำลอง`,
       }).toBe("found");
       await page.screenshot({ path: `${SCREENS_DIR}/cycle-${name}.png` });
@@ -332,6 +333,8 @@ test.describe("feat-123: วงจรบริการในมุมมอง 
           dishesOnTables: scene.tableService?.activeDishCount,
         };
       },
+      // 5% สุดท้ายของการเช็ดที่ 30× ยาวแค่ราว 0.1–0.2 วินาที — เฝ้าทุก 250 ms มักพลาด จึงเฝ้าถี่เหมือนช่วงดึงเก้าอี้
+      5400, 60,
     );
 
     await expect(canvas).toBeVisible();

@@ -66,6 +66,17 @@ export class StaffPacer {
     return worst;
   }
 
+  /**
+   * ให้ภาพพนักงานหยุดที่จุดนี้ (ที่ต่อคิวไว้แล้ว) นาน `simSeconds` วินาทีจำลองเมื่อเดินถึง — ใช้เล่นท่าวางจาน
+   * คืน false เมื่อไม่พบจุดในคิว (ภาพเดินผ่านไปแล้ว)
+   */
+  holdAt(index: number, x: number, y: number, simSeconds: number): boolean {
+    const step = this.servers.get(index)?.queue.find(entry => Math.hypot(entry.x - x, entry.y - y) <= 1e-3);
+    if (!step) return false;
+    step.hold = Math.max(step.hold, simSeconds);
+    return true;
+  }
+
   /** ภาพของพนักงานคนนี้ยังต้องเดิน/ยืนรออีกกี่วินาทีจริงจึงถึงตำแหน่งล่าสุดของการจำลอง */
   backlogFor(index: number, speed: number, timeScale: number): number {
     const server = this.servers.get(index);

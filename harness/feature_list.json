@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-159",
+      "name": "เสิร์ฟอาหารตามภาพพนักงาน และแก้เทสต์วงจรบริการที่ไม่เสถียร",
+      "status": "done",
+      "dependencies": ["feat-158"],
+      "role": "frontend",
+      "summary": "ที่ 30× พนักงานถือถาดจนถึงโต๊ะและวางจานให้เห็น, ไม่ชะลอเวลาเกินจำเป็น, เทสต์วงจรบริการผ่านสม่ำเสมอ",
+      "sprint": 5,
+      "evidence": "สาเหตุ flaky: ที่ 30× ถาดโผล่ราว 1 วินาทีต่อการเสิร์ฟ (การจำลองวางจานเสร็จก่อนภาพถึงโต๊ะ จานโผล่บนโต๊ะก่อนพนักงาน) → DeliveryHold + StaffPacer.holdAt; ช่วง clearing สั้นทำให้ชะลอถึง 7.5× บ่อยจนเวลาเฉลี่ยต่ำกว่า 9× → นับเวลาจนเช็ดเสร็จ (milestone wipeFinishedAtSeconds) วัดใน Chrome ผังคาเฟ่ 6 นาทีจริง: ตัวคูณจริงเฉลี่ย 25–30× (ช่วงคนเยอะต่ำสุด ~18× เฉลี่ยต่อ 30 วินาที); เทสต์ wipe-complete เฝ้าทุก 60 ms (5% สุดท้ายของการเช็ดยาว ~0.1–0.2 วินาที); restaurant-animation:198 ผ่าน 3/3 รอบ รอบละ ~2 นาที; unit 115 ไฟล์ / 1,372 tests, typecheck, lint 0 error"
+    },
+    {
       "id": "feat-158",
       "name": "แก้ E2E ที่ล้มค้างใน CI (keyboard, ผังหนาแน่น, Node job timeout)",
       "status": "done",

@@ -53,6 +53,22 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     expect(pacer.backlogSeconds(SPEED, 30)).toBeCloseTo((7 - SPEED) / SPEED, 5);
   });
 
+  it("holdAt: ภาพหยุดที่จุดที่ต่อคิวไว้ตามเวลาที่สั่ง แล้วเดินต่อ (ท่าวางจาน)", () => {
+    const pacer = new StaffPacer();
+    pacer.update(staff([0, 1, 1, COUNTER]), 0, SPEED);
+    pacer.update(staff([0, 2.4, 1, SERVING]), 0, SPEED);
+    pacer.update(staff([0, 2.4, 3.8, WALKING]), 0, SPEED);
+    expect(pacer.holdAt(0, 2.4, 1, 2)).toBe(true);
+    expect(pacer.holdAt(0, 9, 9, 2)).toBe(false);
+    // 1 วินาทีถึงจุดวาง (1.4 ม.) แล้วยืนอีก 2 วินาทีจำลอง (timeScale 1) ก่อนเดินต่อ
+    let out = pacer.update(staff([0, 2.4, 3.8, WALKING]), 1, SPEED);
+    expect(row(out, 0)!.slice(0, 2)).toEqual([expect.closeTo(2.4, 4), expect.closeTo(1, 4)]);
+    out = pacer.update(staff([0, 2.4, 3.8, WALKING]), 1.5, SPEED);
+    expect(row(out, 0)![1]).toBeCloseTo(1, 4);
+    out = pacer.update(staff([0, 2.4, 3.8, WALKING]), 1, SPEED);
+    expect(row(out, 0)![1]).toBeCloseTo(1 + 0.5 * SPEED, 4);
+  });
+
   it("เดินตามทางที่ engine เดินจริง (เลี้ยวตามมุม ไม่ตัดผ่านโต๊ะ)", () => {
     const pacer = new StaffPacer();
     pacer.update(staff([0, 0, 0, COUNTER]), 0, SPEED);
