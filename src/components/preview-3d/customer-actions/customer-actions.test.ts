@@ -212,6 +212,16 @@ describe("customer-actions feature", () => {
     expect(feature.getReports()[0]!.phase).toBe(caughtUp);
   });
 
+  it("stretches each bite by clipStretch so 30× time does not make the diner chew 30× faster", () => {
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310, 0), { playbackRate: 30, clipStretch: 30 / 1.75 }));
+    const before = feature.getReports()[0]!.phase!;
+    const next = snapshot([customerOf()], [mealOf()], 311.5, 1);
+    feature.update(frameOf(next, { realDeltaSeconds: 0.01, playbackRate: 30, clipStretch: 30 / 1.75 }));
+    const first = feature.getReports()[0]!.phase!;
+    // 0.01 วินาทีจริง = 0.3 วินาทีจำลอง → ท่ากินขยับเท่ากับ 0.0175 วินาทีของคลิป (1.75×) ไม่ใช่ 0.3
+    expect((first - before + 1) % 1).toBeCloseTo((0.3 / (30 / 1.75)) / 3.2, 6);
+  });
+
   it("takes the seating pose feat-119 pushes in, and forgets it when told to", () => {
     feature.setSeatPose({ renderAgentId: 10, phase: "sit", clipPhase: 0.4, outwardOffset: 0.3, usesChairClips: true });
     feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));

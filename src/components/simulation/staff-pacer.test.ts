@@ -43,6 +43,16 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     expect(row(out, 0)![2]).toBe(WALKING);
   });
 
+  it("บอกได้ว่าภาพค้างหลังการจำลองกี่วินาที (ระยะที่ยังต้องเดิน ÷ ความเร็ว)", () => {
+    const pacer = new StaffPacer();
+    pacer.update(staff([0, 1, 1, COUNTER]), 0, SPEED);
+    expect(pacer.backlogSeconds(SPEED, 30)).toBe(0);
+    pacer.update(staff([0, 8, 1, WALKING]), 0, SPEED);
+    expect(pacer.backlogSeconds(SPEED, 30)).toBeCloseTo(7 / SPEED, 5);
+    pacer.update(staff([0, 8, 1, WALKING]), 1, SPEED);
+    expect(pacer.backlogSeconds(SPEED, 30)).toBeCloseTo((7 - SPEED) / SPEED, 5);
+  });
+
   it("เดินตามทางที่ engine เดินจริง (เลี้ยวตามมุม ไม่ตัดผ่านโต๊ะ)", () => {
     const pacer = new StaffPacer();
     pacer.update(staff([0, 0, 0, COUNTER]), 0, SPEED);

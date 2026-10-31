@@ -19,7 +19,7 @@ import {
   SPEED_OPTIONS,
   useSimulationStore,
 } from "@/store/use-simulation-store";
-import { formatClock, formatClockSeconds, formatNumber, toDayInput } from "@/lib/day-config";
+import { formatClock, formatClockMinutes, formatNumber, toDayInput } from "@/lib/day-config";
 import { parseClock } from "@/core/simulation";
 import { DayAnswers } from "./day-answers";
 import { DaySetupForm } from "./day-setup-form";
@@ -128,7 +128,7 @@ export function SimulationPanel({
               data-testid="simulation-metrics"
             >
               {[
-                ["เวลาในร้าน", analysis ? `${formatClockSeconds(openMinute, metrics.time)} น.` : formatSimTime(metrics.time)],
+                ["เวลาในร้าน", analysis ? `${formatClockMinutes(openMinute, metrics.time)} น.` : formatSimTime(metrics.time)],
                 ["ลูกค้าในร้าน", `${metrics.inStore} คน`],
                 ["นั่งที่โต๊ะ", `${metrics.seated} / ${seats} ที่`],
                 ["รอหน้าเข้า", `${metrics.waitingEntrance} คน`],

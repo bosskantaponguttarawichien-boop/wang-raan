@@ -90,6 +90,14 @@ export function formatClockSeconds(openMinute: number, elapsedSeconds: number): 
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * นาทีเปิดร้าน + เวลาจำลอง (วินาที) → "HH:MM" (ปัดลง, เกินวันวนกลับ)
+ * นาฬิการะหว่างเล่นภาพโชว์แค่นาที: เวลาย่อแบบเกมอาจชะลอนาฬิกาเล็กน้อยให้ภาพไล่ทัน วินาทีที่วิ่งจะฟ้องจังหวะนั้น
+ */
+export function formatClockMinutes(openMinute: number, elapsedSeconds: number): string {
+  return formatClock(Math.floor(openMinute + elapsedSeconds / 60 + 1e-6));
+}
+
 /** 1 ทศนิยม ตัด .0 ทิ้ง */
 export const formatNumber = (value: number) => (Math.round(value * 10) / 10).toLocaleString("th-TH");
 

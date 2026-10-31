@@ -55,6 +55,28 @@ export class StaffPacer {
     this.overflow = false;
   }
 
+  /**
+   * ภาพค้างหลังการจำลองนานสุดกี่วินาทีจริง (คนที่ค้างมากที่สุด) — ใช้ชะลอนาฬิกาให้ภาพไล่ทัน
+   * @param speed ความเร็วเดินบนภาพ (ม./วินาทีจริง)
+   * @param timeScale วินาทีจำลองต่อวินาทีจริง ใช้กับเวลาที่ยืนรอ
+   */
+  backlogSeconds(speed: number, timeScale: number): number {
+    if (!(speed > 0) || !(timeScale > 0)) return 0;
+    let worst = 0;
+    for (const server of this.servers.values()) {
+      let distance = 0;
+      let hold = server.holding;
+      let x = server.x, y = server.y;
+      for (const step of server.queue) {
+        distance += Math.hypot(step.x - x, step.y - y);
+        hold += step.hold;
+        x = step.x; y = step.y;
+      }
+      worst = Math.max(worst, distance / speed + hold / timeScale);
+    }
+    return worst;
+  }
+
   /** ประตูครัวของผังที่กำลังจำลอง — null = ไม่ต้องแวะเข้าครัว (รับอาหารหน้าประตูเหมือนเดิม) */
   setKitchenDoor(door: DoorFrame | null) {
     this.door = door;

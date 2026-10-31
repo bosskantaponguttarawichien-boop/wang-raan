@@ -7,7 +7,7 @@ import { useSimulationStore } from "@/store/use-simulation-store";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { formatSimTime } from "@/components/simulation/simulation-panel";
 import { parseClock } from "@/core/simulation";
-import { formatClockSeconds } from "@/lib/day-config";
+import { formatClockMinutes } from "@/lib/day-config";
 import type { LiveValidation } from "@/components/validation/use-live-validation";
 
 const ICON = { fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
@@ -62,7 +62,7 @@ export function PlaygroundStatusBar({ live, onFocusIssue, onRevealPanel }: Playg
     statusText = (
       <span>
         {simStatus === "paused" ? "หยุดชั่วคราว" : "กำลังจำลอง"} ·{" "}
-        {simAnalysis ? `${formatClockSeconds(simOpenMinute, simMetrics?.time ?? 0)} น.` : formatSimTime(simMetrics?.time ?? 0)}
+        {simAnalysis ? `${formatClockMinutes(simOpenMinute, simMetrics?.time ?? 0)} น.` : formatSimTime(simMetrics?.time ?? 0)}
       </span>
     );
   } else if (!hasTables) {

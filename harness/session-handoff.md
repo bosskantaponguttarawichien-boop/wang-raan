@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-10-30 ICT — feat-156 เวลาย่อแบบเกม
+
+- เปลี่ยนค่าเริ่มต้นเป็น 30× และแยก "เวลาจำลอง" ออกจาก "ความเร็วท่าทาง": `motion/pacing-governor.ts` คุมตัวคูณจริงของ Worker (ส่ง `SET_SPEED` เอง ไม่แตะ `config.speed`) และความเร็วเดินของ pacer; ฉาก 3D รับ `motionRate`/`clipStretch` ผ่าน `SimulationFrame.timing`
+- ค้างอยู่: ตรวจใน Chrome แล้วเฉพาะผังคาเฟ่ช่วงก่อนคนเยอะ (ตัวคูณจริง 28–30×) ยังไม่ได้วัดช่วงคนเยอะ/ผังหนาแน่น/ลูกค้า 500 คน; e2e ที่ถือว่าค่าเริ่มต้นคือ 1× อาจต้องตั้ง 1× เองก่อนวัด
+- `animation-contract-v1.md` §2 ข้อ "ระยะและ service phase ใช้ rate เดียวกัน" ถูกแทนที่ที่ตัวคูณเกิน 1.75× — ดู architecture.md §5.3.4
+
 ## 2026-10-30 ICT — ตรวจสอบสมบูรณ์พร้อม Commit (feat-150 & feat-138..155)
 
 - **Review สองสายงานที่รวมกันใน working tree**:

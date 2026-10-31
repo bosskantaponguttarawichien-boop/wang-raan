@@ -1669,7 +1669,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const modern = presentation !== undefined;
       const frameInput = {
         nowMs: now, realDeltaSeconds: running ? step.seconds : 0,
-        playbackRate: simulationStore.getState().config.speed,
+        // ตัวคูณที่ Worker ใช้จริง (อาจถูกชะลอเนียน ๆ ให้ภาพไล่ทัน) และเพดานความเร็วท่าทาง
+        playbackRate: controller.current?.timing?.playbackRate ?? simulationStore.getState().config.speed,
+        motionRate: controller.current?.timing?.motionRate,
+        clipStretch: controller.current?.timing?.clipStretch,
         simulating, paused: pausedRef.current, presentation,
       };
       frameInfo = {

@@ -158,6 +158,27 @@ describe("seating feature", () => {
     expect(seatedAfter(15)).toBeCloseTo(seatedAfter(120), 1);
   });
 
+  it("keeps a natural sitting pace when simulated time runs 30× (motionRate caps the gesture)", () => {
+    const seatedAfter = (overrides: Partial<SceneFrame>) => {
+      const rig = buildChairRig("chair-1", layout);
+      const paced = createSeatingFeature({ chairs: { listChairs: () => [rig] } })(context);
+      paced.syncLayout(layout);
+      let frames = 0;
+      const dt = 1 / 60;
+      while (frames < 600) {
+        frames += 1;
+        paced.update(frameOf(snapshot([customerOf()], frames * dt, frames), dt, overrides));
+        if (paced.getReports()[0]?.phase === "seated") break;
+      }
+      paced.dispose();
+      return frames * dt;
+    };
+    const natural = seatedAfter({ playbackRate: 1 });
+    // ภาพนั่งที่ 30× ใช้เวลาจริงเท่ากับเล่นท่าทางที่ 1.75× ไม่ใช่วูบเดียวแบบ 30×
+    expect(seatedAfter({ playbackRate: 30, motionRate: 1.75 })).toBeCloseTo(natural / 1.75, 1);
+    expect(seatedAfter({ playbackRate: 30 })).toBeLessThan(natural / 10);
+  });
+
   it("freezes the chair and the body while the host reports no elapsed time", () => {
     drive(feature, 0.6, 60, [customerOf()]);
     const before = { ...feature.getReports()[0]! };
