@@ -13,7 +13,7 @@
  */
 import * as THREE from "three";
 import type { StoreLayout } from "@/core/layout/types";
-import type { MealPresentation, PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
+import type { CustomerPresentation, MealPresentation, PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
 import type { SceneFeature, SceneFeatureContext, SceneFrame } from "../runtime/contracts";
 import type {
   CustomerActionReport,
@@ -70,6 +70,19 @@ interface RigState {
 }
 
 const ZERO_SPEED_FRAME = 1e-4;
+
+/**
+ * ลูกค้าที่ Engine ลบออกไปแล้ว (จ่ายเงินแล้วออก/ยกเลิก) แต่ภาพยังเดินออกจากร้านอยู่ — walk-pacer เก็บตัวไว้ให้เดิน
+ * จนพ้นประตู (`gone`) ซึ่งที่ความเร็วสูงกินเวลาหลายวินาทีหลังชื่อหายจาก snapshot
+ * เดิมไม่มีการตัดสินใจท่าให้ตัวนี้ คลิปทั้งหมดถูกหยุด โมเดลจึงไถลไปในท่ายืนตรง (rest pose) ขาไม่ก้าว
+ * ตอนนี้ให้เดิน/ยืนตามความเร็วจริงบนจอเหมือนลูกค้าที่ยังไม่มีเก้าอี้
+ */
+function walkingOut(renderAgentId: number): CustomerPresentation {
+  return {
+    renderAgentId, partyId: -1, memberIndex: 0, tableId: null, chairId: null, serviceCycleId: null,
+    activity: "leaving", seatingPhase: "depart", walkMetersPerSecond: 0, mealId: null,
+  };
+}
 /** ภาพตามหลังเวลาจำลองได้ไม่เกินเท่านี้ (วินาทีจริง) ก่อนเริ่มไล่ — Worker ส่ง tick ทุก ~50 ms จึงเผื่อไว้ 5 tick */
 const LAG_ALLOWANCE_SECONDS = 0.25;
 /** ส่วนที่ค้างเกินเพดานไล่คืนได้เร็วแค่ไหน (ต่อวินาที; delta 0.14 × 8 ≥ 1 = ไล่ทันในเฟรมเดียว) */
@@ -333,8 +346,10 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       const meals = new Map(snapshot.meals.map(meal => [meal.mealId, meal]));
       for (const rig of rigs) {
         if (rig.removed) continue;
-        const customer = snapshot.customers.find(entry => entry.renderAgentId === rig.renderAgentId);
-        if (!customer) continue;
+        const listed = snapshot.customers.find(entry => entry.renderAgentId === rig.renderAgentId);
+        // ยังวาดอยู่แต่ไม่อยู่ใน snapshot = กำลังเดินออกจากร้าน — ทิ้งท่านั่ง/กิน แล้วเดินตามความเร็วบนจอ
+        if (!listed) pushedPoses.delete(rig.renderAgentId);
+        const customer = listed ?? walkingOut(rig.renderAgentId);
         live.add(rig.renderAgentId);
         const state = stateFor(rig);
         const meal = customer.mealId ? meals.get(customer.mealId) ?? null : null;
