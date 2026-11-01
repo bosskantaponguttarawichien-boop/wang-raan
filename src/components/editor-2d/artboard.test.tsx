@@ -7,7 +7,7 @@ import { useLiveValidation } from "@/components/validation/use-live-validation";
 import { layoutStore, selectUndoDepth } from "@/store/use-layout-store";
 import { block, cafeLayout } from "@/test/fixtures/layouts";
 import { Artboard } from "./artboard";
-import { clientToMeters, deltaToMeters, nearestWallPosition, objectAriaLabel, percent } from "./stage-math";
+import { OUTSIDE_PADDING, clientToMeters, deltaToMeters, nearestWallPosition, objectAriaLabel, outsideMargins, percent } from "./stage-math";
 
 function Harness() {
   const live = useLiveValidation();
@@ -262,5 +262,39 @@ describe("Issue rings", () => {
     state().loadLayout({ ...cafeLayout(), objects: [...cafeLayout().objects, block("blocker-kd", 1, 0, 1, 0.5)] });
     render(<Harness />);
     expect(screen.getByTestId("kitchen-door-marker")).toHaveAttribute("data-issue", "blocked");
+  });
+});
+
+describe("วัตถุที่หลุดนอกร้าน", () => {
+  it("outsideMargins: ไม่มีอะไรยื่น = 0 ทุกด้าน, ยื่นซ้าย/ล่าง = ระยะที่ยื่น + ระยะเผื่อ", () => {
+    const room = { width: 8, depth: 6 };
+    expect(outsideMargins([block("a", 1, 1, 1, 1)], room)).toEqual({ left: 0, top: 0, right: 0, bottom: 0 });
+    const m = outsideMargins([block("a", -2, 5.5, 1, 1)], room);
+    expect(m.left).toBeCloseTo(2 + OUTSIDE_PADDING, 9);
+    expect(m.bottom).toBeCloseTo(0.5 + OUTSIDE_PADDING, 9);
+    expect(m.top).toBe(0);
+    expect(m.right).toBe(0);
+  });
+
+  it("outsideMargins คิดตามทิศบนจอเมื่อหมุนมุมมอง", () => {
+    // หมุน 180°: ที่ยื่นทางซ้ายของผัง (ตะวันตก) อยู่ทางขวาของจอ
+    const m = outsideMargins([block("a", -2, 1, 1, 1)], { width: 8, depth: 6 }, 180);
+    expect(m.left).toBe(0);
+    expect(m.right).toBeCloseTo(2 + OUTSIDE_PADDING, 9);
+  });
+
+  it("กรอบร้านเว้นที่ด้านที่วัตถุยื่นออกไป เพื่อให้เลื่อนจอไปเห็นได้", () => {
+    render(<Harness />);
+    const box = screen.getByTestId("artboard-stage").parentElement!;
+    expect(box.dataset.outsideMargins).toBeUndefined();
+    expect(box.style.marginLeft).toBe("");
+    act(() => {
+      const layout = state().layout;
+      state().loadLayout({ ...layout, objects: [...layout.objects, block("stray", -2, -1, 1, 1)] });
+    });
+    expect(box.dataset.outsideMargins).toBe("true");
+    expect(box.style.marginLeft).toMatch(/calc\(/);
+    expect(box.style.marginTop).toMatch(/calc\(/);
+    expect(box.style.marginRight).toBe("");
   });
 });
