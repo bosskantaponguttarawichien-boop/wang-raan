@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
+import { AdaptiveQuality, prefersLightRendering, QUALITY_LEVELS, TOUCH_START_LEVEL } from "./adaptive-quality";
 
 /** ป้อนเฟรมช่วงละ intervalMs รวม totalMs คืนขั้นที่เปลี่ยน */
 function run(quality: AdaptiveQuality, intervalMs: number, totalMs: number) {
@@ -66,5 +66,24 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     const quality = new AdaptiveQuality();
     expect(run(quality, 270, 30000)).toEqual([2, 3]);
     expect(quality.current).toEqual(QUALITY_LEVELS[QUALITY_LEVELS.length - 1]);
+  });
+
+  it("มือถือ (จอสัมผัส) เริ่มที่ขั้นเบากว่า: pixelRatio 1 แต่ยังมีเงาตัวละคร แล้วลดต่อได้ตามปกติ", () => {
+    const quality = new AdaptiveQuality({ startLevel: TOUCH_START_LEVEL });
+    expect(quality.current.maxPixelRatio).toBe(1);
+    expect(quality.current.characterShadows).toBe(true);
+    expect(run(quality, 50, 30000)).toEqual([2, 3]);
+  });
+
+  it("startLevel นอกช่วงถูกจำกัดให้อยู่ในขั้นที่มีจริง", () => {
+    expect(new AdaptiveQuality({ startLevel: -2 }).level).toBe(0);
+    expect(new AdaptiveQuality({ startLevel: 99 }).level).toBe(QUALITY_LEVELS.length - 1);
+  });
+
+  it("ตรวจเครื่องจอสัมผัสจาก pointer: coarse", () => {
+    const media = (coarse: boolean) => (query: string) => ({ matches: coarse && query === "(pointer: coarse)" });
+    expect(prefersLightRendering(media(true))).toBe(true);
+    expect(prefersLightRendering(media(false))).toBe(false);
+    expect(prefersLightRendering(undefined)).toBe(false);
   });
 });

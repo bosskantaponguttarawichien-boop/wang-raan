@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-161",
+      "name": "ฉาก 3D บนมือถือเริ่มที่คุณภาพเบากว่าและปิด MSAA",
+      "status": "done",
+      "dependencies": ["feat-160"],
+      "role": "frontend",
+      "summary": "เครื่องจอสัมผัส (pointer: coarse) สร้าง WebGL โดยไม่เปิด antialias และเริ่ม AdaptiveQuality ที่ขั้น 1 (pixelRatio 1, ยังมีเงาตัวละคร); คอมพิวเตอร์ไม่เปลี่ยน",
+      "sprint": 5,
+      "evidence": "เหตุผล: ตัวลดคุณภาพอัตโนมัติทำงานเมื่อ median ช้ากว่า 38 ms (~26 fps) เท่านั้น มือถือที่ได้ 27–35 fps จึงค้างที่ pixelRatio 1.5 + MSAA + เงาทุกเฟรม; ตรวจด้วย diagnostic hook บน Chromium จำลอง iPhone 13: level 1, pixelRatio 1, antialias false, characterShadows true · Desktop Chrome: level 0, antialias true (เหมือนเดิม); unit 115 ไฟล์ / 1,376 tests, typecheck, lint 0 error; ยังไม่ได้วัด fps บนมือถือจริง (container ไม่มี GPU)"
+    },
+    {
       "id": "feat-160",
       "name": "ลากของในผัง 2D บนมือถือไม่กระตุก (ตรวจผังเมื่อหยุดขยับระหว่างลาก)",
       "status": "done",

@@ -48,7 +48,7 @@ export interface SceneReports {
   frame: { modern: boolean; running: boolean; simTimeSeconds: number | null; frameDebtSeconds: number; customerCount: number; staffCount: number } | null;
   quality: {
     level: number; maxPixelRatio: number; characterShadows: boolean; shadowMapSize: number;
-    pixelRatio: number; shadowAutoUpdate: boolean; visibleShadowProxies: number;
+    pixelRatio: number; antialias: boolean | null; shadowAutoUpdate: boolean; visibleShadowProxies: number;
     sampler: { samplesInWindow: number; measuredMs: number; warmupMs: number; lastSampleMs: number };
     sceneInstances: number;
   } | null;
