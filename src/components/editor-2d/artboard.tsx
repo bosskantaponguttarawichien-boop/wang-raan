@@ -38,6 +38,7 @@ import {
   nearestWallPosition,
   objectAriaLabel,
   objectLabel,
+  outsideMargins,
   percent,
 } from "./stage-math";
 
@@ -310,10 +311,13 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
   const entranceSeverity = entrance ? live.severityById.get(entrance.id) : undefined;
   const kitchenDoor = layout.kitchenDoor;
   const kitchenDoorSeverity = kitchenDoor ? live.severityById.get(kitchenDoor.id) : undefined;
+  // วัตถุที่หลุดนอกร้าน: เว้นที่รอบกรอบเท่าระยะที่ยื่น เพื่อให้เลื่อนไปเห็นและลากกลับได้ (ดู outsideMargins)
+  const outside = React.useMemo(() => outsideMargins(objects, layout, viewRotation), [objects, layout, viewRotation]);
+  const metersToCss = (m: number) => (m > 0 ? `calc(${fitWidth} * ${zoom} * ${m / view.width})` : undefined);
 
   return (
-    <div className="flex w-full min-w-0 flex-col items-center [--artboard-chrome:96px] max-[767px]:[--artboard-chrome:32px]">
-      <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong max-[767px]:mb-1.5" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: "100%" }} aria-hidden="true">
+    <div className="flex w-full min-w-0 flex-col items-center-safe [--artboard-chrome:96px] max-[767px]:[--artboard-chrome:32px]">
+      <div className="mb-3 flex items-center gap-3 text-[12px] text-secondary-strong max-[767px]:mb-1.5" style={{ width: `calc(${fitWidth} * ${zoom})`, maxWidth: outside.left || outside.right ? undefined : "100%", marginLeft: metersToCss(outside.left), marginRight: metersToCss(outside.right) }} aria-hidden="true">
         <span className="h-px flex-1 bg-[#ccd6e4]" />
         {view.width} เมตร
         <span className="h-px flex-1 bg-[#ccd6e4]" />
@@ -325,7 +329,12 @@ export function Artboard({ live, onToast = () => {} }: ArtboardProps) {
           width: `calc(${fitWidth} * ${zoom})`,
           aspectRatio: `${view.width} / ${view.depth}`,
           touchAction: "none",
+          marginLeft: metersToCss(outside.left),
+          marginTop: metersToCss(outside.top),
+          marginRight: metersToCss(outside.right),
+          marginBottom: metersToCss(outside.bottom),
         }}
+        data-outside-margins={outside.left || outside.top || outside.right || outside.bottom ? "true" : undefined}
       >
         <div
           ref={stageRef}

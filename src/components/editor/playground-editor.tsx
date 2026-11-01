@@ -102,6 +102,11 @@ export function PlaygroundEditor() {
     const targetId = issue.objectIds[0];
     if (targetId) {
       actions().selectObject(targetId);
+      // พาไปที่วัตถุนั้นบนผัง — รวมถึงวัตถุที่หลุดนอกร้านซึ่งอยู่นอกจอ (รอ render ที่เลือกแล้วก่อน)
+      requestAnimationFrame(() => {
+        const element = stageRef.current?.querySelector<HTMLElement>(`[data-id="${CSS.escape(targetId)}"]`);
+        element?.scrollIntoView?.({ block: "center", inline: "center", behavior: "smooth" });
+      });
     }
   };
 

@@ -1,5 +1,5 @@
-import type { LayoutObject, Meters, Point, StoreLayout, Wall } from "@/core/layout";
-import { pointFromView, vectorFromView, viewSize, type ViewRotation } from "@/core/preview/view-rotation";
+import { footprint, type LayoutObject, type Meters, type Point, type StoreLayout, type Wall } from "@/core/layout";
+import { pointFromView, rectToView, vectorFromView, viewSize, type ViewRotation } from "@/core/preview/view-rotation";
 import { OBJECT_LABEL } from "@/core/validation";
 
 /**
@@ -70,4 +70,39 @@ const meters = (v: Meters) => v.toFixed(2);
 export function objectAriaLabel(obj: LayoutObject, issue?: string): string {
   const base = `${objectLabel(obj)} ตำแหน่ง x ${meters(obj.x)} ม. y ${meters(obj.y)} ม. หมุน ${obj.rotation} องศา`;
   return issue ? `${base} — ${issue}` : base;
+}
+
+/** ระยะเผื่อรอบวัตถุที่หลุดนอกร้าน (เมตร) ให้ขอบวัตถุไม่ชิดขอบจอพอดีและยังจับลากได้ */
+export const OUTSIDE_PADDING: Meters = 0.3;
+
+export interface OutsideMargins {
+  left: Meters;
+  top: Meters;
+  right: Meters;
+  bottom: Meters;
+}
+
+/**
+ * วัตถุยื่นออกนอกกรอบร้านเท่าไรในแต่ละด้านของจอ (เมตร ในพิกัดมุมมอง) — ใช้เป็น margin รอบกรอบร้าน
+ *
+ * วัตถุวางแบบ absolute เทียบกับกรอบร้าน ส่วนที่ยื่นไปทางซ้าย/บนของจอเลื่อน scroll ไปดูไม่ได้เลย
+ * (เบราว์เซอร์ไม่ให้ scroll ไปทางพิกัดติดลบ) ผู้ใช้จึงเห็น error "ล้นออกนอกผนัง" โดยหาวัตถุไม่เจอ
+ * การเว้น margin เท่าระยะที่ยื่นทำให้วัตถุทุกชิ้นอยู่ในพื้นที่ที่เลื่อนไปถึงได้
+ */
+export function outsideMargins(
+  objects: readonly LayoutObject[],
+  layout: Pick<StoreLayout, "width" | "depth">,
+  rotation: ViewRotation = 0,
+): OutsideMargins {
+  const view = viewSize(layout, rotation);
+  const margins: OutsideMargins = { left: 0, top: 0, right: 0, bottom: 0 };
+  for (const obj of objects) {
+    const r = rectToView(footprint(obj), layout, rotation);
+    margins.left = Math.max(margins.left, -r.x);
+    margins.top = Math.max(margins.top, -r.y);
+    margins.right = Math.max(margins.right, r.x + r.width - view.width);
+    margins.bottom = Math.max(margins.bottom, r.y + r.depth - view.depth);
+  }
+  const pad = (v: Meters) => (v > 1e-6 ? v + OUTSIDE_PADDING : 0);
+  return { left: pad(margins.left), top: pad(margins.top), right: pad(margins.right), bottom: pad(margins.bottom) };
 }
