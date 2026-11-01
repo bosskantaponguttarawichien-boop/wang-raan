@@ -9,6 +9,7 @@ import {
   nextSeatReachShift,
   plateReach,
   resolveClipName,
+  substitutePhase,
   resolveCustomerAction,
   seedFromRevision,
   utensilFor,
@@ -238,6 +239,21 @@ describe("walk timing and asset fallback", () => {
     expect(resolveClipName("Eat", ["Idle", "Walk", "Sit", "Eat"])).toBe("Eat");
     expect(resolveClipName("Eat", ["Walk"])).toBe("Walk");
     expect(resolveClipName("Eat", [])).toBeNull();
+  });
+});
+
+describe("substitute clip phase", () => {
+  it("holds the seated end of Sit while an old asset without Eat is eating, whatever the bite phase", () => {
+    for (const bite of [0, 0.25, 0.5, 0.99]) expect(substitutePhase("Eat", "Sit", bite)).toBe(1);
+    expect(substitutePhase("PushChair", "Sit", 0.3)).toBe(1);
+  });
+
+  it("maps the seating transitions onto Sit by meaning, and leaves real clips untouched", () => {
+    expect(substitutePhase("SitDown", "Sit", 0.4)).toBe(0.4);
+    expect(substitutePhase("StandUp", "Sit", 0.25)).toBe(0.75);
+    expect(substitutePhase("Eat", "Eat", 0.4)).toBe(0.4);
+    expect(substitutePhase("PullChair", "Idle", 0.4)).toBe(0.4);
+    expect(substitutePhase("Eat", "Sit", null)).toBeNull();
   });
 });
 

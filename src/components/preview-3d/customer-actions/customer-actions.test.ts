@@ -357,6 +357,26 @@ describe("customer-actions feature", () => {
     legacyFeature.dispose();
   });
 
+  it("holds the seated end of Sit on every bite of a pre-feat-110 asset instead of standing up and sitting down again", () => {
+    // มือถือที่ Service Worker เก็บโมเดลรุ่นเก่า (ไม่มีคลิป Eat): เดิมเอาจังหวะคำที่กินไปเล่นคลิป Sit
+    // (0 = ยืน, 1 = นั่ง) ลูกค้าจึงเด้งยืนแล้วค่อย ๆ นั่งลงใหม่ทุกคำ
+    const legacyRig = buildRig(10, ["Idle", "Walk", "Sit"]);
+    const legacyFeature = createCustomerActionsFeature({ rigs: { listRigs: () => [legacyRig] }, tableService })(context);
+    legacyFeature.syncLayout(layout());
+    const sit = legacyRig.mixer.clipAction(legacyRig.clips.find(clip => clip.name === "Sit")!);
+    const phases = new Set<number>();
+    for (let index = 0; index < 40; index += 1) {
+      legacyFeature.update(frameOf(snapshot([customerOf()], [mealOf()], 310 + index * 0.4, index), { realDeltaSeconds: 0.4, playbackRate: 1 }));
+      legacyRig.mixer.update(0.4);
+      phases.add(Number(legacyFeature.getReports()[0]!.phase!.toFixed(2)));
+      expect(sit.time).toBeCloseTo(CLIP_DURATIONS.Sit!, 6);
+      expect(sit.loop).toBe(THREE.LoopOnce);
+    }
+    // ยังกินอยู่จริง (จังหวะคำเดินต่อ) แต่ท่าที่วาดคือท่านั่งนิ่ง
+    expect(phases.size).toBeGreaterThan(5);
+    legacyFeature.dispose();
+  });
+
   it("drives a party of four on separate bites in one frame", () => {
     const rigs = [0, 1, 2, 3].map(index => buildRig(10 + index));
     const party = createCustomerActionsFeature({ rigs: { listRigs: () => rigs }, tableService })(context);

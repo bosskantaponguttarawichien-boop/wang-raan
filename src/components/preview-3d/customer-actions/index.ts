@@ -26,6 +26,7 @@ export {
   markerTime,
   plateReach,
   resolveClipName,
+  substitutePhase,
   resolveCustomerAction,
   seedFromRevision,
   utensilFor,

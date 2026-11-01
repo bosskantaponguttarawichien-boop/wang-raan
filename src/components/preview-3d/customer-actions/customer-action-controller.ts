@@ -221,6 +221,23 @@ export function resolveClipName(requested: CustomerClipName, available: readonly
 }
 
 /**
+ * Phase to use on the clip that actually plays. A substitute clip means something else: Sit runs
+ * from standing (0) to seated (1), so feeding it the Eat bite phase or the PushChair phase makes a
+ * seated diner stand up and sit down again on every bite (seen on phones that kept an old model in
+ * the service-worker cache). A seated substitute therefore holds the seated end of Sit, and
+ * StandUp → Sit plays Sit backwards. Same-name clips keep the decision's phase verbatim.
+ */
+export function substitutePhase(requested: CustomerClipName, played: string, phase: number | null): number | null {
+  if (played === requested || phase === null) return phase;
+  if (played !== "Sit") return phase;
+  switch (requested) {
+    case "SitDown": return phase;
+    case "StandUp": return clamp01(1 - phase);
+    default: return 1;
+  }
+}
+
+/**
  * How far the host must shift the seated body forward for the real dish to sit where the Eat clip
  * reaches. `forward` is the dish distance along the customer's facing axis, in metres.
  */

@@ -1,6 +1,8 @@
 /* Service Worker ของวางร้าน — ทำให้เปิดแอปได้แม้ออฟไลน์ (ผังเก็บร่างในเบราว์เซอร์อยู่แล้ว)
  *
- * - ไฟล์ build (/_next/static), รูป/โมเดล (/assets), ไอคอน: เก็บแคชครั้งแรกที่โหลด แล้วใช้จากแคช (ชื่อไฟล์มี hash)
+ * - ไฟล์ build (/_next/static): เก็บแคชครั้งแรกที่โหลด แล้วใช้จากแคช (ชื่อไฟล์มี hash ใหม่ทุก build)
+ * - รูป/โมเดล (/assets), ไอคอน: ขอจากเน็ตก่อน ออฟไลน์ค่อยใช้แคช — ชื่อไฟล์ไม่มี hash (เช่น cafe-customer-lite.glb)
+ *   ถ้าใช้แคชก่อน เครื่องที่เคยเปิดแอปจะได้โมเดลรุ่นเก่าตลอดไป (เคยทำให้มือถือไม่มีคลิป Eat ลูกค้าลุก-นั่งทุกคำที่กิน)
  * - หน้าเว็บ: ขอจากเน็ตก่อน ถ้าออฟไลน์ใช้ฉบับที่เคยเปิด → ไม่มีก็แสดงหน้า /offline
  * - /api และคำขอ RSC ไม่แคช (ข้อมูลบัญชีต้องสดเสมอ)
  * - Web Worker: ไฟล์เริ่ม worker ของ Turbopack ชื่อเดิมทุก build และรับรายชื่อไฟล์โค้ดผ่าน #params ท้าย URL
@@ -8,7 +10,7 @@
  *   จึงต้องห่อ response ใหม่ให้ worker ใช้ URL ของคำขอปัจจุบัน
  * เปลี่ยน VERSION เมื่อแก้ไฟล์นี้ เพื่อล้างแคชเก่า
  */
-const VERSION = "v3";
+const VERSION = "v4";
 const STATIC_CACHE = `wangraan-static-${VERSION}`;
 const PAGE_CACHE = `wangraan-pages-${VERSION}`;
 const OFFLINE_URL = "/offline";
@@ -39,6 +41,9 @@ self.addEventListener("activate", (event) => {
 const isStatic = (url) =>
   url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/");
 
+/** ไฟล์ที่ชื่อเดิมทุก build — เนื้อหาเปลี่ยนได้โดยชื่อไม่เปลี่ยน จึงห้ามใช้แคชก่อนเน็ต */
+const isUnhashed = (url) => url.pathname.startsWith("/assets/") || url.pathname.startsWith("/icons/");
+
 const isWorker = (request) => request.destination === "worker" || request.destination === "sharedworker";
 
 /** response ที่สร้างใหม่ไม่มี URL ติดมา — worker จึงใช้ URL ของคำขอนี้ (#params ของ build ปัจจุบัน) */
@@ -60,6 +65,21 @@ async function cacheFirst(event, request) {
     event.waitUntil(cache.put(request, response.clone()).then(() => trimStatic(cache)));
   }
   return response;
+}
+
+async function networkFirstStatic(event, request) {
+  const cache = await caches.open(STATIC_CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.status === 200) {
+      event.waitUntil(cache.put(request, response.clone()).then(() => trimStatic(cache)));
+    }
+    return response;
+  } catch (error) {
+    const hit = await cache.match(request);
+    if (hit) return hit;
+    throw error;
+  }
 }
 
 async function networkFirstPage(request, url) {
@@ -88,6 +108,8 @@ self.addEventListener("fetch", (event) => {
 
   if (request.mode === "navigate") {
     event.respondWith(networkFirstPage(request, url));
+  } else if (isUnhashed(url)) {
+    event.respondWith(networkFirstStatic(event, request));
   } else if (isStatic(url)) {
     event.respondWith(cacheFirst(event, request));
   }

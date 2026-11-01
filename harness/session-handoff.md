@@ -3,6 +3,11 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-11-01 ICT — ลูกค้าลุก-นั่งทุกคำที่กิน (มือถือ)
+
+- ต้นเหตุคือโมเดลเก่าค้างใน Service Worker (ไม่มีคลิป Eat) ไม่ใช่เรื่องเวลา/fps — แก้ `public/sw.js` (v4, `/assets` network-first) และ `substitutePhase` ใน customer-action-controller
+- เครื่องผู้ใช้ต้องโหลดหน้าใหม่ 1–2 ครั้งหลัง deploy ให้ SW v4 ทำงาน (activate ลบแคช v3 ทั้งหมด)
+
 ## 2026-11-01 ICT — ท่ากินกระตุกบนมือถือ
 
 - `customer-actions.ts` `smoothAnimationTime` ไล่เวลาจำลองที่ค้างเกิน 0.25 วินาทีจริง — เดิมเครื่องช้าค้างสะสมแล้วกระโดด
