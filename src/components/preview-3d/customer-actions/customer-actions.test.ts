@@ -314,12 +314,26 @@ describe("customer-actions feature", () => {
     late.dispose();
   });
 
-  it("hands the rig back when a customer is cancelled, and clears its pushed pose", () => {
+  it("hands the rig back when the host stops drawing a customer", () => {
+    let drawn = true;
+    const hosted = createCustomerActionsFeature({ rigs: { listRigs: () => (drawn ? [rig] : []) }, tableService })(context);
+    hosted.syncLayout(layout());
+    hosted.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));
+    expect(hosted.getStats().rigCount).toBe(1);
+    drawn = false;
+    hosted.update(frameOf(snapshot([], [], 311, 1)));
+    expect(hosted.getStats()).toMatchObject({ rigCount: 0, utensilCount: 0 });
+    expect(rig.getObject("RightHand")!.children).toHaveLength(0);
+    hosted.dispose();
+  });
+
+  it("drops the seat and the spoon when a customer leaves the snapshot but is still drawn, and clears its pushed pose", () => {
     feature.setSeatPose({ renderAgentId: 10, phase: "seated", clipPhase: null, outwardOffset: 0, usesChairClips: true });
     feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));
     expect(feature.getStats().rigCount).toBe(1);
     feature.update(frameOf(snapshot([], [], 311, 1)));
-    expect(feature.getStats()).toMatchObject({ rigCount: 0, utensilCount: 0 });
+    expect(feature.getStats()).toMatchObject({ utensilCount: 0 });
+    expect(feature.getReports()[0]).toMatchObject({ clip: "Idle", seated: false, eating: false });
     expect(rig.getObject("RightHand")!.children).toHaveLength(0);
     // The stale pose must not come back if the same id is reused by a new run.
     feature.update(frameOf(snapshot([customerOf({ activity: "walking", seatingPhase: "approach" })], [], 1)));
@@ -391,6 +405,29 @@ describe("customer-actions feature", () => {
     expect(new Set(phases.map(value => value.toFixed(4))).size).toBe(4);
     expect(party.getReports().every(report => report.eating)).toBe(true);
     party.dispose();
+  });
+
+  it("keeps the legs walking while a customer who already left the engine walks out of the door", () => {
+    // Engine ลบลูกค้าทันทีที่ออก แต่ walk-pacer ยังพาตัวเดินออกประตูต่อ — เดิมคลิปถูกหยุด ตัวไถลในท่ายืนตรง
+    const walking = customerOf({ activity: "leaving", seatingPhase: "depart", chairId: null, tableId: null, mealId: null });
+    feature.update(frameOf(snapshot([walking], [], 10, 0)));
+    rig.model.position.set(0.03, 0, 0);
+    feature.update(frameOf(snapshot([walking], [], 10.02, 1)));
+    expect(feature.getReports()[0]).toMatchObject({ clip: "Walk", tier: "walk" });
+    const walk = rig.mixer.clipAction(rig.clips.find(clip => clip.name === "Walk")!);
+    for (let index = 2; index < 8; index += 1) {
+      rig.model.position.x += 0.03;
+      feature.update(frameOf(snapshot([], [], 10 + index * 0.02, index)));
+      rig.mixer.update(1 / 60);
+      expect(feature.getReports()[0]).toMatchObject({ clip: "Walk", tier: "walk" });
+      expect(feature.getReports()[0]!.timeScale).toBeGreaterThan(0);
+    }
+    expect(walk.isRunning()).toBe(true);
+    expect(walk.time).toBeGreaterThan(0);
+    // หยุดเดินที่นอกร้าน = ยืนพัก ไม่ใช่ท่า rest pose
+    feature.update(frameOf(snapshot([], [], 10.2, 9)));
+    feature.update(frameOf(snapshot([], [], 10.22, 10)));
+    expect(feature.getReports()[0]).toMatchObject({ clip: "Idle" });
   });
 
   it("preserves groundSpeed across frames when listRigs returns a fresh descriptor each frame", () => {
