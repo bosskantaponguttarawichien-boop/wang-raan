@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AdaptiveQuality, prefersLightRendering, QUALITY_LEVELS, TOUCH_START_LEVEL } from "./adaptive-quality";
+import { AdaptiveQuality, pixelRatioFor, prefersLightRendering, QUALITY_LEVELS, TOUCH_QUALITY_LEVELS } from "./adaptive-quality";
 
 /** ป้อนเฟรมช่วงละ intervalMs รวม totalMs คืนขั้นที่เปลี่ยน */
 function run(quality: AdaptiveQuality, intervalMs: number, totalMs: number) {
@@ -68,11 +68,28 @@ describe("Adaptive quality (ปรับคุณภาพฉาก 3D ตาม
     expect(quality.current).toEqual(QUALITY_LEVELS[QUALITY_LEVELS.length - 1]);
   });
 
-  it("มือถือ (จอสัมผัส) เริ่มที่ขั้นเบากว่า: pixelRatio 1 แต่ยังมีเงาตัวละคร แล้วลดต่อได้ตามปกติ", () => {
-    const quality = new AdaptiveQuality({ startLevel: TOUCH_START_LEVEL });
-    expect(quality.current.maxPixelRatio).toBe(1);
-    expect(quality.current.characterShadows).toBe(true);
-    expect(run(quality, 50, 30000)).toEqual([2, 3]);
+  it("มือถือ (จอสัมผัส) ใช้บันไดของตัวเอง: เริ่มคมที่ 2x แลกกับเงาตัวละคร แล้วลดต่อได้ตามปกติ", () => {
+    const quality = new AdaptiveQuality({ levels: TOUCH_QUALITY_LEVELS });
+    expect(quality.current.maxPixelRatio).toBe(2);
+    expect(quality.current.characterShadows).toBe(false);
+    expect(run(quality, 50, 30000)).toEqual([1, 2, 3]);
+    expect(quality.current).toEqual(TOUCH_QUALITY_LEVELS[TOUCH_QUALITY_LEVELS.length - 1]);
+  });
+
+  it("pixelRatio ไม่เกิน dpr จอ เพดานขั้น และงบพิกเซล (แต่งบไม่กดต่ำกว่า 1)", () => {
+    const [phone] = TOUCH_QUALITY_LEVELS;
+    // มือถือ canvas ~430×390 ที่ dpr 3 → ได้ 2x เต็ม
+    expect(pixelRatioFor(phone!, 3, 430, 390)).toBe(2);
+    // dpr จอต่ำกว่าเพดาน → ใช้ dpr จอ
+    expect(pixelRatioFor(phone!, 1, 430, 390)).toBe(1);
+    // แท็บเล็ต canvas ใหญ่ → ถูกงบพิกเซลจำกัด
+    const tablet = pixelRatioFor(phone!, 2, 1000, 700);
+    expect(tablet).toBeLessThan(2);
+    expect(1000 * 700 * tablet * tablet).toBeLessThanOrEqual(phone!.maxPixels! + 1);
+    // จอยักษ์ไม่ถูกกดต่ำกว่า 1
+    expect(pixelRatioFor(phone!, 2, 4000, 3000)).toBe(1);
+    // ไม่มีงบ = ใช้เพดานขั้นตรง ๆ (คอม)
+    expect(pixelRatioFor(QUALITY_LEVELS[0]!, 2, 4000, 3000)).toBe(1.5);
   });
 
   it("startLevel นอกช่วงถูกจำกัดให้อยู่ในขั้นที่มีจริง", () => {

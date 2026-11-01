@@ -31,7 +31,7 @@ import {
   type SeatMotion,
 } from "./seat-motion";
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
-import { AdaptiveQuality, prefersLightRendering, TOUCH_START_LEVEL } from "./adaptive-quality";
+import { AdaptiveQuality, pixelRatioFor, prefersLightRendering, TOUCH_QUALITY_LEVELS } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
 import { createLegacyLighting } from "./runtime/legacy-lighting";
 import { createLegacyServingProps } from "./runtime/legacy-serving-props";
@@ -1130,10 +1130,12 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       return;
     }
 
-    // มือถือ/แท็บเล็ต: ปิด MSAA (ตั้งได้ตอนสร้าง context เท่านั้น) และเริ่มที่ pixelRatio 1 — จอ dpr สูง
-    // ขอบหยักแทบมองไม่เห็น แต่ MSAA × ความละเอียดสูงคือภาระ GPU มือถือที่หนักที่สุดของฉากนี้
+    // มือถือ/แท็บเล็ต: ปิด MSAA (ตั้งได้ตอนสร้าง context เท่านั้น) แล้วใช้ความละเอียดสูง (2x ภายในงบพิกเซล)
+    // แทน — ภาพคมกว่า pixelRatio 1 + MSAA มาก · จ่ายด้วยการตัดเงาตัวละคร (shadow map นิ่ง) ดู TOUCH_QUALITY_LEVELS
     const lightRendering = prefersLightRendering(window.matchMedia?.bind(window));
-    const quality = new AdaptiveQuality({ startLevel: lightRendering ? TOUCH_START_LEVEL : 0 });
+    const quality = new AdaptiveQuality(lightRendering ? { levels: TOUCH_QUALITY_LEVELS } : {});
+    const applyPixelRatio = () =>
+      renderer.setPixelRatio(pixelRatioFor(quality.current, window.devicePixelRatio || 1, host.clientWidth, host.clientHeight));
     let renderer: THREE.WebGLRenderer;
     try {
       renderer = new THREE.WebGLRenderer({ antialias: !lightRendering, alpha: true, powerPreference: "high-performance" });
@@ -1142,9 +1144,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.current.maxPixelRatio));
+    applyPixelRatio();
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // ขั้นที่ไม่มีเงาตัวละคร (มือถือเริ่มที่นี่) = เงานิ่ง วาด shadow map เฉพาะตอนฉากเปลี่ยน ไม่ใช่ทุกเฟรม
+    renderer.shadowMap.autoUpdate = quality.current.characterShadows;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.domElement.dataset.testid = "three-canvas";
     renderer.domElement.setAttribute("aria-hidden", "true");
@@ -1610,7 +1614,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     /** ลดคุณภาพตามขั้นของ AdaptiveQuality: ความละเอียด canvas → เงาตัวละคร + shadow map เล็กลง */
     const applyQuality = () => {
       const level = quality.current;
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, level.maxPixelRatio));
+      applyPixelRatio();
       scene.traverse((object) => {
         if (object.name === "ShadowProxy" || object.name === STAFF_CAP_NAME) object.castShadow = level.characterShadows;
         if (object.name === "ShadowProxy") object.visible = level.characterShadows;
@@ -1777,6 +1781,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const resize = () => {
       const width = Math.max(1, host.clientWidth);
       const height = Math.max(1, host.clientHeight);
+      // งบพิกเซลขึ้นกับขนาด canvas — คำนวณ pixelRatio ใหม่ทุกครั้งที่ขนาดเปลี่ยน (setSize ใช้ค่าใหม่ทันที)
+      applyPixelRatio();
       renderer.setSize(width, height, false);
       if (stage.layout) fitCamera(camera, stage.layout, stage.viewRotation, width, height);
       camera.zoom = zoomRef.current;

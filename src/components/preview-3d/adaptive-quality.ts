@@ -10,6 +10,8 @@ export interface QualityLevel {
   characterShadows: boolean;
   /** ขนาด shadow map (px ต่อด้าน) */
   shadowMapSize: number;
+  /** งบพิกเซลรวมของ canvas (กว้าง×สูง หลังคูณ pixelRatio) — ไม่ระบุ = ไม่จำกัด */
+  maxPixels?: number;
 }
 
 /** ขั้น 0 = ดีสุด — ลดความละเอียดจอก่อน (เห็นต่างน้อยสุด) แล้วค่อยตัดเงาตัวละคร */
@@ -21,13 +23,28 @@ export const QUALITY_LEVELS: readonly QualityLevel[] = [
 ];
 
 /**
- * ขั้นเริ่มต้นของเครื่องจอสัมผัส (มือถือ/แท็บเล็ต) — เริ่มที่ pixelRatio 1 แทน 1.5
+ * บันไดคุณภาพของเครื่องจอสัมผัส (มือถือ/แท็บเล็ต) — ไม่มี MSAA (ตั้งตอนสร้าง context)
  *
- * ตัววัดลดคุณภาพเฉพาะเมื่อ median ช้ากว่า `slowFrameMs` (~26 fps) มือถือที่วาดได้ 27–35 fps
- * (รู้สึกกระตุกแล้ว) จึงค้างที่ขั้นสูงสุดตลอด · จอมือถือ dpr 3 ที่ pixelRatio 1 ยังคมพอ
- * เพราะฉากเป็นมุมมองสามมิติที่ซูมได้ ไม่ใช่ตัวอักษร และลดพิกเซลที่ต้องวาด ~55%
+ * เดิมมือถือเริ่มที่ pixelRatio 1 บนจอ dpr 3 = ภาพถูกขยาย 3 เท่า เบลอและขอบหยักชัด
+ * แลกใหม่: ตัดเงาตัวละครตั้งแต่ขั้นแรก (shadow map กลายเป็นภาพนิ่ง วาดครั้งเดียว ไม่ต้องวาดฉากรอบที่สองทุกเฟรม)
+ * แล้วเอางบ GPU ที่ได้คืนมาเพิ่มความละเอียดเป็น 2x — ความคมเห็นชัดกว่าเงาตัวละครเล็ก ๆ ในมุมมองไกล
+ * `maxPixels` คุมไม่ให้แท็บเล็ตจอใหญ่วาดพิกเซลเยอะเกินงบ (มือถือ canvas เล็ก ได้ 2x เต็ม)
  */
-export const TOUCH_START_LEVEL = 1;
+export const TOUCH_QUALITY_LEVELS: readonly QualityLevel[] = [
+  { maxPixelRatio: 2, characterShadows: false, shadowMapSize: 2048, maxPixels: 1_300_000 },
+  { maxPixelRatio: 1.5, characterShadows: false, shadowMapSize: 2048, maxPixels: 900_000 },
+  { maxPixelRatio: 1, characterShadows: false, shadowMapSize: 1024 },
+  { maxPixelRatio: 0.75, characterShadows: false, shadowMapSize: 1024 },
+];
+
+/** pixelRatio จริงของ canvas: ไม่เกิน dpr จอ, เพดานของขั้น และงบพิกเซลรวม (ถ้ามี) — งบพิกเซลไม่กดให้ต่ำกว่า 1 */
+export function pixelRatioFor(level: QualityLevel, devicePixelRatio: number, width: number, height: number): number {
+  let ratio = Math.min(devicePixelRatio || 1, level.maxPixelRatio);
+  if (level.maxPixels && width > 0 && height > 0) {
+    ratio = Math.min(ratio, Math.max(1, Math.sqrt(level.maxPixels / (width * height))));
+  }
+  return ratio;
+}
 
 /** เครื่องที่ใช้นิ้วเป็นหลัก (pointer: coarse) = มือถือ/แท็บเล็ต — GPU และแบตจำกัดกว่าคอม */
 export function prefersLightRendering(matchMedia: ((query: string) => { matches: boolean }) | undefined): boolean {
@@ -52,11 +69,13 @@ export interface AdaptiveQualityOptions {
    * ซึ่งยังตัดฉากหนาแน่นที่วาดเฟรมละเกิน 0.9 วินาทีทิ้งทั้งหมด = ไม่เคยลดคุณภาพให้เครื่องที่ช้าที่สุด
    */
   ignoreAboveMs: number;
-  /** ขั้นที่เริ่ม (ค่าเริ่มต้น 0 = ดีสุด) — มือถือใช้ `TOUCH_START_LEVEL` */
+  /** ขั้นที่เริ่ม (ค่าเริ่มต้น 0 = ดีสุด) */
   startLevel: number;
+  /** บันไดคุณภาพ — มือถือใช้ `TOUCH_QUALITY_LEVELS` */
+  levels: readonly QualityLevel[];
 }
 
-const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 5000, startLevel: 0 };
+const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 5000, startLevel: 0, levels: QUALITY_LEVELS };
 
 export class AdaptiveQuality {
   level = 0;
@@ -68,11 +87,11 @@ export class AdaptiveQuality {
 
   constructor(options: Partial<AdaptiveQualityOptions> = {}) {
     this.options = { ...DEFAULTS, ...options };
-    this.level = Math.max(0, Math.min(QUALITY_LEVELS.length - 1, Math.floor(this.options.startLevel)));
+    this.level = Math.max(0, Math.min(this.options.levels.length - 1, Math.floor(this.options.startLevel)));
   }
 
   get current(): QualityLevel {
-    return QUALITY_LEVELS[this.level]!;
+    return this.options.levels[this.level]!;
   }
 
   /** สิ่งที่ตัววัดเห็นอยู่จริง — ใช้ตอบว่า "ทำไมคุณภาพไม่ลด" ได้โดยไม่ต้องเดา (diagnostics ของ feat-123) */
@@ -97,7 +116,7 @@ export class AdaptiveQuality {
    * ใช้ค่ามัธยฐานของช่วงวัด เฟรมกระตุกนาน ๆ ครั้ง (GC, โหลดไฟล์) จึงไม่ทำให้ลดคุณภาพ
    */
   sample(intervalMs: number): number | null {
-    const { slowFrameMs, windowMs, warmupMs, ignoreAboveMs } = this.options;
+    const { slowFrameMs, windowMs, warmupMs, ignoreAboveMs, levels } = this.options;
     this.lastSample = intervalMs;
     if (!(intervalMs > 0) || intervalMs > ignoreAboveMs) return null;
     if (this.warmup < warmupMs) {
@@ -111,11 +130,11 @@ export class AdaptiveQuality {
     const median = sorted[Math.floor(sorted.length / 2)]!;
     this.intervals = [];
     this.measured = 0;
-    if (median <= slowFrameMs || this.level >= QUALITY_LEVELS.length - 1) return null;
+    if (median <= slowFrameMs || this.level >= levels.length - 1) return null;
     // ช้ากว่าเป้าหลายเท่า = ลดทีละขั้นต้องรอหลายวินาทีกว่าจะถึงขั้นที่ไหว ข้ามให้เร็วขึ้นตามระยะที่ห่าง
     // (ยังไม่เพิ่มกลับเอง จึงไม่เกิดภาพกระพริบสลับคุณภาพ)
     const steps = median > slowFrameMs * 4 ? 2 : 1;
-    this.level = Math.min(QUALITY_LEVELS.length - 1, this.level + steps);
+    this.level = Math.min(levels.length - 1, this.level + steps);
     this.warmup = 0;
     return this.level;
   }
