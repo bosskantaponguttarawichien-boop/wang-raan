@@ -21,7 +21,7 @@ function fakeDiagnostics(): SceneDiagnostics {
     }),
     quality: () => ({
       level: 0, maxPixelRatio: 1.5, characterShadows: true, shadowMapSize: 2048,
-      pixelRatio: 1, shadowAutoUpdate: true, visibleShadowProxies: 0,
+      pixelRatio: 1, antialias: true, shadowAutoUpdate: true, visibleShadowProxies: 0,
       sampler: { samplesInWindow: 0, measuredMs: 0, warmupMs: 0, lastSampleMs: 0 },
       sceneInstances: 1,
     }),

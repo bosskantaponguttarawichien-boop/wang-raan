@@ -20,6 +20,20 @@ export const QUALITY_LEVELS: readonly QualityLevel[] = [
   { maxPixelRatio: 0.75, characterShadows: false, shadowMapSize: 1024 },
 ];
 
+/**
+ * ขั้นเริ่มต้นของเครื่องจอสัมผัส (มือถือ/แท็บเล็ต) — เริ่มที่ pixelRatio 1 แทน 1.5
+ *
+ * ตัววัดลดคุณภาพเฉพาะเมื่อ median ช้ากว่า `slowFrameMs` (~26 fps) มือถือที่วาดได้ 27–35 fps
+ * (รู้สึกกระตุกแล้ว) จึงค้างที่ขั้นสูงสุดตลอด · จอมือถือ dpr 3 ที่ pixelRatio 1 ยังคมพอ
+ * เพราะฉากเป็นมุมมองสามมิติที่ซูมได้ ไม่ใช่ตัวอักษร และลดพิกเซลที่ต้องวาด ~55%
+ */
+export const TOUCH_START_LEVEL = 1;
+
+/** เครื่องที่ใช้นิ้วเป็นหลัก (pointer: coarse) = มือถือ/แท็บเล็ต — GPU และแบตจำกัดกว่าคอม */
+export function prefersLightRendering(matchMedia: ((query: string) => { matches: boolean }) | undefined): boolean {
+  return matchMedia?.("(pointer: coarse)").matches === true;
+}
+
 export interface AdaptiveQualityOptions {
   /**
    * ช่วงเวลาระหว่างเฟรมที่ยอมรับได้ (ms) — เกินนี้ (ต่ำกว่า ~26 fps) ถือว่าช้า
@@ -38,9 +52,11 @@ export interface AdaptiveQualityOptions {
    * ซึ่งยังตัดฉากหนาแน่นที่วาดเฟรมละเกิน 0.9 วินาทีทิ้งทั้งหมด = ไม่เคยลดคุณภาพให้เครื่องที่ช้าที่สุด
    */
   ignoreAboveMs: number;
+  /** ขั้นที่เริ่ม (ค่าเริ่มต้น 0 = ดีสุด) — มือถือใช้ `TOUCH_START_LEVEL` */
+  startLevel: number;
 }
 
-const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 5000 };
+const DEFAULTS: AdaptiveQualityOptions = { slowFrameMs: 38, windowMs: 2000, warmupMs: 1000, ignoreAboveMs: 5000, startLevel: 0 };
 
 export class AdaptiveQuality {
   level = 0;
@@ -52,6 +68,7 @@ export class AdaptiveQuality {
 
   constructor(options: Partial<AdaptiveQualityOptions> = {}) {
     this.options = { ...DEFAULTS, ...options };
+    this.level = Math.max(0, Math.min(QUALITY_LEVELS.length - 1, Math.floor(this.options.startLevel)));
   }
 
   get current(): QualityLevel {

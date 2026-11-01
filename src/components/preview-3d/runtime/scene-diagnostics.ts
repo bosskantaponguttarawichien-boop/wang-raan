@@ -53,6 +53,8 @@ export interface SceneQualityInfo {
   readonly shadowMapSize: number;
   /** ค่าที่ renderer ใช้จริง (อาจต่ำกว่าเพดานของขั้น ตาม devicePixelRatio ของจอ) */
   readonly pixelRatio: number;
+  /** MSAA ของ WebGL context (false บนจอสัมผัส — feat-161) · null เมื่ออ่านไม่ได้ */
+  readonly antialias: boolean | null;
   /** true = วาด shadow map ใหม่ทุกเฟรม (เงาตัวละครขยับได้) */
   readonly shadowAutoUpdate: boolean;
   /** ตัวแทนเงาที่ยังถูกสั่งวาด — ควรเป็น 0 เมื่อ characterShadows เป็น false */

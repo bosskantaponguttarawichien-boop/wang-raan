@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-11-01 ICT — feat-160 มือถือกระตุก (ตรวจ performance)
+
+- 2D: แก้แล้ว — การลากไม่ตรวจผังทุก pointermove (`use-live-validation.ts`, `DRAG_VALIDATION_SETTLE_MS = 120`)
+- 3D (feat-161): จอสัมผัสปิด MSAA และเริ่มที่ pixelRatio 1 (`TOUCH_START_LEVEL`) — ยังต้องวัด fps บนมือถือจริง (container นี้ไม่มี GPU)
+- ยังไม่ได้แตะ: เกณฑ์ลดคุณภาพ 38 ms (~26 fps) คงเดิม; worker ส่ง TICK ทุก 50 ms ผ่าน zod parse + React render — ต้องวัดบนมือถือจริงก่อนตัดสิน
+
 ## 2026-10-31 ICT — feat-157..159 หลังเวลาย่อแบบเกม
 
 - feat-157: ชะลอให้ภาพพนักงานทันเห็นงานที่โต๊ะ (ถึง 1/4 ของที่เลือก), ท่ากินใช้นาฬิกาท่าทาง, e2e อ่านเวลาจาก `data-sim-seconds`

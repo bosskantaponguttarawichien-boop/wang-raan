@@ -31,7 +31,7 @@ import {
   type SeatMotion,
 } from "./seat-motion";
 import { CHARACTER_HEIGHT, CHARACTER_MODELS, CHARACTER_SCALE, customerLook } from "./character-models";
-import { AdaptiveQuality, QUALITY_LEVELS } from "./adaptive-quality";
+import { AdaptiveQuality, prefersLightRendering, TOUCH_START_LEVEL } from "./adaptive-quality";
 import { createCharacterLoader } from "./character-loader";
 import { createLegacyLighting } from "./runtime/legacy-lighting";
 import { createLegacyServingProps } from "./runtime/legacy-serving-props";
@@ -1130,15 +1130,19 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       return;
     }
 
+    // มือถือ/แท็บเล็ต: ปิด MSAA (ตั้งได้ตอนสร้าง context เท่านั้น) และเริ่มที่ pixelRatio 1 — จอ dpr สูง
+    // ขอบหยักแทบมองไม่เห็น แต่ MSAA × ความละเอียดสูงคือภาระ GPU มือถือที่หนักที่สุดของฉากนี้
+    const lightRendering = prefersLightRendering(window.matchMedia?.bind(window));
+    const quality = new AdaptiveQuality({ startLevel: lightRendering ? TOUCH_START_LEVEL : 0 });
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+      renderer = new THREE.WebGLRenderer({ antialias: !lightRendering, alpha: true, powerPreference: "high-performance" });
     } catch {
       onUnavailable();
       return;
     }
 
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, QUALITY_LEVELS[0]!.maxPixelRatio));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality.current.maxPixelRatio));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -1192,7 +1196,6 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     };
     const controller = getSimulationController();
     let templateMaterial: THREE.MeshStandardMaterial | null = null;
-    const quality = new AdaptiveQuality();
     sceneInstances += 1;
     const customerAsset = characterAsset(CHARACTER_MODELS.customer);
     const staffAsset = characterAsset(CHARACTER_MODELS.staff);
@@ -1995,6 +1998,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           characterShadows: level.characterShadows,
           shadowMapSize: level.shadowMapSize,
           pixelRatio: renderer.getPixelRatio(),
+          antialias: renderer.getContext().getContextAttributes()?.antialias ?? null,
           shadowAutoUpdate: renderer.shadowMap.autoUpdate,
           visibleShadowProxies,
           sampler: quality.stats,
