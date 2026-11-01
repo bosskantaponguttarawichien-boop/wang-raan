@@ -3,6 +3,11 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-11-01 ICT — ท่ากินกระตุกบนมือถือ
+
+- `customer-actions.ts` `smoothAnimationTime` ไล่เวลาจำลองที่ค้างเกิน 0.25 วินาทีจริง — เดิมเครื่องช้าค้างสะสมแล้วกระโดด
+- ยังต้องให้ผู้ใช้ตรวจบนมือถือจริง (Android Chrome)
+
 ## 2026-11-01 ICT — feat-160 มือถือกระตุก (ตรวจ performance)
 
 - 2D: แก้แล้ว — การลากไม่ตรวจผังทุก pointermove (`use-live-validation.ts`, `DRAG_VALIDATION_SETTLE_MS = 120`)

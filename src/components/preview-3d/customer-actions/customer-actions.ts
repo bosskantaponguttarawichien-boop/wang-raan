@@ -69,6 +69,10 @@ interface RigState {
 }
 
 const ZERO_SPEED_FRAME = 1e-4;
+/** ภาพตามหลังเวลาจำลองได้ไม่เกินเท่านี้ (วินาทีจริง) ก่อนเริ่มไล่ — Worker ส่ง tick ทุก ~50 ms จึงเผื่อไว้ 5 tick */
+const LAG_ALLOWANCE_SECONDS = 0.25;
+/** ส่วนที่ค้างเกินเพดานไล่คืนได้เร็วแค่ไหน (ต่อวินาที; delta 0.14 × 8 ≥ 1 = ไล่ทันในเฟรมเดียว) */
+const CATCH_UP_PER_SECOND = 8;
 
 function markersOf(rig: CustomerRig): CustomerMarkerTable {
   return rig.markers ?? {};
@@ -104,7 +108,12 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         animationRun = snapshot.runId;
         animationTime = target;
       } else if (!frame.paused) {
-        animationTime = Math.min(target, animationTime + Math.max(0, frame.realDeltaSeconds) * rate);
+        // เครื่องช้า (มือถือ) ได้ delta ที่ FrameClock ตัดเหลือ ≤ 0.14 วินาที แต่เวลาจำลองเดินตามเวลาจริงเต็ม ๆ
+        // ถ้าเดินด้วย delta อย่างเดียว ภาพจะตามหลังสะสมจนเกินเพดานแล้วกระโดดทีเดียว (ท่ากินช้า-กระตุกสลับกัน)
+        // จึงไล่เฉพาะส่วนที่ค้างเกินช่วงห่างปกติระหว่าง tick ของ Worker — เครื่องเร็วไม่ถึงเพดานนี้ ภาพจึงเหมือนเดิม
+        const delta = Math.max(0, frame.realDeltaSeconds);
+        const excess = Math.max(0, target - animationTime - LAG_ALLOWANCE_SECONDS * Math.max(rate, 1));
+        animationTime = Math.min(target, animationTime + delta * rate + excess * Math.min(1, delta * CATCH_UP_PER_SECOND));
       }
       return animationTime;
     };
