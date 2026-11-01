@@ -227,6 +227,25 @@ describe("customer-actions feature", () => {
     expect((second - first + 1) % 1).toBeCloseTo(0.01 * 1.75 / 3.2, 6);
   });
 
+  it("keeps bites steady on a slow phone instead of lagging and then jumping (frame delta clamped to 0.14 s)", () => {
+    // มือถือ ~3 fps: เฟรมจริงห่าง 0.3 วินาที (เวลาจำลอง +9 วินาทีที่ 30×) แต่ FrameClock ส่ง delta ได้แค่ 0.14
+    const rates = { playbackRate: 30, motionRate: 1.75 };
+    let sim = 310;
+    feature.update(frameOf(snapshot([customerOf()], [mealOf()], sim, 0), rates));
+    let previous = feature.getReports()[0]!.phase!;
+    const steps: number[] = [];
+    for (let index = 1; index <= 30; index += 1) {
+      sim += 9;
+      feature.update(frameOf(snapshot([customerOf()], [mealOf()], sim, index), { realDeltaSeconds: 0.14, ...rates }));
+      const phase = feature.getReports()[0]!.phase!;
+      steps.push((phase - previous + 1) % 1);
+      previous = phase;
+    }
+    // ท่ากินควรเดินเท่ากันทุกเฟรม: 0.3 วินาทีจริง × 1.75 ÷ คลิป 3.2 วินาที ≈ 0.164 ต่อเฟรม
+    const expected = 0.3 * 1.75 / 3.2;
+    for (const step of steps.slice(3)) expect(step).toBeCloseTo(expected, 2);
+  });
+
   it("takes the seating pose feat-119 pushes in, and forgets it when told to", () => {
     feature.setSeatPose({ renderAgentId: 10, phase: "sit", clipPhase: 0.4, outwardOffset: 0.3, usesChairClips: true });
     feature.update(frameOf(snapshot([customerOf()], [mealOf()], 310)));
