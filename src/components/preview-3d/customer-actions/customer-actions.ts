@@ -31,6 +31,7 @@ import {
   resolveClipName,
   resolveCustomerAction,
   seedFromRevision,
+  substitutePhase,
   type CustomerActionDecision,
 } from "./customer-action-controller";
 
@@ -355,7 +356,13 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         });
         const available = rig.clips.map(clip => clip.name);
         const resolved = resolveClipName(decision.clip, available);
-        if (resolved) applyClip(state, resolved, decision);
+        // โมเดลรุ่นเก่า (ไม่มีคลิป Eat ฯลฯ) ใช้คลิปแทน — ต้องแปลงจังหวะให้ตรงความหมายของคลิปที่เล่นจริง
+        if (resolved) applyClip(state, resolved, {
+          ...decision,
+          phase: substitutePhase(decision.clip, resolved, decision.phase),
+          // ท่านั่งค้างบนคลิปแทนไม่วนรอบ (เวลาที่ปลายคลิปพอดีห้ามถูกวนกลับไปต้นคลิป = ท่ายืน)
+          loop: decision.loop && resolved === decision.clip,
+        });
         // The utensil only exists while a bite is actually being taken.
         syncUtensil(state, decision.eating ? decision.utensil : null);
         const gripWeight = setGrip(state, decision.eating);
