@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 import { act, cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { layoutStore } from "@/store/use-layout-store";
 import { IsometricView } from "@/components/preview-3d/isometric-view";
 import { cafeLayout, withObjects } from "@/test/fixtures/layouts";
-import { summarizeIssues, useLiveValidation } from "./use-live-validation";
+import { DRAG_VALIDATION_SETTLE_MS, summarizeIssues, useLiveValidation } from "./use-live-validation";
 import { ValidationStatusBar } from "./validation-status-bar";
 
 function Bar() {
@@ -31,6 +31,28 @@ describe("Validation Status Bar", () => {
     expect(screen.getByRole("status")).toHaveTextContent("ยังจำลองไม่ได้ · ต้องแก้ 1 ข้อก่อนเริ่มจำลอง");
     act(() => state().undo());
     expect(screen.getByTestId("validation-status-bar")).toHaveAttribute("data-status", "ready");
+  });
+
+  it("ระหว่างลาก: ตรวจผังเมื่อหยุดขยับ ไม่ตรวจทุก pointermove · ปล่อยนิ้วแล้วตรวจทันที", () => {
+    vi.useFakeTimers();
+    try {
+      render(<Bar />);
+      const bar = () => screen.getByTestId("validation-status-bar");
+      act(() => state().beginInteraction());
+      act(() => state().removeKitchenDoor());
+      // ยังขยับอยู่ = คงผลเดิมไว้ (ไม่จ่ายค่าตรวจผังทั้งร้านทุกเฟรมของการลาก)
+      expect(bar()).toHaveAttribute("data-status", "ready");
+      act(() => vi.advanceTimersByTime(DRAG_VALIDATION_SETTLE_MS - 1));
+      expect(bar()).toHaveAttribute("data-status", "ready");
+      act(() => vi.advanceTimersByTime(1));
+      expect(bar()).toHaveAttribute("data-status", "blocked");
+      // ปล่อยนิ้ว: ผังล่าสุดถูกตรวจใน render เดียวกัน ไม่ต้องรอ timer
+      act(() => state().undo());
+      act(() => state().endInteraction());
+      expect(bar()).toHaveAttribute("data-status", "ready");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("Warning → เริ่มจำลองได้พร้อมจำนวนข้อควรระวัง", () => {

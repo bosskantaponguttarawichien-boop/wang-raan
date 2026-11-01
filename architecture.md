@@ -30,7 +30,7 @@
 | **Communication** | **REST API (JSON over HTTP)** | รูปแบบการรับส่งข้อมูลมาตรฐาน ปลอดภัย และเข้าใจง่าย ผ่าน Fetch API บน BFF Route Handlers |
 | **2D Canvas Editor** | **Hybrid DOM (% CSS) + SVG** | คมชัดทุกระดับความละเอียด (Retina/4K), ปรับขนาดตามจอได้ทันที, ได้ Tab/Focus/Screen Reader ฟรี |
 | **3D Preview** | **Three.js + WebGL (lazy-loaded)** | แสดงห้อง เฟอร์นิเจอร์ และตัวละคร GLB ที่มี skeleton/animation; โหลดเมื่อเลือกมุมมอง 3D เท่านั้น และ fallback เป็น SVG isometric เมื่อ WebGL ใช้ไม่ได้หรือเปิด reduced motion |
-| **Validation Engine** | **Dual-Tier (Client + BFF)** | รันกฎ 4 ด้านบน Client ทันที (0ms) เพื่อแสดงสถานะ Ready/Warning/Blocked และ Re-validate ที่ BFF ก่อนบันทึก/ส่ง P2 |
+| **Validation Engine** | **Dual-Tier (Client + BFF)** | รันกฎ 4 ด้านบน Client ทันที (0ms; ระหว่างลาก/ปรับขนาดตรวจเมื่อหยุดขยับ 120 ms เพื่อไม่ให้มือถือกระตุก — feat-160) เพื่อแสดงสถานะ Ready/Warning/Blocked และ Re-validate ที่ BFF ก่อนบันทึก/ส่ง P2 |
 | **P2 Simulation Engine**| **Web Worker + Canvas Overlay** | รัน Pathfinding บน Thread แยก เมื่อผังผ่านเงื่อนไข Validation (Ready/Warning) เท่านั้น แล้ววาดจุดลูกค้า/Heatmap บน Canvas Layer |
 | **Unit / Integration Test** | **Vitest + React Testing Library** | รันเร็ว รองรับ ESM/TypeScript ทันที ใช้เทส Core Domain Logic, Validation Engine และ Hooks |
 | **E2E & Visual Test** | **Playwright** | ทดสอบ Cross-browser (Chromium/WebKit) และทุก Breakpoint (320px–1440px) |

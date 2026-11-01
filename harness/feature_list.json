@@ -2,6 +2,16 @@
   "_note": "harness/feature_list.json — single source of truth สำหรับติดตามสถานะงานโครงการ วางร้าน (Wang-Raan). งานแบ่งเป็น sprint (ฟิลด์ \"sprint\"); งาน Sprint 1 ที่เสร็จแล้วเก็บแบบย่อ — รายละเอียดเต็มอยู่ใน feature_list.archive.json. Sprint 2 (FE เท่านั้น — Backend/DB อยู่ใน repo แยก): ดูเป้าหมายและ Production Gate ที่ harness/sprint-2.md · Sprint 3 (feat-049 → feat-060): Playground UX Revamp ตาม mockup design-html/playground-ux/index.html",
   "features": [
     {
+      "id": "feat-160",
+      "name": "ลากของในผัง 2D บนมือถือไม่กระตุก (ตรวจผังเมื่อหยุดขยับระหว่างลาก)",
+      "status": "done",
+      "dependencies": ["feat-159"],
+      "role": "frontend",
+      "summary": "useLiveValidation ไม่ตรวจผังทั้งร้านทุก pointermove ระหว่างลาก/ปรับขนาด — ตรวจเมื่อหยุดขยับ 120 ms และตรวจทันทีเมื่อปล่อยนิ้ว; การเริ่มจำลองยัง runValidation() ใหม่เสมอ",
+      "sprint": 5,
+      "evidence": "ต้นเหตุ: validateLayout (walk grid 5 ซม. + หาทางเดินทุกความกว้าง) รันใน useMemo ทุก pointermove ~15 ms/รอบบน CPU เดสก์ท็อปสำหรับผัง 80 ที่นั่ง; Chromium จำลอง iPhone 13 + CPU ช้าลง 4 เท่า ลากโต๊ะ 60 ก้าว: ก่อนแก้ long task 60 ครั้ง (สูงสุด 140 ms รวม 5.7 วินาที) เฟรม p90 83 ms → หลังแก้ long task 1 ครั้ง (ตอนปล่อยนิ้ว ~110 ms) เฟรม p90 16.7 ms (วัด 2 รอบ); ผังคาเฟ่ 0 ครั้ง; unit 115 ไฟล์ / 1,373 tests, typecheck, lint 0 error, e2e editor-flow/responsive/playground-ux/keyboard 40/40 ผ่าน; ฉาก 3D วัดบนเครื่องนี้ไม่ได้ (SwiftShader วาดด้วย CPU) ยังต้องวัดบนมือถือจริง"
+    },
+    {
       "id": "feat-159",
       "name": "เสิร์ฟอาหารตามภาพพนักงาน และแก้เทสต์วงจรบริการที่ไม่เสถียร",
       "status": "done",
