@@ -47,7 +47,7 @@ import { getSimulationController } from "@/components/simulation/simulation-cont
 import { simulationStore } from "@/store/use-simulation-store";
 import { OUTSIDE_DISTANCE, VISUAL_WALK_SPEED, doorFrame } from "@/components/simulation/walk-pacer";
 import { FrameInterpolator, followTarget, type InterpolatedPositions } from "@/components/simulation/motion/frame-interpolator";
-import { applySeatedIdle } from "./runtime/seated-idle";
+import { applySeatedIdle, clearSeatedIdle } from "./runtime/seated-idle";
 import { nextSeatReachShift } from "./customer-actions/customer-action-controller";
 
 export interface ThreeViewProps {
@@ -1754,9 +1754,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         idleClock += animationDelta;
         if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches !== true) {
           for (const report of features.customerActions?.getReports() ?? []) {
-            if (!report.seated || report.eating || report.clip !== "Sit" || report.tier !== "base") continue;
             const customer = customers.get(report.renderAgentId);
-            if (customer) applySeatedIdle(customer.model, idleClock, report.renderAgentId);
+            if (!customer) continue;
+            if (report.seated && !report.eating && report.clip === "Sit" && report.tier === "base") {
+              applySeatedIdle(customer.model, idleClock, report.renderAgentId);
+            } else clearSeatedIdle(customer.model);
           }
         }
         renderer.render(scene, camera);
