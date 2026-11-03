@@ -16,6 +16,8 @@
 import type { StoreApi } from "zustand/vanilla";
 import { ANALYSIS_SEEDS, STAFF_WALK_SPEED, type TickMessage } from "@/core/simulation";
 import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
+import { buildOccupancyGrid } from "@/core/simulation/occupancy-grid";
+import { createPathRefiner } from "@/core/simulation/path-smoothing";
 import { toDayInput } from "@/lib/day-config";
 import { P1LayoutContractSchema } from "@/core/validation";
 import { SimulationClient, createSimulationWorker, type WorkerLike } from "@/lib/simulation-client";
@@ -32,7 +34,7 @@ import { PlaybackClock } from "./motion/playback-clock";
 import { alignPresentation } from "./motion/presentation-frame";
 import { DeliveryHold, PUT_DOWN_SECONDS } from "./motion/delivery-hold";
 import {
-  CUSTOMER_BACKLOG_GRACE_SECONDS, MIN_TASK_SHOW_SECONDS, PacingGovernor, motionRate, type PacingState,
+  CUSTOMER_BACKLOG_GRACE_SECONDS, MIN_TASK_SHOW_SECONDS, PacingGovernor, type PacingState,
 } from "./motion/pacing-governor";
 
 export interface SimulationFrame {
@@ -108,7 +110,6 @@ export class SimulationController {
   private readonly staffPacer = new StaffPacer();
   private readonly bridge = new PresentationBridge();
   private readonly clock = new PlaybackClock();
-  private readonly velocities = new Map<number, number>();
   private readonly governor = new PacingGovernor();
   private readonly deliveries = new DeliveryHold();
   /** วินาทีจริงที่ภาพเล่นไปแล้ว ไม่นับช่วงหยุด/แท็บซ่อน — นาฬิกาของท่าวางจาน (DeliveryHold) */
@@ -198,6 +199,8 @@ export class SimulationController {
     this.clearFrames();
     // ลูกค้าเดินมาจากนอกร้าน / ต่อแถวรอโต๊ะนอกประตู (เฉพาะภาพ)
     this.pacer.setDoor(doorFrame(layout));
+    // ทางเดินบนจอตัดมุมซิกแซกของกริดและเว้นระยะจากโต๊ะ (เฉพาะภาพ — ทางใน engine ไม่เปลี่ยน)
+    this.pacer.setRefiner(createPathRefiner(buildOccupancyGrid(layout)));
     // พนักงานเดินเข้าประตูครัวไปรับอาหาร (เฉพาะภาพ — engine รับอาหารที่ช่องติดผนัง)
     this.staffPacer.setKitchenDoor(wallDoorFrame(layout, layout.kitchenDoor));
     try {
@@ -353,7 +356,7 @@ export class SimulationController {
    * ซึ่งดีกว่าหยุดภาพค้างแล้วรอให้ผู้ใช้กดเล่นต่อเอง
    */
   private resync(simulationSeconds: number, now: number) {
-    this.pacer.reset(); this.staffPacer.reset(); this.velocities.clear(); this.deliveries.reset();
+    this.pacer.reset(); this.staffPacer.reset(); this.deliveries.reset();
     this.clock.reset(simulationSeconds, now);
     this.previous = null; this.current = null;
     this.resyncOnNextTick = false;
@@ -368,17 +371,22 @@ export class SimulationController {
 
   /** ตัวคูณที่ฉาก 3D ใช้: เวลาจำลองตามที่ Worker เดินจริง ท่าทางตามเพดานภาพ */
   private rates() {
-    return { playbackRate: this.workerSpeed, motionRate: motionRate(this.workerSpeed) };
+    // ท่าทาง/ท่าเดินใช้เพดานเดียวกับที่ pacer เดินจริง (คงที่ ไม่ตามนาฬิกาที่ถูกชะลอ/เร่งช่วงเงียบ)
+    return { playbackRate: this.workerSpeed, motionRate: this.pacing.walkRate };
   }
 
   /** ชะลอ/เร่งนาฬิกาตามที่ภาพค้างหลัง — ส่งให้ Worker เฉพาะเมื่อเปลี่ยนพอสมควร ไม่ถี่เกิน */
   private updatePacing(selected: number, dt: number, now: number, staff: Float32Array, snapshot: PresentationSnapshot | null) {
     const staffSpeed = STAFF_WALK_SPEED * this.pacing.walkRate;
     const staffBacklog = this.staffPacer.backlogSeconds(staffSpeed, this.workerSpeed);
-    const customerBacklog = this.pacer.backlogSeconds(id => (this.velocities.get(id) ?? VISUAL_WALK_SPEED) * this.pacing.walkRate);
+    const customerBacklog = this.pacer.backlogSeconds(() => VISUAL_WALK_SPEED * this.pacing.walkRate);
+    // ร้านเงียบ = ไม่มีใครต้องเดินบนจอ และพนักงานทุกคนอยู่ประจำเคาน์เตอร์ (ไม่ได้ทำงานที่โต๊ะ)
+    const quiet = snapshot !== null && staffBacklog <= 0 && customerBacklog <= 0 &&
+      snapshot.staff.every(member => member.activity === "counter");
     this.pacing = this.governor.update(
-      selected, Math.max(staffBacklog, customerBacklog - CUSTOMER_BACKLOG_GRACE_SECONDS), dt, this.taskSpeedLimit(staff, snapshot, staffSpeed),
+      selected, Math.max(staffBacklog, customerBacklog - CUSTOMER_BACKLOG_GRACE_SECONDS), dt, this.taskSpeedLimit(staff, snapshot, staffSpeed), quiet,
     );
+    this.pacer.setMotionRate(this.pacing.walkRate);
     const target = this.pacing.speed;
     if (!this.client || target === this.workerSpeed || now - this.lastPacingSentAt < PACING_SEND_INTERVAL_MS) return;
     const settled = target === selected;
@@ -429,7 +437,6 @@ export class SimulationController {
     this.staffPacer.reset();
     this.clock.reset();
     this.bridge.reset();
-    this.velocities.clear();
     this.resyncOnNextTick = false;
     this.lastMetricsAt = -Infinity;
   }
@@ -439,7 +446,10 @@ export class SimulationController {
     if (status !== "running" || this.hidden || !this.bridge.accept(tick)) return;
     const now = this.deps.now();
     const selected = this.deps.simulation.getState().config.speed;
-    const playback = this.workerSpeed;
+    // ตัวคูณที่ Worker ใช้เดินเวลา tick นี้จริง — SET_SPEED ที่เพิ่งสั่งอาจยังไปไม่ถึง Worker
+    const reported = tick.speed !== undefined && Number.isFinite(tick.speed) && tick.speed > 0
+      ? tick.speed / REAL_SECONDS_TO_SIMULATION_SECONDS_AT_1X : null;
+    const playback = reported ?? this.workerSpeed;
     const snapshot = this.bridge.current;
     if (this.resyncOnNextTick) this.resync(tick.metrics.time, now);
     let timing = this.clock.advance(tick.metrics.time, now, playback, snapshot !== null);
@@ -462,9 +472,10 @@ export class SimulationController {
       this.resync(tick.metrics.time, now);
       timing = { seconds: 0, gap: false };
     }
-    if (snapshot) for (const customer of snapshot.customers) this.velocities.set(customer.renderAgentId, customer.walkMetersPerSecond);
     const walkRate = this.pacing.walkRate;
-    const walkSpeed = (id: number) => (this.velocities.get(id) ?? VISUAL_WALK_SPEED) * walkRate;
+    // ทุกคนเดินบนจอด้วยความเร็วเดียวกันและคงที่ (ความเร็วรายคนของ engine ใช้คิดเวลาในการจำลองเท่านั้น)
+    // เดิมใช้ 1.0–1.4 ม./วิ ตามรายคน × ตัวคูณที่เปลี่ยนได้ — คนบนจอจึงเดินเร็วช้าไม่เท่ากัน
+    const walkSpeed = VISUAL_WALK_SPEED * walkRate;
     let sourceStaff = tick.staff ?? new Float32Array(0);
     if (snapshot?.staff.some(member => member.activity === "pickup")) {
       sourceStaff = sourceStaff.slice();
@@ -474,7 +485,6 @@ export class SimulationController {
     this.previous = this.current;
     const agents = this.pacer.update(tick.agents, tick.paths, timing.seconds, walkSpeed);
     const staff = this.staffPacer.update(sourceStaff, timing.seconds, STAFF_WALK_SPEED * walkRate, playback, snapshot !== null);
-    for (const id of this.velocities.keys()) if (!this.pacer.has(id)) this.velocities.delete(id);
     this.current = {
       at: now,
       agents, staff, presentation: snapshot ? alignPresentation(this.holdDeliveries(snapshot, staff, timing.seconds), agents, staff) : undefined,

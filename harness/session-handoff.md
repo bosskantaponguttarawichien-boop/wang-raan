@@ -3,6 +3,12 @@
 > **archive**: เก็บ 5 entry ล่าสุดเท่านั้น — รายการก่อนหน้าจะถูกย้ายไปเก็บที่
 > `harness/archive/session-handoff-archive.md`
 
+## 2026-11-03 ICT — feat-162 เดินลื่น/แอนิเมชัน 3D
+
+- เปลี่ยนพฤติกรรมตั้งใจ (เทสต์ปรับตาม): ไม่มีการเร่งท่าเดินไล่, ความเร็วเดินบนจอเท่ากันทุกคน, สลับท่าเดิน/ยืนช้าลงไม่กี่เฟรม (เฉลี่ยความเร็ว) และ crossfade แทนการตัดท่า
+- วัดด้วย `e2e/restaurant-animation-smoothness.spec.ts` (ต้องมี hook `characters` ใน scene diagnostics) — container นี้ build production ไม่ได้เพราะดึง Google Fonts ไม่ได้ จึงวัดบน `next dev`
+- ยังต้องให้ผู้ใช้ดูด้วยตาบนเครื่องจริงที่ 30× ช่วงคนเยอะ
+
 ## 2026-11-01 ICT — ลูกค้าลุก-นั่งทุกคำที่กิน (มือถือ)
 
 - ต้นเหตุคือโมเดลเก่าค้างใน Service Worker (ไม่มีคลิป Eat) ไม่ใช่เรื่องเวลา/fps — แก้ `public/sw.js` (v4, `/assets` network-first) และ `substitutePhase` ใน customer-action-controller

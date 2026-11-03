@@ -245,7 +245,7 @@ describe("สเกลเวลาเล่นภาพ", () => {
     expect(fake.posted.some((m) => (m as { type: string; speed?: number }).type === "SET_SPEED" && (m as { speed: number }).speed < 30)).toBe(true);
   });
 
-  it("controller ใช้ความเร็วแต่ละคนจาก metadata และพนักงานเดิน 6 เมตรใน 5 วินาที", async () => {
+  it("controller ให้ทุกคนเดินบนจอด้วยความเร็วเดียวกันคงที่ (ไม่ตามความเร็วรายคน) และพนักงานเดิน 6 เมตรใน 5 วินาที", async () => {
     let now = 0;
     const { fake, controller } = setup(cafeLayout(), false, () => now);
     disposers.push(() => controller.dispose());
@@ -276,8 +276,12 @@ describe("สเกลเวลาเล่นภาพ", () => {
     }
     expect(controller.current!.staff[1]! - x).toBeCloseTo(6, 4);
     // Includes the entrance corner; sampled chords may be slightly shorter than the complete path.
-    expect(distances[0]).toBeGreaterThan(4.75); expect(distances[0]).toBeLessThanOrEqual(5.001);
-    expect(distances[1]).toBeGreaterThan(6.65); expect(distances[1]).toBeLessThanOrEqual(7.001);
+    // ความเร็วรายคนของ engine (1.0 / 1.4) ใช้คิดเวลาในการจำลองเท่านั้น — บนจอทุกคนเดิน VISUAL_WALK_SPEED
+    // (เดิมเดินเร็วไม่เท่ากัน ผู้ใช้เห็นเป็น "บางเวลาเดินไว บางเวลาเดินช้า")
+    for (const distance of distances) {
+      expect(distance).toBeGreaterThan(5.7); expect(distance).toBeLessThanOrEqual(6.001);
+    }
+    expect(Math.abs(distances[0]! - distances[1]!)).toBeLessThan(0.05);
     expect(controller.current!.presentation?.customers.map(c => c.walkMetersPerSecond)).toEqual([1, 1.4]);
     expect(controller.current!.timing).toMatchObject({ simulationSeconds: expect.closeTo(5), deltaSeconds: expect.closeTo(0.1), playbackRate: 1 });
   });

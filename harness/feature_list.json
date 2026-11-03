@@ -2840,6 +2840,16 @@
       "delivery": "ส่ง source/commit และหลักฐาน harness/evidence/feat-123/; รวม Harness กลางโดย coordinator; ห้ามแก้ shared files/GLB นอก ownership",
       "parallel_policy": "หนึ่ง task ต่อ agent/worktree; เริ่มจาก integration base ที่รวม dependencies แล้ว; งาน source และ shared-file ownership ดูแผน §5–6",
       "evidence": "harness/evidence/feat-123/ (summary.md, measurements.jsonl, e2e-run.log, screens/ 27 ภาพ); e2e 28 tests ผ่านครบทุกข้อด้วย --workers=1 บน Chrome + GTX 1050 Ti (hardware WebGL) กับ production build: เวลา 1× อัตรา 0.999×, 10× อัตรา 9.97×, resume 0.994× และกลับจากแท็บซ่อน 0.996× (ไม่มีการไล่เวลาสะสม); pause และ stop ทำให้ภาพนิ่ง 0.000% ของพิกเซล; วงจรบริการยืนยันผ่าน diagnostic hook อ่านอย่างเดียว (CarryIdle 1 จาน → Eat ด้วย fork เมนู steak พร้อม plateOutOfReach=false → คราบ 1 โต๊ะ 5 ก้อน → WipeTable progress 0.003→0.982 โดยคราบยังอยู่ครบ 8 ก้อนระหว่างเช็ดและหายเมื่อเช็ดเสร็จ → ดึงเก้าอี้ handOnBackrest=true ขณะเก้าอี้เคลื่อน ครบ approach→pull→sit→push→seated ระยะดึงสูงสุด 0.30 ม.); แสง 4 เวลา (กลางคืน 0.820 ยังอ่านผังออก, เที่ยง 0.917) และปรับเวลาผ่านแผงตั้งค่าแสง LightingSettingsPanel ในแท็บร้านได้จริง, หมุน 4 มุมแล้วแดดกลับที่เดิม, ร้าน 2–30 ม., reduced motion ใช้ SVG, WebGL fail ถอยไป SVG, 6 breakpoints ไม่มี horizontal scroll, start/stop 10 รอบ canvas ไม่งอก (heap 18.5→21.3 MB); performance ฉากหนาแน่น 80 ที่นั่ง (นำเข้าผ่านช่อง JSON จริงขึ้น Ready): ลูกค้า 66 + พนักงาน 8 คน (นั่ง 45/80 ที่), จาน 41 ใบ, draw calls 693, triangles 582,820, median 50.0 fps / p95 49.8 fps, heap 53.3 MB, frame debt 0; ปิด defect ครบทั้ง 3 ข้อ (หยุด mixer ตอน pause, mount LightingSettingsPanel ใน playground-panel.tsx แท็บ shop, และแก้ computeTablePlatePlacement ให้ใช้ PLATE_EDGE_INSET=0.18 ม. จน plateOutOfReach=false ทุกขนาดโต๊ะ); npm test 110 files / 1,294 tests, lint 0 error, typecheck, validate_harness, boundary scan ผ่าน"
+    },
+    {
+      "id": "feat-162",
+      "name": "เดินลื่น ความเร็วคงที่ และแอนิเมชันตัวละคร 3D เป็นธรรมชาติ",
+      "status": "done",
+      "dependencies": ["feat-156", "feat-159"],
+      "role": "frontend",
+      "summary": "แก้อาการเดินเร็ว-ช้าไม่สม่ำเสมอ กระตุกทุก TICK วาร์ปตอนลุกจากโต๊ะ ตัดท่าทันที นั่งนิ่งเป็นรูปปั้น เดินหักมุม/เฉียดโต๊ะ ฉากนิ่งนาน และก้อนความคิดซ้อน/เล็ก ตามวิดีโอผู้ใช้ 2026-11-01",
+      "sprint": 5,
+      "evidence": "harness/evidence/feat-162/summary.md · วัดตำแหน่งที่วาดจริงทุกเฟรม 45 วิที่ 30× (SwiftShader, next dev): ความแปรปรวนความเร็วขณะเดิน 0.18–0.22 → 0.15–0.16, ขยับมากสุดในเฟรมเดียว 5.7–6.1 ม. (วาร์ปไปเก้าอี้ตั้งแต่ยังเดินอยู่) → 0.47 ม.; unit 1,397+ tests, typecheck, lint ผ่าน; e2e/restaurant-animation-smoothness.spec.ts ผ่าน · ยังต้องดูด้วยตาบนเครื่องที่มี GPU"
     }
   ]
 }

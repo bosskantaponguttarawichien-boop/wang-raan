@@ -45,7 +45,9 @@ import type { CustomerRig } from "./customer-actions/contracts";
 import type { ChairRig as SeatingChairRig } from "./seating/contracts";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { simulationStore } from "@/store/use-simulation-store";
-import { OUTSIDE_DISTANCE, doorFrame } from "@/components/simulation/walk-pacer";
+import { OUTSIDE_DISTANCE, VISUAL_WALK_SPEED, doorFrame } from "@/components/simulation/walk-pacer";
+import { FrameInterpolator, followTarget, type InterpolatedPositions } from "@/components/simulation/motion/frame-interpolator";
+import { applySeatedIdle } from "./runtime/seated-idle";
 import { nextSeatReachShift } from "./customer-actions/customer-action-controller";
 
 export interface ThreeViewProps {
@@ -481,7 +483,12 @@ function createRoom(group: THREE.Group, layout: StoreLayout, assets: SceneAssets
     }
     group.add(...parts);
   };
-  if (entrance) addDoor(entrance, false);
+  if (entrance) {
+    addDoor(entrance, false);
+    // ผนังด้านใกล้กล้องถูกซ่อน วงกบทางเข้าจึงหายไปด้วย ลูกค้าดูเหมือนเดินออกมาจากที่ว่าง —
+    // ธรณีเข้มบนพื้น + พื้นทางเดินนอกร้านไม่จางตามผนัง จึงเห็นตำแหน่งทางเข้าเสมอ
+    group.add(createEntranceMarker(layout, entrance, assets));
+  }
   if (kitchenDoor) addDoor(kitchenDoor, true);
   return materials;
 }
@@ -546,6 +553,26 @@ function createDoorBase(
   );
   placeDoorOnWall(door, layout, doorInfo, a, b);
   return door;
+}
+
+/** ระยะพื้นทางเดินนอกร้านหน้าทางเข้า (ม.) — คลุมแถวรอโต๊ะนอกประตู */
+const ENTRANCE_APRON_DEPTH = 1.2;
+
+/** ธรณีทางเข้าและพื้นทางเดินนอกร้าน — ไม่ผูกกับ opacity ของผนัง (มองเห็นแม้ผนังด้านนั้นถูกซ่อน) */
+function createEntranceMarker(layout: StoreLayout, doorInfo: WallDoor, assets: SceneAssets) {
+  const { a, b, width } = doorSize(layout, doorInfo);
+  const sill = assets.material("entrance-sill", { color: DOOR_COLORS.entrance.frame, roughness: 0.6 });
+  const apron = assets.material("entrance-apron", { color: "#d9dee7", roughness: 0.95 });
+  const frameD = WALL_THICKNESS + 0.02;
+  const flat = { cast: false, receive: true };
+  const marker = new THREE.Group();
+  marker.add(
+    placeMesh(assets.box(width, 0.014, frameD), sill, width / 2, 0.007, 0, flat),
+    // แกน z ท้องถิ่นชี้เข้าในห้อง → ค่าลบ = นอกร้าน
+    placeMesh(assets.box(width + 0.4, 0.01, ENTRANCE_APRON_DEPTH), apron, width / 2, 0.005, -(frameD / 2 + ENTRANCE_APRON_DEPTH / 2), flat),
+  );
+  placeDoorOnWall(marker, layout, doorInfo, a, b);
+  return marker;
 }
 
 /** วงกบและบานประตูใช้ opacity ของผนังด้านเดียวกัน จึงไม่ซ้อนหลายชุดระหว่างหมุน */
@@ -1163,6 +1190,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
 
     const clock = new THREE.Clock(false);
     const frameClock = new FrameClock();
+    /** ตำแหน่งเดินที่เฉลี่ยระหว่าง TICK (ความเร็วคงที่ ไม่พุ่ง-หยุดตามจังหวะ TICK) */
+    const interpolator = new FrameInterpolator();
+    let sampled: InterpolatedPositions | null = null;
+    /** เพดานความเร็วที่ตัวละครเลื่อนตามเป้าบนจอ (ม./วินาที) — ตั้งทุกเฟรมจากความเร็วเดินจริง */
+    let followSpeed = VISUAL_WALK_SPEED * 1.6;
+    /** นาฬิกาท่านั่งรอ (เดินเฉพาะตอนเล่นอยู่) */
+    let idleClock = 0;
+    const seatPoint = new THREE.Vector3();
     // วัสดุของตัวแทนเงาทุกตัว (ดู attachShadowProxy) — ไม่ถูกวาดในรอบภาพเพราะ drawRange เป็น 0
     const shadowProxyMaterial = new THREE.MeshBasicMaterial({ name: "ShadowProxyMaterial" });
     const thoughtOverlay = overlayRef.current ? createThoughtOverlayManager(overlayRef.current) : null;
@@ -1382,7 +1417,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       }
       const layout = stageRef.current?.layout;
       const spots = layout ? staffSpots(layout) : [];
-      const { staff: frame } = current;
+      const frame = sampled?.staff ?? current.staff;
       const count = frame.length / STAFF_STRIDE;
       if (staff.length !== count || staff.some((member) => !member.target)) {
         removeStaff();
@@ -1408,7 +1443,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const target = member.target!;
         const dx = x - target.x;
         const dz = z - target.z;
-        if (dx * dx + dz * dz > 0.0001) member.targetRotation = Math.atan2(dx, dz);
+        // ตำแหน่งเฉลี่ยทุกเฟรมขยับทีละน้อย จึงใช้เกณฑ์ ~1 มม. (เดิม 1 ซม. ต่อ TICK)
+        if (dx * dx + dz * dz > 1e-6) member.targetRotation = Math.atan2(dx, dz);
         else if (code === STAFF_STATE_CODE["taking-order"] || code === STAFF_STATE_CODE.cleaning) {
           // ยืนทำงานที่โต๊ะ: หันหน้าเข้าโต๊ะที่ใกล้ที่สุด
           const table = tables.reduce<(typeof tables)[number] | null>((best, t) => {
@@ -1435,7 +1471,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const current = controller.current;
       if (!customerAsset.template || !current) return;
       const liveIds = new Set<number>();
-      const { agents } = current;
+      const agents = sampled?.agents ?? current.agents;
       const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
       const door = stageRef.current?.layout ? doorFrame(stageRef.current.layout) : null;
       for (let offset = 0; offset < agents.length; offset += AGENT_STRIDE) {
@@ -1489,7 +1525,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         }
         const dx = targetX - customer.target.x;
         const dz = targetZ - customer.target.z;
-        if (dx * dx + dz * dz > 0.0001) customer.targetRotation = Math.atan2(dx, dz);
+        if (dx * dx + dz * dz > 1e-6) customer.targetRotation = Math.atan2(dx, dz);
         if (seatedChair) customer.targetRotation = THREE.MathUtils.degToRad(180 - seatedChair.rotation);
         if (state === AGENT_STATE_WAITING_ENTRANCE && door) {
           // ยืนต่อแถวนอกร้าน: หันหน้าเข้าประตูเสมอ (ไม่ใช่ทิศที่เดินมาล่าสุด)
@@ -1569,18 +1605,23 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       for (const member of staff) {
         if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
         if (!member.target) continue;
-        member.model.position.lerp(member.target, blend);
+        if (blend > 0) followTarget(member.model.position, member.target, delta, followSpeed);
         turnTowards(member.model, member.targetRotation);
       }
       const seats = new Map((features.seating?.getBodyPlacements() ?? []).map((seat) => [seat.renderAgentId, seat]));
       const eating = new Map((features.customerActions?.getReports() ?? []).map((report) => [report.renderAgentId, report]));
+      const seatPhases = new Map((features.seating?.getReports() ?? []).map((report) => [report.renderAgentId, report.phase]));
       for (const [id, customer] of customers) {
         if (body && customer.body && customer.body.geometry !== body) customer.body.geometry = body;
         const seat = seats.get(id);
         const rig = seat ? chairRigs.get(seat.chairId) : undefined;
-        if (!seat || !rig) {
+        // engine จองเก้าอี้ให้ตั้งแต่ลูกค้ายังเดินอยู่ (phase approach) — เดิมตัวถูกวางที่เก้าอี้ทันที = วาร์ปข้ามร้าน
+        // ใช้ตำแหน่งเก้าอี้เฉพาะช่วงดึงเก้าอี้/นั่ง/ลุกจริง ช่วงเดินมา/เดินออกให้เดินตามทาง
+        const phase = seatPhases.get(id);
+        const atChair = phase !== undefined && phase !== "approach" && phase !== "depart";
+        if (!seat || !rig || !atChair) {
           seatReachShifts.delete(id);
-          customer.model.position.lerp(customer.target, blend);
+          if (blend > 0) followTarget(customer.model.position, customer.target, delta, followSpeed);
           turnTowards(customer.model, customer.targetRotation);
           continue;
         }
@@ -1591,7 +1632,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
           : 0;
         seatReachShifts.set(id, reach);
         const along = seat.outwardOffset - (seat.seated ? SEATED_FRONT_OFFSET : 0) - reach;
-        customer.model.position.copy(rig.home).addScaledVector(rig.out, along);
+        // เข้าที่เก้าอี้ด้วยความเร็วจำกัด (ไม่กระโดดจากจุดที่เดินมาถึง) แล้วตามเก้าอี้พอดีระหว่างนั่ง
+        seatPoint.copy(rig.home).addScaledVector(rig.out, along);
+        followTarget(customer.model.position, seatPoint, delta, followSpeed);
+        customer.model.position.y = seatPoint.y;
         turnTowards(customer.model, Math.atan2(seat.facing.x, seat.facing.y));
       }
     };
@@ -1664,6 +1708,15 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const cameraAnimating = stage.updateCamera(now);
       const roomAnimating = stage.updateRoomTransition(now);
       const modernFrame = simulating && controller.current?.presentation !== undefined;
+      if (simulating && controller.current) {
+        interpolator.push(controller.current);
+        sampled = interpolator.sample(now, running);
+      } else {
+        interpolator.reset();
+        sampled = null;
+      }
+      // ตามทันตำแหน่งเฉลี่ยได้เสมอ (1.6 เท่าของความเร็วเดิน) แต่ไม่พุ่งเมื่อเป้าหมายกระโดด เช่นตอนลุกจากเก้าอี้
+      followSpeed = VISUAL_WALK_SPEED * Math.max(1, controller.current?.timing?.motionRate ?? 1) * 1.6;
       if (simulating) {
         syncCustomers(modernFrame);
         syncSimStaff(modernFrame);
@@ -1697,6 +1750,15 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         runtime.update(frameInput);
         for (const member of staff) member.mixer.update(animationDelta);
         for (const customer of customers.values()) customer.mixer.update(animationDelta);
+        // นั่งรอ (ไม่ได้กิน) ไม่ค้างเป็นรูปนิ่ง: หายใจและหันมองเบา ๆ ซ้อนบนท่า Sit
+        idleClock += animationDelta;
+        if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches !== true) {
+          for (const report of features.customerActions?.getReports() ?? []) {
+            if (!report.seated || report.eating || report.clip !== "Sit" || report.tier !== "base") continue;
+            const customer = customers.get(report.renderAgentId);
+            if (customer) applySeatedIdle(customer.model, idleClock, report.renderAgentId);
+          }
+        }
         renderer.render(scene, camera);
         const showThoughts = simulationStore.getState().showThoughts;
         thoughtOverlay?.update(presentation, camera, renderer, customers, staff, showThoughts, pausedRef.current);
@@ -1716,7 +1778,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         }
         const beforeX = member.model.position.x;
         const beforeZ = member.model.position.z;
-        member.model.position.lerp(member.target, blend);
+        followTarget(member.model.position, member.target, delta, followSpeed);
         const distance = Math.hypot(member.model.position.x - beforeX, member.model.position.z - beforeZ);
         const turn = member.targetRotation - member.model.rotation.y;
         member.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
@@ -1744,7 +1806,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         }
         const beforeX = customer.model.position.x;
         const beforeZ = customer.model.position.z;
-        if (simulating) customer.model.position.lerp(customer.target, blend);
+        if (simulating) followTarget(customer.model.position, customer.target, delta, followSpeed);
         const distance = Math.hypot(customer.model.position.x - beforeX, customer.model.position.z - beforeZ);
         const turn = customer.targetRotation - customer.model.rotation.y;
         customer.model.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, delta * 8);
@@ -1992,6 +2054,10 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       },
       renderer: () => readRendererCounters(renderer.info),
       frame: () => frameInfo,
+      characters: () => ({
+        customers: [...customers].map(([id, customer]) => [id, customer.model.position.x, customer.model.position.z, customer.model.rotation.y]),
+        staff: staff.map((member, index) => [member.staffId ?? index, member.model.position.x, member.model.position.z, member.model.rotation.y]),
+      }),
       quality: () => {
         let visibleShadowProxies = 0;
         scene.traverse((object) => {

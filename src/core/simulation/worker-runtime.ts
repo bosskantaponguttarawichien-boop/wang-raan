@@ -252,7 +252,9 @@ export class SimulationWorkerRuntime {
     const staff = this.simulation.staffBuffer();
     const sequence = ++this.sequence;
     const presentation = this.simulation.presentationSnapshot({ runId: this.runId, layoutRevision: this.synced!.revision, sequence });
-    const tick: TickMessage = { type: "TICK", runId: this.runId, sequence, presentation, agents, paths, staff, metrics: this.simulation.getMetrics() };
+    const tick: TickMessage = {
+      type: "TICK", runId: this.runId, sequence, presentation, agents, paths, staff, metrics: this.simulation.getMetrics(), speed: this.speed,
+    };
     if (finished) tick.finished = true;
     const transfer: ArrayBuffer[] = [agents.buffer as ArrayBuffer, paths.buffer as ArrayBuffer, staff.buffer as ArrayBuffer];
     if (this.ticks++ % HEATMAP_EVERY === 0 || finished) {

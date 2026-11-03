@@ -132,6 +132,44 @@ export function createSeatingFeature(options: SeatingOptions) {
       const rigs = new Map(options.chairs.listChairs().filter(rig => !rig.removed).map(rig => [rig.chairId, rig]));
       const live = new Set<number>();
 
+      /** เดินลำดับนั่ง/ลุกของคนหนึ่งคนไปหนึ่งเฟรม แล้ววางเก้าอี้/ตัว/ท่าตามนั้น */
+      const stepOccupant = (occupant: Occupant, indexed: IndexedChair, intent: SeatIntent) => {
+        const chairId = occupant.chairId;
+        const sequenceOptions = { effectivePull: indexed.space.effectivePull, usesChairClips: indexed.space.usesChairClips };
+        // Reduced motion: jump through the travel so the end state is reached without sliding.
+        const step = reducedMotion ? Number.POSITIVE_INFINITY : deltaSeconds;
+        occupant.sequence = Number.isFinite(step)
+          ? advanceSeatSequence(occupant.sequence, step, intent, sequenceOptions)
+          : advanceSeatSequence(occupant.sequence, 1e6, intent, sequenceOptions);
+        const state = describeSeatSequence(occupant.sequence, sequenceOptions);
+        occupant.sequence = state;
+
+        const rig = rigs.get(chairId);
+        if (rig) applyChairPull(rig, state.chairPull);
+
+        const point: Point = offsetAlongOutward(indexed.axes, state.outwardOffset);
+        poses.set(occupant.renderAgentId, {
+          renderAgentId: occupant.renderAgentId,
+          phase: state.phase,
+          clipPhase: state.clipPhase,
+          outwardOffset: state.outwardOffset,
+          usesChairClips: state.usesChairClips,
+        });
+        placements.push({
+          renderAgentId: occupant.renderAgentId, chairId, point,
+          outwardOffset: state.outwardOffset, facing: indexed.axes.facing,
+          seated: !state.bodyClear,
+        });
+        reports.push({
+          renderAgentId: occupant.renderAgentId, chairId, tableId: indexed.axes.tableId,
+          phase: state.phase, clipPhase: state.clipPhase, chairPull: state.chairPull,
+          outwardOffset: state.outwardOffset, effectivePull: indexed.space.effectivePull,
+          usesChairClips: state.usesChairClips, handOnBackrest: state.handOnBackrest,
+          bodyClear: state.bodyClear, blockedBy: indexed.space.blockedBy,
+        });
+        return state;
+      };
+
       for (const customer of snapshot.customers) {
         const chairId = customer.chairId;
         if (!chairId) continue;
@@ -153,43 +191,19 @@ export function createSeatingFeature(options: SeatingOptions) {
         claims.set(chairId, customer.renderAgentId);
         returning.delete(chairId);
         live.add(customer.renderAgentId);
-
-        const sequenceOptions = { effectivePull: indexed.space.effectivePull, usesChairClips: indexed.space.usesChairClips };
-        const intent = intentOf(customer.seatingPhase, customer.activity);
-        // Reduced motion: jump through the travel so the end state is reached without sliding.
-        const step = reducedMotion ? Number.POSITIVE_INFINITY : deltaSeconds;
-        occupant.sequence = Number.isFinite(step)
-          ? advanceSeatSequence(occupant.sequence, step, intent, sequenceOptions)
-          : advanceSeatSequence(occupant.sequence, 1e6, intent, sequenceOptions);
-        const state = describeSeatSequence(occupant.sequence, sequenceOptions);
-        occupant.sequence = state;
-
-        const rig = rigs.get(chairId);
-        if (rig) applyChairPull(rig, state.chairPull);
-
-        const point: Point = offsetAlongOutward(indexed.axes, state.outwardOffset);
-        poses.set(customer.renderAgentId, {
-          renderAgentId: customer.renderAgentId,
-          phase: state.phase,
-          clipPhase: state.clipPhase,
-          outwardOffset: state.outwardOffset,
-          usesChairClips: state.usesChairClips,
-        });
-        placements.push({
-          renderAgentId: customer.renderAgentId, chairId, point,
-          outwardOffset: state.outwardOffset, facing: indexed.axes.facing,
-          seated: !state.bodyClear,
-        });
-        reports.push({
-          renderAgentId: customer.renderAgentId, chairId, tableId: indexed.axes.tableId,
-          phase: state.phase, clipPhase: state.clipPhase, chairPull: state.chairPull,
-          outwardOffset: state.outwardOffset, effectivePull: indexed.space.effectivePull,
-          usesChairClips: state.usesChairClips, handOnBackrest: state.handOnBackrest,
-          bodyClear: state.bodyClear, blockedBy: indexed.space.blockedBy,
-        });
+        stepOccupant(occupant, indexed, intentOf(customer.seatingPhase, customer.activity));
       }
 
-      for (const occupant of [...occupants.values()]) if (!live.has(occupant.renderAgentId)) releaseOccupant(occupant);
+      // ลูกค้าที่หลุดจาก snapshot (engine ให้ออกจากร้านแล้ว) แต่บนจอยังนั่งอยู่: เล่นท่าดันเก้าอี้-ลุกให้จบที่เก้าอี้ก่อน
+      // แล้วค่อยปล่อย — เดิมปล่อยทันที ตัวละครจึงหลุดจากเก้าอี้แล้วพุ่งตามทางเดินไปหลายเมตร (ดูเหมือนวาร์ป)
+      for (const occupant of [...occupants.values()]) {
+        if (live.has(occupant.renderAgentId)) continue;
+        const indexed = chairs.get(occupant.chairId);
+        const seatedNow = occupant.sequence.phase !== "approach" && occupant.sequence.phase !== "depart";
+        if (!indexed || !seatedNow || reducedMotion) { releaseOccupant(occupant); continue; }
+        const state = stepOccupant(occupant, indexed, "leave");
+        if (state.bodyClear) releaseOccupant(occupant);
+      }
 
       for (const [chairId, entry] of [...returning]) {
         const rig = rigs.get(chairId);

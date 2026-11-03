@@ -148,3 +148,19 @@ describe("WalkPacer — นอกร้าน (ประตูผนังทิ
     expect(maxY).toBeGreaterThan(depth + OUTSIDE_DISTANCE - 0.2);
   });
 });
+
+describe("WalkPacer — ลุกจากโต๊ะก่อนเดิน", () => {
+  it("รอท่าลุกบนจอให้จบก่อนออกเดิน และคงสถานะนั่งระหว่างนั้น", async () => {
+    const { RISE_SECONDS } = await import("./walk-pacer");
+    const pacer = new WalkPacer();
+    pacer.setMotionRate(1);
+    pacer.update(new Float32Array([5, 1, 1, 4]), undefined, 0, 1);
+    // engine ให้ลุกเดินออก: ทางเดิน 2 ม.
+    let out = pacer.update(new Float32Array([5, 3, 1, 5]), new Float32Array([5, 2, 1, 1, 3, 1]), 0.5, 1);
+    expect(out[1]).toBeCloseTo(1, 6);
+    expect(out[3]).toBe(4);
+    out = pacer.update(new Float32Array([5, 3, 1, 5]), undefined, RISE_SECONDS - 0.5 + 0.5, 1);
+    expect(out[1]).toBeCloseTo(1.5, 6);
+    expect(out[3]).toBe(5);
+  });
+});
