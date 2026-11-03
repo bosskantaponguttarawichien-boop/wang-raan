@@ -12,6 +12,7 @@ import type { Meters, Point, Rect, StoreLayout } from "../layout/types";
 import { staffSpots } from "../preview/staff-spots";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
+import { createPathRefiner, smoothPath, type PathRefiner } from "./path-smoothing";
 import type { StaffActivity } from "./presentation-contract";
 
 /** รหัสสถานะพนักงานใน buffer ที่ส่งข้าม thread */
@@ -89,10 +90,12 @@ export class StaffVisuals {
   private readonly homeFields = new Map<number, FlowField>();
   private readonly tableRects = new Map<string, Rect>();
   private readonly room: { width: Meters; depth: Meters };
+  private readonly refiner: PathRefiner;
 
   constructor(layout: StoreLayout, workers: number) {
     this.room = { width: layout.width, depth: layout.depth };
     this.grid = buildOccupancyGrid(layout, undefined, { blockStaffSpots: false });
+    this.refiner = createPathRefiner(this.grid);
     this.kitchenField = computeFlowField(this.grid, this.grid.kitchenCells);
     for (const o of layout.objects) if (o.type === "table") this.tableRects.set(o.id, footprint(o));
     this.homes = this.placeHomes(layout, workers);
@@ -218,6 +221,8 @@ export class StaffVisuals {
       ];
       work = still(0, kind === "clean" ? STAFF_STATE_CODE.cleaning : STAFF_STATE_CODE["taking-order"], at);
     }
+    // ทางเดินบนจอ: ตัดมุมซิกแซกของกริดและเว้นระยะจากโต๊ะ — เวลางานรวมยังเท่าเดิม (แบ่งตามความยาวใหม่)
+    legs = legs.map((leg) => ({ ...leg, points: smoothPath(leg.points, this.refiner) }));
     const lengths = legs.map((leg) => polylineLength(leg.points));
     const distance = lengths.reduce((a, b) => a + b, 0);
     // Use distance/time, not an arbitrary fraction of the entire service task.

@@ -122,7 +122,10 @@ describe("staff-actions feature", () => {
     rig.model.position.set(0.02, 0, 0);
     feature.update(frameOf(snapshot([member], 1.1, 1)));
     expect(feature.getReports()[0]?.clip).toBe("CarryWalk");
+    // หยุดแล้ว: ความเร็วเฉลี่ยลดลงใต้เกณฑ์หยุดเดินภายในไม่กี่เฟรม (ไม่สลับท่าทันทีจากเฟรมเดียว)
     feature.update(frameOf(snapshot([member], 1.2, 2)));
+    expect(feature.getReports()[0]?.clip).toBe("CarryWalk");
+    for (let index = 3; index < 40; index += 1) feature.update(frameOf(snapshot([member], 1.2 + index * 0.01, index)));
     expect(feature.getReports()[0]?.clip).toBe("CarryIdle");
   });
 
@@ -273,10 +276,13 @@ describe("staff-actions feature", () => {
     rig.model.position.set(0.02, 0, 0);
     freshListFeature.update(frameOf(snapshot([walking], 1.02, 1)));
     expect(freshListFeature.getReports()[0]).toMatchObject({ clip: "Walk", tier: "walk" });
-    expect(preStartedWork.isRunning()).toBe(false);
+    // ท่าเดิมค่อย ๆ จางออก (crossfade) แล้วหยุดเองเมื่อจางหมด — ไม่ตัดท่าทันที
+    expect(preStartedWork.isRunning()).toBe(true);
 
     const walkAction = rig.mixer.clipAction(rig.clips.find(clip => clip.name === "Walk")!);
     rig.mixer.update(0.1);
+    rig.mixer.update(0.1);
+    expect(preStartedWork.isRunning()).toBe(false);
     const timeAfterFirstStep = walkAction.time;
     expect(timeAfterFirstStep).toBeGreaterThan(0);
 

@@ -425,8 +425,7 @@ describe("customer-actions feature", () => {
     expect(walk.isRunning()).toBe(true);
     expect(walk.time).toBeGreaterThan(0);
     // หยุดเดินที่นอกร้าน = ยืนพัก ไม่ใช่ท่า rest pose
-    feature.update(frameOf(snapshot([], [], 10.2, 9)));
-    feature.update(frameOf(snapshot([], [], 10.22, 10)));
+    for (let index = 9; index < 40; index += 1) feature.update(frameOf(snapshot([], [], 10 + index * 0.02, index)));
     expect(feature.getReports()[0]).toMatchObject({ clip: "Idle" });
   });
 

@@ -1,3 +1,6 @@
+/** Wall-clock gap between two ticks that still continues without a resync (seconds). */
+export const MAX_WALL_GAP_SECONDS = 2;
+
 /** Authoritative simulation seconds, independent of renderer FPS and TICK arrival jitter. */
 export class PlaybackClock {
   private simulationTime: number | null = null;
@@ -14,6 +17,9 @@ export class PlaybackClock {
     this.simulationTime = simulationTime; this.wallTime = nowMs;
     // Explicit pause/resume or visibility handling owns resynchronisation. Never accelerate.
     const seconds = modern ? simulationDelta / rate : wallDelta;
-    return { seconds, gap: wallDelta > 0.5 || seconds > 0.5 };
+    // A main-thread stall (GC, model upload) delays delivery but the worker still stepped in small,
+    // bounded slices: the simulated delta stays honest, so only a long wall gap forces a resync.
+    // Resyncing on every half-second hitch teleported everyone on screen.
+    return { seconds, gap: seconds > 0.5 || wallDelta > MAX_WALL_GAP_SECONDS };
   }
 }

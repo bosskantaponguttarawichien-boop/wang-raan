@@ -12,6 +12,7 @@
  *   tray once feat-116 reports it on the target table, which is why the food never blinks out.
  */
 import * as THREE from "three";
+import { CLIP_FADE_SECONDS, createLocomotionState, measureLocomotion, type LocomotionState } from "../runtime/locomotion";
 import { objectCenter } from "@/core/layout";
 import type { StoreLayout } from "@/core/layout/types";
 import type { PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
@@ -66,9 +67,10 @@ interface RigState {
   trayVisibleBefore: boolean | null;
   lastPosition: THREE.Vector3 | null;
   groundSpeed: number;
+  /** ความเร็วเดินเฉลี่ยและสถานะเดิน/ยืนแบบสองเกณฑ์ */
+  locomotion: LocomotionState;
 }
 
-const ZERO_SPEED_FRAME = 1e-4;
 
 function clipOf(rig: StaffRig, name: string): THREE.AnimationClip | null {
   return rig.clips.find(clip => clip.name === name) ?? null;
@@ -153,7 +155,7 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
       state = {
         rig, actions: new Map(), active: null, activeName: null, cloth: null, plate: null,
         trayVisibleBefore: rig.tray ? rig.tray.visible : null,
-        lastPosition: null, groundSpeed: 0,
+        lastPosition: null, groundSpeed: 0, locomotion: createLocomotionState(),
       };
       states.set(rig.staffId, state);
       return state;
@@ -173,17 +175,18 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
       const action = actionFor(state, name);
       if (!action) return;
       if (state.activeName !== name) {
-        // Carry and walk share the lower body; a crossfade would make the arms fight, so swap.
-        if (!state.active) state.rig.mixer.stopAllAction();
-        else if (state.active !== action) state.active.stop();
+        // ผสมท่าเดิมเข้าท่าใหม่สั้น ๆ แทนการตัดทันที (เดิม stop แล้ว play ทำให้ท่ากระโดด เช่นเดิน ↔ ยืน ↔ ถือถาด)
+        const previous = state.active;
+        if (!previous) state.rig.mixer.stopAllAction();
         action.reset();
+        action.setEffectiveWeight(1);
         action.play();
+        if (previous && previous !== action) action.crossFadeFrom(previous, CLIP_FADE_SECONDS, false);
         state.active = action;
         state.activeName = name;
       }
       action.setLoop(decision.loop ? THREE.LoopRepeat : THREE.LoopOnce, decision.loop ? Infinity : 1);
       action.clampWhenFinished = !decision.loop;
-      action.setEffectiveWeight(1);
       action.setEffectiveTimeScale(decision.timeScale);
       action.enabled = true;
       if (decision.phase !== null) {
@@ -212,15 +215,8 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
 
     /** Ground speed of the drawn model, so CarryWalk/Walk never cycle while the rig stands still. */
     const measureSpeed = (state: RigState, deltaSeconds: number) => {
-      const position = state.rig.model.position;
-      if (!state.lastPosition) {
-        state.lastPosition = position.clone();
-        return 0;
-      }
-      const moved = Math.hypot(position.x - state.lastPosition.x, position.z - state.lastPosition.z);
-      state.lastPosition.copy(position);
-      if (deltaSeconds <= ZERO_SPEED_FRAME) return state.groundSpeed;
-      state.groundSpeed = moved / deltaSeconds;
+      const { position, rotation } = state.rig.model;
+      state.groundSpeed = measureLocomotion(state.locomotion, position.x, position.z, rotation.y, deltaSeconds);
       return state.groundSpeed;
     };
 

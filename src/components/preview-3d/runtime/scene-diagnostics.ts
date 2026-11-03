@@ -81,6 +81,8 @@ export interface SceneDiagnostics {
   renderer(): SceneRendererCounters | null;
   frame(): SceneFrameInfo;
   quality(): SceneQualityInfo;
+  /** ตำแหน่ง/ทิศที่วาดจริงของตัวละคร [id, x, z, yaw] — ใช้วัดความลื่นของการเดิน (optional เพื่อเข้ากับ hook เดิม) */
+  characters?(): { customers: readonly (readonly number[])[]; staff: readonly (readonly number[])[] };
 }
 
 type DiagnosticsScope = Record<string, unknown>;

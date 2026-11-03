@@ -21,8 +21,33 @@ export interface ThoughtOverlayManager {
   dispose(): void;
 }
 
+/** ขนาดก้อนความคิดที่ scale 1 (px) */
+const BUBBLE_WIDTH = 80;
+const BUBBLE_HEIGHT = 64;
+/** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
+const BUBBLE_GAP = 6;
+/** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
+const REFERENCE_PIXELS_PER_METER = 70;
+
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches === true;
+}
+
+const scaleA = new THREE.Vector3();
+const scaleB = new THREE.Vector3();
+/** ก้อนความคิดโตตามการซูม (เดิมคงที่ 80×64 px จึงเล็กมากบนจอใหญ่/ซูมเข้า) */
+function bubbleScale(camera: THREE.Camera, width: number, height: number) {
+  scaleA.set(0, 0, 0).project(camera);
+  scaleB.set(0, 1, 0).project(camera);
+  const pixels = Math.hypot((scaleB.x - scaleA.x) * width / 2, (scaleB.y - scaleA.y) * height / 2);
+  if (!Number.isFinite(pixels) || pixels <= 0) return 1;
+  // ไม่เล็กกว่าขนาดเดิม (80×64) — ขยายเฉพาะตอนซูมเข้า/จอใหญ่
+  return Math.min(1.75, Math.max(1, pixels / REFERENCE_PIXELS_PER_METER));
+}
+
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {
   const nodes = new Map<number, HTMLDivElement>();
+  const popAfterRender: { el: HTMLDivElement; bouncing: boolean }[] = [];
   const projVec = new THREE.Vector3();
   const viewport = new THREE.Vector2();
   // Keep the bubble DOM stable across animation frames.
@@ -48,6 +73,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
     const width = viewport.x || 800;
     const height = viewport.y || 600;
     const activeIds = new Set<number>();
+    /** ตำแหน่งปลายหางของก้อนความคิดแต่ละก้อนบนจอ — จัดไม่ให้ซ้อนกันก่อนเขียน transform */
+    const placements: { el: HTMLDivElement; x: number; y: number }[] = [];
 
     // 1. Process customer thoughts
     for (const customer of presentation.customers) {
@@ -106,10 +133,11 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
 
       el.style.display = "block";
       // Position tail circle (~70% x, 100% y) directly above customer's head
-      el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-65%, -100%)`;
+      placements.push({ el, x: screenX, y: screenY });
       const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity, bounceClass]);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
+        popAfterRender.push({ el, bouncing: bounceClass !== "" });
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
         el.innerHTML = `
@@ -165,10 +193,11 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
 
       const config = getEmoteConfig(member.thought);
       el.style.display = "block";
-      el.style.transform = `translate3d(${screenX}px, ${screenY}px, 0) translate(-65%, -100%)`;
+      placements.push({ el, x: screenX, y: screenY });
       const contentKey = JSON.stringify([config.label, config.emoji]);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
+        popAfterRender.push({ el, bouncing: false });
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
         el.innerHTML = `
@@ -186,7 +215,41 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
     }
 
-    // 3. Remove inactive nodes
+    // 3. ขนาดตามการซูม แล้วเลื่อนก้อนที่ซ้อนกันขึ้นไปทีละชั้น (ลูกค้าโต๊ะเดียวกันมักอยู่ชิดกัน)
+    const scale = bubbleScale(camera, width, height);
+    const boxWidth = BUBBLE_WIDTH * scale;
+    const boxHeight = BUBBLE_HEIGHT * scale;
+    placements.sort((a, b) => b.y - a.y);
+    const placed: { left: number; top: number }[] = [];
+    for (const placement of placements) {
+      let top = placement.y - boxHeight;
+      const left = placement.x - boxWidth * 0.65;
+      for (let guard = 0; guard < 8; guard++) {
+        const hit = placed.find(box => Math.abs(box.left - left) < boxWidth - BUBBLE_GAP && Math.abs(box.top - top) < boxHeight - BUBBLE_GAP);
+        if (!hit) break;
+        top = hit.top - boxHeight + BUBBLE_GAP;
+      }
+      placed.push({ left, top });
+      const lift = placement.y - boxHeight - top;
+      placement.el.style.transformOrigin = "65% 100%";
+      placement.el.style.zIndex = String(Math.round(placement.y));
+      placement.el.style.transform = `translate3d(${placement.x}px, ${placement.y - lift}px, 0) translate(-65%, -100%) scale(${scale.toFixed(3)})`;
+    }
+
+    // 4. ก้อนใหม่/เปลี่ยนสถานะเด้งเข้าเล็กน้อย ให้เห็นว่ามีอะไรเปลี่ยน (ไม่ทำตอนหยุดชั่วคราวหรือผู้ใช้ลดการเคลื่อนไหว)
+    if (!paused && !prefersReducedMotion()) {
+      for (const { el, bouncing } of popAfterRender) {
+        const inner = el.firstElementChild as HTMLElement | null;
+        if (!inner || bouncing || typeof inner.animate !== "function") continue;
+        inner.animate(
+          [{ transform: "scale(0.55)", opacity: 0 }, { transform: "scale(1.08)", opacity: 1, offset: 0.7 }, { transform: "scale(1)", opacity: 1 }],
+          { duration: 220, easing: "ease-out", transformOrigin: "65% 100%" } as KeyframeAnimationOptions,
+        );
+      }
+    }
+    popAfterRender.length = 0;
+
+    // 5. Remove inactive nodes
     for (const [id, el] of nodes) {
       if (!activeIds.has(id)) {
         el.remove();

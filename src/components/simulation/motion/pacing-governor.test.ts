@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  BACKLOG_LIMIT_SECONDS, MAX_CATCH_UP_MOTION_RATE, MIN_SPEED_FRACTION, PacingGovernor, VISUAL_MOTION_RATE, motionRate,
+  BACKLOG_LIMIT_SECONDS, MIN_SPEED_FRACTION, PacingGovernor, QUIET_DELAY_SECONDS, QUIET_SPEED_MULTIPLIER,
+  VISUAL_MOTION_RATE, motionRate,
 } from "./pacing-governor";
 
 /** เดินเวลา `seconds` วินาทีด้วยเฟรมละ 0.1 วินาทีที่ค้างหลังคงที่ */
@@ -21,7 +22,7 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
     expect(state).toEqual({ speed: 30, walkRate: VISUAL_MOTION_RATE });
   });
 
-  it("ค้างหลังนาน → ชะลอนาฬิกาค่อย ๆ ลงไม่ต่ำกว่าขั้นต่ำ แล้วค่อยเร่งท่าเดินไม่เกินเพดานไล่", () => {
+  it("ค้างหลังนาน → ชะลอนาฬิกาค่อย ๆ ลงไม่ต่ำกว่าขั้นต่ำ โดยความเร็วท่าเดินคงที่ตลอด", () => {
     const governor = new PacingGovernor();
     let previous = 30;
     for (let t = 0; t < 30; t += 0.1) {
@@ -29,12 +30,12 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
       // เปลี่ยนทีละน้อย ไม่กระโดด
       expect(Math.abs(speed - previous)).toBeLessThanOrEqual(30 * 0.4 * 0.1 + 1e-9);
       expect(speed).toBeGreaterThanOrEqual(30 * MIN_SPEED_FRACTION - 1e-9);
-      expect(walkRate).toBeLessThanOrEqual(MAX_CATCH_UP_MOTION_RATE + 1e-9);
+      expect(walkRate).toBe(VISUAL_MOTION_RATE);
       previous = speed;
     }
     const state = governor.state(30);
-    expect(state.speed).toBeCloseTo(20);
-    expect(state.walkRate).toBeCloseTo(MAX_CATCH_UP_MOTION_RATE);
+    expect(state.speed).toBeCloseTo(30 * MIN_SPEED_FRACTION);
+    expect(state.walkRate).toBe(VISUAL_MOTION_RATE);
   });
 
   it("ไล่ทันแล้ว → กลับไปความเร็วที่เลือกและท่าเดินปกติ", () => {
@@ -48,6 +49,19 @@ describe("PacingGovernor — เวลาย่อแบบเกม", () => {
     expect(run(governor, 30, 0, 5, 12).speed).toBeCloseTo(12);
     expect(run(governor, 30, 0, 5, 1).speed).toBeCloseTo(7.5);
     expect(run(governor, 30, 0, 30).speed).toBe(30);
+  });
+
+  it("ร้านเงียบต่อเนื่อง → เร่งนาฬิกาข้ามช่วงนิ่ง และกลับความเร็วที่เลือกทันทีเมื่อมีคนต้องเดิน", () => {
+    const governor = new PacingGovernor();
+    let state = governor.state(30);
+    for (let t = 0; t < QUIET_DELAY_SECONDS - 0.2; t += 0.1) state = governor.update(30, 0, 0.1, Number.POSITIVE_INFINITY, true);
+    expect(state.speed).toBe(30);
+    for (let t = 0; t < 10; t += 0.1) state = governor.update(30, 0, 0.1, Number.POSITIVE_INFINITY, true);
+    expect(state).toEqual({ speed: 30 * QUIET_SPEED_MULTIPLIER, walkRate: VISUAL_MOTION_RATE });
+    expect(governor.update(30, 0.5, 0.1, Number.POSITIVE_INFINITY, false)).toEqual({ speed: 30, walkRate: VISUAL_MOTION_RATE });
+    // งานที่โต๊ะยังรออยู่ = ไม่นับว่าเงียบ
+    for (let t = 0; t < 10; t += 0.1) state = governor.update(30, 0, 0.1, 40, true);
+    expect(state.speed).toBeLessThanOrEqual(30);
   });
 
   it("ความเร็วต่ำกว่าเพดานภาพไม่ถูกคุม", () => {

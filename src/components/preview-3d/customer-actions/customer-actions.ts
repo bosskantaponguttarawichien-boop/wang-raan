@@ -12,6 +12,7 @@
  *   the table, and so feat-122 learns how far the seated body still has to shift.
  */
 import * as THREE from "three";
+import { CLIP_FADE_SECONDS, createLocomotionState, measureLocomotion, type LocomotionState } from "../runtime/locomotion";
 import type { StoreLayout } from "@/core/layout/types";
 import type { CustomerPresentation, MealPresentation, PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
 import type { SceneFeature, SceneFeatureContext, SceneFrame } from "../runtime/contracts";
@@ -64,12 +65,13 @@ interface RigState {
   utensilKind: UtensilSpec["utensil"] | null;
   lastPosition: THREE.Vector3 | null;
   groundSpeed: number;
+  /** ความเร็วเดินเฉลี่ยและสถานะเดิน/ยืนแบบสองเกณฑ์ */
+  locomotion: LocomotionState;
   /** ผิวตัวที่มี morph "EatGrip" — หาไว้ครั้งเดียวต่อ rig ไม่ไล่ชื่อทุกเฟรม */
   gripBody?: THREE.SkinnedMesh | null;
   gripIndex?: number;
 }
 
-const ZERO_SPEED_FRAME = 1e-4;
 
 /**
  * ลูกค้าที่ Engine ลบออกไปแล้ว (จ่ายเงินแล้วออก/ยกเลิก) แต่ภาพยังเดินออกจากร้านอยู่ — walk-pacer เก็บตัวไว้ให้เดิน
@@ -77,9 +79,10 @@ const ZERO_SPEED_FRAME = 1e-4;
  * เดิมไม่มีการตัดสินใจท่าให้ตัวนี้ คลิปทั้งหมดถูกหยุด โมเดลจึงไถลไปในท่ายืนตรง (rest pose) ขาไม่ก้าว
  * ตอนนี้ให้เดิน/ยืนตามความเร็วจริงบนจอเหมือนลูกค้าที่ยังไม่มีเก้าอี้
  */
-function walkingOut(renderAgentId: number): CustomerPresentation {
+function walkingOut(renderAgentId: number, last?: CustomerPresentation): CustomerPresentation {
   return {
-    renderAgentId, partyId: -1, memberIndex: 0, tableId: null, chairId: null, serviceCycleId: null,
+    renderAgentId, partyId: last?.partyId ?? -1, memberIndex: last?.memberIndex ?? 0,
+    tableId: last?.tableId ?? null, chairId: last?.chairId ?? null, serviceCycleId: null,
     activity: "leaving", seatingPhase: "depart", walkMetersPerSecond: 0, mealId: null,
   };
 }
@@ -95,6 +98,8 @@ function markersOf(rig: CustomerRig): CustomerMarkerTable {
 export function createCustomerActionsFeature(options: CustomerActionsOptions) {
   return (context: SceneFeatureContext): CustomerActionsFeature => {
     const states = new Map<number, RigState>();
+    /** ข้อมูลล่าสุดของลูกค้าแต่ละคนตอนยังอยู่ใน snapshot — ใช้ตอนเล่นท่าลุกหลัง engine ให้ออกไปแล้ว */
+    const lastListed = new Map<number, CustomerPresentation>();
     const pushedPoses = new Map<number, CustomerSeatPose>();
     const reports: CustomerActionReport[] = [];
     const chairRotations = new Map<string, number>();
@@ -224,7 +229,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       if (existing) releaseRig(existing);
       const state: RigState = {
         rig, actions: new Map(), active: null, activeName: null,
-        utensil: null, utensilKind: null, lastPosition: null, groundSpeed: 0,
+        utensil: null, utensilKind: null, lastPosition: null, groundSpeed: 0, locomotion: createLocomotionState(),
       };
       states.set(rig.renderAgentId, state);
       return state;
@@ -244,17 +249,18 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
       const action = actionFor(state, name);
       if (!action) return;
       if (state.activeName !== name) {
-        // Eat and the seating clips each own the hips and legs; blending them would fight.
-        if (!state.active) state.rig.mixer.stopAllAction();
-        else if (state.active !== action) state.active.stop();
+        // ผสมท่าเดิมเข้าท่าใหม่สั้น ๆ แทนการตัดทันที (เดิม stop แล้ว play ทำให้ท่ากระโดด เช่นเดิน ↔ ยืน ↔ ถือถาด)
+        const previous = state.active;
+        if (!previous) state.rig.mixer.stopAllAction();
         action.reset();
+        action.setEffectiveWeight(1);
         action.play();
+        if (previous && previous !== action) action.crossFadeFrom(previous, CLIP_FADE_SECONDS, false);
         state.active = action;
         state.activeName = name;
       }
       action.setLoop(decision.loop ? THREE.LoopRepeat : THREE.LoopOnce, decision.loop ? Infinity : 1);
       action.clampWhenFinished = !decision.loop;
-      action.setEffectiveWeight(1);
       action.setEffectiveTimeScale(decision.timeScale);
       action.enabled = true;
       if (decision.phase !== null) {
@@ -286,15 +292,8 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
     };
 
     const measureSpeed = (state: RigState, deltaSeconds: number) => {
-      const position = state.rig.model.position;
-      if (!state.lastPosition) {
-        state.lastPosition = position.clone();
-        return 0;
-      }
-      const moved = Math.hypot(position.x - state.lastPosition.x, position.z - state.lastPosition.z);
-      state.lastPosition.copy(position);
-      if (deltaSeconds <= ZERO_SPEED_FRAME) return state.groundSpeed;
-      state.groundSpeed = moved / deltaSeconds;
+      const { position, rotation } = state.rig.model;
+      state.groundSpeed = measureLocomotion(state.locomotion, position.x, position.z, rotation.y, deltaSeconds);
       return state.groundSpeed;
     };
 
@@ -349,7 +348,9 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         const listed = snapshot.customers.find(entry => entry.renderAgentId === rig.renderAgentId);
         // ยังวาดอยู่แต่ไม่อยู่ใน snapshot = กำลังเดินออกจากร้าน — ทิ้งท่านั่ง/กิน แล้วเดินตามความเร็วบนจอ
         if (!listed) pushedPoses.delete(rig.renderAgentId);
-        const customer = listed ?? walkingOut(rig.renderAgentId);
+        if (listed) lastListed.set(rig.renderAgentId, listed);
+        // ยังนั่งอยู่บนจอ (สาย seating กำลังเล่นท่าลุกให้จบ) → คงเก้าอี้เดิมไว้ให้เล่นท่าดันเก้าอี้/ลุก ไม่ใช่ไถลในท่าเดิน
+        const customer = listed ?? walkingOut(rig.renderAgentId, lastListed.get(rig.renderAgentId));
         live.add(rig.renderAgentId);
         const state = stateFor(rig);
         const meal = customer.mealId ? meals.get(customer.mealId) ?? null : null;
@@ -402,6 +403,7 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         });
       }
       for (const renderAgentId of biteStarts.keys()) if (!live.has(renderAgentId)) biteStarts.delete(renderAgentId);
+      for (const renderAgentId of lastListed.keys()) if (!live.has(renderAgentId)) lastListed.delete(renderAgentId);
       for (const [renderAgentId, state] of states) if (!live.has(renderAgentId)) {
         releaseRig(state);
         states.delete(renderAgentId);

@@ -74,6 +74,11 @@ export interface TickMessage {
   /** พนักงานหน้าร้าน: index, x, y, STAFF_STATE_CODE (ดู STAFF_STRIDE) */
   staff?: Float32Array;
   metrics: SimulationMetrics;
+  /**
+   * ตัวคูณเวลาที่ Worker ใช้เดินเวลาใน tick นี้จริง (วินาทีจำลองต่อวินาทีจริง) — ฝั่งภาพใช้แปลงเวลาจำลอง
+   * กลับเป็นเวลาจริงได้ตรง แม้ SET_SPEED ที่เพิ่งสั่งยังไปไม่ถึง Worker (ไม่ระบุ = Worker รุ่นเก่า)
+   */
+  speed?: number;
   /** ส่งเป็นระยะ (ไม่ใช่ทุก tick) เพื่อลดปริมาณข้อมูล */
   heatmap?: Float32Array;
   heatmapMax?: number;
