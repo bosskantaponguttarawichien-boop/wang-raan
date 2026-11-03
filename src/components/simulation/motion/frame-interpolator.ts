@@ -134,3 +134,58 @@ export function followTarget(
   position.z += (dz / distance) * step;
   return step;
 }
+
+/**
+ * ไล่ตามเป้าหมายตามทางที่เป้าหมายเดินผ่านมา (ไม่ใช่เส้นตรง) — เมื่อภาพตามหลัง เช่นเพิ่งลุกจากเก้าอี้
+ * หรือเครื่องค้าง การไล่เป็นเส้นตรงจะตัดมุมทะลุเคาน์เตอร์/โต๊ะ จึงเก็บจุดที่เป้าหมายผ่านไว้แล้วเดินตามทีละจุด
+ */
+export class TrailFollower {
+  private readonly trail: { x: number; z: number }[] = [];
+
+  /** ล้างทาง (เช่นตอนตัวละครถูกวางที่เก้าอี้) */
+  reset() {
+    this.trail.length = 0;
+  }
+
+  /**
+   * @returns ระยะที่เลื่อนจริง
+   */
+  follow(
+    position: { x: number; z: number },
+    target: { x: number; z: number },
+    deltaSeconds: number,
+    maxSpeed: number,
+    snapDistance = 2.5,
+  ): number {
+    const last = this.trail[this.trail.length - 1];
+    if (!last || Math.hypot(target.x - last.x, target.z - last.z) > 0.01) this.trail.push({ x: target.x, z: target.z });
+    else { last.x = target.x; last.z = target.z; }
+    // ทางยาวผิดปกติ (ตั้งต้นภาพใหม่/วาร์ปตั้งใจ) → วางที่เป้าทันที
+    let remaining = 0;
+    let px = position.x, pz = position.z;
+    for (const point of this.trail) { remaining += Math.hypot(point.x - px, point.z - pz); px = point.x; pz = point.z; }
+    if (remaining > snapDistance * 2 || this.trail.length > 256 || Math.hypot(target.x - position.x, target.z - position.z) > snapDistance) {
+      position.x = target.x; position.z = target.z;
+      this.trail.length = 0;
+      this.trail.push({ x: target.x, z: target.z });
+      return remaining;
+    }
+    let budget = Math.max(0, maxSpeed) * Math.max(0, deltaSeconds);
+    let moved = 0;
+    while (budget > 1e-9 && this.trail.length > 0) {
+      const next = this.trail[0]!;
+      const dx = next.x - position.x, dz = next.z - position.z;
+      const distance = Math.hypot(dx, dz);
+      if (distance <= budget) {
+        position.x = next.x; position.z = next.z;
+        budget -= distance; moved += distance;
+        // จุดสุดท้าย (= เป้าหมายปัจจุบัน) เก็บไว้เป็นจุดอ้างอิงของเฟรมถัดไป
+        if (this.trail.length > 1) this.trail.shift(); else break;
+      } else {
+        position.x += (dx / distance) * budget; position.z += (dz / distance) * budget;
+        moved += budget; budget = 0;
+      }
+    }
+    return moved;
+  }
+}

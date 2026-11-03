@@ -26,7 +26,9 @@ const DOORSTEP = 0.3;
  * ใน preview-3d/seat-motion.ts) — ภาพลูกค้าที่ลุกจากโต๊ะรอเท่านี้ก่อนเริ่มเดิน ไม่งั้นจุดหมายบนจอเดินนำไป
  * หลายเมตรระหว่างที่ตัวยังนั่งอยู่ แล้วตัวละครพุ่งตามไปทันทีที่ลุกเสร็จ (ดูเหมือนวาร์ป)
  */
-export const RISE_SECONDS = 1.8;
+// +0.6 วินาทีเผื่อ: ภาพเริ่มท่าลุกช้ากว่า pacer เล็กน้อย (วาดย้อนหลัง ~1.5 TICK และรอ snapshot) — ถ้าจุดหมายออกเดินก่อน
+// ตัวละครที่เพิ่งลุกเสร็จต้องไล่ตามเป็นเส้นตรงตัดมุม
+export const RISE_SECONDS = 2.4;
 const SEATED = AGENT_STATE_CODE.seated;
 
 const LEAVING = AGENT_STATE_CODE.leaving;
@@ -102,6 +104,7 @@ export class WalkPacer {
   private door: DoorFrame | null = null;
   private overflow = false;
   private refiner: PathRefiner | null = null;
+  private router: ((from: Point, to: Point) => Point[]) | null = null;
   private motionRate = 1;
 
   get needsResync() { return this.overflow; }
@@ -109,6 +112,14 @@ export class WalkPacer {
   /** สิ่งกีดขวางของผังที่กำลังจำลอง — ใช้ทำทางเดินบนจอให้เรียบและไม่เฉียดโต๊ะ (null = เดินตามจุดเดิม) */
   setRefiner(refiner: PathRefiner | null) {
     this.refiner = refiner;
+  }
+
+  /**
+   * ตัวหาทางบนผัง — บางช่วง engine ย้ายตำแหน่งโดยไม่ส่งทางเดินมาด้วย (เช่นลุกจากโต๊ะไปจ่ายเงิน)
+   * เดินตรงระหว่างจุดจะทะลุเคาน์เตอร์/โต๊ะ จึงเติมทางเดินจริงเมื่อเส้นตรงไม่ว่าง
+   */
+  setRouter(router: ((from: Point, to: Point) => Point[]) | null) {
+    this.router = router;
   }
 
   /** ท่าทางเล่นเร็วกว่าคนจริงกี่เท่า — ใช้แปลงเวลาท่าลุกเป็นวินาทีจริง */
@@ -250,6 +261,18 @@ export class WalkPacer {
    * @param fixed จุดนี้ห้ามตัด/ขยับ (หน้าประตู นอกร้าน)
    */
   private push(walker: Walker, x: number, y: number, fixed = false) {
+    if (this.router && this.refiner && !fixed && !walker.outside) {
+      const n = walker.queue.length;
+      const from = n > 0 ? { x: walker.queue[n - 2]!, y: walker.queue[n - 1]! } : { x: walker.x, y: walker.y };
+      if (Math.hypot(x - from.x, y - from.y) > 0.5 && !this.refiner.segmentClear(from, { x, y })) {
+        const route = this.router(from, { x, y });
+        for (const point of route.slice(1, -1)) this.pushPoint(walker, point.x, point.y, false);
+      }
+    }
+    this.pushPoint(walker, x, y, fixed);
+  }
+
+  private pushPoint(walker: Walker, x: number, y: number, fixed: boolean) {
     this.refine(walker, x, y);
     const n = walker.queue.length;
     const lastX = n > 0 ? walker.queue[n - 2]! : walker.x;

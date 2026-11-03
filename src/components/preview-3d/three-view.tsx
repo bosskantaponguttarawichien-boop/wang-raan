@@ -46,7 +46,7 @@ import type { ChairRig as SeatingChairRig } from "./seating/contracts";
 import { getSimulationController } from "@/components/simulation/simulation-controller";
 import { simulationStore } from "@/store/use-simulation-store";
 import { OUTSIDE_DISTANCE, VISUAL_WALK_SPEED, doorFrame } from "@/components/simulation/walk-pacer";
-import { FrameInterpolator, followTarget, type InterpolatedPositions } from "@/components/simulation/motion/frame-interpolator";
+import { FrameInterpolator, TrailFollower, followTarget, type InterpolatedPositions } from "@/components/simulation/motion/frame-interpolator";
 import { applySeatedIdle, clearSeatedIdle } from "./runtime/seated-idle";
 import { nextSeatReachShift } from "./customer-actions/customer-action-controller";
 
@@ -1197,6 +1197,13 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     let followSpeed = VISUAL_WALK_SPEED * 1.6;
     /** นาฬิกาท่านั่งรอ (เดินเฉพาะตอนเล่นอยู่) */
     let idleClock = 0;
+    /** ทางที่ตัวละครแต่ละตัวไล่ตาม (key: object ของโมเดล) */
+    const trails = new WeakMap<THREE.Object3D, TrailFollower>();
+    const trailOf = (model: THREE.Object3D) => {
+      let trail = trails.get(model);
+      if (!trail) { trail = new TrailFollower(); trails.set(model, trail); }
+      return trail;
+    };
     const seatPoint = new THREE.Vector3();
     // วัสดุของตัวแทนเงาทุกตัว (ดู attachShadowProxy) — ไม่ถูกวาดในรอบภาพเพราะ drawRange เป็น 0
     const shadowProxyMaterial = new THREE.MeshBasicMaterial({ name: "ShadowProxyMaterial" });
@@ -1605,7 +1612,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       for (const member of staff) {
         if (staffBody && member.body && member.body.geometry !== staffBody) member.body.geometry = staffBody;
         if (!member.target) continue;
-        if (blend > 0) followTarget(member.model.position, member.target, delta, followSpeed);
+        if (blend > 0) trailOf(member.model).follow(member.model.position, member.target, delta, followSpeed);
         turnTowards(member.model, member.targetRotation);
       }
       const seats = new Map((features.seating?.getBodyPlacements() ?? []).map((seat) => [seat.renderAgentId, seat]));
@@ -1621,7 +1628,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const atChair = phase !== undefined && phase !== "approach" && phase !== "depart";
         if (!seat || !rig || !atChair) {
           seatReachShifts.delete(id);
-          if (blend > 0) followTarget(customer.model.position, customer.target, delta, followSpeed);
+          if (blend > 0) trailOf(customer.model).follow(customer.model.position, customer.target, delta, followSpeed);
           turnTowards(customer.model, customer.targetRotation);
           continue;
         }
@@ -1634,6 +1641,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const along = seat.outwardOffset - (seat.seated ? SEATED_FRONT_OFFSET : 0) - reach;
         // เข้าที่เก้าอี้ด้วยความเร็วจำกัด (ไม่กระโดดจากจุดที่เดินมาถึง) แล้วตามเก้าอี้พอดีระหว่างนั่ง
         seatPoint.copy(rig.home).addScaledVector(rig.out, along);
+        trailOf(customer.model).reset();
         followTarget(customer.model.position, seatPoint, delta, followSpeed);
         customer.model.position.y = seatPoint.y;
         turnTowards(customer.model, Math.atan2(seat.facing.x, seat.facing.y));

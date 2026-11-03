@@ -109,3 +109,75 @@ export function smoothPath(points: readonly Point[], refiner: PathRefiner): Poin
     return refiner.segmentClear(pulled[index - 1]!, moved) && refiner.segmentClear(moved, pulled[index + 1]!) ? moved : point;
   });
 }
+
+const DIAGONAL = Math.SQRT2;
+
+/**
+ * ทางเดินบนกริดจากจุด a ไป b (A* 8 ทิศ ไม่ตัดมุม) แล้วทำให้เรียบ — ใช้เติมทางระหว่างตำแหน่งที่ห่างกันมาก
+ * (ที่ 30× ตำแหน่งพนักงานจาก Worker ห่างกันราว 1.8 ม. ต่อ TICK ถ้าเดินตรงระหว่างจุดจะตัดมุมทะลุเคาน์เตอร์/โต๊ะ)
+ * คืน [] เมื่อไปไม่ถึงหรือจุดอยู่นอกกริด — ผู้เรียกเดินตรงตามเดิม
+ */
+export function findGridPath(grid: OccupancyGrid, refiner: PathRefiner, a: Point, b: Point, maxNodes = 4000): Point[] {
+  const s = grid.cellSize;
+  const cellOf = (p: Point) => {
+    const col = Math.floor(p.x / s), row = Math.floor(p.y / s);
+    return col >= 0 && row >= 0 && col < grid.cols && row < grid.rows ? row * grid.cols + col : -1;
+  };
+  const free = (cell: number) => cell >= 0 && grid.cells[cell] === CELL_FREE;
+  /** จุดที่อยู่ในช่องที่ถูกกัน (เช่นจุดยืนหลังเคาน์เตอร์ชิดของ) ใช้ช่องว่างที่ใกล้ที่สุดรอบ ๆ แทน */
+  const nearestFree = (p: Point) => {
+    const cell = cellOf(p);
+    if (cell < 0 || free(cell)) return cell;
+    const col0 = cell % grid.cols, row0 = (cell - col0) / grid.cols;
+    let best = -1, bestD = Number.POSITIVE_INFINITY;
+    for (let row = row0 - 2; row <= row0 + 2; row++) for (let col = col0 - 2; col <= col0 + 2; col++) {
+      if (col < 0 || row < 0 || col >= grid.cols || row >= grid.rows) continue;
+      const index = row * grid.cols + col;
+      if (!free(index)) continue;
+      const d = Math.hypot((col + 0.5) * s - p.x, (row + 0.5) * s - p.y);
+      if (d < bestD) { bestD = d; best = index; }
+    }
+    return best;
+  };
+  const start = nearestFree(a), goal = nearestFree(b);
+  if (start < 0 || goal < 0) return [];
+  const gc = goal % grid.cols, gr = (goal - gc) / grid.cols;
+  const h = (cell: number) => {
+    const c = cell % grid.cols, r = (cell - c) / grid.cols;
+    const dx = Math.abs(c - gc), dy = Math.abs(r - gr);
+    return Math.max(dx, dy) + (DIAGONAL - 1) * Math.min(dx, dy);
+  };
+  const g = new Map<number, number>([[start, 0]]);
+  const parent = new Map<number, number>();
+  const open: [number, number][] = [[h(start), start]];
+  const closed = new Set<number>();
+  while (open.length > 0 && closed.size < maxNodes) {
+    let bestIndex = 0;
+    for (let i = 1; i < open.length; i++) if (open[i]![0] < open[bestIndex]![0]) bestIndex = i;
+    const [, cell] = open.splice(bestIndex, 1)[0]!;
+    if (closed.has(cell)) continue;
+    if (cell === goal) break;
+    closed.add(cell);
+    const col = cell % grid.cols, row = (cell - col) / grid.cols;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dc && !dr) continue;
+      const nc = col + dc, nr = row + dr;
+      if (nc < 0 || nr < 0 || nc >= grid.cols || nr >= grid.rows) continue;
+      const next = nr * grid.cols + nc;
+      if (!free(next) || closed.has(next)) continue;
+      if (dc && dr && (!free(row * grid.cols + nc) || !free(nr * grid.cols + col))) continue;
+      const cost = g.get(cell)! + (dc && dr ? DIAGONAL : 1);
+      if (cost < (g.get(next) ?? Number.POSITIVE_INFINITY)) {
+        g.set(next, cost); parent.set(next, cell); open.push([cost + h(next), next]);
+      }
+    }
+  }
+  if (start !== goal && !parent.has(goal)) return [];
+  const cells = [goal];
+  while (cells[0] !== start) cells.unshift(parent.get(cells[0]!)!);
+  const centers = cells.map((cell) => {
+    const col = cell % grid.cols;
+    return { x: (col + 0.5) * s, y: ((cell - col) / grid.cols + 0.5) * s };
+  });
+  return smoothPath([a, ...centers, b], refiner);
+}

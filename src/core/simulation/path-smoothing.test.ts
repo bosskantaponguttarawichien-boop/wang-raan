@@ -31,3 +31,17 @@ describe("path-smoothing", () => {
     expect(refiner.clearance(smoothed[1]!)).toBeLessThanOrEqual(BODY_CLEARANCE + 1e-9);
   });
 });
+
+describe("findGridPath", () => {
+  it("อ้อมโต๊ะแทนการเดินตรงทะลุ และทุกจุดบนทางไม่อยู่ในโต๊ะ", async () => {
+    const { findGridPath } = await import("./path-smoothing");
+    const g = grid();
+    const refiner = createPathRefiner(g);
+    const a = { x: 1.5, y: 0.5 }, b = { x: 1.5, y: 2.6 };
+    expect(refiner.segmentClear(a, b)).toBe(false);
+    const path = findGridPath(g, refiner, a, b);
+    expect(path[0]).toEqual(a);
+    expect(path.at(-1)).toEqual(b);
+    for (let i = 1; i < path.length; i++) expect(refiner.segmentClear(path[i - 1]!, path[i]!)).toBe(true);
+  });
+});

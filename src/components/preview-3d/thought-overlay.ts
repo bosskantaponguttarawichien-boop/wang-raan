@@ -41,7 +41,8 @@ function bubbleScale(camera: THREE.Camera, width: number, height: number) {
   scaleB.set(0, 1, 0).project(camera);
   const pixels = Math.hypot((scaleB.x - scaleA.x) * width / 2, (scaleB.y - scaleA.y) * height / 2);
   if (!Number.isFinite(pixels) || pixels <= 0) return 1;
-  return Math.min(1.75, Math.max(0.85, pixels / REFERENCE_PIXELS_PER_METER));
+  // ไม่เล็กกว่าขนาดเดิม (80×64) — ขยายเฉพาะตอนซูมเข้า/จอใหญ่
+  return Math.min(1.75, Math.max(1, pixels / REFERENCE_PIXELS_PER_METER));
 }
 
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {

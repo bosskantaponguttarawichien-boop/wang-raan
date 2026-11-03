@@ -43,3 +43,19 @@ describe("followTarget", () => {
     expect(position.x).toBe(10);
   });
 });
+
+describe("TrailFollower", () => {
+  it("ไล่ตามทางที่เป้าหมายผ่าน ไม่ตัดมุมเป็นเส้นตรง", async () => {
+    const { TrailFollower } = await import("./frame-interpolator");
+    const follower = new TrailFollower();
+    const position = { x: 0, z: 0 };
+    // เป้าหมายเดินไปทางขวา 1 ม. แล้วเลี้ยวขึ้น 1 ม. ระหว่างที่ตัวละครยังไม่ขยับ
+    for (const target of [{ x: 0.5, z: 0 }, { x: 1, z: 0 }, { x: 1, z: 0.5 }, { x: 1, z: 1 }]) follower.follow(position, target, 0, 2);
+    follower.follow(position, { x: 1, z: 1 }, 0.4, 2);
+    // ไปได้ 0.8 ม. ตามทาง = ยังอยู่บนแนวล่าง (z = 0) ไม่ใช่เส้นทแยง
+    expect(position.z).toBeCloseTo(0, 6);
+    expect(position.x).toBeCloseTo(0.8, 6);
+    follower.follow(position, { x: 1, z: 1 }, 1, 2);
+    expect(position).toEqual({ x: 1, z: 1 });
+  });
+});

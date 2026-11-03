@@ -7,6 +7,10 @@
  */
 import { STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation";
 import type { DoorFrame } from "./walk-pacer";
+import type { Point } from "@/core/layout/types";
+
+/** หาทางเดินบนผังระหว่างสองจุด ([] = เดินตรงได้/หาทางไม่ได้) */
+export type StaffRouter = (from: Point, to: Point) => Point[];
 
 /**
  * รหัสสถานะเฉพาะภาพ: อยู่ในครัว (เลยผนังออกไป) — ผังไม่ต้องวาดพนักงานคนนี้
@@ -48,7 +52,16 @@ export class StaffPacer {
   private readonly servers = new Map<number, Server>();
   private door: DoorFrame | null = null;
   private overflow = false;
+  private router: StaffRouter | null = null;
   get needsResync() { return this.overflow; }
+
+  /**
+   * ตัวหาทางบนผัง — ที่ความเร็วสูง ตำแหน่งจาก engine ห่างกันหลายเมตรต่อ TICK เดินตรงระหว่างจุดจะตัดมุมทะลุ
+   * เคาน์เตอร์/โต๊ะ จึงเติมทางเดินจริงเมื่อเส้นตรงไม่ว่าง (null = เดินตรงตามเดิม)
+   */
+  setRouter(router: StaffRouter | null) {
+    this.router = router;
+  }
 
   reset() {
     this.servers.clear();
@@ -164,6 +177,14 @@ export class StaffPacer {
       Math.abs((tail.x - before.x) * (y - tail.y) - (tail.y - before.y) * (x - tail.x)) < 1e-7 &&
       (tail.x - before.x) * (x - tail.x) + (tail.y - before.y) * (y - tail.y) >= 0) {
       tail.x = x; tail.y = y; return;
+    }
+    if (this.router && code !== STAFF_KITCHEN_CODE && last.code !== STAFF_KITCHEN_CODE) {
+      const route = this.router(last, { x, y });
+      // จุดกลางทาง (ไม่รวมต้น/ปลาย) ใช้รหัสสถานะเดียวกับจุดหมาย
+      for (const point of route.slice(1, -1)) {
+        if (server.queue.length >= MAX_QUEUED_STAFF_POINTS) { this.overflow = true; return; }
+        server.queue.push({ x: point.x, y: point.y, code, hold: 0 });
+      }
     }
     if (server.queue.length >= MAX_QUEUED_STAFF_POINTS) { this.overflow = true; return; }
     server.queue.push({ x, y, code, hold: 0 });

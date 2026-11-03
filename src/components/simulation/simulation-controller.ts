@@ -17,7 +17,7 @@ import type { StoreApi } from "zustand/vanilla";
 import { ANALYSIS_SEEDS, STAFF_WALK_SPEED, type TickMessage } from "@/core/simulation";
 import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
 import { buildOccupancyGrid } from "@/core/simulation/occupancy-grid";
-import { createPathRefiner } from "@/core/simulation/path-smoothing";
+import { createPathRefiner, findGridPath } from "@/core/simulation/path-smoothing";
 import { toDayInput } from "@/lib/day-config";
 import { P1LayoutContractSchema } from "@/core/validation";
 import { SimulationClient, createSimulationWorker, type WorkerLike } from "@/lib/simulation-client";
@@ -200,7 +200,14 @@ export class SimulationController {
     // ลูกค้าเดินมาจากนอกร้าน / ต่อแถวรอโต๊ะนอกประตู (เฉพาะภาพ)
     this.pacer.setDoor(doorFrame(layout));
     // ทางเดินบนจอตัดมุมซิกแซกของกริดและเว้นระยะจากโต๊ะ (เฉพาะภาพ — ทางใน engine ไม่เปลี่ยน)
-    this.pacer.setRefiner(createPathRefiner(buildOccupancyGrid(layout)));
+    const customerGrid = buildOccupancyGrid(layout);
+    const customerRefiner = createPathRefiner(customerGrid);
+    this.pacer.setRefiner(customerRefiner);
+    this.pacer.setRouter((from, to) => findGridPath(customerGrid, customerRefiner, from, to));
+    // พนักงาน: เติมทางเดินจริงระหว่างตำแหน่งที่ห่างกัน (ไม่กันจุดยืนหลังเคาน์เตอร์ เหมือน StaffVisuals)
+    const staffGrid = buildOccupancyGrid(layout, undefined, { blockStaffSpots: false });
+    const staffRefiner = createPathRefiner(staffGrid);
+    this.staffPacer.setRouter((from, to) => (staffRefiner.segmentClear(from, to) ? [] : findGridPath(staffGrid, staffRefiner, from, to)));
     // พนักงานเดินเข้าประตูครัวไปรับอาหาร (เฉพาะภาพ — engine รับอาหารที่ช่องติดผนัง)
     this.staffPacer.setKitchenDoor(wallDoorFrame(layout, layout.kitchenDoor));
     try {
