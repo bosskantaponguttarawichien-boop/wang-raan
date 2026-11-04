@@ -133,26 +133,26 @@ export function getEmoteConfig(thought: CustomerThought | StaffThought): EmoteCo
 
 export function getMinimalIconSvg(thought: CustomerThought | StaffThought): string {
   const icon = thought.kind;
-  const svg = (body: string) => `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+  const svg = (body: string) => `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
 
   switch (icon) {
     case "queue-wait":
     case "queue-warning":
-    case "food-warning":
-      return svg('<circle cx="12" cy="12" r="7"/><path d="M12 8v4l3 2"/>');
+      return svg('<path d="M4 13h6v5H4z" fill="#f28a2f" stroke="#f28a2f"/><path d="M5 18v2m4-2v2M4 13l2-3h4v3M14 12h6v6h-6z" fill="#f28a2f" stroke="#f28a2f"/><path d="M15 18v2m4-2v2m-5-8 2-2h4v2"/>');
     case "queue-critical":
+      return svg('<path d="M4 13h6v5H4z" fill="#f28a2f" stroke="#f28a2f"/><path d="M5 18v2m4-2v2M4 13l2-3h4v3M14 12h6v6h-6z" fill="#f28a2f" stroke="#f28a2f"/><path d="M15 18v2m4-2h4v2"/><path d="M12 4v3m-2-1 2-2 2 2" stroke="#fff7ea" stroke-width="2"/>');
+    case "food-warning":
     case "food-critical":
-      return svg('<path d="M12 4 20 19H4L12 4Z"/><path d="M12 9v4"/><path d="M12 16h.01"/>');
     case "food-wait":
-    case "eating":
-      return svg('<path d="M5 4v6"/><path d="M8 4v6"/><path d="M5 7h3"/><path d="M6.5 10v10"/><path d="M16 4v16"/><path d="M16 4c3 2 3 6 0 8"/>');
+    case "serving":
+      return svg('<path d="M4 16h16" stroke="#6a5b53" stroke-width="2"/><path d="M6 16a6 6 0 0 1 12 0" fill="#fff7ea" stroke="#6a5b53"/><path d="M12 9V7"/><path d="M8 5c1-1 1-2 0-3m4 3c1-1 1-2 0-3m4 3c1-1 1-2 0-3" stroke="#fff7ea"/>');
     case "order-wait":
     case "taking-order":
-      return svg('<rect x="7" y="5" width="10" height="14" rx="1.5"/><path d="M10 5.5V4h4v1.5"/><path d="M10 10h4M10 14h4"/>');
+      return svg('<rect x="6" y="4" width="11" height="15" rx="1.5" fill="#fff7ea" stroke="#564942"/><path d="M9 4V3h5v1M9 9h5M9 12h5"/><circle cx="8" cy="9" r=".8" fill="#e86d65" stroke="none"/><circle cx="8" cy="12" r=".8" fill="#e86d65" stroke="none"/><path d="m15 17 4-5 1.5 1.3-4 5-2 .7z" fill="#f28a2f" stroke="#f28a2f"/>');
+    case "eating":
+      return svg('<ellipse cx="12" cy="15" rx="7" ry="3.5" fill="#fff7ea" stroke="#5d514b"/><path d="M5 6v5m3-5v5M5 8h3m-1.5 3v8M18 5v14m0-14c3 2 3 6 0 8"/><path d="M10 14c1-2 3-2 4 0" stroke="#70a96e"/>');
     case "bill-wait":
-      return svg('<rect x="4" y="7" width="16" height="11" rx="2"/><path d="M4 11h16"/><path d="M8 15h3"/>');
-    case "serving":
-      return svg('<path d="M4 15h16"/><path d="M6 15a6 6 0 0 1 12 0"/><path d="M12 7v-1"/>');
+      return svg('<rect x="4" y="7" width="14" height="10" rx="2" fill="#fff7ea" stroke="#514951"/><path d="M4 11h14" stroke="#514951"/><path d="M15 14h5v4h-5z" fill="#ffd05a" stroke="#c58e25"/>');
     case "cleaning":
       return svg('<path d="m6 18 6-12"/><path d="m10 17 5 3"/><path d="m9 19 5-3"/><path d="m16 5 .01 0"/><path d="m19 8 .01 0"/>');
     case "resting":
@@ -162,7 +162,7 @@ export function getMinimalIconSvg(thought: CustomerThought | StaffThought): stri
 }
 
 function MinimalStatusIcon({ thought, color }: { thought: CustomerThought | StaffThought; color: string }) {
-  return <span className="flex h-3.5 w-3.5 items-center justify-center" style={{ color }} dangerouslySetInnerHTML={{ __html: getMinimalIconSvg(thought) }} />;
+  return <span className="flex h-[18px] w-[18px] items-center justify-center" style={{ color }} dangerouslySetInnerHTML={{ __html: getMinimalIconSvg(thought) }} />;
 }
 
 export function CharacterThoughtBubble({
@@ -177,7 +177,7 @@ export function CharacterThoughtBubble({
 
   return (
     <div
-      className={`relative inline-flex h-6 w-5 items-center justify-center select-none pointer-events-auto cursor-pointer ${className}`}
+      className={`relative inline-flex h-9 w-8 items-center justify-center select-none pointer-events-auto cursor-pointer ${className}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       role="status"
