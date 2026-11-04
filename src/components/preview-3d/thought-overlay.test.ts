@@ -59,7 +59,7 @@ describe("ThoughtOverlayManager", () => {
     const bubble = container.querySelector('[data-agent-id="10"]');
     expect(bubble).not.toBeNull();
     expect(bubble?.getAttribute("aria-label")).toContain("รออาหารนาน");
-    expect(bubble?.innerHTML).toContain("⏳");
+    expect(bubble?.innerHTML).toContain("<svg");
     expect(bubble?.innerHTML).toContain("7น.");
 
     // Animation frames should move the existing DOM, not rebuild its SVG.
@@ -103,8 +103,8 @@ describe("ThoughtOverlayManager", () => {
 
     manager.update(snapshot, camera, renderer, customers, [], true);
     const badge = container.querySelector('[data-agent-id="11"]');
-    expect(badge?.innerHTML).toContain("width:36px");
-    expect(badge?.innerHTML).toContain("rounded-full");
+    expect(badge?.innerHTML).toContain("width:20px");
+    expect(badge?.innerHTML).toContain("polygon(50% 100%");
     expect(badge?.innerHTML).not.toContain("animate-bounce");
 
     manager.update(snapshot, camera, renderer, customers, [], true, true);
@@ -151,7 +151,7 @@ describe("ThoughtOverlayManager", () => {
     manager.update(snapshot, camera, renderer, customers, staff, true);
     const staffBubble = container.querySelector('[data-staff-id="0"]');
     expect(staffBubble).not.toBeNull();
-    expect(staffBubble?.innerHTML).toContain("📝");
+    expect(staffBubble?.innerHTML).toContain("<svg");
     expect(staffBubble?.getAttribute("aria-label")).toContain("กำลังรับออร์เดอร์");
     const cloud = staffBubble?.firstElementChild;
     manager.update(snapshot, camera, renderer, customers, staff, true);

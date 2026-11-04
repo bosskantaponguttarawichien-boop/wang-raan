@@ -11,7 +11,7 @@
 import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
 import type { CustomerThought, PresentationSnapshot, StaffThought, TableSurface } from "@/core/simulation/presentation-contract";
-import { getEmoteConfig } from "./character-thought-bubble";
+import { getEmoteConfig, getThoughtBadgeTheme } from "./character-thought-bubble";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
 import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
@@ -139,9 +139,9 @@ interface Walker {
  * มุมมองหมุน: `layout` คือผังที่หมุนแล้ว (ตรงกับฉาก) และ `planSize` คือขนาดผังจริงที่ใช้แปลงพิกัดลูกค้า
  */
 
-function drawMinimalThoughtIcon(ctx: CanvasRenderingContext2D, x: number, y: number, thought: CustomerThought | StaffThought) {
+function drawMinimalThoughtIcon(ctx: CanvasRenderingContext2D, x: number, y: number, thought: CustomerThought | StaffThought, color: string) {
   ctx.save();
-  ctx.strokeStyle = "#334155";
+  ctx.strokeStyle = color;
   ctx.lineWidth = 1.5;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -171,19 +171,31 @@ export function drawThoughtBubble(
   const config = getEmoteConfig(thought);
   const radius = Math.max(8, 10 * size);
   const centerY = cy - Math.max(21, 30 * size);
-  const fillColor = config.severity === "critical" ? "#fff1f2" : config.severity === "warning" ? "#fffbeb" : "#f8fafc";
-  const strokeColor = config.severity === "critical" ? "#fb7185" : config.severity === "warning" ? "#fbbf24" : "#cbd5e1";
+  const theme = getThoughtBadgeTheme(thought);
 
   ctx.save();
-  ctx.fillStyle = fillColor;
-  ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = Math.max(1, 1.2 * size);
+  // Fallback canvas uses the same small teardrop marker as the WebGL overlay.
+  ctx.fillStyle = theme.rim;
   ctx.beginPath();
-  ctx.arc(cx, centerY, radius, 0, Math.PI * 2);
+  ctx.moveTo(cx, centerY + radius + 3 * size);
+  ctx.bezierCurveTo(cx - radius, centerY + radius * 0.25, cx - radius, centerY - radius * 0.6, cx, centerY - radius);
+  ctx.bezierCurveTo(cx + radius, centerY - radius * 0.6, cx + radius, centerY + radius * 0.25, cx, centerY + radius + 3 * size);
   ctx.fill();
+  ctx.fillStyle = theme.fill;
+  ctx.beginPath();
+  ctx.moveTo(cx, centerY + radius);
+  ctx.bezierCurveTo(cx - radius + 2 * size, centerY + radius * 0.18, cx - radius + 2 * size, centerY - radius * 0.5, cx, centerY - radius + 2 * size);
+  ctx.bezierCurveTo(cx + radius - 2 * size, centerY - radius * 0.5, cx + radius - 2 * size, centerY + radius * 0.18, cx, centerY + radius);
+  ctx.fill();
+  ctx.strokeStyle = theme.rim;
+  ctx.lineWidth = Math.max(0.75, size);
+  ctx.beginPath();
+  ctx.moveTo(cx, centerY + radius + 3 * size);
+  ctx.bezierCurveTo(cx - radius, centerY + radius * 0.25, cx - radius, centerY - radius * 0.6, cx, centerY - radius);
+  ctx.bezierCurveTo(cx + radius, centerY - radius * 0.6, cx + radius, centerY + radius * 0.25, cx, centerY + radius + 3 * size);
   ctx.stroke();
 
-  drawMinimalThoughtIcon(ctx, cx, centerY, thought);
+  drawMinimalThoughtIcon(ctx, cx, centerY - size, thought, theme.icon);
 
   if (config.badgeText) {
     const badgeFont = Math.round(Math.max(7, 8 * size));

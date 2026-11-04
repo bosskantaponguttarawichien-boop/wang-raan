@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
-import { getEmoteConfig, getMinimalIconSvg } from "../simulation/character-thought-bubble";
+import { getEmoteConfig, getMinimalIconSvg, getThoughtBadgeTheme } from "../simulation/character-thought-bubble";
 
 export interface ThoughtOverlayHost {
   readonly element: HTMLElement;
@@ -22,10 +22,10 @@ export interface ThoughtOverlayManager {
 }
 
 /** ขนาดก้อนความคิดที่ scale 1 (px) */
-const BUBBLE_WIDTH = 36;
-const BUBBLE_HEIGHT = 36;
+const BUBBLE_WIDTH = 20;
+const BUBBLE_HEIGHT = 24;
 /** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
-const BUBBLE_GAP = 4;
+const BUBBLE_GAP = 3;
 /** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
 const REFERENCE_PIXELS_PER_METER = 70;
 
@@ -43,6 +43,19 @@ function bubbleScale(camera: THREE.Camera, width: number, height: number) {
   if (!Number.isFinite(pixels) || pixels <= 0) return 1;
   // คงให้เป็น badge เล็กเสมอ แม้บนจอใหญ่หรือซูมเข้า
   return Math.min(1.2, Math.max(0.82, pixels / REFERENCE_PIXELS_PER_METER));
+}
+
+const TEARDROP_CLIP = "polygon(50% 100%, 8% 54%, 0 33%, 5% 15%, 22% 3%, 50% 0, 78% 3%, 95% 15%, 100% 33%, 92% 54%)";
+
+function thoughtBadgeMarkup(thought: Parameters<typeof getThoughtBadgeTheme>[0]) {
+  const theme = getThoughtBadgeTheme(thought);
+  const iconSvg = getMinimalIconSvg(thought);
+  return `<div style="position:relative;width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;filter:drop-shadow(0 1px 2px rgb(15 23 42 / 0.2))">
+    <div style="position:absolute;inset:0;background:${theme.rim};clip-path:${TEARDROP_CLIP}"></div>
+    <div style="position:absolute;left:2px;top:2px;width:16px;height:19px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
+      <span style="display:flex;width:12px;height:12px;color:${theme.icon}">${iconSvg}</span>
+    </div>
+  </div>`;
 }
 
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {
@@ -117,11 +130,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const config = getEmoteConfig(customer.thought);
-      const iconSvg = getMinimalIconSvg(customer.thought);
       const isCritical = config.severity === "critical";
       const isWarning = config.severity === "warning";
-      const fillColor = isCritical ? "#fff1f2" : isWarning ? "#fffbeb" : "#f8fafc";
-      const strokeColor = isCritical ? "#fb7185" : isWarning ? "#fbbf24" : "#cbd5e1";
       const badgeColor = isCritical ? "#e11d48" : isWarning ? "#d97706" : "#334155";
 
       el.style.display = "block";
@@ -136,10 +146,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
           ? `<span style="position:absolute;right:-7px;bottom:-4px;border-radius:999px;padding:1px 4px;font-size:9px;font-weight:700;line-height:12px;color:#fff;background:${badgeColor};box-shadow:0 1px 2px rgb(15 23 42 / 0.16)">${config.badgeText}</span>`
           : "";
         el.innerHTML = `
-          <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
-            <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:${fillColor};border-color:${strokeColor};">
-              <span style="display:flex;width:16px;height:16px;color:#334155">${iconSvg}</span>
-            </div>
+          <div class="relative flex items-center justify-center select-none" style="width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;">
+            ${thoughtBadgeMarkup(customer.thought)}
             ${badgeHtml}
           </div>
         `;
@@ -182,7 +190,6 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const config = getEmoteConfig(member.thought);
-      const iconSvg = getMinimalIconSvg(member.thought);
       el.style.display = "block";
       placements.push({ el, x: screenX, y: screenY });
       const contentKey = JSON.stringify([config.label, config.emoji]);
@@ -192,10 +199,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
         el.innerHTML = `
-          <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
-            <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:#f8fafc;border-color:#cbd5e1;">
-              <span style="display:flex;width:16px;height:16px;color:#334155">${iconSvg}</span>
-            </div>
+          <div class="relative flex items-center justify-center select-none" style="width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;">
+            ${thoughtBadgeMarkup(member.thought)}
           </div>
         `;
       }
