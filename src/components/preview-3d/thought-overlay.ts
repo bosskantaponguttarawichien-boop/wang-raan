@@ -22,8 +22,10 @@ export interface ThoughtOverlayManager {
 }
 
 /** ขนาดก้อนความคิดที่ scale 1 (px) */
-const BUBBLE_WIDTH = 20;
-const BUBBLE_HEIGHT = 24;
+// This is intentionally larger than the 18px design preview: camera scaling
+// reduces it on a real phone, where 30×36 becomes roughly a 24px marker.
+const BUBBLE_WIDTH = 30;
+const BUBBLE_HEIGHT = 36;
 /** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
 const BUBBLE_GAP = 3;
 /** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
@@ -52,8 +54,8 @@ function thoughtBadgeMarkup(thought: Parameters<typeof getThoughtBadgeTheme>[0])
   const iconSvg = getMinimalIconSvg(thought);
   return `<div style="position:relative;width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;filter:drop-shadow(0 1px 2px rgb(15 23 42 / 0.2))">
     <div style="position:absolute;inset:0;background:${theme.rim};clip-path:${TEARDROP_CLIP}"></div>
-    <div style="position:absolute;left:2px;top:2px;width:16px;height:19px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
-      <span style="display:flex;width:12px;height:12px;color:${theme.icon}">${iconSvg}</span>
+    <div style="position:absolute;left:2px;top:2px;width:26px;height:31px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
+      <span style="display:flex;width:18px;height:18px;color:${theme.icon}">${iconSvg}</span>
     </div>
   </div>`;
 }
