@@ -60,7 +60,9 @@ describe("ThoughtOverlayManager", () => {
     expect(bubble).not.toBeNull();
     expect(bubble?.getAttribute("aria-label")).toContain("รออาหารนาน");
     expect(bubble?.innerHTML).toContain("<svg");
-    expect(bubble?.innerHTML).toContain("7น.");
+    // Duration remains in the accessible label/tooltip; it must not cover the
+    // illustrated badge in the 3D scene.
+    expect(bubble?.innerHTML).not.toContain("7น.");
 
     // Animation frames should move the existing DOM, not rebuild its SVG.
     const cloud = bubble?.firstElementChild;
@@ -103,7 +105,7 @@ describe("ThoughtOverlayManager", () => {
 
     manager.update(snapshot, camera, renderer, customers, [], true);
     const badge = container.querySelector('[data-agent-id="11"]');
-    expect(badge?.innerHTML).toContain("width:30px");
+    expect(badge?.innerHTML).toContain("width:42px");
     expect(badge?.innerHTML).toContain("polygon(50% 100%");
     expect(badge?.innerHTML).not.toContain("animate-bounce");
 
