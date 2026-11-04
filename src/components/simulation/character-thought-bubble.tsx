@@ -122,6 +122,7 @@ export function getMinimalIconSvg(thought: CustomerThought | StaffThought): stri
     case "resting":
       return svg('<path d="M5 8h12v8H5z"/><path d="M17 10h2a2 2 0 0 1 0 4h-2"/><path d="M8 5v2M11 5v2"/>');
   }
+  return svg('<circle cx="12" cy="12" r="6"/>');
 }
 
 function MinimalStatusIcon({ thought }: { thought: CustomerThought | StaffThought }) {
