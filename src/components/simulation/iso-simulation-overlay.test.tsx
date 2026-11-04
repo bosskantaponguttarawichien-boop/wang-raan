@@ -139,7 +139,7 @@ describe("fallback 2D แสดงวงจรบริการจาก snapsh
 
     drawThoughtBubble(ctx, 100, 100, { kind: "food-critical", waitSeconds: 900, severity: "critical" }, 1);
     expect(fillText).toHaveBeenCalled();
-    expect(String(fillText.mock.calls[0]?.[0])).toContain("😤");
+    expect(stroke).toHaveBeenCalled();
     expect(fillText.mock.calls.some(([text]) => String(text).includes("15น.!"))).toBe(true);
   });
 });

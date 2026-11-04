@@ -139,6 +139,28 @@ interface Walker {
  * มุมมองหมุน: `layout` คือผังที่หมุนแล้ว (ตรงกับฉาก) และ `planSize` คือขนาดผังจริงที่ใช้แปลงพิกัดลูกค้า
  */
 
+function drawMinimalThoughtIcon(ctx: CanvasRenderingContext2D, x: number, y: number, thought: CustomerThought | StaffThought) {
+  ctx.save();
+  ctx.strokeStyle = "#334155";
+  ctx.lineWidth = 1.5;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  if (thought.kind.includes("warning") || thought.kind === "queue-wait") {
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.moveTo(x, y - 3); ctx.lineTo(x, y); ctx.lineTo(x + 2.5, y + 1.5); ctx.stroke();
+  } else if (thought.kind.includes("critical")) {
+    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x + 6, y + 5); ctx.lineTo(x - 6, y + 5); ctx.closePath(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 2); ctx.lineTo(x, y + 1); ctx.moveTo(x, y + 3.5); ctx.lineTo(x, y + 3.5); ctx.stroke();
+  } else if (thought.kind === "bill-wait") {
+    ctx.beginPath(); ctx.roundRect(x - 7, y - 4.5, 14, 9, 2); ctx.moveTo(x - 7, y - 1); ctx.lineTo(x + 7, y - 1); ctx.stroke();
+  } else if (thought.kind === "taking-order" || thought.kind === "order-wait") {
+    ctx.beginPath(); ctx.roundRect(x - 5, y - 7, 10, 14, 1.5); ctx.moveTo(x - 2, y - 8); ctx.lineTo(x + 2, y - 8); ctx.moveTo(x - 2, y - 2); ctx.lineTo(x + 3, y - 2); ctx.moveTo(x - 2, y + 2); ctx.lineTo(x + 3, y + 2); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(x, y + 2, 6, Math.PI, 0); ctx.moveTo(x - 8, y + 3); ctx.lineTo(x + 8, y + 3); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function drawThoughtBubble(
   ctx: CanvasRenderingContext2D,
   cx: number,
@@ -148,7 +170,7 @@ export function drawThoughtBubble(
 ) {
   const config = getEmoteConfig(thought);
   const radius = Math.max(8, 10 * size);
-  const centerY = cy - Math.max(15, 22 * size);
+  const centerY = cy - Math.max(21, 30 * size);
   const fillColor = config.severity === "critical" ? "#fff1f2" : config.severity === "warning" ? "#fffbeb" : "#f8fafc";
   const strokeColor = config.severity === "critical" ? "#fb7185" : config.severity === "warning" ? "#fbbf24" : "#cbd5e1";
 
@@ -161,11 +183,7 @@ export function drawThoughtBubble(
   ctx.fill();
   ctx.stroke();
 
-  ctx.font = `${Math.round(Math.max(11, 14 * size))}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = "#334155";
-  ctx.fillText(config.emoji, cx, centerY + 0.5);
+  drawMinimalThoughtIcon(ctx, cx, centerY, thought);
 
   if (config.badgeText) {
     const badgeFont = Math.round(Math.max(7, 8 * size));
