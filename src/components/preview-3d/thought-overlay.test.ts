@@ -85,49 +85,30 @@ describe("ThoughtOverlayManager", () => {
     expect(container.children.length).toBe(0);
   });
 
-  it("หยุดชั่วคราวแล้วก้อนความคิดวิกฤตต้องไม่เด้งต่อ (ภาพต้องนิ่งสนิท)", () => {
+  it("แสดงสถานะวิกฤตเป็น badge เล็กนิ่ง ๆ เพื่อไม่รบกวนฉาก", () => {
     const manager = createThoughtOverlayManager(container);
     const model = new THREE.Object3D();
     model.updateMatrixWorld(true);
     const customers = new Map<number, { model: THREE.Object3D }>([[11, { model }]]);
     const snapshot: PresentationSnapshot = {
-      version: 1,
-      runId: "test",
-      layoutRevision: "rev",
-      sequence: 1,
-      simTimeSeconds: 100,
-      customers: [
-        {
-          renderAgentId: 11,
-          partyId: 1,
-          memberIndex: 0,
-          tableId: "t1",
-          chairId: "c1",
-          serviceCycleId: "cy1",
-          activity: "waiting-food",
-          seatingPhase: "seated",
-          walkMetersPerSecond: 1.2,
-          mealId: null,
-          thought: { kind: "food-critical", waitSeconds: 900, severity: "critical" },
-        },
-      ],
-      meals: [],
-      tables: [],
-      staff: [],
-      milestones: [],
+      version: 1, runId: "test", layoutRevision: "rev", sequence: 1, simTimeSeconds: 100,
+      customers: [{
+        renderAgentId: 11, partyId: 1, memberIndex: 0, tableId: "t1", chairId: "c1",
+        serviceCycleId: "cy1", activity: "waiting-food", seatingPhase: "seated",
+        walkMetersPerSecond: 1.2, mealId: null,
+        thought: { kind: "food-critical", waitSeconds: 900, severity: "critical" },
+      }],
+      meals: [], tables: [], staff: [], milestones: [],
     };
 
     manager.update(snapshot, camera, renderer, customers, [], true);
-    const bubble = container.querySelector('[data-agent-id="11"]');
-    expect(bubble?.innerHTML).toContain("animate-bounce");
+    const badge = container.querySelector('[data-agent-id="11"]');
+    expect(badge?.innerHTML).toContain("width:36px");
+    expect(badge?.innerHTML).toContain("rounded-full");
+    expect(badge?.innerHTML).not.toContain("animate-bounce");
 
-    // พัก → ต้องวาด DOM ใหม่โดยไม่มีคลาสเด้ง (ไม่งั้นภาพที่ "หยุด" ยังขยับอยู่)
     manager.update(snapshot, camera, renderer, customers, [], true, true);
-    expect(bubble?.innerHTML).not.toContain("animate-bounce");
-
-    // เล่นต่อ → เด้งเหมือนเดิม
-    manager.update(snapshot, camera, renderer, customers, [], true, false);
-    expect(bubble?.innerHTML).toContain("animate-bounce");
+    expect(badge?.innerHTML).not.toContain("animate-bounce");
     manager.dispose();
   });
 

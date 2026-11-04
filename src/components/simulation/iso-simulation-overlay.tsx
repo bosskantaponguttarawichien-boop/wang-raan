@@ -11,7 +11,7 @@
 import * as React from "react";
 import { directionVector, footprint, type StoreLayout } from "@/core/layout";
 import type { CustomerThought, PresentationSnapshot, StaffThought, TableSurface } from "@/core/simulation/presentation-contract";
-import { CLOUD_PATH, getEmoteConfig } from "./character-thought-bubble";
+import { getEmoteConfig } from "./character-thought-bubble";
 import { AGENT_STRIDE } from "@/core/simulation";
 import { ISO_ORIGIN_X, ISO_ORIGIN_Y, projectPoint, type IsoScene } from "@/core/preview/isometric";
 import { pointToView, viewMatrix, type ViewRotation } from "@/core/preview/view-rotation";
@@ -147,66 +147,40 @@ export function drawThoughtBubble(
   size: number,
 ) {
   const config = getEmoteConfig(thought);
-  const bubbleY = cy - 32 * size;
+  const radius = Math.max(8, 10 * size);
+  const centerY = cy - Math.max(15, 22 * size);
+  const fillColor = config.severity === "critical" ? "#fff1f2" : config.severity === "warning" ? "#fffbeb" : "#f8fafc";
+  const strokeColor = config.severity === "critical" ? "#fb7185" : config.severity === "warning" ? "#fbbf24" : "#cbd5e1";
 
   ctx.save();
-  const fillColor =
-    config.severity === "critical"
-      ? "#fff1f2"
-      : config.severity === "warning"
-      ? "#fffbeb"
-      : "#ffffff";
-
-  const strokeColor =
-    config.severity === "critical"
-      ? "#f43f5e"
-      : config.severity === "warning"
-      ? "#f59e0b"
-      : "#64748b";
-
-  const scaleFactor = 0.38 * size;
-  ctx.save();
-  ctx.translate(cx - 36 * size, bubbleY - 24 * size);
-  ctx.scale(scaleFactor, scaleFactor);
-
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = strokeColor;
-  ctx.lineWidth = 1.6;
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-
-  if (typeof Path2D !== "undefined") {
-    const cloud = new Path2D(CLOUD_PATH);
-    ctx.fill(cloud);
-    ctx.stroke(cloud);
-  } else {
-    ctx.beginPath();
-    ctx.arc(50, 30, 24, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-
-  // Tail circles
+  ctx.lineWidth = Math.max(1, 1.2 * size);
   ctx.beginPath();
-  ctx.arc(66, 66, 4.2, 0, Math.PI * 2);
+  ctx.arc(cx, centerY, radius, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(75, 77, 2.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  ctx.restore();
-
-  // Emoji and badge text
-  ctx.font = `${Math.round(11 * size)}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
+  ctx.font = `${Math.round(Math.max(11, 14 * size))}px "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
+  ctx.fillStyle = "#334155";
+  ctx.fillText(config.emoji, cx, centerY + 0.5);
 
-  const text = config.badgeText ? `${config.emoji} ${config.badgeText}` : config.emoji;
-  ctx.fillStyle = config.severity === "critical" ? "#881337" : config.severity === "warning" ? "#78350f" : "#475569";
-  ctx.fillText(text, cx - 16 * size, bubbleY - 13 * size);
+  if (config.badgeText) {
+    const badgeFont = Math.round(Math.max(7, 8 * size));
+    ctx.font = `700 ${badgeFont}px "Noto Sans Thai", sans-serif`;
+    const label = config.badgeText;
+    const labelWidth = Math.ceil(ctx.measureText(label).width) + 7;
+    const badgeX = cx + radius - 1;
+    const badgeY = centerY + radius - 2;
+    ctx.fillStyle = config.severity === "critical" ? "#e11d48" : config.severity === "warning" ? "#d97706" : "#334155";
+    ctx.beginPath();
+    ctx.roundRect(badgeX - labelWidth / 2, badgeY - 6, labelWidth, 12, 6);
+    ctx.fill();
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(label, badgeX, badgeY + 0.5);
+  }
   ctx.restore();
 }
 

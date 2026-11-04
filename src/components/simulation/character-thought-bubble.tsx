@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import type { CustomerThought, StaffThought } from "@/core/simulation/presentation-contract";
 
-export const CLOUD_PATH =
-  "M 62 50 C 55 55 45 55 38 51 C 30 55 20 53 14 46 C 6 45 2 36 4 27 C 2 18 10 10 18 11 C 23 4 35 3 43 7 C 49 2 61 3 67 7 C 75 3 85 7 88 15 C 97 17 101 27 98 36 C 102 44 94 53 84 51 C 77 56 68 55 62 50 Z";
-
 export interface CharacterThoughtBubbleProps {
   thought: CustomerThought | StaffThought;
   agentId?: number;
@@ -107,84 +104,40 @@ export function CharacterThoughtBubble({
   const config = getEmoteConfig(thought);
 
   const colors = {
-    normal: {
-      fill: "#ffffff",
-      stroke: "#64748b",
-      badgeText: "text-slate-600",
-    },
-    warning: {
-      fill: "#fffbeb",
-      stroke: "#f59e0b",
-      badgeText: "text-amber-800",
-    },
-    critical: {
-      fill: "#fff1f2",
-      stroke: "#f43f5e",
-      badgeText: "text-rose-800",
-    },
+    normal: { fill: "#f8fafc", stroke: "#cbd5e1", badge: "bg-slate-700" },
+    warning: { fill: "#fffbeb", stroke: "#fbbf24", badge: "bg-amber-600" },
+    critical: { fill: "#fff1f2", stroke: "#fb7185", badge: "bg-rose-600" },
   }[config.severity];
-
-  const animateClass = config.severity === "critical" ? "animate-bounce" : "";
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center select-none pointer-events-auto cursor-pointer transition-transform duration-150 hover:scale-110 ${animateClass} ${className}`}
-      style={{ width: 80, height: 64 }}
+      className={`relative inline-flex h-9 w-9 items-center justify-center select-none pointer-events-auto cursor-pointer ${className}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       role="status"
       aria-label={config.label}
     >
-      {/* Cartoon Thought Cloud SVG matching user sketch */}
-      <svg
-        viewBox="0 0 108 86"
-        className="absolute inset-0 w-full h-full overflow-visible drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]"
-      >
-        <path
-          d={CLOUD_PATH}
-          fill={colors.fill}
-          stroke={colors.stroke}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <circle
-          cx="66"
-          cy="66"
-          r="4.2"
-          fill={colors.fill}
-          stroke={colors.stroke}
-          strokeWidth="1.3"
-        />
-        <circle
-          cx="75"
-          cy="77"
-          r="2.6"
-          fill={colors.fill}
-          stroke={colors.stroke}
-          strokeWidth="1.3"
-        />
-      </svg>
-
-      {/* Content centered in the cloud body */}
       <div
-        className="absolute left-0 top-0 z-10 flex items-center justify-center gap-1"
-        style={{ width: 78, height: 42 }}
+        className="flex h-9 w-9 items-center justify-center rounded-full border shadow-sm"
+        style={{ backgroundColor: colors.fill, borderColor: colors.stroke }}
       >
         <span className="text-[15px] leading-none" role="img" aria-hidden="true">
           {config.emoji}
         </span>
-        {config.badgeText && (
-          <span className={`text-[11px] font-semibold tracking-tight ${colors.badgeText}`}>
-            {config.badgeText}
-          </span>
-        )}
       </div>
 
-      {/* Interactive Tooltip on hover */}
+      {config.badgeText && (
+        <span
+          className={`absolute -bottom-1 -right-2 rounded-full px-1 py-px text-[9px] font-bold leading-3 text-white shadow-sm ${colors.badge}`}
+          aria-hidden="true"
+        >
+          {config.badgeText}
+        </span>
+      )}
+
       {showTooltip && hovered && (
         <div
-          className="absolute bottom-full mb-1 z-30 whitespace-nowrap rounded-md bg-slate-900/95 px-2.5 py-1 text-xs font-medium text-white shadow-lg pointer-events-none transition-opacity duration-150"
+          className="absolute bottom-full mb-1 z-30 whitespace-nowrap rounded-md bg-slate-900/95 px-2.5 py-1 text-xs font-medium text-white shadow-lg pointer-events-none"
           role="tooltip"
         >
           {config.label}
