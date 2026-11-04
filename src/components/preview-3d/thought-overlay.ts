@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
-import { getEmoteConfig } from "../simulation/character-thought-bubble";
+import { getEmoteConfig, getMinimalIconSvg } from "../simulation/character-thought-bubble";
 
 export interface ThoughtOverlayHost {
   readonly element: HTMLElement;
@@ -85,7 +85,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
 
       activeIds.add(id);
       rig.model.getWorldPosition(projVec);
-      projVec.y += 1.38; // Minimal badge floats just above the head
+      projVec.y += 1.75; // Clear the full customer head
       projVec.project(camera);
 
       // Check if behind camera or far off screen
@@ -96,7 +96,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const screenX = ((projVec.x + 1) * width) / 2;
-      const screenY = ((-projVec.y + 1) * height) / 2 - 5;
+      const screenY = ((-projVec.y + 1) * height) / 2 - 9;
 
       if (screenX < -60 || screenX > width + 60 || screenY < -60 || screenY > height + 60) {
         const existing = nodes.get(id);
@@ -117,6 +117,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const config = getEmoteConfig(customer.thought);
+      const iconSvg = getMinimalIconSvg(customer.thought);
       const isCritical = config.severity === "critical";
       const isWarning = config.severity === "warning";
       const fillColor = isCritical ? "#fff1f2" : isWarning ? "#fffbeb" : "#f8fafc";
@@ -137,7 +138,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         el.innerHTML = `
           <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
             <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:${fillColor};border-color:${strokeColor};">
-              <span style="font-size:15px;line-height:1" role="img" aria-hidden="true">${config.emoji}</span>
+              <span style="display:flex;width:16px;height:16px;color:#334155">${iconSvg}</span>
             </div>
             ${badgeHtml}
           </div>
@@ -156,7 +157,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       activeIds.add(staffKey);
 
       staffMember.model.getWorldPosition(projVec);
-      projVec.y += 1.4;
+      projVec.y += 2.15; // Staff model is taller: keep a clear gap above the head
       projVec.project(camera);
 
       if (projVec.z >= 1) {
@@ -166,7 +167,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const screenX = ((projVec.x + 1) * width) / 2;
-      const screenY = ((-projVec.y + 1) * height) / 2;
+      const screenY = ((-projVec.y + 1) * height) / 2 - 11;
 
       let el = nodes.get(staffKey);
       if (!el) {
@@ -181,6 +182,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const config = getEmoteConfig(member.thought);
+      const iconSvg = getMinimalIconSvg(member.thought);
       el.style.display = "block";
       placements.push({ el, x: screenX, y: screenY });
       const contentKey = JSON.stringify([config.label, config.emoji]);
@@ -192,7 +194,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         el.innerHTML = `
           <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
             <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:#f8fafc;border-color:#cbd5e1;">
-              <span style="font-size:15px;line-height:1" role="img" aria-hidden="true">${config.emoji}</span>
+              <span style="display:flex;width:16px;height:16px;color:#334155">${iconSvg}</span>
             </div>
           </div>
         `;
