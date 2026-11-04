@@ -103,7 +103,7 @@ describe("ThoughtOverlayManager", () => {
 
     manager.update(snapshot, camera, renderer, customers, [], true);
     const badge = container.querySelector('[data-agent-id="11"]');
-    expect(badge?.innerHTML).toContain("width:20px");
+    expect(badge?.innerHTML).toContain("width:30px");
     expect(badge?.innerHTML).toContain("polygon(50% 100%");
     expect(badge?.innerHTML).not.toContain("animate-bounce");
 
