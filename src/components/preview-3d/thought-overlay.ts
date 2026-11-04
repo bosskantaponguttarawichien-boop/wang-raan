@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
-import { CLOUD_PATH, getEmoteConfig } from "../simulation/character-thought-bubble";
+import { getEmoteConfig } from "../simulation/character-thought-bubble";
 
 export interface ThoughtOverlayHost {
   readonly element: HTMLElement;
@@ -22,10 +22,10 @@ export interface ThoughtOverlayManager {
 }
 
 /** ขนาดก้อนความคิดที่ scale 1 (px) */
-const BUBBLE_WIDTH = 80;
-const BUBBLE_HEIGHT = 64;
+const BUBBLE_WIDTH = 36;
+const BUBBLE_HEIGHT = 36;
 /** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
-const BUBBLE_GAP = 6;
+const BUBBLE_GAP = 4;
 /** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
 const REFERENCE_PIXELS_PER_METER = 70;
 
@@ -41,8 +41,8 @@ function bubbleScale(camera: THREE.Camera, width: number, height: number) {
   scaleB.set(0, 1, 0).project(camera);
   const pixels = Math.hypot((scaleB.x - scaleA.x) * width / 2, (scaleB.y - scaleA.y) * height / 2);
   if (!Number.isFinite(pixels) || pixels <= 0) return 1;
-  // ไม่เล็กกว่าขนาดเดิม (80×64) — ขยายเฉพาะตอนซูมเข้า/จอใหญ่
-  return Math.min(1.75, Math.max(1, pixels / REFERENCE_PIXELS_PER_METER));
+  // คงให้เป็น badge เล็กเสมอ แม้บนจอใหญ่หรือซูมเข้า
+  return Math.min(1.2, Math.max(0.82, pixels / REFERENCE_PIXELS_PER_METER));
 }
 
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {
@@ -85,7 +85,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
 
       activeIds.add(id);
       rig.model.getWorldPosition(projVec);
-      projVec.y += 1.55; // Floating above character head
+      projVec.y += 1.38; // Minimal badge floats just above the head
       projVec.project(camera);
 
       // Check if behind camera or far off screen
@@ -96,7 +96,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const screenX = ((projVec.x + 1) * width) / 2;
-      const screenY = ((-projVec.y + 1) * height) / 2;
+      const screenY = ((-projVec.y + 1) * height) / 2 - 5;
 
       if (screenX < -60 || screenX > width + 60 || screenY < -60 || screenY > height + 60) {
         const existing = nodes.get(id);
@@ -119,39 +119,28 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       const config = getEmoteConfig(customer.thought);
       const isCritical = config.severity === "critical";
       const isWarning = config.severity === "warning";
-
-      // Softer, refined outline colors matching modern palette
-      const fillColor = isCritical ? "#fff1f2" : isWarning ? "#fffbeb" : "#ffffff";
-      const strokeColor = isCritical ? "#f43f5e" : isWarning ? "#f59e0b" : "#64748b";
-      const badgeColor = isCritical ? "text-rose-800" : isWarning ? "text-amber-800" : "text-slate-600";
-      // หยุดชั่วคราวแล้วภาพต้องนิ่งสนิท (เหมือนที่คลิปตัวละครหยุดด้วย delta 0)
-      const bounceClass = isCritical && !paused ? "animate-bounce" : "";
-
-      const badgeHtml = config.badgeText
-        ? `<span class="text-[11px] font-semibold tracking-tight ${badgeColor}">${config.badgeText}</span>`
-        : "";
+      const fillColor = isCritical ? "#fff1f2" : isWarning ? "#fffbeb" : "#f8fafc";
+      const strokeColor = isCritical ? "#fb7185" : isWarning ? "#fbbf24" : "#cbd5e1";
+      const badgeColor = isCritical ? "#e11d48" : isWarning ? "#d97706" : "#334155";
 
       el.style.display = "block";
-      // Position tail circle (~70% x, 100% y) directly above customer's head
       placements.push({ el, x: screenX, y: screenY });
-      const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity, bounceClass]);
+      const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity]);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
-        popAfterRender.push({ el, bouncing: bounceClass !== "" });
+        popAfterRender.push({ el, bouncing: false });
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
+        const badgeHtml = config.badgeText
+          ? `<span style="position:absolute;right:-7px;bottom:-4px;border-radius:999px;padding:1px 4px;font-size:9px;font-weight:700;line-height:12px;color:#fff;background:${badgeColor};box-shadow:0 1px 2px rgb(15 23 42 / 0.16)">${config.badgeText}</span>`
+          : "";
         el.innerHTML = `
-        <div class="relative flex items-center justify-center select-none transition-transform hover:scale-105 ${bounceClass}" style="width: 80px; height: 64px;">
-          <svg viewBox="0 0 108 86" class="absolute inset-0 w-full h-full overflow-visible drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
-            <path d="${CLOUD_PATH}" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-            <circle cx="66" cy="66" r="4.2" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" />
-            <circle cx="75" cy="77" r="2.6" fill="${fillColor}" stroke="${strokeColor}" stroke-width="1.5" />
-          </svg>
-          <div class="absolute inset-x-1 top-0.5 flex items-center justify-center gap-1" style="height: 58%;">
-            <span class="text-lg leading-none" role="img" aria-hidden="true">${config.emoji}</span>
+          <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
+            <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:${fillColor};border-color:${strokeColor};">
+              <span style="font-size:15px;line-height:1" role="img" aria-hidden="true">${config.emoji}</span>
+            </div>
             ${badgeHtml}
           </div>
-        </div>
         `;
       }
     }
@@ -167,7 +156,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       activeIds.add(staffKey);
 
       staffMember.model.getWorldPosition(projVec);
-      projVec.y += 1.58;
+      projVec.y += 1.4;
       projVec.project(camera);
 
       if (projVec.z >= 1) {
@@ -201,16 +190,11 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
         el.innerHTML = `
-        <div class="relative flex items-center justify-center select-none transition-transform hover:scale-105" style="width: 80px; height: 64px;">
-          <svg viewBox="0 0 108 86" class="absolute inset-0 w-full h-full overflow-visible drop-shadow-[0_2px_4px_rgba(0,0,0,0.08)]">
-            <path d="${CLOUD_PATH}" fill="#ffffff" stroke="#64748b" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-            <circle cx="66" cy="66" r="4.2" fill="#ffffff" stroke="#64748b" stroke-width="1.5" />
-            <circle cx="75" cy="77" r="2.6" fill="#ffffff" stroke="#64748b" stroke-width="1.5" />
-          </svg>
-          <div class="absolute inset-x-1 top-0.5 flex items-center justify-center gap-1" style="height: 58%;">
-            <span class="text-lg leading-none" role="img" aria-hidden="true">${config.emoji}</span>
+          <div class="relative flex items-center justify-center select-none" style="width:36px;height:36px;">
+            <div class="flex items-center justify-center rounded-full border shadow-sm" style="width:36px;height:36px;background:#f8fafc;border-color:#cbd5e1;">
+              <span style="font-size:15px;line-height:1" role="img" aria-hidden="true">${config.emoji}</span>
+            </div>
           </div>
-        </div>
         `;
       }
     }
@@ -223,7 +207,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
     const placed: { left: number; top: number }[] = [];
     for (const placement of placements) {
       let top = placement.y - boxHeight;
-      const left = placement.x - boxWidth * 0.65;
+      const left = placement.x - boxWidth * 0.5;
       for (let guard = 0; guard < 8; guard++) {
         const hit = placed.find(box => Math.abs(box.left - left) < boxWidth - BUBBLE_GAP && Math.abs(box.top - top) < boxHeight - BUBBLE_GAP);
         if (!hit) break;
@@ -231,9 +215,9 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
       placed.push({ left, top });
       const lift = placement.y - boxHeight - top;
-      placement.el.style.transformOrigin = "65% 100%";
+      placement.el.style.transformOrigin = "50% 100%";
       placement.el.style.zIndex = String(Math.round(placement.y));
-      placement.el.style.transform = `translate3d(${placement.x}px, ${placement.y - lift}px, 0) translate(-65%, -100%) scale(${scale.toFixed(3)})`;
+      placement.el.style.transform = `translate3d(${placement.x}px, ${placement.y - lift}px, 0) translate(-50%, -100%) scale(${scale.toFixed(3)})`;
     }
 
     // 4. ก้อนใหม่/เปลี่ยนสถานะเด้งเข้าเล็กน้อย ให้เห็นว่ามีอะไรเปลี่ยน (ไม่ทำตอนหยุดชั่วคราวหรือผู้ใช้ลดการเคลื่อนไหว)
@@ -243,7 +227,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         if (!inner || bouncing || typeof inner.animate !== "function") continue;
         inner.animate(
           [{ transform: "scale(0.55)", opacity: 0 }, { transform: "scale(1.08)", opacity: 1, offset: 0.7 }, { transform: "scale(1)", opacity: 1 }],
-          { duration: 220, easing: "ease-out", transformOrigin: "65% 100%" } as KeyframeAnimationOptions,
+          { duration: 220, easing: "ease-out", transformOrigin: "50% 100%" } as KeyframeAnimationOptions,
         );
       }
     }
