@@ -23,7 +23,9 @@ export type CustomerThoughtKind =
   | "food-warning"
   | "food-critical"
   | "eating"
-  | "bill-wait";
+  | "bill-wait"
+  /** Walking to the exit: severity "critical" when the party gave up without being served. */
+  | "leaving";
 
 export interface CustomerThought {
   readonly kind: CustomerThoughtKind;
@@ -31,7 +33,7 @@ export interface CustomerThought {
   readonly severity: "normal" | "warning" | "critical";
 }
 
-export type StaffThoughtKind = "taking-order" | "serving" | "cleaning" | "resting";
+export type StaffThoughtKind = "taking-order" | "taking-payment" | "serving" | "cleaning" | "resting";
 
 export interface StaffThought {
   readonly kind: StaffThoughtKind;

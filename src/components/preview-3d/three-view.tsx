@@ -18,7 +18,9 @@ import {
 import { AGENT_STRIDE, STAFF_STATE_CODE, STAFF_STRIDE } from "@/core/simulation";
 import { STAFF_KITCHEN_CODE } from "@/components/simulation/staff-pacer";
 import { farWalls, vectorFromView, type ViewRotation } from "@/core/preview/view-rotation";
-import { staffSpots } from "@/core/preview/staff-spots";
+import { OutsideWallFade, wallsWithPeopleOutside } from "./outside-wall-fade";
+import { paySpots, posInset, staffSpots, type PaySpot } from "@/core/preview/staff-spots";
+import { CASHIER_REACH, PAY_QUEUE_REACH, facingTowardPos } from "./pay-facing";
 import {
   CHAIR_PULL,
   createChairSlide,
@@ -132,6 +134,8 @@ type Stage = {
   animateRoom: (nextView: ViewRotation) => void;
   /** อัปเดต transition ของกำแพงหนึ่งเฟรม และบอกว่ายังต้องวาดต่อหรือไม่ */
   updateRoomTransition: (now: number) => boolean;
+  /** ผนังด้านที่มีลูกค้าอยู่ข้างนอกจางลงให้เห็นแถวรอคิว (agents = null เมื่อไม่ได้จำลอง) — true = ยังเปลี่ยนอยู่ */
+  updateOutsideFade: (agents: Float32Array | null, dt: number) => boolean;
 };
 
 /** ค่ากล้องที่ต้องเปลี่ยนพร้อมกัน เพื่อไม่ให้ภาพกระโดดเมื่อเปลี่ยนมุม isometric */
@@ -293,6 +297,18 @@ const CUSTOMER_SCALE = CHARACTER_SCALE;
 const AGENT_STATE_SEATED = 4;
 /** รอโต๊ะนอกร้าน (AGENT_STATE_CODE["waiting-entrance"]) — ยืนหันหน้าเข้าประตู */
 const AGENT_STATE_WAITING_ENTRANCE = 6;
+/** ต่อคิวจ่ายเงิน / ยืนจ่ายเงินหน้าเคาน์เตอร์ (AGENT_STATE_CODE.queuing / ordering) — หันหน้าเข้าจอ POS */
+const AGENT_STATE_QUEUING = 1;
+const AGENT_STATE_ORDERING = 2;
+
+/** จุดจ่ายเงินของผัง (คำนวณใหม่เมื่อผังเปลี่ยนเท่านั้น — ใช้ทุกเฟรม) */
+const paySpotCache = new WeakMap<StoreLayout, PaySpot[]>();
+function paySpotsOf(layout: StoreLayout | null | undefined): PaySpot[] {
+  if (!layout) return [];
+  let spots = paySpotCache.get(layout);
+  if (!spots) paySpotCache.set(layout, spots = paySpots(layout));
+  return spots;
+}
 /** กัน animation กระโดดเมื่อ loop หยุดไปนาน (แท็บถูกซ่อน/หยุดวาดตอนไม่มีอะไรขยับ) */
 const MAX_FRAME_DELTA = 1 / 30;
 /** ผสมท่าเดิมกับท่าใหม่ (เดิน ↔ นั่ง) แทนการตัดท่าทันที */
@@ -774,7 +790,8 @@ function createCounter(width: number, depth: number, style: CounterStyle, assets
   // จอ POS ด้านขวา: ฐาน + ก้าน + จอเอียง
   const dark = assets.material("appliance-dark", { color: "#2b3038", roughness: 0.45, metalness: 0.2 });
   const screen = assets.material("pos-screen", { color: "#3d8fd1", roughness: 0.2, emissive: "#1d5f99", emissiveIntensity: 0.35 });
-  const posX = long / 2 - Math.min(0.35, long * 0.2);
+  // ตำแหน่งเดียวกับจุดจ่ายเงินของการจำลอง (paySpots) — ลูกค้ายืนจ่ายหน้าจอนี้
+  const posX = long / 2 - posInset(long);
   const posZ = style.variant === "bar" ? -0.1 : 0.02;
   counter.add(placeMesh(assets.box(0.16, 0.02, 0.14), dark, posX, surface + 0.01, posZ));
   counter.add(placeMesh(assets.box(0.03, 0.12, 0.03), dark, posX, surface + 0.08, posZ + 0.02));
@@ -1047,14 +1064,21 @@ function roomOpacityForView(viewRotation: ViewRotation): RoomOpacity {
   return new Map((["north", "south", "west", "east"] as WallDoor["wall"][]).map((wall) => [wall, visible.includes(wall) ? 1 : 0]));
 }
 
+/** ความทึบตามมุมกล้อง (ก่อนคูณความจางเพราะมีคนอยู่ข้างนอก) */
 function roomOpacitySnapshot(group: THREE.Group): RoomOpacity {
-  return new Map([...roomMaterials(group)].map(([wall, materials]) => [wall, materials[0]?.opacity ?? 0]));
+  const base = group.userData.baseOpacity as RoomOpacity | undefined;
+  return new Map([...roomMaterials(group)].map(([wall, materials]) => [wall, base?.get(wall) ?? materials[0]?.opacity ?? 0]));
 }
 
-/** ผนังและวงกบด้านเดียวกันใช้ material ชุดเดียว จึงจางพร้อมกันโดยไม่เกิดกรอบประตูซ้อน */
+/**
+ * ผนังและวงกบด้านเดียวกันใช้ material ชุดเดียว จึงจางพร้อมกันโดยไม่เกิดกรอบประตูซ้อน
+ * ความทึบจริง = ตามมุมกล้อง × ตัวคูณผนังโปร่งเมื่อมีคนรอข้างนอก (userData.outsideFade)
+ */
 function setRoomOpacity(group: THREE.Group, opacityByWall: RoomOpacity) {
+  group.userData.baseOpacity = new Map(opacityByWall);
+  const fade = group.userData.outsideFade as OutsideWallFade | undefined;
   for (const [wall, materials] of roomMaterials(group)) {
-    const opacity = opacityByWall.get(wall) ?? 0;
+    const opacity = (opacityByWall.get(wall) ?? 0) * (fade?.factor(wall) ?? 1);
     for (const material of materials) {
       material.opacity = opacity;
       material.depthWrite = opacity >= 0.999;
@@ -1290,6 +1314,8 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
     const clearCustomers = () => {
       for (const [id, customer] of customers) removeCustomer(id, customer);
       resetChairs();
+      // จบการจำลอง: ลูปวาดภาพไม่ผ่านขั้นอัปเดตก้อนความคิดแล้ว จึงต้องล้างเองตรงนี้ (เดิมค้างบนจอ)
+      thoughtOverlay?.clear();
     };
 
     const loader = createCharacterLoader();
@@ -1451,8 +1477,14 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         const dx = x - target.x;
         const dz = z - target.z;
         // ตำแหน่งเฉลี่ยทุกเฟรมขยับทีละน้อย จึงใช้เกณฑ์ ~1 มม. (เดิม 1 ซม. ต่อ TICK)
-        if (dx * dx + dz * dz > 1e-6) member.targetRotation = Math.atan2(dx, dz);
-        else if (code === STAFF_STATE_CODE["taking-order"] || code === STAFF_STATE_CODE.cleaning) {
+        // ยืนรับเงินหลังจอ POS: หันหน้าเข้าหาจอ (ไม่ใช่โต๊ะที่ใกล้ที่สุด)
+        const moving = dx * dx + dz * dz > 1e-6;
+        const cashierFacing = !moving && (code === STAFF_STATE_CODE["taking-order"] || code === STAFF_STATE_CODE.counter)
+          ? facingTowardPos(paySpotsOf(layout), x, z, CASHIER_REACH, "staff") : null;
+        if (moving) member.targetRotation = Math.atan2(dx, dz);
+        else if (cashierFacing !== null) {
+          member.targetRotation = cashierFacing;
+        } else if (code === STAFF_STATE_CODE["taking-order"] || code === STAFF_STATE_CODE.cleaning) {
           // ยืนทำงานที่โต๊ะ: หันหน้าเข้าโต๊ะที่ใกล้ที่สุด
           const table = tables.reduce<(typeof tables)[number] | null>((best, t) => {
             const c = objectCenter(t);
@@ -1481,6 +1513,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const agents = sampled?.agents ?? current.agents;
       const chairs = stageRef.current?.layout?.objects.filter((item) => item.type === "chair") ?? [];
       const door = stageRef.current?.layout ? doorFrame(stageRef.current.layout) : null;
+      const payLayoutSpots = paySpotsOf(stageRef.current?.layout);
       for (let offset = 0; offset < agents.length; offset += AGENT_STRIDE) {
         const id = agents[offset]!;
         const x = agents[offset + 1]!;
@@ -1537,6 +1570,11 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         if (state === AGENT_STATE_WAITING_ENTRANCE && door) {
           // ยืนต่อแถวนอกร้าน: หันหน้าเข้าประตูเสมอ (ไม่ใช่ทิศที่เดินมาล่าสุด)
           customer.targetRotation = Math.atan2(door.center.x - targetX, door.center.y - targetZ);
+        }
+        if ((state === AGENT_STATE_QUEUING || state === AGENT_STATE_ORDERING) && dx * dx + dz * dz <= 1e-6) {
+          // ยืนต่อคิว/จ่ายเงิน: หันหน้าเข้าหาจอ POS บนเคาน์เตอร์
+          const facing = facingTowardPos(payLayoutSpots, targetX, targetZ, PAY_QUEUE_REACH);
+          if (facing !== null) customer.targetRotation = facing;
         }
         customer.target.set(targetX, 0, targetZ);
         // ท่ายืนรอ (Idle) สลับกับ Walk ตามความเร็วใน tick — simulation บอกแค่ว่าไม่ได้นั่ง
@@ -1714,7 +1752,6 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       const step = frameClock.step(realDelta, running);
       const delta = running ? step.seconds : Math.min(realDelta, MAX_FRAME_DELTA);
       const cameraAnimating = stage.updateCamera(now);
-      const roomAnimating = stage.updateRoomTransition(now);
       const modernFrame = simulating && controller.current?.presentation !== undefined;
       if (simulating && controller.current) {
         interpolator.push(controller.current);
@@ -1723,6 +1760,9 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
         interpolator.reset();
         sampled = null;
       }
+      // เรียกทั้งคู่ทุกเฟรม (|| จะข้ามผนังโปร่งระหว่างหมุนกล้อง)
+      const roomTransitioning = stage.updateRoomTransition(now);
+      const roomAnimating = stage.updateOutsideFade(simulating ? sampled?.agents ?? controller.current?.agents ?? null : null, Math.min(realDelta, MAX_FRAME_DELTA)) || roomTransitioning;
       // ตามทันตำแหน่งเฉลี่ยได้เสมอ (1.6 เท่าของความเร็วเดิน) แต่ไม่พุ่งเมื่อเป้าหมายกระโดด เช่นตอนลุกจากเก้าอี้
       followSpeed = VISUAL_WALK_SPEED * Math.max(1, controller.current?.timing?.motionRate ?? 1) * 1.6;
       if (simulating) {
@@ -1926,6 +1966,16 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       roomMotion = null;
       return false;
     };
+    const outsideFade = new OutsideWallFade();
+    const updateOutsideFade = (agents: Float32Array | null, dt: number) => {
+      const layout = stage.layout;
+      if (!stage.room || !layout) return false;
+      stage.room.userData.outsideFade = outsideFade;
+      const outside = agents ? wallsWithPeopleOutside(agents, layout) : new Set<never>();
+      if (!outsideFade.update(outside, dt, reducedMotionActive())) return false;
+      setRoomOpacity(stage.room, roomOpacitySnapshot(stage.room));
+      return true;
+    };
     const animateRoom = (nextView: ViewRotation) => {
       if (!stage.room) return;
       // กดหมุนซ้ำกลางทางได้: เริ่มจาก opacity จริงของเฟรมปัจจุบัน ไม่ย้อนกลับหรือกระโดด
@@ -2048,6 +2098,7 @@ export function ThreeView({ layout, zoom, viewRotation = 0, isSim, simPaused = f
       replaceContent,
       animateRoom,
       updateRoomTransition,
+      updateOutsideFade,
     };
     stageRef.current = stage;
     // QA อัตโนมัติอ่านสิ่งที่ feature ตัดสินใจได้ เฉพาะเมื่อมีการตั้ง flag ไว้ก่อนฉากถูกสร้าง

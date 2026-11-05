@@ -23,6 +23,7 @@ import {
   type LegacyCustomerClipName,
   type UtensilSpec,
 } from "./contracts";
+import { gaitProfile } from "../runtime/locomotion";
 
 /** Duration of one bite in the published Eat clip. */
 export const EAT_CLIP_SECONDS = 3.2;
@@ -144,7 +145,8 @@ export function resolveCustomerAction(input: CustomerActionInput): CustomerActio
   const walkTimeScale = () => {
     const cycleSpeed = input.walkCycleDistance / Math.max(input.walkClipDuration, 1e-6);
     if (!Number.isFinite(cycleSpeed) || cycleSpeed <= 0) return 1;
-    return Math.max(0, input.groundSpeed) / cycleSpeed;
+    // จังหวะก้าวประจำตัว: ไม่ก้าวพร้อมกันทั้งร้าน
+    return (Math.max(0, input.groundSpeed) / cycleSpeed) * gaitProfile(customer.renderAgentId).cadence;
   };
   const onFoot = (tier: CustomerActionTier = moving ? "walk" : "base"): CustomerActionDecision => ({
     ...base, clip: moving ? "Walk" : "Idle", tier, loop: true,

@@ -14,6 +14,7 @@ import {
   seedFromRevision,
   utensilFor,
 } from "./customer-action-controller";
+import { gaitProfile } from "../runtime/locomotion";
 
 /** The marker table published inside cafe-customer.glb (feat-110/112). */
 const MARKERS: CustomerMarkerTable = {
@@ -222,7 +223,8 @@ describe("reduced motion", () => {
 describe("walk timing and asset fallback", () => {
   it("scales the walk cycle to the drawn speed", () => {
     const decision = decide(customerOf({ activity: "walking", seatingPhase: "approach" }), { groundSpeed: 1.1 });
-    expect(decision.timeScale).toBeCloseTo((1.1 * 0.95) / 0.9, 6);
+    // ความเร็วบนพื้นตรงกับรอบคลิป × จังหวะก้าวประจำตัว (ไม่ก้าวพร้อมกันทั้งร้าน)
+    expect(decision.timeScale).toBeCloseTo(((1.1 * 0.95) / 0.9) * gaitProfile(decision.renderAgentId).cadence, 6);
   });
 
   it.each([

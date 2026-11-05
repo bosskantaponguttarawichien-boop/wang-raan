@@ -14,6 +14,7 @@ import {
   type StaffClipName,
   type StaffMarkerTable,
 } from "./contracts";
+import { gaitProfile, staffGaitKey } from "../runtime/locomotion";
 
 export type StaffActionTier = "task" | "carry" | "walk" | "base";
 
@@ -113,7 +114,8 @@ export function resolveStaffAction(input: StaffActionInput): StaffActionDecision
   const walkTimeScale = () => {
     const cycleSpeed = input.walkCycleDistance / Math.max(input.walkClipDuration, 1e-6);
     if (!Number.isFinite(cycleSpeed) || cycleSpeed <= 0) return 1;
-    return Math.max(0, input.groundSpeed) / cycleSpeed;
+    // จังหวะก้าวประจำตัว: ไม่ก้าวพร้อมกันทั้งร้าน
+    return (Math.max(0, input.groundSpeed) / cycleSpeed) * gaitProfile(staffGaitKey(staff.staffId)).cadence;
   };
   /** Reduced motion keeps the semantic stops and drops everything between them. */
   const at = (phase: number, snapped: number) => (reducedMotion ? snapped : phase);

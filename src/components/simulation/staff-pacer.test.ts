@@ -78,6 +78,28 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     expect(row(out, 0)![1]).toBeCloseTo(1.4, 4);
   });
 
+  it("งานใหม่ที่จุดเดิม (รับเงินที่จุดยืนประจำ) ได้สถานะใหม่ ไม่ถูกทิ้ง", () => {
+    const pacer = new StaffPacer();
+    let task: string | null = null;
+    pacer.setGate({ taskOf: () => task, open: () => true });
+    pacer.update(staff([0, 1, 1, COUNTER]), 0, SPEED);
+    task = "pay:1";
+    const out = pacer.update(staff([0, 1, 1, STAFF_STATE_CODE["taking-order"]]), 0.1, SPEED);
+    expect(row(out, 0)).toEqual([1, 1, STAFF_STATE_CODE["taking-order"]]);
+    expect(pacer.currentTask(0)).toBe("pay:1");
+  });
+
+  it("ยืนรอประตูของงาน = ยืนนิ่ง (ระยะที่ยังต้องเดินเป็น 0) ให้หลบทางคนอื่นได้", () => {
+    const pacer = new StaffPacer();
+    let task: string | null = null;
+    pacer.setGate({ taskOf: () => task, open: () => false });
+    pacer.update(staff([0, 1, 1, COUNTER]), 0, SPEED);
+    task = "task:1";
+    pacer.update(staff([0, 4, 1, WALKING]), 0.5, SPEED);
+    expect(pacer.waitingTask(0)).toBe("task:1");
+    expect(pacer.remainingDistance(0)).toBe(0);
+  });
+
   it("รับอาหาร → เดินพ้นผนังเข้าครัว หายไป ~5 วินาที แล้วออกมาที่ประตูพร้อมถาด", () => {
     const pacer = new StaffPacer();
     pacer.setKitchenDoor(kitchenDoor());
@@ -105,6 +127,44 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     const [, lastY, lastCode] = row(out, 0)!;
     expect(lastY).toBeGreaterThan(0);
     expect(lastCode).toBe(SERVING);
+  });
+
+  it("โหมด metadata: รับอาหาร → เดินถึงประตูครัวก่อนแล้วจึงหายตัว ไม่หายกลางร้าน", () => {
+    const pacer = new StaffPacer();
+    pacer.setKitchenDoor(kitchenDoor());
+    // เดินจากกลางร้านไปจุดรับอาหาร แล้ว engine ประกาศ "รับอาหาร" ทันทีขณะภาพยังเดินอยู่
+    pacer.update(staff([0, 1.375, 2.5, WALKING]), 0, SPEED, 1, true);
+    pacer.update(staff([0, 1.375, 0.35, WALKING]), 0, SPEED, 1, true);
+    const seen: Array<[number, number]> = [];
+    for (let t = 0; t < 3; t += 0.1) {
+      const out = pacer.update(staff([0, 1.375, 0.35, STAFF_KITCHEN_CODE]), 0.1, SPEED, 1, true);
+      const [, y, code] = row(out, 0)!;
+      seen.push([y!, code!]);
+    }
+    // ยังอยู่ในร้าน (ก่อนถึงแนวผนัง) = มองเห็นเสมอ · พ้นผนังไปแล้ว = อยู่ในครัว
+    expect(seen.filter(([y]) => y > 0.01).every(([, code]) => code !== STAFF_KITCHEN_CODE)).toBe(true);
+    expect(seen.some(([y]) => y < 0)).toBe(true);
+    expect(seen.at(-1)![1]).toBe(STAFF_KITCHEN_CODE);
+    // รับเสร็จ: โผล่ที่ช่องประตูก่อน แล้วถือถาดเดินไปโต๊ะ
+    const back: Array<[number, number]> = [];
+    for (let t = 0; t < 4; t += 0.1) {
+      const out = pacer.update(staff([0, 3, 3, SERVING]), 0.1, SPEED, 1, true);
+      const [, y, code] = row(out, 0)!;
+      back.push([y!, code!]);
+    }
+    expect(back.filter(([y]) => y < 0).every(([, code]) => code === STAFF_KITCHEN_CODE)).toBe(true);
+    expect(back.at(-1)![0]).toBeGreaterThan(0);
+    expect(back.at(-1)![1]).toBe(SERVING);
+  });
+
+  it("โหมด metadata ไม่มีประตูครัว: รับอาหารที่จุดเดิมโดยไม่หายตัว", () => {
+    const pacer = new StaffPacer();
+    pacer.setKitchenDoor(null);
+    pacer.update(staff([0, 1.375, 0.35, WALKING]), 0, SPEED, 1, true);
+    for (let t = 0; t < 1; t += 0.1) {
+      const out = pacer.update(staff([0, 1.375, 0.35, STAFF_KITCHEN_CODE]), 0.1, SPEED, 1, true);
+      expect(row(out, 0)![2]).not.toBe(STAFF_KITCHEN_CODE);
+    }
   });
 
   it("เล่นภาพเร็วขึ้น เวลารอในครัวสั้นลงตามความเร็วที่เลือก", () => {
@@ -143,5 +203,26 @@ describe("StaffPacer — ภาพพนักงานเดินเท่า�
     let out = pacer.update(staff([0, 0, 0, COUNTER]), 0, SPEED);
     for (let i = 0; i < 10; i++) out = pacer.update(staff([0, 20, 0, WALKING]), 0.1, SPEED);
     expect(row(out, 0)![0]).toBeCloseTo(SPEED, 5);
+  });
+
+  it("งานใหม่ที่ประตูรอยังปิด: ยืนรอที่เดิมในท่ายืน ไม่เดินไปรอที่โต๊ะ — เปิดแล้วจึงเดิน", () => {
+    const pacer = new StaffPacer();
+    let task: string | null = null, open = false;
+    pacer.setGate({ taskOf: () => task, open: () => open });
+    pacer.update(staff([0, 1, 1, COUNTER]), 0, SPEED);
+    task = "task:1";
+    let out = pacer.update(staff([0, 4, 1, WALKING]), 0.5, SPEED);
+    expect(row(out, 0)).toEqual([1, 1, COUNTER]);
+    expect(pacer.waitingTask(0)).toBe("task:1");
+    for (let i = 0; i < 10; i++) out = pacer.update(staff([0, 4, 1, WALKING]), 0.5, SPEED);
+    expect(row(out, 0)![0]).toBe(1);
+    open = true;
+    out = pacer.update(staff([0, 4, 1, WALKING]), 0.5, SPEED);
+    expect(row(out, 0)![0]).toBeCloseTo(1.7, 4);
+    expect(pacer.waitingTask(0)).toBeNull();
+    // เริ่มงานแล้ว ประตูปิดอีกก็ทำงานเดิมต่อจนจบ (ไม่หยุดกลางทาง)
+    open = false;
+    out = pacer.update(staff([0, 4, 1, WALKING]), 0.5, SPEED);
+    expect(row(out, 0)![0]).toBeCloseTo(2.4, 4);
   });
 });

@@ -1,6 +1,8 @@
 import * as THREE from "three";
-import type { PresentationSnapshot } from "@/core/simulation/presentation-contract";
-import { getEmoteConfig, getMinimalIconSvg, getThoughtBadgeTheme } from "../simulation/character-thought-bubble";
+import type { CustomerThought, StaffThought } from "@/core/simulation/presentation-contract";
+import { getEmoteConfig } from "../simulation/character-thought-bubble";
+import { BADGE_ASPECT, badgeArtFor, thoughtBadgeSvg } from "../simulation/thought-badge-art";
+import type { VisualPresentation } from "../simulation/motion/visual-sync";
 
 export interface ThoughtOverlayHost {
   readonly element: HTMLElement;
@@ -8,7 +10,7 @@ export interface ThoughtOverlayHost {
 
 export interface ThoughtOverlayManager {
   update(
-    presentation: PresentationSnapshot | undefined,
+    presentation: VisualPresentation | undefined,
     camera: THREE.Camera,
     renderer: THREE.WebGLRenderer,
     customers: Map<number, { model: THREE.Object3D }>,
@@ -26,7 +28,7 @@ export interface ThoughtOverlayManager {
 // camera scale on a phone. Smaller "notification" markers lose the character
 // of the coloured badge entirely.
 const BUBBLE_WIDTH = 42;
-const BUBBLE_HEIGHT = 50;
+const BUBBLE_HEIGHT = Math.round(BUBBLE_WIDTH * BADGE_ASPECT);
 /** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
 const BUBBLE_GAP = 3;
 /** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
@@ -48,17 +50,15 @@ function bubbleScale(camera: THREE.Camera, width: number, height: number) {
   return Math.min(1.2, Math.max(0.82, pixels / REFERENCE_PIXELS_PER_METER));
 }
 
-const TEARDROP_CLIP = "polygon(50% 100%, 8% 54%, 0 33%, 5% 15%, 22% 3%, 50% 0, 78% 3%, 95% 15%, 100% 33%, 92% 54%)";
+function thoughtBadgeMarkup(thought: CustomerThought | StaffThought) {
+  return `<div style="position:relative;width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;display:flex;filter:drop-shadow(0 1px 2px rgb(15 23 42 / 0.2))">${thoughtBadgeSvg(thought, BUBBLE_WIDTH)}</div>`;
+}
 
-function thoughtBadgeMarkup(thought: Parameters<typeof getThoughtBadgeTheme>[0]) {
-  const theme = getThoughtBadgeTheme(thought);
-  const iconSvg = getMinimalIconSvg(thought);
-  return `<div style="position:relative;width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;filter:drop-shadow(0 1px 2px rgb(15 23 42 / 0.2))">
-    <div style="position:absolute;inset:0;background:${theme.rim};clip-path:${TEARDROP_CLIP}"></div>
-    <div style="position:absolute;left:3px;top:3px;width:36px;height:42px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
-      <span style="display:flex;width:30px;height:30px;color:${theme.icon}">${iconSvg}</span>
-    </div>
-  </div>`;
+/** ข้อความอ่านออกเสียง/tooltip ตามสถานะล่าสุด (เขียน DOM เฉพาะเมื่อเปลี่ยน) */
+function updateLabel(el: HTMLDivElement, label: string) {
+  if (el.title === label) return;
+  el.title = label;
+  el.setAttribute("aria-label", label);
 }
 
 export function createThoughtOverlayManager(container: HTMLElement): ThoughtOverlayManager {
@@ -70,7 +70,7 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
   const contentKeys = new WeakMap<HTMLDivElement, string>();
 
   const update = (
-    presentation: PresentationSnapshot | undefined,
+    presentation: VisualPresentation | undefined,
     camera: THREE.Camera,
     renderer: THREE.WebGLRenderer,
     customers: Map<number, { model: THREE.Object3D }>,
@@ -92,8 +92,8 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
     /** ตำแหน่งปลายหางของก้อนความคิดแต่ละก้อนบนจอ — จัดไม่ให้ซ้อนกันก่อนเขียน transform */
     const placements: { el: HTMLDivElement; x: number; y: number }[] = [];
 
-    // 1. Process customer thoughts
-    for (const customer of presentation.customers) {
+    // 1. Process customer thoughts (รวมคนที่การจำลองให้ออกไปแล้วแต่ภาพยังเดินออกอยู่)
+    for (const customer of [...presentation.customers, ...(presentation.departing ?? [])]) {
       if (!customer.thought) continue;
       const id = customer.renderAgentId;
       const rig = customers.get(id);
@@ -136,12 +136,13 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
 
       el.style.display = "block";
       placements.push({ el, x: screenX, y: screenY });
-      const contentKey = JSON.stringify([config.label, config.emoji, config.badgeText, config.severity]);
+      // วาดใหม่ (และเด้ง) เฉพาะเมื่อรูปบนป้ายเปลี่ยน — ข้อความมีนาทีที่รอซึ่งเปลี่ยนทุกไม่กี่วินาทีที่เวลาเร่ง
+      // ถ้านับรวมด้วย ป้ายจะเด้งจากโปร่งใสซ้ำ ๆ ดูเหมือนกะพริบ
+      updateLabel(el, config.label);
+      const contentKey = JSON.stringify([badgeArtFor(customer.thought), config.severity]);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
         popAfterRender.push({ el, bouncing: false });
-        el.setAttribute("aria-label", config.label);
-        el.title = config.label;
         el.innerHTML = `
           <div class="relative flex items-center justify-center select-none" style="width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;">
             ${thoughtBadgeMarkup(customer.thought)}
@@ -188,12 +189,11 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       const config = getEmoteConfig(member.thought);
       el.style.display = "block";
       placements.push({ el, x: screenX, y: screenY });
-      const contentKey = JSON.stringify([config.label, config.emoji]);
+      updateLabel(el, config.label);
+      const contentKey = badgeArtFor(member.thought);
       if (contentKeys.get(el) !== contentKey) {
         contentKeys.set(el, contentKey);
         popAfterRender.push({ el, bouncing: false });
-        el.setAttribute("aria-label", config.label);
-        el.title = config.label;
         el.innerHTML = `
           <div class="relative flex items-center justify-center select-none" style="width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;">
             ${thoughtBadgeMarkup(member.thought)}

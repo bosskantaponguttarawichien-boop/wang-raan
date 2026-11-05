@@ -254,6 +254,8 @@ describe("สเกลเวลาเล่นภาพ", () => {
     const x = start[1]!, y = start[2]!;
     let previous: Float32Array | null = null;
     const distances = [0, 0];
+    // ช่วงหลัง (วินาทีที่ 3–5) ทั้งสองคนเดินแยกกันแล้ว ไม่มีใครต้องชะลอหลีกทาง
+    const settled = [0, 0];
     for (let i = 0; i <= 50; i++) {
       now = i * 100;
       const tick = fake.runtime.tick(i === 0 ? 0 : 100)!.response;
@@ -270,7 +272,9 @@ describe("สเกลเวลาเล่นภาพ", () => {
       const current = controller.current!.agents;
       if (previous) for (let member = 0; member < 2; member++) {
         const offset = member * 4;
-        distances[member]! += Math.hypot(current[offset + 1]! - previous[offset + 1]!, current[offset + 2]! - previous[offset + 2]!);
+        const step = Math.hypot(current[offset + 1]! - previous[offset + 1]!, current[offset + 2]! - previous[offset + 2]!);
+        distances[member]! += step;
+        if (i > 30) settled[member]! += step;
       }
       previous = current;
     }
@@ -278,10 +282,13 @@ describe("สเกลเวลาเล่นภาพ", () => {
     // Includes the entrance corner; sampled chords may be slightly shorter than the complete path.
     // ความเร็วรายคนของ engine (1.0 / 1.4) ใช้คิดเวลาในการจำลองเท่านั้น — บนจอทุกคนเดิน VISUAL_WALK_SPEED
     // (เดิมเดินเร็วไม่เท่ากัน ผู้ใช้เห็นเป็น "บางเวลาเดินไว บางเวลาเดินช้า")
+    // ไม่มีใครเดินเร็วเกิน VISUAL_WALK_SPEED; ช่วงที่สองคนเดินเข้าประตูพร้อมกัน คนข้างหลังรอเว้นระยะ
+    // (crowd-avoidance — เบี่ยงทะลุกำแพงข้างประตูไม่ได้) ไม่เกินราวหนึ่งวินาที จึงเทียบความเร็วเท่ากันในช่วงที่เดินแยกกันแล้ว
     for (const distance of distances) {
-      expect(distance).toBeGreaterThan(5.7); expect(distance).toBeLessThanOrEqual(6.001);
+      expect(distance).toBeGreaterThan(4.8); expect(distance).toBeLessThanOrEqual(6.001);
     }
-    expect(Math.abs(distances[0]! - distances[1]!)).toBeLessThan(0.05);
+    for (const distance of settled) expect(distance).toBeCloseTo(2.4, 1);
+    expect(Math.abs(settled[0]! - settled[1]!)).toBeLessThan(0.05);
     expect(controller.current!.presentation?.customers.map(c => c.walkMetersPerSecond)).toEqual([1, 1.4]);
     expect(controller.current!.timing).toMatchObject({ simulationSeconds: expect.closeTo(5), deltaSeconds: expect.closeTo(0.1), playbackRate: 1 });
   });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AGENT_STATE_CODE, AGENT_STRIDE } from "@/core/simulation";
 import { cafeLayout } from "@/test/fixtures/layouts";
-import { OUTSIDE_DISTANCE, QUEUE_FIRST, QUEUE_GAP, WalkPacer, doorFrame } from "./walk-pacer";
+import { OUTSIDE_DISTANCE, PAY_SECONDS, QUEUE_FIRST, QUEUE_GAP, RISE_SECONDS, WalkPacer, doorFrame } from "./walk-pacer";
 
 const TO_SEAT = AGENT_STATE_CODE["to-seat"];
 const SEATED = AGENT_STATE_CODE.seated;
@@ -65,6 +65,18 @@ describe("WalkPacer — ภาพเดินเท่าคนจริง", ()
     expect(row(out, 5)![2]).toBe(LEAVING);
     for (let i = 0; i < 20 && row(out, 5); i++) out = pacer.update(agents(), undefined, 0.05, 1.4);
     expect(row(out, 5)).toBeNull();
+  });
+
+  it("การจำลองให้ออกจากร้านแล้วแต่ภาพยังเดินไปเคาน์เตอร์ → แสดง to-counter จนถึงเคาน์เตอร์ จึงเป็น leaving", () => {
+    const TO_COUNTER = AGENT_STATE_CODE["to-counter"];
+    const pacer = new WalkPacer();
+    pacer.update(agents([6, 0, 0, TO_COUNTER]), undefined, 0, 1);
+    // tick เดียว engine เดินถึงเคาน์เตอร์ (2, 0) จ่ายเงินเสร็จ แล้วเดินออกไป (2, 2)
+    pacer.update(agents([6, 2, 0, TO_COUNTER]), paths([6, [0, 0, 2, 0]]), 0, 1);
+    let out = pacer.update(agents([6, 2, 2, LEAVING]), paths([6, [2, 0, 2, 2]]), 0.5, 1);
+    expect(row(out, 6)).toEqual([0.5, 0, TO_COUNTER]);
+    out = pacer.update(agents([6, 2, 2, LEAVING]), undefined, 2, 1);
+    expect(row(out, 6)![2]).toBe(LEAVING);
   });
 
   it("ตามหลัง 40 เมตรก็ยังเดินด้วยความเร็วเดิม", () => {
@@ -150,6 +162,57 @@ describe("WalkPacer — นอกร้าน (ประตูผนังทิ
 });
 
 describe("WalkPacer — ลุกจากโต๊ะก่อนเดิน", () => {
+  it("ยืนจ่ายเงินที่เคาน์เตอร์ PAY_SECONDS ก่อนเดินออก แม้การจำลองจ่ายเสร็จไปก่อนแล้ว", () => {
+    const TO_COUNTER = AGENT_STATE_CODE["to-counter"], ORDERING = AGENT_STATE_CODE.ordering;
+    const pacer = new WalkPacer();
+    // กินเสร็จแล้วลุกจากโต๊ะ (ลุกเสร็จก่อนเริ่มนับ)
+    pacer.update(agents([7, 0, 0, SEATED]), undefined, 0, 1);
+    pacer.update(agents([7, 0, 0, TO_COUNTER]), undefined, 0, 1);
+    pacer.update(agents([7, 0, 0, TO_COUNTER]), undefined, RISE_SECONDS, 1);
+    pacer.update(agents([7, 2, 0, ORDERING]), paths([7, [0, 0, 2, 0]]), 0, 1);
+    pacer.update(agents([7, 2, 3, LEAVING]), paths([7, [2, 0, 2, 3]]), 0, 1);
+    // เดินถึงเคาน์เตอร์ (2 ม.) แล้วยืนจ่าย
+    let out = pacer.update(agents([7, 2, 3, LEAVING]), undefined, 2, 1);
+    expect(row(out, 7)).toEqual([2, 0, ORDERING]);
+    expect(pacer.remainingDistance(7)).toBe(0);
+    out = pacer.update(agents([7, 2, 3, LEAVING]), undefined, PAY_SECONDS - 0.1, 1);
+    expect(row(out, 7)).toEqual([2, 0, ORDERING]);
+    // จ่ายเสร็จ → เดินออกต่อ
+    out = pacer.update(agents([7, 2, 3, LEAVING]), undefined, 0.6, 1);
+    expect(row(out, 7)![1]).toBeCloseTo(0.5, 5);
+    expect(row(out, 7)![2]).toBe(LEAVING);
+  });
+
+  it("โหมดสั่งที่เคาน์เตอร์: สั่งอาหารตอนมาถึง (ยังไม่เคยนั่ง) ไม่หยุดยืนจ่ายเงิน", () => {
+    const TO_COUNTER = AGENT_STATE_CODE["to-counter"], ORDERING = AGENT_STATE_CODE.ordering;
+    const pacer = new WalkPacer();
+    pacer.update(agents([7, 0, 0, TO_COUNTER]), undefined, 0, 1);
+    pacer.update(agents([7, 2, 0, ORDERING]), paths([7, [0, 0, 2, 0]]), 0, 1);
+    pacer.update(agents([7, 2, 3, LEAVING]), paths([7, [2, 0, 2, 3]]), 0, 1);
+    pacer.update(agents([7, 2, 3, LEAVING]), undefined, 2, 1);
+    const out = pacer.update(agents([7, 2, 3, LEAVING]), undefined, 0.5, 1);
+    expect(row(out, 7)![1]).toBeCloseTo(0.5, 5);
+  });
+
+  it("เลิกรอคิวนอกร้าน: เดินออกจากแถวไปก่อนหายไป ไม่หายวับ", () => {
+    const layout = cafeLayout();
+    const pacer = new WalkPacer();
+    pacer.setDoor(doorFrame(layout));
+    pacer.update(agents(), undefined, 0, 1.4);
+    let out = pacer.update(agents([8, 0, 0, WAITING]), undefined, 0, 1.4);
+    for (let i = 0; i < 100; i++) out = pacer.update(agents([8, 0, 0, WAITING]), undefined, 0.1, 1.4);
+    const queued = row(out, 8)!;
+    out = pacer.update(agents(), undefined, 0.1, 1.4);
+    expect(row(out, 8)).not.toBeNull();
+    expect(row(out, 8)![2]).toBe(LEAVING);
+    let frames = 0;
+    for (; frames < 200 && row(out, 8); frames++) out = pacer.update(agents(), undefined, 0.1, 1.4);
+    // เดินไปอย่างน้อย 3 ม. (≈2 วินาที) ก่อนหาย
+    expect(frames).toBeGreaterThan(20);
+    expect(row(out, 8)).toBeNull();
+    expect(queued[2]).toBe(WAITING);
+  });
+
   it("รอท่าลุกบนจอให้จบก่อนออกเดิน และคงสถานะนั่งระหว่างนั้น", async () => {
     const { RISE_SECONDS } = await import("./walk-pacer");
     const pacer = new WalkPacer();

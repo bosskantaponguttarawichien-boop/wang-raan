@@ -28,10 +28,12 @@ import {
   type SimulationStoreState,
 } from "@/store/use-simulation-store";
 import { StaffPacer } from "./staff-pacer";
-import { VISUAL_WALK_SPEED, WalkPacer, doorFrame, wallDoorFrame } from "./walk-pacer";
+import { PAY_SECONDS, VISUAL_WALK_SPEED, WalkPacer, doorFrame, wallDoorFrame } from "./walk-pacer";
+import { paySpots } from "@/core/preview/staff-spots";
 import { PresentationBridge } from "./presentation-bridge";
 import { PlaybackClock } from "./motion/playback-clock";
-import { alignPresentation } from "./motion/presentation-frame";
+import { VisualSync, type VisualPresentation } from "./motion/visual-sync";
+import { CrowdAvoider, REMAINING_CAP } from "./motion/crowd-avoidance";
 import { DeliveryHold, PUT_DOWN_SECONDS } from "./motion/delivery-hold";
 import {
   CUSTOMER_BACKLOG_GRACE_SECONDS, MIN_TASK_SHOW_SECONDS, PacingGovernor, type PacingState,
@@ -43,7 +45,8 @@ export interface SimulationFrame {
   agents: Float32Array;
   /** พนักงานหน้าร้าน: index, x, y, STAFF_STATE_CODE */
   staff: Float32Array;
-  presentation?: PresentationSnapshot;
+  /** ปรับตามภาพแล้ว (VisualSync) — รวมป้ายของคนที่กำลังเดินออก */
+  presentation?: VisualPresentation;
   /**
    * Tick time for scene actions; delta is simulation time, already scaled once.
    * playbackRate = ตัวคูณเวลาที่ Worker ใช้จริง (อาจถูกชะลอจากที่ผู้ใช้เลือก),
@@ -108,10 +111,13 @@ export class SimulationController {
   private readonly pacer = new WalkPacer();
   /** ภาพพนักงานเดินเท่าคนจริง และแวะเข้าครัวก่อนเสิร์ฟ */
   private readonly staffPacer = new StaffPacer();
+  /** ตัวละครบนจอเบี่ยงหลบ/ชะลอหลีกทางกัน (เฉพาะภาพ) */
+  private readonly crowd = new CrowdAvoider();
   private readonly bridge = new PresentationBridge();
   private readonly clock = new PlaybackClock();
   private readonly governor = new PacingGovernor();
   private readonly deliveries = new DeliveryHold();
+  private readonly sync = new VisualSync();
   /** วินาทีจริงที่ภาพเล่นไปแล้ว ไม่นับช่วงหยุด/แท็บซ่อน — นาฬิกาของท่าวางจาน (DeliveryHold) */
   private playedSeconds = 0;
   /** ตัวคูณเวลาที่ Worker ใช้อยู่ (ส่งไปล่าสุด) */
@@ -210,6 +216,11 @@ export class SimulationController {
     this.staffPacer.setRouter((from, to) => (staffRefiner.segmentClear(from, to) ? [] : findGridPath(staffGrid, staffRefiner, from, to)));
     // พนักงานเดินเข้าประตูครัวไปรับอาหาร (เฉพาะภาพ — engine รับอาหารที่ช่องติดผนัง)
     this.staffPacer.setKitchenDoor(wallDoorFrame(layout, layout.kitchenDoor));
+    this.staffPacer.setGate(this.sync);
+    this.sync.setPayPoints(paySpots(layout));
+    // ตัวละครเบี่ยงหลบกันได้เฉพาะในที่ว่างจากโต๊ะ/ผนัง (เฉพาะภาพ)
+    this.crowd.setClearance(customerRefiner.segmentClear, staffRefiner.segmentClear);
+    this.crowd.setRoom({ width: layout.width, depth: layout.depth });
     try {
       const client = this.ensureClient();
       const synced = await client.syncLayout(layout, validation);
@@ -363,7 +374,7 @@ export class SimulationController {
    * ซึ่งดีกว่าหยุดภาพค้างแล้วรอให้ผู้ใช้กดเล่นต่อเอง
    */
   private resync(simulationSeconds: number, now: number) {
-    this.pacer.reset(); this.staffPacer.reset(); this.deliveries.reset();
+    this.pacer.reset(); this.staffPacer.reset(); this.deliveries.reset(); this.crowd.reset(); this.sync.reset();
     this.clock.reset(simulationSeconds, now);
     this.previous = null; this.current = null;
     this.resyncOnNextTick = false;
@@ -438,10 +449,19 @@ export class SimulationController {
     return held;
   }
 
+  /** ท่าทาง/ป้ายสถานะตามภาพที่เห็น (จานตามถาด, ลูกค้าตามที่นั่ง, พนักงานตามงานที่เริ่มจริงบนจอ) */
+  private alignToVisuals(snapshot: PresentationSnapshot, agents: Float32Array, staff: Float32Array, playedDelta: number) {
+    const orders = this.staffPacer.pendingOrders();
+    return this.sync.align(this.holdDeliveries(snapshot, staff, playedDelta), agents, staff,
+      index => this.staffPacer.waitingTask(index), taskId => orders.has(taskId));
+  }
+
   private resetPacer() {
     this.pacer.reset();
     this.deliveries.reset();
     this.staffPacer.reset();
+    this.crowd.reset();
+    this.sync.reset();
     this.clock.reset();
     this.bridge.reset();
     this.resyncOnNextTick = false;
@@ -490,11 +510,25 @@ export class SimulationController {
       for (let offset = 0; offset < sourceStaff.length; offset += 4) if (hidden.has(sourceStaff[offset]!)) sourceStaff[offset + 3] = 5;
     }
     this.previous = this.current;
-    const agents = this.pacer.update(tick.agents, tick.paths, timing.seconds, walkSpeed);
-    const staff = this.staffPacer.update(sourceStaff, timing.seconds, STAFF_WALK_SPEED * walkRate, playback, snapshot !== null);
+    // ชะลอคนที่กำลังหลีกทาง/เดินตามหลังใกล้เกิน (ตัวคูณจาก TICK ก่อน)
+    const agents = this.pacer.update(tick.agents, tick.paths, timing.seconds, id => walkSpeed * this.crowd.customerFactor(id));
+    // พนักงานเริ่มงานที่โต๊ะเมื่อภาพลูกค้าพร้อม (นั่งแล้ว / ลุกพ้นโต๊ะแล้ว) — ไม่ไปยืนรอก่อนลูกค้ามาถึง
+    this.sync.observe(snapshot, agents, id => this.pacer.isRising(id), timing.seconds);
+    const staff = this.staffPacer.update(sourceStaff, timing.seconds, index => STAFF_WALK_SPEED * walkRate * this.crowd.staffFactor(index), playback, snapshot !== null);
+    // ยืนรับเงินหลังจอ POS ให้นานเท่ากับที่ลูกค้ายืนจ่าย (การจำลองจ่ายเสร็จในเสี้ยววินาทีที่เวลาเร่ง)
+    for (const stop of this.sync.payStops) this.staffPacer.holdAt(stop.staffId, stop.point.x, stop.point.y, PAY_SECONDS * this.workerSpeed);
+    // ภาพใช้ตำแหน่งที่เบี่ยงหลบกันแล้ว; logic (ส่งอาหาร, ท่าทาง, pacing) ยังใช้ตำแหน่งตามทางเดินจริงจาก pacer
+    const shown = this.crowd.update({
+      agents, staff, dt: timing.seconds, rate: walkRate,
+      remainingCustomer: id => this.pacer.remainingDistance(id, REMAINING_CAP),
+      remainingStaff: index => this.staffPacer.remainingDistance(index, REMAINING_CAP),
+      customerRising: id => this.pacer.isRising(id),
+      staffStop: index => this.staffPacer.nextStop(index),
+    });
     this.current = {
       at: now,
-      agents, staff, presentation: snapshot ? alignPresentation(this.holdDeliveries(snapshot, staff, timing.seconds), agents, staff) : undefined,
+      agents: shown.agents, staff: shown.staff,
+      presentation: snapshot ? this.alignToVisuals(snapshot, agents, staff, timing.seconds) : undefined,
       timing: { simulationSeconds: tick.metrics.time, deltaSeconds: timing.seconds * playback, ...this.rates() },
     };
     this.updatePacing(selected, timing.seconds, now, staff, snapshot);

@@ -21,6 +21,37 @@ export const CLIP_FADE_SECONDS = 0.18;
 
 const MIN_FRAME_SECONDS = 1e-4;
 
+/**
+ * จังหวะก้าวประจำตัว (เดิมทุกคนก้าวเร็วเท่ากันและเริ่มก้าวแรกที่ต้นคลิปพร้อมกัน → เดินเหมือนทหาร)
+ * แต่ละคนก้าวถี่/ห่างต่างกันไม่เกิน ±GAIT_CADENCE_VARIATION โดยความเร็วบนพื้นเท่าเดิม (ก้าวยาว/สั้นต่างกันแทน)
+ * และเริ่มท่าเดินที่จังหวะต่างกัน — คงที่ต่อคน เล่นซ้ำได้ภาพเดิม
+ */
+export const GAIT_CADENCE_VARIATION = 0.08;
+
+export interface GaitProfile {
+  /** ตัวคูณจังหวะก้าว (1 ± GAIT_CADENCE_VARIATION) */
+  cadence: number;
+  /** จุดเริ่มในรอบคลิปเดิน 0..1 */
+  phase: number;
+}
+
+const unit = (value: number) => {
+  let h = Math.imul(value | 0, 0x9e3779b1) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  return ((h ^ (h >>> 16)) >>> 0) / 0x1_0000_0000;
+};
+
+/** key: renderAgentId ของลูกค้า หรือ -(staffId + 1) ของพนักงาน (ไม่ชนกัน) */
+export function gaitProfile(key: number): GaitProfile {
+  // ลำดับอัตราส่วนทอง: id ติดกัน (คนในกลุ่มเดียวกัน) ห่างกันในรอบก้าวเสมอ แล้วเหลื่อมอีกเล็กน้อยไม่ให้เป็นแบบแผน
+  const spread = key * 0.618_033_988_75 + unit(key ^ 0x5bd1e995) * 0.2;
+  return { cadence: 1 + (unit(key) * 2 - 1) * GAIT_CADENCE_VARIATION, phase: ((spread % 1) + 1) % 1 };
+}
+
+/** key จังหวะก้าวของพนักงาน — แยกจาก id ลูกค้าที่เริ่มจาก 0 เหมือนกัน */
+export const staffGaitKey = (staffId: number) => -(staffId + 1);
+
 export interface LocomotionState {
   lastX: number | null;
   lastZ: number | null;

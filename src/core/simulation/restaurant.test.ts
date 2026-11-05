@@ -153,6 +153,20 @@ describe("ร้านอาหารแบบ A: นั่งก่อน พ�
     expect(seen.has("take-order")).toBe(true);
     expect(seen.has("deliver")).toBe(true);
   });
+  it("ทุกคนช่วยกัน (cashiers 0): งานใหม่ไปที่คนที่ว่างนานที่สุด สองคนผลัดกันทำ ไม่กองที่คนแรก", () => {
+    const sim = restaurant({ frontStaff: 2, cashiers: 0, customersPerHour: 40, seed: 1 });
+    sim.spawnFirstCustomer();
+    const counts = [0, 0], seen = new Set<string>();
+    for (let t = 0; t < 2 * 3600; t += 1) {
+      sim.step(1);
+      for (const member of sim.presentationSnapshot({ runId: "test", layoutRevision: "test", sequence: t }).staff) {
+        if (member.taskId && !seen.has(member.taskId)) { seen.add(member.taskId); counts[member.staffId]!++; }
+      }
+    }
+    // เดิมคนแรกได้ 21 งาน คนที่สองได้ 4 งาน
+    expect(counts[0]! + counts[1]!).toBeGreaterThan(15);
+    expect(Math.min(counts[0]!, counts[1]!) / (counts[0]! + counts[1]!)).toBeGreaterThan(0.35);
+  });
   it("เวลาปรุงแต่ละจานอิงชนิดอาหารที่แสดงและเปลี่ยนผลการจำลองได้", () => {
     expect(MENU_COOK_FACTORS.steak).toBeGreaterThan(MENU_COOK_FACTORS["fried-rice"]);
     expect(MENU_COOK_FACTORS.cake).toBeLessThan(MENU_COOK_FACTORS["fried-rice"]);
