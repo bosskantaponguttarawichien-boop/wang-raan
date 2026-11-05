@@ -22,10 +22,11 @@ export interface ThoughtOverlayManager {
 }
 
 /** ขนาดก้อนความคิดที่ scale 1 (px) */
-// This is intentionally larger than the 18px design preview: camera scaling
-// reduces it on a real phone, where 30×36 becomes roughly a 24px marker.
-const BUBBLE_WIDTH = 30;
-const BUBBLE_HEIGHT = 36;
+// The illustration needs enough physical pixels to remain legible after the
+// camera scale on a phone. Smaller "notification" markers lose the character
+// of the coloured badge entirely.
+const BUBBLE_WIDTH = 42;
+const BUBBLE_HEIGHT = 50;
 /** ยอมให้ขอบก้อนเกยกันได้เท่านี้ (px) ก่อนเลื่อนขึ้น */
 const BUBBLE_GAP = 3;
 /** ตัวละครสูงราวเท่านี้ (px ต่อเมตร) ถือเป็นขนาดปกติ scale 1 */
@@ -54,8 +55,8 @@ function thoughtBadgeMarkup(thought: Parameters<typeof getThoughtBadgeTheme>[0])
   const iconSvg = getMinimalIconSvg(thought);
   return `<div style="position:relative;width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;filter:drop-shadow(0 1px 2px rgb(15 23 42 / 0.2))">
     <div style="position:absolute;inset:0;background:${theme.rim};clip-path:${TEARDROP_CLIP}"></div>
-    <div style="position:absolute;left:2px;top:2px;width:26px;height:31px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
-      <span style="display:flex;width:18px;height:18px;color:${theme.icon}">${iconSvg}</span>
+    <div style="position:absolute;left:3px;top:3px;width:36px;height:42px;display:flex;align-items:center;justify-content:center;background:${theme.fill};clip-path:${TEARDROP_CLIP}">
+      <span style="display:flex;width:30px;height:30px;color:${theme.icon}">${iconSvg}</span>
     </div>
   </div>`;
 }
@@ -132,9 +133,6 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
       }
 
       const config = getEmoteConfig(customer.thought);
-      const isCritical = config.severity === "critical";
-      const isWarning = config.severity === "warning";
-      const badgeColor = isCritical ? "#e11d48" : isWarning ? "#d97706" : "#334155";
 
       el.style.display = "block";
       placements.push({ el, x: screenX, y: screenY });
@@ -144,13 +142,9 @@ export function createThoughtOverlayManager(container: HTMLElement): ThoughtOver
         popAfterRender.push({ el, bouncing: false });
         el.setAttribute("aria-label", config.label);
         el.title = config.label;
-        const badgeHtml = config.badgeText
-          ? `<span style="position:absolute;right:-7px;bottom:-4px;border-radius:999px;padding:1px 4px;font-size:9px;font-weight:700;line-height:12px;color:#fff;background:${badgeColor};box-shadow:0 1px 2px rgb(15 23 42 / 0.16)">${config.badgeText}</span>`
-          : "";
         el.innerHTML = `
           <div class="relative flex items-center justify-center select-none" style="width:${BUBBLE_WIDTH}px;height:${BUBBLE_HEIGHT}px;">
             ${thoughtBadgeMarkup(customer.thought)}
-            ${badgeHtml}
           </div>
         `;
       }
