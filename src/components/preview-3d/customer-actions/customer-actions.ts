@@ -12,7 +12,7 @@
  *   the table, and so feat-122 learns how far the seated body still has to shift.
  */
 import * as THREE from "three";
-import { CLIP_FADE_SECONDS, createLocomotionState, measureLocomotion, type LocomotionState } from "../runtime/locomotion";
+import { CLIP_FADE_SECONDS, createLocomotionState, gaitProfile, measureLocomotion, type LocomotionState } from "../runtime/locomotion";
 import type { StoreLayout } from "@/core/layout/types";
 import type { CustomerPresentation, MealPresentation, PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
 import type { SceneFeature, SceneFeatureContext, SceneFrame } from "../runtime/contracts";
@@ -253,6 +253,10 @@ export function createCustomerActionsFeature(options: CustomerActionsOptions) {
         const previous = state.active;
         if (!previous) state.rig.mixer.stopAllAction();
         action.reset();
+        // เริ่มท่าเดินคนละจังหวะ (เดิมทุกคนเริ่มที่ต้นคลิป → ก้าวเท้าพร้อมกัน)
+        if (decision.loop && decision.phase === null && name.includes("Walk")) {
+          action.time = gaitProfile(decision.renderAgentId).phase * action.getClip().duration;
+        }
         action.setEffectiveWeight(1);
         action.play();
         if (previous && previous !== action) action.crossFadeFrom(previous, CLIP_FADE_SECONDS, false);

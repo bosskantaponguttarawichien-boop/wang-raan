@@ -9,7 +9,7 @@
  */
 import { footprint } from "../layout/geometry";
 import type { Meters, Point, Rect, StoreLayout } from "../layout/types";
-import { staffSpots } from "../preview/staff-spots";
+import { cashierSpot, staffSpots } from "../preview/staff-spots";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
 import { createPathRefiner, smoothPath, type PathRefiner } from "./path-smoothing";
@@ -36,6 +36,8 @@ export const STAFF_VISUAL_WALK_SPEED = 1.2;
  * จึงไม่เดินจมผนัง; ยังอยู่ในช่องกริดแถวที่สอง (0.25–0.50 ม.) ที่ตรวจแล้วว่าว่าง
  */
 export const WALL_CLEARANCE: Meters = 0.35;
+/** จุดยืนประจำห่างจุดหลังจอ POS น้อยกว่านี้ (ม.) ถือว่ายืนรับเงินอยู่แล้ว ไม่ต้องเดิน */
+export const PAY_NEAR_HOME: Meters = 0.3;
 
 export type StaffTaskKind = "deliver" | "pay" | "clean" | "take-order";
 
@@ -82,6 +84,35 @@ function cellsAround(grid: OccupancyGrid, rect: Rect): number[] {
   return out;
 }
 
+/** กลางช่องกริด (ม.) */
+function cellCenter(grid: OccupancyGrid, cell: number): Point {
+  const col = cell % grid.cols;
+  return { x: (col + 0.5) * grid.cellSize, y: ((cell - col) / grid.cols + 0.5) * grid.cellSize };
+}
+
+/** จุดยืนประจำของพนักงานหน้าร้านแต่ละคน: จุดหลังเคาน์เตอร์ก่อน แล้วช่องว่างรอบเคาน์เตอร์ที่ใกล้ที่สุด */
+function placeHomes(grid: OccupancyGrid, layout: StoreLayout, workers: number): Point[] {
+  const homes = staffSpots(layout).map((spot) => spot.position);
+  const counters = layout.objects.filter((o) => o.type === "counter").map(footprint);
+  const spare = counters.flatMap((rect) => cellsAround(grid, rect)).map((cell) => cellCenter(grid, cell));
+  const anchor = homes[0] ?? spare[0] ?? cellCenter(grid, grid.kitchenCells[0] ?? 0);
+  spare.sort((a, b) => Math.hypot(a.x - anchor.x, a.y - anchor.y) - Math.hypot(b.x - anchor.x, b.y - anchor.y));
+  for (const p of spare) {
+    if (homes.length >= workers) break;
+    if (homes.every((h) => Math.hypot(h.x - p.x, h.y - p.y) >= 0.5)) homes.push(p);
+  }
+  while (homes.length < workers) homes.push(homes[homes.length % Math.max(1, homes.length)] ?? anchor);
+  return homes.slice(0, workers);
+}
+
+/**
+ * จุดยืนประจำเดียวกับที่ภาพพนักงานใช้ (StaffVisuals) — engine ใช้เลือกคนที่ใกล้จอ POS ที่สุดไปรับเงิน
+ * คำนวณจากผังอย่างเดียว ผลจำลองจึงเท่ากันทั้งตอนวิเคราะห์และตอนดูภาพ
+ */
+export function staffHomes(layout: StoreLayout, workers: number): Point[] {
+  return placeHomes(buildOccupancyGrid(layout, undefined, { blockStaffSpots: false }), layout, workers);
+}
+
 export class StaffVisuals {
   /** จุดยืนประจำของพนักงานแต่ละคน */
   readonly homes: Point[];
@@ -91,6 +122,8 @@ export class StaffVisuals {
   private readonly tableRects = new Map<string, Rect>();
   private readonly room: { width: Meters; depth: Meters };
   private readonly refiner: PathRefiner;
+  /** จุดยืนรับเงินหลังจอ POS (null = ไม่มีจอ/ไม่มีที่ยืน → รับเงินที่จุดยืนประจำ) */
+  private readonly payPoint: Point | null;
 
   constructor(layout: StoreLayout, workers: number) {
     this.room = { width: layout.width, depth: layout.depth };
@@ -98,7 +131,8 @@ export class StaffVisuals {
     this.refiner = createPathRefiner(this.grid);
     this.kitchenField = computeFlowField(this.grid, this.grid.kitchenCells);
     for (const o of layout.objects) if (o.type === "table") this.tableRects.set(o.id, footprint(o));
-    this.homes = this.placeHomes(layout, workers);
+    this.homes = placeHomes(this.grid, layout, workers);
+    this.payPoint = cashierSpot(layout)?.staff ?? null;
   }
 
   private cellOf(p: Point) {
@@ -124,20 +158,6 @@ export class StaffVisuals {
   }
 
   /** จุดยืนหลังเคาน์เตอร์ก่อน คนที่เกินยืนช่องว่างรอบเคาน์เตอร์ (ห่างกันอย่างน้อย 0.5 ม.) */
-  private placeHomes(layout: StoreLayout, workers: number): Point[] {
-    const homes = staffSpots(layout).map((spot) => spot.position);
-    const counters = layout.objects.filter((o) => o.type === "counter").map(footprint);
-    const spare = counters.flatMap((rect) => cellsAround(this.grid, rect)).map((cell) => this.center(cell));
-    const anchor = homes[0] ?? spare[0] ?? this.center(this.grid.kitchenCells[0] ?? 0);
-    spare.sort((a, b) => Math.hypot(a.x - anchor.x, a.y - anchor.y) - Math.hypot(b.x - anchor.x, b.y - anchor.y));
-    for (const p of spare) {
-      if (homes.length >= workers) break;
-      if (homes.every((h) => Math.hypot(h.x - p.x, h.y - p.y) >= 0.5)) homes.push(p);
-    }
-    while (homes.length < workers) homes.push(homes[homes.length % Math.max(1, homes.length)] ?? anchor);
-    return homes.slice(0, workers);
-  }
-
   private homeField(worker: number): FlowField {
     let field = this.homeFields.get(worker);
     if (!field) {
@@ -196,13 +216,18 @@ export class StaffVisuals {
   plan(worker: number, kind: StaffTaskKind, tableId: string | null, total: number, walkSeconds: number): StaffPlan {
     if (!Number.isFinite(total) || !Number.isFinite(walkSeconds) || total < 0 || walkSeconds < 0) throw new RangeError("Invalid staff task duration");
     const home = this.homes[worker]!;
-    const stand = kind === "pay" ? null : this.standCell(worker, tableId);
     const still = (seconds: number, code: number, at: Point = home): Phase => ({ points: [at], length: 0, seconds, code });
-    if (stand === null) return { phases: [still(total, STAFF_STATE_CODE.counter)], total };
+    // รับเงิน: ยืนหลังจอ POS (เดินไปถ้าจุดยืนประจำอยู่ไกล) — ไม่มีจอ POS ก็ยืนประจำที่เดิมเหมือนเดิม
+    const pay = kind === "pay" ? this.payPoint : null;
+    const payFar = pay !== null && Math.hypot(pay.x - home.x, pay.y - home.y) >= PAY_NEAR_HOME;
+    const stand = kind === "pay" ? (payFar ? this.cellOf(pay!) : null) : this.standCell(worker, tableId);
+    if (stand === null || (kind === "pay" && this.toHome(worker, stand).length === 0)) {
+      return { phases: [still(total, pay ? STAFF_STATE_CODE["taking-order"] : STAFF_STATE_CODE.counter)], total };
+    }
 
     const back = this.toHome(worker, stand);
     const out = [...back].reverse();
-    const at = this.offWall(this.center(stand));
+    const at = pay ?? this.offWall(this.center(stand));
     let legs: { points: Point[]; code: number }[];
     let work: Phase | null = null;
     if (kind === "deliver") {

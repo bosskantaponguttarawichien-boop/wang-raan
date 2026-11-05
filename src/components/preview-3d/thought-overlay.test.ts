@@ -71,10 +71,21 @@ describe("ThoughtOverlayManager", () => {
     manager.update(snapshot, camera, renderer, customers, staff, true);
     expect(bubble?.firstElementChild).toBe(cloud);
 
+    // นาทีที่รอเปลี่ยนทุกไม่กี่วินาทีที่เวลาเร่ง: อัปเดตแค่ข้อความ ไม่วาดใหม่/ไม่เด้ง (เดิมป้ายกะพริบ)
+    const laterSnapshot: PresentationSnapshot = { ...snapshot, customers: [{ ...snapshot.customers[0]!, thought: { kind: "food-warning", waitSeconds: 480, severity: "warning" } }] };
+    manager.update(laterSnapshot, camera, renderer, customers, staff, true);
+    expect(bubble?.firstElementChild).toBe(cloud);
+    expect(bubble?.getAttribute("aria-label")).toContain("8 นาที");
+
     const changedSnapshot: PresentationSnapshot = { ...snapshot, customers: [{ ...snapshot.customers[0]!, thought: { kind: "food-critical", waitSeconds: 900, severity: "critical" } }] };
     manager.update(changedSnapshot, camera, renderer, customers, staff, true);
     expect(bubble?.firstElementChild).not.toBe(cloud);
     expect(bubble?.getAttribute("aria-label")).toContain("รออาหารนานมาก");
+
+    // คนที่การจำลองให้ออกไปแล้วแต่ภาพยังเดินออกอยู่ ก็มีป้าย
+    manager.update({ ...snapshot, customers: [], departing: [{ renderAgentId: 10, thought: { kind: "leaving", waitSeconds: 0, severity: "normal" } }] },
+      camera, renderer, customers, staff, true);
+    expect(container.querySelector('[data-agent-id="10"]')?.getAttribute("aria-label")).toBe("กำลังออกจากร้าน");
 
     // 2. Hide when showThoughts is false
     manager.update(snapshot, camera, renderer, customers, staff, false);
@@ -106,7 +117,9 @@ describe("ThoughtOverlayManager", () => {
     manager.update(snapshot, camera, renderer, customers, [], true);
     const badge = container.querySelector('[data-agent-id="11"]');
     expect(badge?.innerHTML).toContain("width:42px");
-    expect(badge?.innerHTML).toContain("polygon(50% 100%");
+    // Round pin drawn as one SVG (design reference), not a faceted clip-path polygon.
+    expect(badge?.innerHTML).not.toContain("polygon(");
+    expect(badge?.innerHTML).toContain('data-badge-art="food"');
     expect(badge?.innerHTML).not.toContain("animate-bounce");
 
     manager.update(snapshot, camera, renderer, customers, [], true, true);

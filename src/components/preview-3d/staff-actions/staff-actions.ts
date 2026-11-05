@@ -12,7 +12,8 @@
  *   tray once feat-116 reports it on the target table, which is why the food never blinks out.
  */
 import * as THREE from "three";
-import { CLIP_FADE_SECONDS, createLocomotionState, measureLocomotion, type LocomotionState } from "../runtime/locomotion";
+import { CLIP_FADE_SECONDS, createLocomotionState, gaitProfile, measureLocomotion, staffGaitKey, type LocomotionState } from "../runtime/locomotion";
+import { setTrayPlateCount } from "../runtime/legacy-serving-props";
 import { objectCenter } from "@/core/layout";
 import type { StoreLayout } from "@/core/layout/types";
 import type { PresentationPoint, PresentationSnapshot } from "@/core/simulation/presentation-contract";
@@ -179,6 +180,10 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
         const previous = state.active;
         if (!previous) state.rig.mixer.stopAllAction();
         action.reset();
+        // เริ่มท่าเดินคนละจังหวะ (เดิมทุกคนเริ่มที่ต้นคลิป → ก้าวเท้าพร้อมกัน)
+        if (decision.loop && decision.phase === null && name.includes("Walk")) {
+          action.time = gaitProfile(staffGaitKey(decision.staffId)).phase * action.getClip().duration;
+        }
         action.setEffectiveWeight(1);
         action.play();
         if (previous && previous !== action) action.crossFadeFrom(previous, CLIP_FADE_SECONDS, false);
@@ -198,9 +203,13 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
       }
     };
 
-    const syncProps = (state: RigState, decision: StaffActionDecision, trayVisible: boolean) => {
+    const syncProps = (state: RigState, decision: StaffActionDecision, trayVisible: boolean, trayMeals: number) => {
       const { rig } = state;
-      if (rig.tray) rig.tray.visible = trayVisible;
+      if (rig.tray) {
+        rig.tray.visible = trayVisible;
+        // จานบนถาดเท่าที่ถืออยู่จริง (ลดลงทีละจานเมื่อวางบนโต๊ะแล้ว)
+        if (trayVisible) setTrayPlateCount(rig.tray, trayMeals);
+      }
       if (decision.props.cloth) state.cloth ??= attachProp(rig, clothMesh(), "RightHand", CLOTH_SIZE.height / 2);
       else {
         detachProp(state.cloth);
@@ -256,7 +265,7 @@ export function createStaffActionsFeature(options: StaffActionsOptions) {
           : new Set<string>();
         const pending = staff.carryMealIds.filter(mealId => !placed.has(mealId));
         const trayVisible = decision.props.tray && (!decision.props.dishReleased || pending.length > 0);
-        syncProps(state, decision, trayVisible);
+        syncProps(state, decision, trayVisible, decision.props.dishReleased ? pending.length : decision.props.trayMealIds.length);
 
         const reach = wipeReach(
           staff.servicePoint,

@@ -179,9 +179,17 @@ describe("presentation snapshots", () => {
       severity: "normal",
     });
 
-    // 6. เดินออก หรือ cancelled
-    expect(resolveCustomerThought({ ...eatingParty, cancelled: true }, 1600, 0, 1.0)).toBeNull();
-    expect(resolveCustomerThought({ ...eatingParty, state: "leaving" }, 1600, 0, 1.0)).toBeNull();
+    // 6. เดินออกจากร้าน: กินเสร็จแล้วออก (ปกติ) หรือถอนตัวโดยไม่ได้รับบริการ (วิกฤต)
+    expect(resolveCustomerThought({ ...eatingParty, state: "leaving" }, 1600, 0, 1.0)).toEqual({
+      kind: "leaving",
+      waitSeconds: 0,
+      severity: "normal",
+    });
+    expect(resolveCustomerThought({ ...foodParty, cancelled: true }, 1600, 0, 0)).toEqual({
+      kind: "leaving",
+      waitSeconds: 0,
+      severity: "critical",
+    });
   });
 
   it("resolves staff thoughts for active tasks", () => {

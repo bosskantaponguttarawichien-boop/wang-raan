@@ -34,6 +34,11 @@ describe("CharacterThoughtBubble & getEmoteConfig", () => {
     expect(getEmoteConfig(bill)).toMatchObject({ emoji: "💳", severity: "normal" });
   });
 
+  it("formats leaving thoughts, separating walk-outs from served guests", () => {
+    expect(getEmoteConfig({ kind: "leaving", waitSeconds: 0, severity: "normal" })).toMatchObject({ emoji: "🚪", label: "กำลังออกจากร้าน" });
+    expect(getEmoteConfig({ kind: "leaving", waitSeconds: 0, severity: "critical" })).toMatchObject({ label: "ไม่ได้รับบริการ เดินออกจากร้าน", severity: "critical" });
+  });
+
   it("formats staff tasks appropriately", () => {
     const order: StaffThought = { kind: "taking-order" };
     const serve: StaffThought = { kind: "serving" };

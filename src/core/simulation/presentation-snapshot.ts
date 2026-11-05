@@ -91,7 +91,9 @@ export function resolveCustomerThought(
   consumed: number,
   patienceSeconds = 15 * 60,
 ): CustomerThought | null {
-  if (party.cancelled || party.state === "leaving") return null;
+  if (party.cancelled || party.state === "leaving") {
+    return { kind: "leaving", waitSeconds: 0, severity: party.cancelled ? "critical" : "normal" };
+  }
 
   // 1. รอคิวหน้าร้าน
   if (party.state === "waiting-entrance") {
@@ -187,7 +189,10 @@ function staffPresentation(staff: StaffView, now: number, meals: readonly MealPr
     walkMetersPerSecond: 1.2,
     carryMealIds: current === "carrying" ? meals.filter(meal => meal.serviceCycleId === task?.cycleId).map(meal => meal.mealId) : [],
     servicePoint, phaseStartedAtSeconds: start, phaseEndsAtSeconds: end,
-    thought: staff.onBreak && !task ? { kind: "resting" } : resolveStaffThought(current),
+    thought: staff.onBreak && !task ? { kind: "resting" }
+      // รับเงินที่หลังจอ POS ใช้ท่าเดียวกับรับออเดอร์ แต่ป้ายเป็นรับเงิน
+      : task?.kind === "pay" && current === "taking-order" ? { kind: "taking-payment" }
+      : resolveStaffThought(current),
   };
 }
 

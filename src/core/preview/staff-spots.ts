@@ -70,3 +70,57 @@ function spotsForCounter(counter: Counter, layout: StoreLayout): StaffSpot[] {
 export function staffSpots(layout: StoreLayout): StaffSpot[] {
   return layout.objects.flatMap((o) => (o.type === "counter" ? spotsForCounter(o, layout) : []));
 }
+
+/** จอ POS อยู่ห่างปลายด้าน +x (แกนยาวในพิกัดท้องถิ่นของเคาน์เตอร์) เท่านี้ — ใช้ร่วมกับ createCounter ใน three-view */
+export function posInset(long: Meters): Meters {
+  return Math.min(0.35, long * 0.2);
+}
+
+/** จุดจ่ายเงินของเคาน์เตอร์หนึ่งตัว: ลูกค้ายืนหน้าจอ POS, พนักงานยืนหลังจอ POS */
+export interface PaySpot {
+  counterId: string;
+  /** กลางตัวลูกค้าหน้าจอ POS (ฝั่งห้อง) */
+  customer: Point;
+  /** กลางตัวพนักงานหลังจอ POS — null เมื่อไม่มีที่ยืน (ชนผนัง/วัตถุ) */
+  staff: Point | null;
+  /** ตำแหน่งจอ POS บนท็อปเคาน์เตอร์ — ลูกค้าและพนักงานหันหน้าเข้าหาจุดนี้ตอนจ่าย/รับเงิน */
+  pos: Point;
+}
+
+/**
+ * ตำแหน่งจอ POS บนผัง — ตรงกับ createCounter: ก่อนหมุน ด้านยาวแกน x (ถ้า depth > width หมุน 90° จึงชี้ −y),
+ * จอห่างปลาย +x ตาม posInset, ฝั่งลูกค้า +z (ใต้) แล้วหมุนตาม `rotation` ของเคาน์เตอร์
+ */
+function paySpotForCounter(counter: Counter, layout: StoreLayout): PaySpot {
+  const alongX = counter.width >= counter.depth;
+  const long = Math.max(counter.width, counter.depth);
+  const short = Math.min(counter.width, counter.depth);
+  const axis = rotatePoint(alongX ? { x: 1, y: 0 } : { x: 0, y: -1 }, ORIGIN, counter.rotation);
+  const front = rotatePoint(alongX ? { x: 0, y: 1 } : { x: 1, y: 0 }, ORIGIN, counter.rotation);
+  const center = objectCenter(counter);
+  const along = long / 2 - posInset(long);
+  const at = (side: number, standoff: Meters) => ({
+    x: center.x + axis.x * along + front.x * side * (short / 2 + standoff),
+    y: center.y + axis.y * along + front.y * side * (short / 2 + standoff),
+  });
+  const others = layout.objects.filter((o) => o.id !== counter.id).map(footprint);
+  const fits = (position: Point) =>
+    position.x - STAFF_RADIUS >= 0 && position.y - STAFF_RADIUS >= 0 &&
+    position.x + STAFF_RADIUS <= layout.width && position.y + STAFF_RADIUS <= layout.depth &&
+    !others.some((rect) => squareHitsRect(position, STAFF_RADIUS, rect));
+  const staff = STAFF_STANDOFFS.map((standoff) => at(-1, standoff)).find(fits) ?? null;
+  const pos = { x: center.x + axis.x * along, y: center.y + axis.y * along };
+  return { counterId: counter.id, customer: at(1, STAFF_STANDOFFS[0]!), staff, pos };
+}
+
+export function paySpots(layout: StoreLayout): PaySpot[] {
+  return layout.objects.flatMap((o) => (o.type === "counter" ? [paySpotForCounter(o, layout)] : []));
+}
+
+/**
+ * จอ POS ที่ใช้รับเงินจริง (ตัวแรกที่มีจุดยืนฝั่งพนักงาน) — engine ให้ลูกค้าต่อคิวจ่ายที่จอนี้
+ * และภาพพนักงานเดินไปหลังจอนี้ ผังที่มีหลายเคาน์เตอร์จึงจ่าย/รับเงินที่จอเดียวกันเสมอ
+ */
+export function cashierSpot(layout: StoreLayout): PaySpot | null {
+  return paySpots(layout).find((spot) => spot.staff !== null) ?? null;
+}

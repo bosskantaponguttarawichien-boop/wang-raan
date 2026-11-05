@@ -29,7 +29,13 @@ const DOORSTEP = 0.3;
 // +0.6 วินาทีเผื่อ: ภาพเริ่มท่าลุกช้ากว่า pacer เล็กน้อย (วาดย้อนหลัง ~1.5 TICK และรอ snapshot) — ถ้าจุดหมายออกเดินก่อน
 // ตัวละครที่เพิ่งลุกเสร็จต้องไล่ตามเป็นเส้นตรงตัดมุม
 export const RISE_SECONDS = 2.4;
+/**
+ * ยืนจ่ายเงินที่เคาน์เตอร์บนจอเท่านี้ (วินาทีจริง) — ที่เวลาเร่ง การจำลองจ่ายเงินเสร็จในเสี้ยววินาที
+ * ภาพจึงเดินผ่านเคาน์เตอร์ออกประตูไปเลยโดยไม่เห็นขั้นจ่ายเงิน
+ */
+export const PAY_SECONDS = 1.5;
 const SEATED = AGENT_STATE_CODE.seated;
+const ORDERING = AGENT_STATE_CODE.ordering;
 
 const LEAVING = AGENT_STATE_CODE.leaving;
 const WAITING = AGENT_STATE_CODE["waiting-entrance"];
@@ -69,6 +75,17 @@ interface Walker {
   walkState: number;
   /** จุดที่ยังต้องเดินไป (x, y ต่อจุด) */
   queue: number[];
+  /**
+   * รหัสสถานะที่แสดงระหว่างเดินไปแต่ละจุดในคิว (1 ค่าต่อจุด) — จำไว้ตอนต่อคิว ภาพจึงบอกขั้นที่ตัวละครอยู่จริง
+   * เช่นยังเดินไปจ่ายเงินที่เคาน์เตอร์ = to-counter แม้การจำลองจะให้ออกจากร้านไปแล้ว
+   */
+  tags: number[];
+  /** ถึงจุดนี้แล้วยืนนิ่งกี่วินาทีจริง (1 ค่าต่อจุด, 0 = เดินผ่าน) */
+  waits: number[];
+  /** วินาทีจริงที่ยังต้องยืนที่จุดนี้ (จ่ายเงินที่เคาน์เตอร์) */
+  pause: number;
+  /** เคยนั่งที่โต๊ะแล้ว (ordering หลังจากนี้ = ยืนจ่ายเงิน) */
+  dined: boolean;
   /** ออกจากร้านในการจำลองแล้ว */
   gone: boolean;
   /** ยังอยู่นอกร้าน (ยังไม่ได้เดินผ่านประตูเข้ามา) */
@@ -150,9 +167,31 @@ export class WalkPacer {
         distance += Math.hypot(walker.queue[i]! - x, walker.queue[i + 1]! - y);
         x = walker.queue[i]!; y = walker.queue[i + 1]!;
       }
-      worst = Math.max(worst, distance / pace + walker.hold);
+      worst = Math.max(worst, distance / pace + walker.hold + walker.pause + walker.waits.reduce((sum, wait) => sum + wait, 0));
     }
     return worst;
+  }
+
+  /**
+   * ระยะ (ม.) ที่ภาพลูกค้าคนนี้ยังต้องเดินก่อนหยุด — 0 เมื่อยืนอยู่กับที่หรือกำลังลุกจากเก้าอี้
+   * ใช้ลดการเบี่ยงหลบคนอื่นลงให้ถึงจุดหมายตรงตำแหน่ง (crowd-avoidance)
+   */
+  remainingDistance(id: number, cap = Infinity): number {
+    const walker = this.walkers.get(id);
+    if (!walker || walker.hold > 0 || walker.pause > 0) return 0;
+    let distance = 0;
+    let x = walker.x, y = walker.y;
+    for (let i = 0; i < walker.queue.length && distance < cap; i += 2) {
+      distance += Math.hypot(walker.queue[i]! - x, walker.queue[i + 1]! - y);
+      x = walker.queue[i]!; y = walker.queue[i + 1]!;
+      if (walker.waits[i / 2]! > 0) break;
+    }
+    return Math.min(distance, cap);
+  }
+
+  /** ลูกค้าคนนี้กำลังเล่นท่าลุกจากเก้าอี้ (ยังไม่ออกเดิน) — พนักงานรอให้ลุกเดินพ้นโต๊ะก่อน (crowd-avoidance) */
+  isRising(id: number): boolean {
+    return (this.walkers.get(id)?.hold ?? 0) > 0;
   }
 
   /** ประตูทางเข้าของผังที่กำลังจำลอง — null = ไม่แสดงการเดินนอกร้าน */
@@ -195,6 +234,10 @@ export class WalkPacer {
           state,
           walkState: WALKING.has(state) ? state : AGENT_STATE_CODE["to-seat"],
           queue: [],
+          tags: [],
+          waits: [],
+          pause: 0,
+          dined: state === SEATED,
           gone: false,
           outside: start !== null || (this.door !== null && state === WAITING),
           hold: 0,
@@ -206,35 +249,54 @@ export class WalkPacer {
         // ยืนต่อแถวนอกร้าน — เดินตรงไปช่องของตัวเอง (นอกร้านไม่มีสิ่งกีดขวาง) และขยับตามแถว
         const spot = this.outsidePoint(QUEUE_FIRST + waiting.indexOf(id) * QUEUE_GAP);
         walker.queue.length = 0;
+        walker.tags.length = 0;
+        walker.waits.length = 0;
         walker.fixed = 0;
-        this.push(walker, spot.x, spot.y);
+        this.push(walker, spot.x, spot.y, walker.walkState);
       } else {
+        if (WALKING.has(state)) walker.walkState = state;
+        const tag = walker.walkState;
         if (walker.outside && this.door) {
           // เดินผ่านประตูเข้าร้าน แล้วต่อด้วยทางเดินจริงใน engine
           const doorstep = this.outsidePoint(DOORSTEP);
-          this.push(walker, doorstep.x, doorstep.y, true);
+          this.push(walker, doorstep.x, doorstep.y, tag, true);
           walker.outside = false;
         }
         // ลุกจากโต๊ะ: รอท่าลุกบนจอให้จบก่อนออกเดิน
         if (walker.state === SEATED && state !== SEATED && walker.queue.length === 0) this.beginRise(walker);
-        if (trail) for (let i = 0; i < trail.length; i += 2) this.push(walker, trail[i]!, trail[i + 1]!);
-        this.push(walker, agents[o + 1]!, agents[o + 2]!);
+        if (trail) for (let i = 0; i < trail.length; i += 2) this.push(walker, trail[i]!, trail[i + 1]!, tag);
+        this.push(walker, agents[o + 1]!, agents[o + 2]!, tag);
+        // เริ่มจ่ายเงินในการจำลอง แต่ภาพยังเดินไม่ถึงเคาน์เตอร์: ให้ยืนจ่ายที่จุดนั้นเมื่อไปถึง (ห้ามตัด/ขยับจุดนี้)
+        if (state === SEATED) walker.dined = true;
+        // เฉพาะคนที่นั่งกินแล้ว — โหมดสั่งที่เคาน์เตอร์ใช้รหัส ordering ตอนสั่งอาหารด้วย (ไม่ใช่ยืนจ่ายเงิน)
+        if (state === ORDERING && walker.state !== ORDERING && walker.dined) {
+          if (walker.queue.length > 0) {
+            walker.waits[walker.waits.length - 1] = PAY_SECONDS;
+            walker.fixed = walker.queue.length;
+          } else {
+            walker.pause = PAY_SECONDS; // ภาพอยู่ที่เคาน์เตอร์แล้ว: ยืนจ่ายตรงนี้เลย
+          }
+        }
       }
       walker.state = state;
-      if (WALKING.has(state)) walker.walkState = state;
     }
     for (const [id, walker] of this.walkers) {
       if (live.has(id) || walker.gone) continue;
       walker.gone = true;
       if (walker.state === SEATED && walker.queue.length === 0) this.beginRise(walker);
       const trail = trails.get(id);
-      if (trail) for (let i = 0; i < trail.length; i += 2) this.push(walker, trail[i]!, trail[i + 1]!);
+      if (trail) for (let i = 0; i < trail.length; i += 2) this.push(walker, trail[i]!, trail[i + 1]!, LEAVING);
       if (this.door && !walker.outside) {
         // เดินออกประตูไปจนพ้นร้านก่อนหายไป
         const doorstep = this.outsidePoint(DOORSTEP);
         const away = this.outsidePoint(OUTSIDE_DISTANCE, spread(id, 2) * this.door.width);
-        this.push(walker, doorstep.x, doorstep.y, true);
-        this.push(walker, away.x, away.y, true);
+        this.push(walker, doorstep.x, doorstep.y, LEAVING, true);
+        this.push(walker, away.x, away.y, LEAVING, true);
+      } else if (this.door) {
+        // เลิกรอคิวนอกร้าน: เดินออกจากแถวไปตามแนวหน้าร้านก่อนหายไป (เดิมหายวับจากแถวทันที)
+        const side = spread(id, 2) >= 0 ? 1 : -1;
+        const away = this.outsidePoint(OUTSIDE_DISTANCE, side * (this.door.width / 2 + OUTSIDE_DISTANCE));
+        this.push(walker, away.x, away.y, LEAVING, true);
       }
     }
     this.started = true;
@@ -258,21 +320,22 @@ export class WalkPacer {
   /**
    * ต่อจุดหมายท้ายคิว — ถ้ามีสิ่งกีดขวางของผัง จุดก่อนหน้า (ที่ไม่ใช่จุดตายตัว) ถูกตัดทิ้งเมื่อเดินตรงถึงจุดใหม่ได้
    * (ไม่หักมุมซิกแซกตามกริด) หรือถูกดันให้ห่างโต๊ะเมื่อยังต้องเลี้ยว
+   * @param tag รหัสสถานะที่แสดงระหว่างเดินไปจุดนี้
    * @param fixed จุดนี้ห้ามตัด/ขยับ (หน้าประตู นอกร้าน)
    */
-  private push(walker: Walker, x: number, y: number, fixed = false) {
+  private push(walker: Walker, x: number, y: number, tag: number, fixed = false) {
     if (this.router && this.refiner && !fixed && !walker.outside) {
       const n = walker.queue.length;
       const from = n > 0 ? { x: walker.queue[n - 2]!, y: walker.queue[n - 1]! } : { x: walker.x, y: walker.y };
       if (Math.hypot(x - from.x, y - from.y) > 0.5 && !this.refiner.segmentClear(from, { x, y })) {
         const route = this.router(from, { x, y });
-        for (const point of route.slice(1, -1)) this.pushPoint(walker, point.x, point.y, false);
+        for (const point of route.slice(1, -1)) this.pushPoint(walker, point.x, point.y, tag, false);
       }
     }
-    this.pushPoint(walker, x, y, fixed);
+    this.pushPoint(walker, x, y, tag, fixed);
   }
 
-  private pushPoint(walker: Walker, x: number, y: number, fixed: boolean) {
+  private pushPoint(walker: Walker, x: number, y: number, tag: number, fixed: boolean) {
     this.refine(walker, x, y);
     const n = walker.queue.length;
     const lastX = n > 0 ? walker.queue[n - 2]! : walker.x;
@@ -283,7 +346,7 @@ export class WalkPacer {
     }
     if (n >= 4) {
       const ax = walker.queue[n - 4]!, ay = walker.queue[n - 3]!;
-      if (n - 2 >= walker.fixed && Math.abs((lastX - ax) * (y - lastY) - (lastY - ay) * (x - lastX)) < 1e-7 && (lastX - ax) * (x - lastX) + (lastY - ay) * (y - lastY) >= 0) {
+      if (n - 2 >= walker.fixed && walker.tags[n / 2 - 1] === tag && Math.abs((lastX - ax) * (y - lastY) - (lastY - ay) * (x - lastX)) < 1e-7 && (lastX - ax) * (x - lastX) + (lastY - ay) * (y - lastY) >= 0) {
         walker.queue[n - 2] = x; walker.queue[n - 1] = y;
         if (fixed) walker.fixed = n;
         return;
@@ -291,6 +354,8 @@ export class WalkPacer {
     }
     if (n >= MAX_QUEUED_WALK_POINTS * 2) { this.overflow = true; return; }
     walker.queue.push(x, y);
+    walker.tags.push(tag);
+    walker.waits.push(0);
     if (fixed) walker.fixed = walker.queue.length;
   }
 
@@ -305,6 +370,8 @@ export class WalkPacer {
     if (Math.hypot(c.x - bx, c.y - by) <= 1e-4) return;
     if (refiner.segmentClear(a, c)) {
       walker.queue.length = n - 2;
+      walker.tags.length = n / 2 - 1;
+      walker.waits.length = n / 2 - 1;
       return;
     }
     const moved = refiner.nudge({ x: bx, y: by });
@@ -315,12 +382,14 @@ export class WalkPacer {
 
   private move(walker: Walker, dt: number, speed: number) {
     const { queue } = walker;
-    if (queue.length === 0) return;
-    if (walker.hold > 0 && Number.isFinite(dt) && dt > 0) {
-      const wait = Math.min(walker.hold, dt);
-      walker.hold -= wait;
-      dt -= wait;
+    if (Number.isFinite(dt) && dt > 0) {
+      for (const field of ["hold", "pause"] as const) {
+        const wait = Math.min(walker[field], dt);
+        walker[field] -= wait;
+        dt -= wait;
+      }
     }
+    if (queue.length === 0) return;
     let budget = Number.isFinite(speed) && Number.isFinite(dt) ? Math.max(0, speed) * Math.max(0, dt) : 0;
     let consumed = 0;
     while (consumed < queue.length && budget > 0) {
@@ -331,7 +400,12 @@ export class WalkPacer {
         walker.x = queue[consumed]!;
         walker.y = queue[consumed + 1]!;
         budget -= dist;
+        const wait = walker.waits[consumed / 2]!;
         consumed += 2;
+        if (wait > 0) {
+          walker.pause = Math.max(0, wait - (speed > 0 ? budget / speed : 0));
+          budget = 0;
+        }
       } else {
         walker.x += (dx / dist) * budget;
         walker.y += (dy / dist) * budget;
@@ -339,15 +413,18 @@ export class WalkPacer {
       }
     }
     queue.splice(0, consumed);
+    walker.tags.splice(0, consumed / 2);
+    walker.waits.splice(0, consumed / 2);
     walker.fixed = Math.max(0, walker.fixed - consumed);
   }
 
   private displayState(walker: Walker): number {
     // ยังอยู่ระหว่างท่าลุก: คงสถานะนั่งไว้ให้ภาพเล่นท่าลุกที่เก้าอี้ให้จบก่อน
     if (walker.hold > 0) return SEATED;
-    if (walker.gone) return LEAVING;
+    // ยืนจ่ายเงินที่เคาน์เตอร์
+    if (walker.pause > 0) return ORDERING;
     if (walker.queue.length === 0) return walker.state;
-    // ยังเดินไม่ถึง: แสดงท่าเดินแทนท่านั่ง/ยืนรอ
-    return WALKING.has(walker.state) ? walker.state : walker.walkState;
+    // ยังเดินไม่ถึง: แสดงท่าเดินของขั้นที่จุดนั้นเป็น (ไม่ใช่สถานะล่าสุดของการจำลองที่อาจล้ำหน้าไปแล้ว)
+    return walker.tags[0] ?? walker.walkState;
   }
 }

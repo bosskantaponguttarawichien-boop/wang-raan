@@ -9,6 +9,7 @@ import {
   resolveStaffAction,
   wipeReach,
 } from "./staff-action-controller";
+import { gaitProfile, staffGaitKey } from "../runtime/locomotion";
 
 /** The marker table published inside cafe-staff.glb (feat-109/111). */
 const MARKERS: StaffMarkerTable = {
@@ -74,9 +75,11 @@ describe("staff action priority", () => {
   it("scales the walk cycle to the drawn speed so the feet do not slide", () => {
     // 0.9 m per 0.95 s cycle ⇒ 0.947 m/s at timeScale 1.
     const fast = decide(staffMember({ activity: "walking" }), 100, { groundSpeed: 1.2 });
-    expect(fast.timeScale).toBeCloseTo((1.2 * 0.95) / 0.9, 6);
+    // × จังหวะก้าวประจำตัว (แต่ละคนก้าวถี่ต่างกันเล็กน้อย ไม่เดินเหมือนทหาร)
+    const cadence = gaitProfile(staffGaitKey(fast.staffId)).cadence;
+    expect(fast.timeScale).toBeCloseTo(((1.2 * 0.95) / 0.9) * cadence, 6);
     const slow = decide(staffMember({ activity: "walking" }), 100, { groundSpeed: 0.6 });
-    expect(slow.timeScale).toBeCloseTo((0.6 * 0.95) / 0.9, 6);
+    expect(slow.timeScale).toBeCloseTo(((0.6 * 0.95) / 0.9) * cadence, 6);
   });
 
   it("task interaction outranks carrying: put-down wins while meals are still held", () => {

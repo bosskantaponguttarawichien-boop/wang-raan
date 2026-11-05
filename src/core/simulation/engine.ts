@@ -19,7 +19,8 @@ import { footprint, objectCenter } from "../layout/geometry";
 import type { Chair, Point, Rect, StoreLayout, Table } from "../layout/types";
 import { computeFlowField, type FlowField } from "./flow-field";
 import { CELL_FREE, buildOccupancyGrid, type OccupancyGrid } from "./occupancy-grid";
-import { STAFF_STRIDE, STAFF_VISUAL_WALK_SPEED, StaffVisuals, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { STAFF_STRIDE, STAFF_VISUAL_WALK_SPEED, StaffVisuals, staffHomes, type StaffPlan, type StaffTaskKind } from "./staff-visual";
+import { cashierSpot, paySpots } from "../preview/staff-spots";
 import { buildPresentationSnapshot, foodKindFor, renderMemberId, taskMilestones, type PartyView, type TaskView } from "./presentation-snapshot";
 import type { FoodKind } from "./presentation-contract";
 import type { PresentationSnapshot } from "./presentation-contract";
@@ -236,6 +237,8 @@ interface Worker {
   task: StaffTask | null;
   /** เส้นทางเดินของงานปัจจุบัน (เฉพาะตอนเล่นภาพ) */
   plan: StaffPlan | null;
+  /** เวลาจำลองที่ว่างงานล่าสุด — งานใหม่ไปที่คนที่ว่างนานที่สุดก่อน (ผลัดกันทำ ไม่กองที่คนแรก) */
+  freeSince: number;
 }
 
 /** สถานะลูกค้าที่กำลังเดิน — ไม่มีใครเดินเลยถือเป็นช่วงเงียบ */
@@ -367,9 +370,26 @@ export function prepareStore(layout: StoreLayout): PreparedStore {
   const counters = layout.objects.filter((o) => o.type === "counter");
   const counterField = computeFlowField(grid, counters.flatMap((c) => touchingCells(grid, footprint(c))));
   const exitField = computeFlowField(grid, grid.entranceCells);
-  const paymentQueueCells = Array.from(grid.cells.keys())
-    .filter((cell) => grid.cells[cell] === CELL_FREE && Number.isFinite(counterField.distance[cell]!))
-    .sort((a, b) => counterField.distance[a]! - counterField.distance[b]!);
+  // คิวจ่ายเงินเริ่มที่หน้าจอ POS ที่พนักงานรับเงินจริง แล้วต่อแถวออกไปตามระยะเดิน (อ้อมสิ่งกีดขวาง/ปลายเคาน์เตอร์)
+  // ไม่มีจอ POS = ช่องที่ใกล้เคาน์เตอร์ที่สุด
+  // เคาน์เตอร์ชิดผนังไม่มีฝั่งพนักงาน แต่ลูกค้ายังต่อคิวหน้าจอ POS ได้
+  const pay = (cashierSpot(layout) ?? paySpots(layout)[0])?.customer ?? null;
+  const reachable = Array.from(grid.cells.keys())
+    .filter((cell) => grid.cells[cell] === CELL_FREE && Number.isFinite(counterField.distance[cell]!));
+  const center = (cell: number) => {
+    const col = cell % grid.cols;
+    return { x: (col + 0.5) * grid.cellSize, y: ((cell - col) / grid.cols + 0.5) * grid.cellSize };
+  };
+  const payStart = pay === null ? undefined : reachable.reduce<number | undefined>((best, cell) => {
+    if (best === undefined) return cell;
+    const c = center(cell), d = center(best);
+    return Math.hypot(c.x - pay.x, c.y - pay.y) < Math.hypot(d.x - pay.x, d.y - pay.y) ? cell : best;
+  }, undefined);
+  const payField = payStart === undefined ? null : computeFlowField(grid, [payStart]);
+  const byDistance = (a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0);
+  const paymentQueueCells = reachable.sort((a, b) =>
+    (payField ? byDistance(payField.distance[a]!, payField.distance[b]!) : 0) ||
+    byDistance(counterField.distance[a]!, counterField.distance[b]!));
 
   // เก้าอี้ที่ลูกค้าเดินไปถึงได้จากทางเข้าเท่านั้น
   const seatFields = new Map<string, FlowField>();
@@ -415,6 +435,8 @@ export class Simulation {
   private readonly seatRandom: () => number;
   private readonly counterField: FlowField;
   private readonly paymentQueueCells: readonly number[];
+  /** ระยะจากจุดยืนประจำของพนักงานแต่ละคนถึงจุดหลังจอ POS (ไม่มีจอ/จุดยืน = Infinity) */
+  private readonly payDistance: readonly number[];
   private readonly exitField: FlowField;
   private readonly seatFields: ReadonlyMap<string, FlowField>;
   private readonly chairs: readonly Chair[];
@@ -463,6 +485,13 @@ export class Simulation {
     this.heatmap = new Float32Array(this.grid.cells.length);
     this.counterField = prepared.counterField;
     this.paymentQueueCells = prepared.paymentQueueCells;
+    // คำนวณจากผังอย่างเดียว (ไม่ขึ้นกับว่าเล่นภาพหรือไม่) ผลจำลองจึงเท่ากันทั้งตอนวิเคราะห์และตอนดูภาพ
+    // จุดยืนประจำเดียวกับภาพพนักงาน (รวมช่องสำรองของพนักงานที่เกินจุดหลังเคาน์เตอร์)
+    const payStaff = cashierSpot(prepared.layout)?.staff ?? null;
+    const workers = Math.max(1, Math.floor(this.config.frontStaff));
+    const homes = payStaff ? staffHomes(prepared.layout, workers) : [];
+    this.payDistance = Array.from({ length: workers }, (_, index) =>
+      payStaff && homes[index] ? Math.hypot(homes[index].x - payStaff.x, homes[index].y - payStaff.y) : Number.POSITIVE_INFINITY);
     this.exitField = prepared.exitField;
     this.chairs = prepared.chairs;
     for (const chair of this.chairs) this.chairById.set(chair.id, chair);
@@ -475,7 +504,7 @@ export class Simulation {
     this.deliverWalk = prepared.deliverWalk;
     this.servingSlots = Math.max(1, prepared.counterCount * this.config.servingSlotsPerCounter);
 
-    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null, startedAt: 0, total: 0 }));
+    const team = (n: number): Worker[] => Array.from({ length: Math.max(1, Math.floor(n)) }, () => ({ remaining: 0, task: null, plan: null, startedAt: 0, total: 0, freeSince: 0 }));
     this.frontStaff = team(this.config.frontStaff);
     this.cooks = team(this.config.cooks);
 
@@ -1046,6 +1075,7 @@ export class Simulation {
       if (staff.task.agent?.cancelled) {
         staff.task = null;
         staff.plan = null;
+        staff.freeSince = this.metrics.time;
         continue;
       }
       this.frontBusySeconds += dt;
@@ -1060,6 +1090,7 @@ export class Simulation {
         this.finishTask(staff.task);
         staff.task = null;
         staff.plan = null;
+        staff.freeSince = this.metrics.time;
       }
     }
 
@@ -1077,12 +1108,23 @@ export class Simulation {
     this.staffTasks.sort((a, b) => this.taskPriority(a) - this.taskPriority(b) || a.createdAt - b.createdAt);
     for (let i = this.staffTasks.length - 1; i >= 0; i--) if (this.staffTasks[i]!.agent?.cancelled) this.staffTasks.splice(i, 1);
     const cashiers = Math.min(Math.max(0, Math.floor(this.config.cashiers ?? 0)), this.frontStaff.length - 1);
-    for (const [index, staff] of this.frontStaff.entries()) {
-      if (staff.task || this.isStaffOnBreak(index, this.frontStaff.length) || this.staffTasks.length === 0) continue;
-      const taskIndex = this.staffTasks.findIndex((task) => cashiers === 0 || (index < cashiers ? task.kind === "pay" : task.kind !== "pay"));
-      if (taskIndex < 0) continue;
+    // คนที่ว่างนานที่สุดรับงานก่อน (เท่ากันใช้ลำดับเดิม) — เดิมไล่จากคนแรกเสมอ งานจึงกองที่คนแรกแทบทั้งหมด
+    const eligible = (index: number, task: StaffTask) => cashiers === 0 || (index < cashiers ? task.kind === "pay" : task.kind !== "pay");
+    const free = [...this.frontStaff.keys()]
+      .filter((index) => !this.frontStaff[index]!.task && !this.isStaffOnBreak(index, this.frontStaff.length))
+      .sort((a, b) => this.frontStaff[a]!.freeSince - this.frontStaff[b]!.freeSince || a - b);
+    while (free.length > 0 && this.staffTasks.length > 0) {
+      const first = free[0]!;
+      const taskIndex = this.staffTasks.findIndex((task) => eligible(first, task));
+      if (taskIndex < 0) { free.shift(); continue; }
       const [task] = this.staffTasks.splice(taskIndex, 1);
       if (!task) continue;
+      // รับเงิน: ให้คนว่างที่ยืนใกล้จอ POS ที่สุดไปรับ (อีกคนยังว่างรอรับงานถัดไป)
+      const index = task.kind === "pay"
+        ? free.filter((candidate) => eligible(candidate, task)).sort((a, b) => this.payDistance[a]! - this.payDistance[b]! || 0)[0] ?? first
+        : first;
+      free.splice(free.indexOf(index), 1);
+      const staff = this.frontStaff[index]!;
       staff.task = task;
       staff.remaining = this.taskSeconds(task, index);
       staff.total = staff.remaining;
